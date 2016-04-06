@@ -1,0 +1,590 @@
+instance:
+  metadata:
+    type: metrics
+    help: "Information about the server instance."
+  uptime_seconds:
+    help: "The value of the uptime field corresponds to the number of seconds that the mongos or mongod process has been active."
+    type: counter
+  uptime_estimate_seconds:
+    help: "uptimeEstimate provides the uptime as calculated from MongoDB's internal course-grained time keeping system."
+    type: counter
+  local_time:
+    help: "The localTime value is the current time, according to the server, in UTC specified in an ISODate format."
+    type: counter
+
+asserts_total:
+  metadata:
+    type: counter_vec
+    labels:
+    - type
+    help: "The asserts document reports the number of asserts on the database. While assert errors are typically uncommon, if there are non-zero values for the asserts, you should check the log file for the mongod process for more information. In many cases these errors are trivial, but are worth investigating."
+  regular:
+    help: "The regular counter tracks the number of regular assertions raised since the server process started. Check the log file for more information about these messages."
+  warning:
+    help: "The warning counter tracks the number of warnings raised since the server process started. Check the log file for more information about these warnings."
+  msg:
+    help: "The msg counter tracks the number of message assertions raised since the server process started. Check the log file for more information about these messages."
+  user:
+    help: "The user counter reports the number of \"user asserts\" that have occurred since the last time the server process started. These are errors that user may generate, such as out of disk space or duplicate key. You can prevent these assertions by fixing a problem with your application or deployment. Check the MongoDB log for more information."
+  rollovers:
+    help: "The rollovers counter displays the number of times that the rollover counters have rolled over since the last time the server process started. The counters will rollover to zero after 230 assertions. Use this value to provide context to the other values in the asserts data structure."
+
+background_flushing:
+  metadata:
+    help: "mongod periodically flushes writes to disk. In the default configuration, this happens every 60 seconds. The backgroundFlushing data structure contains data regarding these operations. Consider these values if you have concerns about write performance and journaling"
+    type: metrics
+  flushes_total:
+    help: "flushes is a counter that collects the number of times the database has flushed all writes to disk. This value will grow as database runs for longer periods of time"
+    type: counter
+  total_milliseconds:
+    help: "The total_ms value provides the total number of milliseconds (ms) that the mongod processes have spent writing (i.e. flushing) data to disk. Because this is an absolute value, consider the value offlushes and average_ms to provide better context for this datum"
+    type: counter
+  average_milliseconds:
+    help: "The average_ms value describes the relationship between the number of flushes and the total amount of time that the database has spent writing data to disk. The larger flushes is, the more likely this value is likely to represent a \"normal,\" time; however, abnormal data can skew this value"
+    type: gauge
+  last_milliseconds:
+    help: "The value of the last_ms field is the amount of time, in milliseconds, that the last flush operation took to complete. Use this value to verify that the current performance of the server and is in line with the historical data provided by average_ms and total_ms"
+    type: gauge
+  last_finished_time:
+    help: "The last_finished field provides a timestamp of the last completed flush operation in the ISODateformat. If this value is more than a few minutes old relative to your server’s current time and accounting for differences in time zone, restarting the database may result in some data loss"
+    type: gauge
+
+connections:
+  metadata:
+    help: "The connections sub document data regarding the current status of incoming connections and availability of the database server. Use these values to assess the current load and capacity requirements of the server"
+    type: gauge_vec
+    labels:
+    - state
+  current:
+    help: "The value of current corresponds to the number of connections to the database server from clients. This number includes the current shell session. Consider the value of available to add more context to this datum"
+  available:
+    help: "available provides a count of the number of unused available incoming connections the database can provide. Consider this value in combination with the value of current to understand the connection load on the database, and the UNIX ulimit Settings document for more information about system thresholds on available connections"
+
+connections_metrics:
+  metadata:
+    help: "Total connections"
+    type: metrics
+  created_total:
+    help: "totalCreated provides a count of all incoming connections created to the server. This number includes connections that have since closed"
+    type: counter
+
+durability_commits:
+  metadata:
+    help: "Durability commits"
+    type: gauge_vec
+    labels:
+    - state
+  written:
+    help: "The commits provides the number of transactions written to the journal during the last journal group commit interval."
+  in_write_lock:
+    help: "The commitsInWriteLock provides a count of the commits that occurred while a write lock was held. Commits in a write lock indicate a MongoDB node under a heavy write load and call for further diagnosis"
+
+durability:
+  metadata:
+    help: "The dur (for “durability”) document contains data regarding the mongod‘s journaling-related operations and performance. mongod must be running with journaling for these data to appear in the output of \"serverStatus\". MongoDB reports the data in dur based on 3 second intervals of data, collected between 3 and 6 seconds in the past"
+    type: metrics
+  journaled_megabytes:
+    help: "The journaledMB provides the amount of data in megabytes (MB) written to journal during the last journal group commit interval"
+    type: gauge
+  write_to_data_files_megabytes:
+    help: "The writeToDataFilesMB provides the amount of data in megabytes (MB) written from journal to the data files during the last journal group commit interval"
+    type: gauge
+  compression:
+    help: "The compression represents the compression ratio of the data written to the journal:
+( journaled_size_of_data / uncompressed_size_of_data )"
+    type: gauge
+  early_commits:
+    help: "The earlyCommits value reflects the number of times MongoDB requested a commit before the scheduled journal group commit interval. Use this value to ensure that your journal group commit interval is not too long for your deployment"
+    type: summary
+
+durability_time_milliseconds:
+  metadata:
+    help: "Summary of times spent during the journaling process."
+    labels:
+    - stage
+    type: summary_vec
+  dt:
+    help: "The dt value provides, in milliseconds, the amount of time over which MongoDB collected the timeMSdata. Use this field to provide context to the other timeMS field values"
+    type: summary
+  prep_log_buffer:
+    help: "The prepLogBuffer value provides, in milliseconds, the amount of time spent preparing to write to the journal. Smaller values indicate better journal performance"
+    type: summary
+  write_to_journal:
+    help: "The writeToJournal value provides, in milliseconds, the amount of time spent actually writing to the journal. File system speeds and device interfaces can affect performance"
+    type: summary
+  write_to_data_files:
+    help: "The writeToDataFiles value provides, in milliseconds, the amount of time spent writing to data files after journaling. File system speeds and device interfaces can affect performance"
+    type: summary
+  remap_private_view:
+    help: "The remapPrivateView value provides, in milliseconds, the amount of time spent remapping copy-on-write memory mapped views. Smaller values indicate better journal performance"
+    type: summary
+
+extra_info:
+  metadata:
+    help: "The extra_info data structure holds data collected by the mongod instance about the underlying system. Your system may only report a subset of these fields"
+    type: metrics
+  page_faults_total:
+    help: "The page_faults Reports the total number of page faults that require disk operations. Page faults refer to operations that require the database server to access data which isn’t available in active memory. The page_faults counter may increase dramatically during moments of poor performance and may correlate with limited memory environments and larger data sets. Limited and sporadic page faults do not necessarily indicate an issue"
+    type: gauge
+  heap_usage_bytes:
+    help: "The heap_usage_bytes field is only available on Unix/Linux systems, and reports the total size in bytes of heap space used by the database process"
+    type: gauge
+
+global_lock:
+  metadata:
+    help: "The globalLock data structure contains information regarding the database’s current lock state, historical lock status, current operation queue, and the number of active clients"
+    type: metrics
+  ratio:
+    help: "The value of ratio displays the relationship between lockTime and totalTime. Low values indicate that operations have held the globalLock frequently for shorter periods of time. High values indicate that operations have held globalLock infrequently for longer periods of time"
+    type: gauge
+  total:
+    help: "The value of totalTime represents the time, in microseconds, since the database last started and creation of the globalLock. This is roughly equivalent to total server uptime"
+    type: counter
+  lock_total:
+    help: "The value of lockTime represents the time, in microseconds, since the database last started, that the globalLock has been held"
+    type: counter
+
+
+global_lock_current_queue:
+  metadata:
+    help: "The currentQueue data structure value provides more granular information concerning the number of operations queued because of a lock"
+    labels:
+    - type
+    type: gauge_vec
+  reader:
+    help: "The value of readers is the number of operations that are currently queued and waiting for the read lock. A consistently small read-queue, particularly of shorter operations should cause no concern"
+    type: gauge
+  writer:
+    help: "The value of writers is the number of operations that are currently queued and waiting for the write lock. A consistently small write-queue, particularly of shorter operations is no cause for concern"
+    type: gauge
+
+global_lock_client:
+  metadata:
+    help: "The activeClients data structure provides more granular information about the number of connected clients and the operation types (e.g. read or write) performed by these clients"
+    labels:
+    - type
+    type: gauge_vec
+  reader:
+    help: "The value of readers contains a count of the active client connections performing read operations"
+    type: gauge
+  writer:
+    help: "The value of writers contains a count of active client connections performing write operations"
+    type: gauge
+
+index_counters_total:
+  metadata:
+    help: "Total indexes by type"
+    labels:
+    - type
+    type: counter_vec
+  accesses:
+    help: "accesses reports the number of times that operations have accessed indexes. This value is the combination of the hits and misses. Higher values indicate that your database has indexes and that queries are taking advantage of these indexes. If this number does not grow over time, this might indicate that your indexes do not effectively support your use"
+    type: counter
+  hits:
+    help: "The hits value reflects the number of times that an index has been accessed and mongod is able to return the index from memory. A higher value indicates effective index use. hits values that represent a greater proportion of the accesses value, tend to indicate more effective index configuration"
+    type: counter
+  misses:
+    help: "The misses value represents the number of times that an operation attempted to access an index that was not in memory. These \"misses,\" do not indicate a failed query or operation, but rather an inefficient use of the index. Lower values in this field indicate better index use and likely overall performance as well"
+    type: counter
+  resets:
+    help: "The resets value reflects the number of times that the index counters have been reset since the database last restarted. Typically this value is 0, but use this value to provide context for the data specified by other indexCounters values"
+    type: counter
+
+index_counters:
+  metadata:
+    help: "The indexCounters data structure reports information regarding the state and use of indexes in MongoDB"
+    type: metrics
+  miss_ratio:
+    help: "The missRatio value is the ratio of hits to misses. This value is typically 0 or approaching 0"
+    type: gauge
+
+locks_time_locked_global_microseconds_total:
+  metadata:
+    help: "amount of time in microseconds that any database has held the global lock"
+    labels:
+    - type
+    - database
+    type: counter_vec
+  read:
+    help: "The R field reports the amount of time in microseconds that any database has held the global read lock"
+    type: counter
+  write:
+    help: "The W field reports the amount of time in microseconds that any database has held the global write lock"
+    type: counter
+
+locks_time_locked_local_microseconds_total:
+  metadata:
+    help: "amount of time in microseconds that any database has held the local lock"
+    labels:
+    - type
+    - database
+    type: counter_vec
+  read:
+    help: "The r field reports the amount of time in microseconds that any database has held the local read lock"
+    type: counter
+  write:
+    help: "The w field reports the amount of time in microseconds that any database has held the local write lock"
+    type: counter
+
+locks_time_acquiring_global_microseconds_total:
+  metadata:
+    help: "amount of time in microseconds that any database has spent waiting for the global lock"
+    labels:
+    - type
+    - database
+    type: counter_vec
+  write:
+    help: "The W field reports the amount of time in microseconds that any database has spent waiting for the global write lock"
+    type: counter
+  read:
+    help: "The R field reports the amount of time in microseconds that any database has spent waiting for the global read lock"
+    type: counter
+
+cursors:
+  metadata:
+    help: "The cursors data structure contains data regarding cursor state and use"
+    labels:
+    - state
+    type: gauge_vec
+  open:
+    help: "totalOpen provides the number of cursors that MongoDB is maintaining for clients. Because MongoDB exhausts unused cursors, typically this value small or zero. However, if there is a queue, stale tailable cursor, or a large number of operations, this value may rise."
+    type: gauge
+  no_timeout:
+    help: "totalNoTimeout provides the number of open cursors with the option DBQuery.Option.noTimeout set to prevent timeout after a period of inactivity."
+    type: gauge
+  pinned:
+    help: "serverStatus.cursors.pinned provides the number of \"pinned\" open cursors."
+    type: gauge
+
+cursors_metrics:
+  metadata:
+    help: "The cursors data structure contains data regarding cursor state and use"
+    type: metrics
+  timed_out_total:
+    help: "timedOut provides a counter of the total number of cursors that have timed out since the server process started. If this number is large or growing at a regular rate, this may indicate an application error."
+    type: counter
+
+network_bytes_total:
+  metadata:
+    help: "The network data structure contains data regarding MongoDB’s network use"
+    labels:
+    - state
+    type: counter_vec
+  in_bytes:
+    help: "The value of the bytesIn field reflects the amount of network traffic, in bytes, received by this database. Use this value to ensure that network traffic sent to the mongod process is consistent with expectations and overall inter-application traffic"
+    type: counter
+  out_bytes:
+    help: "The value of the bytesOut field reflects the amount of network traffic, in bytes, sent from this database. Use this value to ensure that network traffic sent by the mongod process is consistent with expectations and overall inter-application traffic"
+    type: counter
+
+network_metrics:
+  metadata:
+    help: "The network data structure contains data regarding MongoDB’s network use"
+    type: metrics
+  num_requests_total:
+    help: "The numRequests field is a counter of the total number of distinct requests that the server has received. Use this value to provide context for the bytesIn and bytesOut values to ensure that MongoDB’s network utilization is consistent with expectations and application use"
+    type: counter
+
+op_counters_total:
+  metadata:
+    help: "The opcounters data structure provides an overview of database operations by type and makes it possible to analyze the load on the database in more granular manner. These numbers will grow over time and in response to database use. Analyze these values over time to track database utilization"
+    labels:
+    - type
+    type: counter_vec
+  insert:
+    help: "insert provides a counter of the total number of insert operations received since the mongod instance last started."
+    type: counter
+  query:
+    help: "query provides a counter of the total number of queries received since the mongod instance last started"
+    type: counter
+  update:
+    help: "update provides a counter of the total number of update operations recieved since the mongod instance last started"
+    type: counter
+  delete:
+    help: "delete provides a counter of the total number of delete operations since the mongod instance last started"
+    type: counter
+  getmore:
+    help: "getmore provides a counter of the total number of \"getmore\" operations since the mongod instance last started. This counter can be high even if the query count is low. Secondary nodes send getMore operations as part of the replication process"
+    type: counter
+  command:
+    help: "command provides a counter of the total number of commands issued to the database since the mongod instance last started."
+    type: counter
+
+op_counters_repl_total:
+  metadata:
+    help: "The opcountersRepl data structure, similar to the opcounters data structure, provides an overview of database replication operations by type and makes it possible to analyze the load on the replica in more granular manner. These values only appear when the current host has replication enabled"
+    labels:
+    - type
+    type: counter_vec
+  insert:
+    help: "insert provides a counter of the total number of replicated insert operations since the mongod instance last started"
+    type: counter
+  query:
+    help: "query provides a counter of the total number of replicated queries since the mongod instance last started"
+    type: counter
+  update:
+    help: "update provides a counter of the total number of replicated update operations since the mongod instance last started"
+    type: counter
+  delete:
+    help: "delete provides a counter of the total number of replicated delete operations since the mongod instance last started"
+    type: counter
+  getmore:
+    help: "getmore provides a counter of the total number of \"getmore\" operations since the mongod instance last started. This counter can be high even if the query count is low. Secondary nodes send getMore operations as part of the replication process"
+    type: counter
+  command:
+    help: "command provides a counter of the total number of replicated commands issued to the database since the mongod instance last started"
+    type: counter
+
+memory:
+  metadata:
+    help: "The mem data structure holds information regarding the target system architecture of mongod and current memory use"
+    labels:
+    - type
+    type: gauge_vec
+  resident:
+    help: "The value of resident is roughly equivalent to the amount of RAM, in megabytes (MB), currently used by the database process. In normal use this value tends to grow. In dedicated database servers this number tends to approach the total amount of system memory"
+    type: gauge
+  virtual:
+    help: "virtual displays the quantity, in megabytes (MB), of virtual memory used by the mongod process. With journaling enabled, the value of virtual is at least twice the value of mapped. If virtual value is significantly larger than mapped (e.g. 3 or more times), this may indicate a memory leak"
+    type: gauge
+  mapped:
+    help: "The value of mapped provides the amount of mapped memory, in megabytes (MB), by the database. Because MongoDB uses memory-mapped files, this value is likely to be to be roughly equivalent to the total size of your database or databases"
+    type: gauge
+  mapped_with_journal:
+    help: "mappedWithJournal provides the amount of mapped memory, in megabytes (MB), including the memory used for journaling. This value will always be twice the value of mapped. This field is only included if journaling is enabled"
+    type: gauge
+
+metrics_cursor:
+  metadata:
+    help: "The cursor is a document that contains data regarding cursor state and use"
+    type: metrics
+  timed_out_total:
+    help: "timedOut provides the total number of cursors that have timed out since the server process started. If this number is large or growing at a regular rate, this may indicate an application error"
+    type: counter
+
+metrics_cursor_open:
+  metadata:
+    help: "The open is an embedded document that contains data regarding open cursors"
+    labels:
+    - state
+    type: gauge_vec
+  no_timeout:
+    help: "noTimeout provides the number of open cursors with the option DBQuery.Option.noTimeout set to prevent timeout after a period of inactivity"
+    type: gauge
+
+  pinned:
+    help: "serverStatus.metrics.cursor.open.pinned provides the number of \"pinned\" open cursors"
+    type: gauge
+
+  total:
+    help: "total provides the number of cursors that MongoDB is maintaining for clients. Because MongoDB exhausts unused cursors, typically this value small or zero. However, if there is a queue, stale tailable cursors, or a large number of operations this value may rise"
+    type: gauge
+
+metrics_document_total:
+  metadata:
+    help: "The document holds a document of that reflect document access and modification patterns and data use. Compare these values to the data in the opcounters document, which track total number of operations"
+    labels:
+    - state
+    type: counter_vec
+  deleted:
+    help: "deleted reports the total number of documents deleted"
+    type: counter
+
+  inserted:
+    help: "inserted reports the total number of documents inserted"
+    type: counter
+
+  returned:
+    help: "returned reports the total number of documents returned by queries"
+    type: counter
+
+  updated:
+    help: "updated reports the total number of documents updated"
+    type: counter
+
+metrics_get_last_error_wtime:
+  metadata:
+    help: "wtime is a sub-document that reports getLastError operation counts with a w argument greater than 1"
+    type: metrics
+  num_total:
+    help: "num reports the total number of getLastError operations with a specified write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)"
+    type: gauge
+
+  total_milliseconds:
+    help: "total_millis reports the total amount of time in milliseconds that the mongod has spent performing getLastError operations with write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)"
+    type: counter
+
+metrics_get_last_error:
+  metadata:
+    help: "getLastError is a document that reports on getLastError use"
+    type: metrics
+  wtimeouts_total:
+    help: "wtimeouts reports the number of times that write concern operations have timed out as a result of the wtimeout threshold to getLastError."
+    type: counter
+
+metrics_operation_total:
+  metadata:
+    help: "operation is a sub-document that holds counters for several types of update and query operations that MongoDB handles using special operation types"
+    labels:
+    - type
+    type: counter_vec
+  fastmod:
+    help: "fastmod reports the number of update operations that neither cause documents to grow nor require updates to the index. For example, this counter would record an update operation that use the $inc operator to increment the value of a field that is not indexed"
+    type: counter
+
+  idhack:
+    help: "idhack reports the number of queries that contain the _id field. For these queries, MongoDB will use default index on the _id field and skip all query plan analysis"
+    type: counter
+
+  scan_and_order:
+    help: "scanAndOrder reports the total number of queries that return sorted numbers that cannot perform the sort operation using an index"
+    type: counter
+
+metrics_query_executor_total:
+  metadata:
+    help: "queryExecutor is a document that reports data from the query execution system"
+    labels:
+    - state
+    type: counter_vec
+  scanned:
+    help: "scanned reports the total number of index items scanned during queries and query-plan evaluation. This counter is the same as nscanned in the output of explain()."
+    type: counter
+
+  scanned_objects:
+    help: "record is a document that reports data related to record allocation in the on-disk memory files"
+    type: counter
+
+metrics_record:
+  metadata:
+    help: "record is a document that reports data related to record allocation in the on-disk memory files"
+    type: metrics
+  moves_total:
+    help: "moves reports the total number of times documents move within the on-disk representation of the MongoDB data set. Documents move as a result of operations that increase the size of the document beyond their allocated record size"
+    type: counter
+
+metrics_repl_apply_batches:
+  metadata:
+    help: "batches reports on the oplog application process on secondaries members of replica sets. See Multithreaded Replication for more information on the oplog application processes"
+    type: metrics
+  num_total:
+    help: "num reports the total number of batches applied across all databases"
+    type: counter
+  total_milliseconds:
+    help: "total_millis reports the total amount of time the mongod has spent applying operations from the oplog"
+    type: counter
+
+metrics_repl_apply:
+  metadata:
+    help: "apply holds a sub-document that reports on the application of operations from the replication oplog"
+    type: metrics
+  ops_total:
+    help: "ops reports the total number of oplog operations applied"
+    type: counter
+
+metrics_repl_buffer:
+  metadata:
+    help: "MongoDB buffers oplog operations from the replication sync source buffer before applying oplog entries in a batch. buffer provides a way to track the oplog buffer. See Multithreaded Replication for more information on the oplog application process"
+    type: metrics
+  count:
+    help: "count reports the current number of operations in the oplog buffer"
+    type: gauge
+  max_size_bytes:
+    help: "maxSizeBytes reports the maximum size of the buffer. This value is a constant setting in the mongod, and is not configurable"
+    type: counter
+  size_bytes:
+    help: "sizeBytes reports the current size of the contents of the oplog buffer"
+    type: gauge
+
+metrics_repl_network_getmores:
+  metadata:
+    help: "getmores reports on the getmore operations, which are requests for additional results from the oplog cursor as part of the oplog replication process"
+    type: metrics
+  num_total:
+    help: "num reports the total number of getmore operations, which are operations that request an additional set of operations from the replication sync source."
+    type: counter
+  total_milliseconds:
+    help: "total_millis reports the total amount of time required to collect data from getmore operations"
+    type: counter
+
+metrics_repl_network:
+  metadata:
+    help: "network reports network use by the replication process"
+    type: metrics
+  bytes_total:
+    help: "bytes reports the total amount of data read from the replication sync source"
+    type: counter
+  ops_total:
+    help: "ops reports the total number of operations read from the replication source."
+    type: counter
+  readers_created_total:
+    help: "readersCreated reports the total number of oplog query processes created. MongoDB will create a new oplog query any time an error occurs in the connection, including a timeout, or a network operation. Furthermore, readersCreated will increment every time MongoDB selects a new source fore replication."
+    type: counter
+
+metrics_repl_oplog_insert:
+  metadata:
+    help: "insert is a document that reports insert operations into the oplog"
+    type: metrics
+  num_total:
+    help: "num reports the total number of items inserted into the oplog."
+    type: counter
+  total_milliseconds:
+    help: "total_millis reports the total amount of time spent for the mongod to insert data into the oplog."
+    type: counter
+
+metrics_repl_oplog:
+  metadata:
+    help: "oplog is a document that reports on the size and use of the oplog by this mongod instance"
+    type: metrics
+  insert_bytes_total:
+    help: "insertBytes the total size of documents inserted into the oplog."
+    type: counter
+
+metrics_repl_preload_docs:
+  metadata:
+    help: "docs is a sub-document that reports on the documents loaded into memory during the pre-fetch stage"
+    type: metrics
+  num_total:
+    help: "num reports the total number of documents loaded during the pre-fetch stage of replication"
+    type: counter
+  total_milliseconds:
+    help: "total_millis reports the total amount of time spent loading documents as part of the pre-fetch stage of replication"
+    type: counter
+
+metrics_repl_preload_indexes:
+  metadata:
+    help: "indexes is a sub-document that reports on the index items loaded into memory during the pre-fetch stage of replication"
+    type: metrics
+  num_total:
+    help: "num reports the total number of index entries loaded by members before updating documents as part of the pre-fetch stage of replication"
+    type: counter
+  total_milliseconds:
+    help: "total_millis reports the total amount of time spent loading index entries as part of the pre-fetch stage of replication"
+    type: counter
+
+metrics_storage_freelist_search_total:
+  metadata:
+    help: "metrics about searching records in the database."
+    labels:
+    - type
+    type: counter_vec
+  bucket_exhausted:
+    help: "bucketExhausted reports the number of times that mongod has checked the free list without finding a suitably large record allocation"
+    type: counter
+  requests:
+    help: "requests reports the number of times mongod has searched for available record allocations"
+    type: counter
+  scanned:
+    help: "scanned reports the number of available record allocations mongod has searched"
+    type: counter
+
+metrics_ttl:
+  metadata:
+    help: "ttl is a sub-document that reports on the operation of the resource use of the ttl index process"
+    type: metrics
+  deleted_documents_total:
+    help: "deletedDocuments reports the total number of documents deleted from collections with a ttl index."
+    type: counter
+  passes_total:
+    help: "passes reports the number of times the background process removes documents from collections with a ttl index"
+    type: counter
+
