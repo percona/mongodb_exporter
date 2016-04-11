@@ -40,6 +40,7 @@ func (status *ShardingChangelogStats) Export(ch chan<- prometheus.Metric) {
 	shardingChangelogInfo.WithLabelValues("moveChunk.from_failed").Set(0)
 	shardingChangelogInfo.WithLabelValues("moveChunk.commit").Set(0)
 	shardingChangelogInfo.WithLabelValues("addShard").Set(0)
+	shardingChangelogInfo.WithLabelValues("removeShard.start").Set(0)
 	shardingChangelogInfo.WithLabelValues("shardCollection").Set(0)
 	shardingChangelogInfo.WithLabelValues("shardCollection.start").Set(0)
 	shardingChangelogInfo.WithLabelValues("split").Set(0)
