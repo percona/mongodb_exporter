@@ -230,7 +230,7 @@ func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
 	mongosBalancerLockTimestamp.Describe(ch)
 }
 
-func GetBalancerStatus(session *mgo.Session) *ShardingStats {
+func GetShardingStatus(session *mgo.Session) *ShardingStats {
 	results := &ShardingStats{}
 
 	results.IsBalanced = IsClusterBalanced(session)

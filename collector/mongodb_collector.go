@@ -82,10 +82,10 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 		serverStatus.Export(ch)
 	}
 
-	glog.Info("Collecting Mongos Balancer Status")
-	balancerStatus := collector_mongos.GetBalancerStatus(session)
-	if balancerStatus != nil {
-		balancerStatus.Export(ch)
+	glog.Info("Collecting Sharding Status")
+	shardingStatus := collector_mongos.GetShardingStatus(session)
+	if shardingStatus != nil {
+		shardingStatus.Export(ch)
 	}
 }
 
