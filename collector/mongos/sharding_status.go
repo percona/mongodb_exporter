@@ -52,12 +52,12 @@ var (
 			Name:		"mongos_last_ping_timestamp",
 			Help:		"The unix timestamp of the last Mongos ping to the Cluster config servers",
 	}, []string{"name","version"})
-	mongosBalancerLockTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
+	mongosBalancerLockTimestamp = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace:      Namespace,
 			Subsystem:      "sharding",
 			Name:		"balancer_lock_timestamp",
 			Help:		"The unix timestamp of the last update to the Cluster balancer lock",
-	})
+	}, []string{"name"})
 	mongosBalancerLockState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace:      Namespace,
 			Subsystem:      "sharding",
@@ -185,9 +185,9 @@ func (status *ShardingStats) Export(ch chan<- prometheus.Metric) {
 		mongosClusterMinCompatVersion.Set(status.Version.MinCompatVersion)
 	}
 	if status.Mongos != nil && status.BalancerLock != nil {
-		mongosBalancerLockTimestamp.Set(float64(status.BalancerLock.When.Unix()))
 		mongosBalancerLockWho := strings.Split(status.BalancerLock.Who, ":")
 		mongosBalancerLockHostPort := mongosBalancerLockWho[0] + ":" + mongosBalancerLockWho[1]
+		mongosBalancerLockTimestamp.WithLabelValues(mongosBalancerLockHostPort).Set(float64(status.BalancerLock.When.Unix()))
 		for _, mongos := range *status.Mongos {
 			labels := prometheus.Labels{"name": mongos.Name, "version": mongos.MongoVersion }
 			mongosUpSecs.With(labels).Set(mongos.Up)
