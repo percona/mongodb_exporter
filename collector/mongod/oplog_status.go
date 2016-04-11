@@ -1,102 +1,116 @@
 package collector_mongod
 
 import (
-    "time"
-    "github.com/golang/glog"
-    "github.com/prometheus/client_golang/prometheus"
-    "gopkg.in/mgo.v2"
-    "gopkg.in/mgo.v2/bson"
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 var (
-    oplogStatusLengthSec = prometheus.NewGauge(prometheus.GaugeOpts{
-            Namespace: Namespace,
-            Subsystem: "oplog",
-            Name:      "length_sec",
-            Help:      "Length of oplog in seconds from head to tail",
-    })
-    oplogStatusLengthSecNow = prometheus.NewGauge(prometheus.GaugeOpts{
-            Namespace: Namespace,
-            Subsystem: "oplog",
-            Name:      "length_sec_now",
-            Help:      "Length of oplog in seconds from now to tail",
-    })
-    oplogStatusSizeMB = prometheus.NewGauge(prometheus.GaugeOpts{
-            Namespace: Namespace,
-            Subsystem: "oplog",
-            Name:      "size_mb",
-            Help:      "Size of oplog in megabytes",
-    })
+	oplogStatusCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace:	Namespace,
+		Subsystem:	"replset_oplog",
+		Name:		"current_items",
+		Help:		"The current number of items in the oplog",
+	})
+	oplogStatusHeadTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace:	Namespace,
+		Subsystem:	"replset_oplog",
+		Name:		"head_timestamp",
+		Help:		"The unix timestamp of the newest change in the oplog",
+	})
+	oplogStatusTailTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace:	Namespace,
+		Subsystem:	"replset_oplog",
+		Name:		"tail_timestamp",
+		Help:		"The unix timestamp of the oldest change in the oplog",
+	})
+	oplogStatusSizeBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace:	Namespace,
+		Subsystem:	"replset_oplog",
+		Name:		"size_bytes",
+		Help:		"Size of oplog in bytes",
+	}, []string{"type"})
 )
 
-func GetCollectionSizeMB(db string, collection string, session *mgo.Session) (float64) {
-    var collStats map[string]interface{}
-    err := session.DB(db).Run(bson.D{{"collStats", collection }}, &collStats)
-    if err != nil {
-        glog.Error("Error getting collection stats!")
-    }
-
-    var result float64 = -1
-    if collStats["size"] != nil {
-        size := collStats["size"].(int)
-        result = float64(size)/1024/1024
-    }
-
-    return result
+type OplogCollectionStats struct {
+	Count		float64	`bson:"count"`
+	Size		float64	`bson:"size"`
+	StorageSize	float64 `bson:"storageSize"`
 }
 
-func GetOplogSizeMB(session *mgo.Session) (float64) {
-    return GetCollectionSizeMB("local", "oplog.rs", session)
+type OplogTimestamps struct {
+	Tail	float64
+	Head	float64
 }
 
-func ParseBsonMongoTsToUnix(timestamp bson.MongoTimestamp) (int64) {
-    return int64(timestamp >> 32)
+type OplogStatus struct {
+	OplogTimestamps	*OplogTimestamps
+	CollectionStats	*OplogCollectionStats
 }
 
-type OplogStatsData struct {
-    MinTime	bson.MongoTimestamp	`bson:"min"`
-    MaxTime	bson.MongoTimestamp	`bson:"max"`
+// there's gotta be a better way to do this, but it works for now :/
+func BsonMongoTimestampToUnix(timestamp bson.MongoTimestamp) float64 {
+	return float64(timestamp >> 32)
 }
 
-func GetOplogLengthSecs(session *mgo.Session) (float64, float64) {
-    results := &OplogStatsData{}
-    group := bson.M{ "_id" : 1, "min" : bson.M{ "$min" : "$ts" }, "max" : bson.M{ "$max" : "$ts" } }
-    err := session.DB("local").C("oplog.rs").Pipe([]bson.M{{ "$group" : group  }}).One(&results)
-    if err != nil {
-        glog.Error("Could not get the oplog time min/max!")
-        return -1, -1
-    }
+func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
+	oplogTimestamps := &OplogTimestamps{}
+	result := struct {
+		TailTimestamp	bson.MongoTimestamp	`bson:"tail"`
+		HeadTimestamp	bson.MongoTimestamp	`bson:"head"`
+	}{}
+	group := bson.M{ "_id" : 1, "tail" : bson.M{ "$min" : "$ts" }, "head" : bson.M{ "$max" : "$ts" } }
+	err := session.DB("local").C("oplog.rs").Pipe([]bson.M{{ "$group" : group  }}).One(&result)
+	if err != nil {
+		return oplogTimestamps, err
+	}
 
-    minTime := ParseBsonMongoTsToUnix(results.MinTime)
-    maxTime := ParseBsonMongoTsToUnix(results.MaxTime)
-
-    now := time.Now().Unix()
-    lengthSeconds := maxTime - minTime
-    lengthSecondsNow := now - minTime
-
-    return float64(lengthSeconds), float64(lengthSecondsNow)
+	oplogTimestamps.Tail = BsonMongoTimestampToUnix(result.TailTimestamp)
+	oplogTimestamps.Head = BsonMongoTimestampToUnix(result.HeadTimestamp)
+	return oplogTimestamps, err
 }
 
-type OplogStats struct {
-    LengthSec		float64
-    LengthSecNow	float64
-    SizeMB		float64
+func GetOplogCollectionStats(session *mgo.Session) (*OplogCollectionStats, error) {
+	results := &OplogCollectionStats{}
+	err := session.DB("local").Run(bson.M{ "collStats" : "oplog.rs" }, &results)
+	return results, err
 }
 
-func (status *OplogStats) Export(ch chan<- prometheus.Metric) {
-    oplogStatusLengthSec.Set(status.LengthSec)
-    oplogStatusLengthSecNow.Set(status.LengthSecNow)
-    oplogStatusSizeMB.Set(status.SizeMB)
-    oplogStatusLengthSec.Collect(ch)
-    oplogStatusLengthSecNow.Collect(ch)
-    oplogStatusSizeMB.Collect(ch)
+func (status *OplogStatus) Export(ch chan<- prometheus.Metric) {
+	oplogStatusSizeBytes.WithLabelValues("current").Set(0)
+	oplogStatusSizeBytes.WithLabelValues("storage").Set(0)
+	if status.CollectionStats != nil {
+		oplogStatusCount.Set(status.CollectionStats.Count)
+		oplogStatusSizeBytes.WithLabelValues("current").Set(status.CollectionStats.Size)
+		oplogStatusSizeBytes.WithLabelValues("storage").Set(status.CollectionStats.StorageSize)
+	}
+	if status.OplogTimestamps != nil {
+		oplogStatusHeadTimestamp.Set(status.OplogTimestamps.Head)
+		oplogStatusTailTimestamp.Set(status.OplogTimestamps.Tail)
+	}
+
+	oplogStatusCount.Collect(ch)
+	oplogStatusHeadTimestamp.Collect(ch)
+	oplogStatusTailTimestamp.Collect(ch)
+	oplogStatusSizeBytes.Collect(ch)
 }
 
-func GetOplogStatus(session *mgo.Session) *OplogStats {
-    results := &OplogStats{}
+func (status *OplogStatus) Describe(ch chan<- *prometheus.Desc) {
+	oplogStatusCount.Describe(ch)
+	oplogStatusHeadTimestamp.Describe(ch)
+	oplogStatusTailTimestamp.Describe(ch)
+	oplogStatusSizeBytes.Describe(ch)
+}
 
-    results.LengthSec, results.LengthSecNow = GetOplogLengthSecs(session)
-    results.SizeMB = GetOplogSizeMB(session)
+func GetOplogStatus(session *mgo.Session) *OplogStatus {
+	collectionStats, err := GetOplogCollectionStats(session)
+	oplogTimestamps, err := GetOplogTimestamps(session)
+	if err != nil {
+		glog.Error("Failed to get oplog status.")
+		return nil
+	}
 
-    return results
+	return &OplogStatus{CollectionStats:collectionStats,OplogTimestamps:oplogTimestamps}
 }
