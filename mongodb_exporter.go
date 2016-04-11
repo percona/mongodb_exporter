@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/dcu/mongodb_exporter/collector"
-	"github.com/dcu/mongodb_exporter/shared"
+	"github.com/Percona-Lab/prometheus_mongodb_exporter/collector"
+	"github.com/Percona-Lab/prometheus_mongodb_exporter/shared"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
