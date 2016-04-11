@@ -101,15 +101,15 @@ func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch 
 	exporter.collectMongod(session, ch)
 
 	glog.Info("Collecting Replset Status")
-	oplogStatus := collector_mongod.GetOplogStatus(session)
-	if oplogStatus != nil {
-		oplogStatus.Export(ch)
-	}       
-
-	glog.Info("Collecting Replset Oplog Status")
 	replSetStatus := collector_mongod.GetReplSetStatus(session)
 	if replSetStatus != nil {
 		replSetStatus.Export(ch)
+	}       
+
+	glog.Info("Collecting Replset Oplog Status")
+	oplogStatus := collector_mongod.GetOplogStatus(session)
+	if oplogStatus != nil {
+		oplogStatus.Export(ch)
 	}       
 }
 
