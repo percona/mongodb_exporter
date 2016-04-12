@@ -39,3 +39,7 @@ Point the process to any mongo port and it will detect if it is a mongos, replic
 - Add support for PerconaFT and RocksDB storage engines
 - Write more go tests
 
+## Contact
+
+- Tim Vaillancourt - <tim.vaillancourt@percona.com>
+- David Murphy - <david.murphy@percona.com>
