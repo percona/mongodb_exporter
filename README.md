@@ -38,6 +38,7 @@ Point the process to any mongo port and it will detect if it is a mongos, replic
 - Stabilize WiredTiger support (*currently beta/experimental*)
 - Add support for PerconaFT and RocksDB storage engines
 - Write more go tests
+- Version scheme
 
 ### Contact
 
