@@ -2,13 +2,17 @@
 
 Based on MongoDB exporter for prometheus.io, written in go (https://github.com/dcu/mongodb_exporter), but forked for full sharded support and structure changes.
 
+### Experimental
+
+The exporter is in beta/experimental state and field names are **very likely to change** and features may change or get removed!
+
 ### Features
 
 - MongoDB Server Status metrics (*cursors, operations, indexes, storage, etc*)
 - MongoDB Replica Set metrics (*members, ping, replication lag, etc*)
 - MongoDB Replication Oplog metrics (*size, length in time, etc*)
 - MongoDB Sharding metrics (*shards, chunks, db/collections, balancer operations*)
-- MongoDB WiredTiger storage-engine metrics (*currently in beta/experimental state*)
+- MongoDB WiredTiger storage-engine metrics (*cache, blockmanger, tickets, etc*)
 
 ### Building
 
