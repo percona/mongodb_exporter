@@ -23,7 +23,7 @@ var (
 
 //IndexCounterStats index counter stats
 type IndexCounterStats struct {
-	Accesses  float64 `bson:"accesses`
+	Accesses  float64 `bson:"accesses"`
 	Hits      float64 `bson:"hits"`
 	Misses    float64 `bson:"misses"`
 	Resets    float64 `bson:"resets"`

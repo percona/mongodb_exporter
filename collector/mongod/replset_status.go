@@ -1,232 +1,223 @@
 package collector_mongod
 
 import (
-    "time"
-    "github.com/golang/glog"
-    "github.com/prometheus/client_golang/prometheus"
-    "gopkg.in/mgo.v2"
-    "gopkg.in/mgo.v2/bson"
+	"time"
+
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
+
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
-    replSetLastElection = prometheus.NewCounterVec(prometheus.CounterOpts{
-            Namespace: Namespace,
-            Name:      "replset_last",
-            Help:      "Last event times for replica set",
-    }, []string{"event"})
-    replSetTotalMembers = prometheus.NewGauge(prometheus.GaugeOpts{
-            Namespace: Namespace,
-            Subsystem: "replset",
-            Name:      "members",
-            Help:      "Number of members in replica set",
-    })
-    replSetTotalMembersWithData = prometheus.NewGauge(prometheus.GaugeOpts{
-            Namespace: Namespace,
-            Subsystem: "replset",
-            Name:      "members_w_data",
-            Help:      "Number of members in replica set with data",
-    })
-    replSetMyLagMs = prometheus.NewGauge(prometheus.GaugeOpts{
-            Namespace: Namespace,
-            Subsystem: "replset",
-            Name:      "my_lag_ms",
-            Help:      "Lag in milliseconds in reference to replica set Primary node",
-    })
-    replSetMaxNode2NodePingMs = prometheus.NewGauge(prometheus.GaugeOpts{
-            Namespace: Namespace,
-            Subsystem: "replset",
-            Name:      "max_n2n_ping_ms",
-            Help:      "Maximum ping in milliseconds to other replica set members",
-    })
+	myState   = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "my_state",
+		Help:      "An integer between 0 and 10 that represents the replica state of the current member",
+	}, []string{"set"})
+	term = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "term",
+		Help:      "The election count for the replica set, as known to this replica set member",
+	}, []string{"set"})
+	numberOfMembers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "number_of_members",
+		Help:      "The number of replica set mebers",
+	}, []string{"set"})
+	heartbeatIntervalMillis = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "heatbeat_interval_millis",
+		Help:      "The frequency in milliseconds of the heartbeats",
+	}, []string{"set"})
+	memberHealth = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_health",
+		Help:      "This field conveys if the member is up (1) or down (0).",
+	}, []string{"set", "name", "state"})
+	memberState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_state",
+		Help:      "The value of state is an integer between 0 and 10 that represents the replica state of the member.",
+	}, []string{"set", "name", "state"})
+	memberUptime = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_uptime",
+		Help:      "The uptime field holds a value that reflects the number of seconds that this member has been online.",
+	}, []string{"set", "name", "state"})
+	memberOptimeDate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_optime_date",
+		Help:      "The last entry from the oplog that this member applied.",
+	}, []string{"set", "name", "state"})
+	memberElectionDate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_election_date",
+		Help:      "The timestamp the node was elected as replica leader",
+	}, []string{"set", "name", "state"})
+	memberLastHeartbeat = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_last_heartbeat",
+		Help:      "The lastHeartbeat value provides an ISODate formatted date and time of the transmission time of last heartbeat received from this member",
+	}, []string{"set", "name", "state"})
+	memberLastHeartbeatRecv = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_last_heartbeat_recv",
+		Help:      "The lastHeartbeatRecv value provides an ISODate formatted date and time that the last heartbeat was received from this member",
+	}, []string{"set", "name", "state"})
+	memberPingMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_ping_ms",
+		Help:      "The pingMs represents the number of milliseconds (ms) that a round-trip packet takes to travel between the remote member and the local instance.",
+	}, []string{"set", "name", "state"})
+	memberConfigVersion = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_config_version",
+		Help:      "The configVersion value is the replica set configuration version.",
+	}, []string{"set", "name", "state"})
+	memberOptime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "replset",
+		Name:      "member_optime",
+		Help:      "Information regarding the last operation from the operation log that this member has applied.",
+	}, []string{"set", "name", "state"})
 )
 
-type ReplicaSetMemberStatus struct {
-    Id			int64		`bson:"_id"`
-    ConfigVersion	int64		`bson:"configVersion"`
-    Health		int64		`bson:"health"`
-    Name		string		`bson:"name"`
-    State		int64		`bson:"state"`
-    StateStr		string		`bson:"stateStr"`
-    Uptime		int64		`bson:"uptime"`
-    Optime		int64		`bson:"optime"`
-    OptimeDate		time.Time	`bson:"optimeDate"`
-    LastHeartbeat	time.Time	`bson:"lastHeartbeat"`
-    LastHeartbeatRecv	time.Time	`bson:"lastHeartbeatRecv"`
-    ElectionTime	int64		`bson:"electionTime"`
-    ElectionDate	time.Time	`bson:"electionDate"`
-    PingMs		float64		`bson:"pingMs"`
-    SyncingTo		string		`bson:"syncingTo"`
-    Self		bool		`bson:"self"`
+// ReplSetStatus keeps the data returned by the GetReplSetStatus method
+type ReplSetStatus struct {
+	Set                     string    `bson:"set"`
+	Date                    time.Time `bson:"date"`
+	MyState                 int32     `bson:"myState"`
+	Term                    *int32    `bson:"term,omitempty"`
+	HeartbeatIntervalMillis *float64  `bson:"heartbeatIntervalMillis,omitempty"`
+	Members                 []Member  `bson:"members"`
 }
 
-type ReplicaSetStatus struct {
-    Name	string				`bson:"set"`
-    Date	time.Time			`bson:"date"`
-    MyState	int				`bson:"myState"`
-    Ok		int				`bson:"ok"`	
-    Members	[]ReplicaSetMemberStatus	`bson:"members"`
+// Member represents an array element of ReplSetStatus.Members
+type Member struct {
+	Name                 string      `bson:"name"`
+	Self                 *bool       `bson:"self,omitempty"`
+	Health               *int32      `bson:"health,omitempty"`
+	State                int32       `bson:"state"`
+	StateStr             string      `bson:"stateStr"`
+	Uptime               float64     `bson:"uptime"`
+	Optime               interface{} `bson:"optime"`
+	OptimeDate           time.Time   `bson:"optimeDate"`
+	ElectionTime         *time.Time  `bson:"electionTime,omitempty"`
+	ElectionDate         *time.Time  `bson:"electionDate,omitempty"`
+	LastHeartbeat        *time.Time  `bson:"lastHeartbeat,omitempty"`
+	LastHeartbeatRecv    *time.Time  `bson:"lastHeartbeatRecv,omitempty"`
+	LastHeartbeatMessage *string     `bson:"lastHeartbeatMessage,omitempty"`
+	PingMs               *float64    `bson:"pingMs,omitempty"`
+	SyncingTo            *string     `bson:"syncingTo,omitempty"`
+	ConfigVersion        *int32      `bson:"configVersion,omitempty"`
 }
 
-type ReplicaSetStatusSummary struct {
-    Members             float64
-    MembersWithData     float64
-    LagMs               float64
-    MaxNode2NodePingMs  float64
-    LastElection        float64
+// Export exports the replSetGetStatus stati to be consumed by prometheus
+func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
+	myState.WithLabelValues(replStatus.Set).Set(float64(replStatus.MyState))
+
+	// new in version 3.2
+	if replStatus.Term != nil {
+		term.WithLabelValues(replStatus.Set).Set(float64(*replStatus.Term))
+	}
+	numberOfMembers.WithLabelValues(replStatus.Set).Set(float64(len(replStatus.Members)))
+
+	// new in version 3.2
+	if replStatus.HeartbeatIntervalMillis != nil {
+		heartbeatIntervalMillis.WithLabelValues(replStatus.Set).Set(*replStatus.HeartbeatIntervalMillis)
+	}
+
+	for _, member := range replStatus.Members {
+		ls := prometheus.Labels{
+			"set":   replStatus.Set,
+			"name":  member.Name,
+			"state": member.StateStr,
+		}
+
+		memberState.With(ls).Set(float64(member.State))
+
+		// ReplSetStatus.Member.Health is not available on the node you're connected to
+		if member.Health != nil {
+			memberHealth.With(ls).Set(float64(*member.Health))
+		}
+
+		memberUptime.With(ls).Set(member.Uptime)
+
+		memberOptimeDate.With(ls).Set(float64(member.OptimeDate.Unix()))
+
+		// ReplSetGetStatus.Member.ElectionTime is only available on the PRIMARY
+		if member.ElectionDate != nil {
+			memberElectionDate.With(ls).Set(float64((*member.ElectionDate).Unix()))
+		}
+		if member.LastHeartbeat != nil {
+			memberLastHeartbeat.With(ls).Set(float64((*member.LastHeartbeat).Unix()))
+		}
+		if member.LastHeartbeatRecv != nil {
+			memberLastHeartbeatRecv.With(ls).Set(float64((*member.LastHeartbeatRecv).Unix()))
+		}
+		if member.PingMs != nil {
+			memberPingMs.With(ls).Set(*member.PingMs)
+		}
+		if member.ConfigVersion != nil {
+			memberConfigVersion.With(ls).Set(float64(*member.ConfigVersion))
+		}
+	}
+	// collect metrics
+	myState.Collect(ch)
+	term.Collect(ch)
+	numberOfMembers.Collect(ch)
+	heartbeatIntervalMillis.Collect(ch)
+	memberState.Collect(ch)
+	memberHealth.Collect(ch)
+	memberUptime.Collect(ch)
+	memberOptimeDate.Collect(ch)
+	memberElectionDate.Collect(ch)
+	memberLastHeartbeat.Collect(ch)
+	memberLastHeartbeatRecv.Collect(ch)
+	memberPingMs.Collect(ch)
+	memberConfigVersion.Collect(ch)
+
 }
 
-func GetReplSetStatusData(session *mgo.Session) (*ReplicaSetStatus, error) {
-    replSetStatus := &ReplicaSetStatus{}
+// Describe describes the replSetGetStatus metrics for prometheus
+func (replStatus *ReplSetStatus) Describe(ch chan<- *prometheus.Desc) {
+	myState.Describe(ch)
+	term.Describe(ch)
+	numberOfMembers.Describe(ch)
+	heartbeatIntervalMillis.Describe(ch)
+	memberState.Describe(ch)
+	memberHealth.Describe(ch)
+	memberUptime.Describe(ch)
+	memberOptimeDate.Describe(ch)
+	memberElectionDate.Describe(ch)
+	memberLastHeartbeatRecv.Describe(ch)
+	memberPingMs.Describe(ch)
+	memberConfigVersion.Describe(ch)
 
-    err := session.DB("admin").Run(bson.D{{ "replSetGetStatus", 1 }}, &replSetStatus)
-
-    return replSetStatus, err
 }
 
-func GetReplSetSelf(status *ReplicaSetStatus) *ReplicaSetMemberStatus {
-    result := &ReplicaSetMemberStatus{}
-
-    for _, member := range status.Members {
-        if member.Self == true {
-            result = &member
-            break
-        }
-    }
-
-    return result
-}
-
-func GetReplSetPrimary(status *ReplicaSetStatus) *ReplicaSetMemberStatus {
-    result := &ReplicaSetMemberStatus{}
-
-    for _, member := range status.Members {
-        if member.State == 1 {
-            result = &member
-            break
-        }
-    }
-
-    return result
-}
-
-func GetReplSetMemberByName(status *ReplicaSetStatus, name string) *ReplicaSetMemberStatus {
-    result := &ReplicaSetMemberStatus{}
-
-    for _, member := range status.Members {
-        if member.Name == name {
-            result = &member
-            break
-        }
-    }
-
-    return result
-}
-
-func GetReplSetSyncingTo(status *ReplicaSetStatus) *ReplicaSetMemberStatus {
-    myInfo := GetReplSetSelf(status)
-    if len(myInfo.SyncingTo) > 0 {
-        return GetReplSetMemberByName(status, myInfo.SyncingTo)
-    } else {
-        return GetReplSetPrimary(status)
-    }
-}
-
-func GetReplSetMemberCount(status *ReplicaSetStatus) (float64) {
-    var result float64 = 0
-
-    if status.Members != nil {
-        result = float64(len(status.Members))
-    }
-
-    return result
-}
-
-func GetReplSetMembersWithDataCount(status *ReplicaSetStatus) (float64) {
-    var membersWithDataCount int = 0
-
-    if status.Members != nil {
-        for _, member := range status.Members {
-            if member.Health == 1 {
-                if member.State == 1 || member.State == 2 {
-                    membersWithDataCount = membersWithDataCount + 1
-                }
-            }
-        }
-    }
-
-    return float64(membersWithDataCount)
-}
-
-func GetReplSetMaxNode2NodePingMs(status *ReplicaSetStatus) (float64) {
-    var maxNodePingMs float64 = -1
-
-    for _, member := range status.Members {
-        if &member.PingMs != nil {
-            if member.PingMs > maxNodePingMs {
-                maxNodePingMs = member.PingMs
-            }
-        }
-    }
-
-    return maxNodePingMs
-}
-
-func GetReplSetLagMs(status *ReplicaSetStatus) (float64) {
-    memberInfo := GetReplSetSelf(status)
-
-    // short-circuit the check if you're the Primary
-    if memberInfo.State == 1 {
-        return 0
-    }
-
-    var result float64 = -1
-    optimeNanoSelf := memberInfo.OptimeDate.UnixNano()
-    replSetStatusPrimary := GetReplSetSyncingTo(status)
-    if &replSetStatusPrimary.OptimeDate != nil {
-        optimeNanoPrimary := replSetStatusPrimary.OptimeDate.UnixNano()
-        result = float64(optimeNanoPrimary - optimeNanoSelf)/1000000
-    }
-
-    return result
-}
-
-func GetReplSetLastElectionUnixTime(status *ReplicaSetStatus) (float64) {
-    replSetPrimary := GetReplSetPrimary(status)
-
-    var result float64 = -1
-    if &replSetPrimary.ElectionDate != nil {
-        result = float64(replSetPrimary.ElectionDate.Unix())
-    }
-
-    return result
-}
-
-func(summary *ReplicaSetStatusSummary) Export(ch chan<- prometheus.Metric) {
-    replSetTotalMembers.Set(summary.Members)
-    replSetTotalMembersWithData.Set(summary.MembersWithData)
-    replSetMyLagMs.Set(summary.LagMs)
-    replSetMaxNode2NodePingMs.Set(summary.MaxNode2NodePingMs)
-    replSetLastElection.WithLabelValues("election").Set(summary.LastElection)
-
-    replSetTotalMembers.Collect(ch)
-    replSetTotalMembersWithData.Collect(ch)
-    replSetMyLagMs.Collect(ch)
-    replSetMaxNode2NodePingMs.Collect(ch)
-    replSetLastElection.Collect(ch)
-}
-
-func GetReplSetStatus(session *mgo.Session) *ReplicaSetStatusSummary {
-    status, err := GetReplSetStatusData(session)
-    if err != nil {
-        glog.Error("Could not get replset status!")
-    }
-
-    summary := &ReplicaSetStatusSummary{}
-    summary.Members = GetReplSetMemberCount(status)
-    summary.MembersWithData = GetReplSetMembersWithDataCount(status)
-    summary.LastElection = GetReplSetLastElectionUnixTime(status)
-    summary.LagMs = GetReplSetLagMs(status)
-    summary.MaxNode2NodePingMs = GetReplSetMaxNode2NodePingMs(status)
-
-    return summary
+// GetReplSetStatus returns the replica status info
+func GetReplSetStatus(session *mgo.Session) *ReplSetStatus {
+	result := &ReplSetStatus{}
+	err := session.DB("admin").Run(bson.D{{"replSetGetStatus", 1}}, result)
+	if err != nil {
+		glog.Error("Failed to get replSet status.")
+		return nil
+	}
+	return result
 }
