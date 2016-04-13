@@ -41,5 +41,6 @@ Point the process to any mongo port and it will detect if it is a mongos, replic
 
 ### Contact
 
-- Tim Vaillancourt - <tim.vaillancourt@percona.com>
-- David Murphy - <david.murphy@percona.com>
+- David Murphy - [Twitter](https://twitter.com/dmurphy_data) / [Email](mailto:david.murphy@percona.com)
+- Tim Vaillancourt - [Email](mailto:tim.vaillancourt@percona.com)
+- Percona - [Twitter](https://twitter.com/Percona) / [Contact Page](https://www.percona.com/about-percona/contact)
