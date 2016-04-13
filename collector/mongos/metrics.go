@@ -78,7 +78,7 @@ type CursorStats struct {
 // Export exports the cursor stats.
 func (cursorStats *CursorStats) Export(ch chan<- prometheus.Metric) {
         metricsCursorTimedOutTotal.Set(cursorStats.TimedOut)
-        metricsCursorOpen.WithLabelValues("timed_out").Set(cursorStats.Open.NoTimeout)
+        metricsCursorOpen.WithLabelValues("noTimeout").Set(cursorStats.Open.NoTimeout)
         metricsCursorOpen.WithLabelValues("pinned").Set(cursorStats.Open.Pinned)
         metricsCursorOpen.WithLabelValues("total").Set(cursorStats.Open.Total)
 }
