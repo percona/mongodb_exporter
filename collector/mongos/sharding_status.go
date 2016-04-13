@@ -22,36 +22,18 @@ var (
 			Name:		"chunks_is_balanced",
 			Help:		"Boolean reporting if cluster chunks are evenly balanced across shards (1 = yes/0 = no)",
 	})
-	mongosClusterIdHex = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace:      Namespace,
-			Subsystem:      "sharding",
-			Name:		"cluster_id",
-			Help:		"The hex representation of the Cluster ID",
-	}, []string{"hex"})
-	mongosClusterCurrentVersion = prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace:      Namespace,
-			Subsystem:      "sharding",
-			Name:		"cluster_current_version",
-			Help:		"The current metadata version number of the Cluster",
-	})
-	mongosClusterMinCompatVersion = prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace:      Namespace,
-			Subsystem:      "sharding",
-			Name:		"cluster_min_compatible_version",
-			Help:		"The minimum compatible metadata version number of the Cluster",
-	})
 	mongosUpSecs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace:      Namespace,
 			Subsystem:      "sharding",
 			Name:		"mongos_uptime_seconds",
 			Help:		"The uptime of the Mongos processes in seconds",
-	}, []string{"name","version"})
+	}, []string{"name"})
 	mongosPing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace:      Namespace,
 			Subsystem:      "sharding",
 			Name:		"mongos_last_ping_timestamp",
 			Help:		"The unix timestamp of the last Mongos ping to the Cluster config servers",
-	}, []string{"name","version"})
+	}, []string{"name"})
 	mongosBalancerLockTimestamp = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace:      Namespace,
 			Subsystem:      "sharding",
@@ -63,14 +45,8 @@ var (
 			Subsystem:      "sharding",
 			Name:		"balancer_lock_state",
 			Help:		"The state of the Cluster balancer lock (-1 = none/0 = unlocked/1 = contention/2 = locked)",
-	}, []string{"name","version"})
+	}, []string{"name"})
 )
-
-type ShardingVersion struct {
-	MinCompatVersion	float64		`bson:"minCompatibleVersion"`
-	CurrentVersion		float64		`bson:"currentVersion"`
-	ClusterId		bson.ObjectId	`bson:"clusterId"`
-}
 
 type MongosInfo struct {
 	Name		string		`bson:"_id"`
@@ -94,17 +70,7 @@ type ShardingStats struct {
 	Changelog	*ShardingChangelogStats	
 	Topology	*ShardingTopoStats
 	BalancerLock	*MongosBalancerLock
-	Version		*ShardingVersion
 	Mongos		*[]MongosInfo
-}
-
-func GetShardingVersion(session *mgo.Session) *ShardingVersion {
-	mongosVersion := &ShardingVersion{}
-	err := session.DB("config").C("version").Find(bson.M{ "_id" : 1 }).One(&mongosVersion)
-	if err != nil {
-		glog.Error("Failed to execute find query on 'config.version'!")
-	}
-	return mongosVersion
 }
 
 func GetMongosInfo(session *mgo.Session) *[]MongosInfo {
@@ -178,23 +144,16 @@ func (status *ShardingStats) Export(ch chan<- prometheus.Metric) {
 	if status.Topology != nil {
 		status.Topology.Export(ch)
 	}
-	if status.Version != nil {
-		clusterId := status.Version.ClusterId.Hex()
-		mongosClusterIdHex.WithLabelValues(clusterId).Set(1)
-		mongosClusterCurrentVersion.Set(status.Version.CurrentVersion)
-		mongosClusterMinCompatVersion.Set(status.Version.MinCompatVersion)
-	}
 	if status.Mongos != nil && status.BalancerLock != nil {
 		mongosBalancerLockWho := strings.Split(status.BalancerLock.Who, ":")
 		mongosBalancerLockHostPort := mongosBalancerLockWho[0] + ":" + mongosBalancerLockWho[1]
 		mongosBalancerLockTimestamp.WithLabelValues(mongosBalancerLockHostPort).Set(float64(status.BalancerLock.When.Unix()))
 		for _, mongos := range *status.Mongos {
-			labels := prometheus.Labels{"name": mongos.Name, "version": mongos.MongoVersion }
-			mongosUpSecs.With(labels).Set(mongos.Up)
-			mongosPing.With(labels).Set(float64(mongos.Ping.Unix()))
-			mongosBalancerLockState.With(labels).Set(-1)
+			mongosUpSecs.WithLabelValues(mongos.Name).Set(mongos.Up)
+			mongosPing.WithLabelValues(mongos.Name).Set(float64(mongos.Ping.Unix()))
+			mongosBalancerLockState.WithLabelValues(mongos.Name).Set(-1)
 			if mongos.Name == mongosBalancerLockHostPort {
-				mongosBalancerLockState.With(labels).Set(status.BalancerLock.State)
+				mongosBalancerLockState.WithLabelValues(mongos.Name).Set(status.BalancerLock.State)
 			}
 		}
 	}
@@ -203,9 +162,6 @@ func (status *ShardingStats) Export(ch chan<- prometheus.Metric) {
 
 	balancerIsEnabled.Collect(ch)
 	balancerChunksBalanced.Collect(ch)
-	mongosClusterIdHex.Collect(ch)
-	mongosClusterCurrentVersion.Collect(ch)
-	mongosClusterMinCompatVersion.Collect(ch)
 	mongosUpSecs.Collect(ch)
 	mongosPing.Collect(ch)
 	mongosBalancerLockState.Collect(ch)
@@ -221,9 +177,6 @@ func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
 	}
 	balancerIsEnabled.Describe(ch)
 	balancerChunksBalanced.Describe(ch)
-	mongosClusterIdHex.Describe(ch)
-	mongosClusterCurrentVersion.Describe(ch)
-	mongosClusterMinCompatVersion.Describe(ch)
 	mongosUpSecs.Describe(ch)
 	mongosPing.Describe(ch)
 	mongosBalancerLockState.Describe(ch)
@@ -237,7 +190,6 @@ func GetShardingStatus(session *mgo.Session) *ShardingStats {
 	results.BalancerEnabled = IsBalancerEnabled(session)
 	results.Changelog = GetShardingChangelogStatus(session) 
 	results.Topology = GetShardingTopoStatus(session)
-	results.Version = GetShardingVersion(session)
 	results.Mongos = GetMongosInfo(session)
 	results.BalancerLock = GetMongosBalancerLock(session)
 
