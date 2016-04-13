@@ -3,6 +3,7 @@ package shared
 import (
 	"regexp"
 	"strings"
+	"strconv"
 )
 
 var (
@@ -24,3 +25,17 @@ func ParameterizeString(text string) string {
 	result := parameterizeRegexp.ReplaceAllString(text, "_")
 	return strings.ToLower(result)
 }
+
+func IsVersionGreater(version string, major int, minor int, release int) bool {
+	split := strings.Split(version, ".")
+	cmp_major, _ := strconv.Atoi(split[0])
+	cmp_minor, _ := strconv.Atoi(split[1])
+	cmp_release, _ := strconv.Atoi(split[2])
+
+	if cmp_major >= major && cmp_minor >= minor && cmp_release >= release {
+		return true
+	}
+
+	return false
+}
+
