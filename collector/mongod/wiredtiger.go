@@ -103,19 +103,19 @@ var(
 var(
 	wtConcurrentTransactionsOut = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:      Namespace,
-		Subsystem:      "wiredtiger_concur_transactions",
+		Subsystem:      "wiredtiger_concurrent_transactions",
 		Name:	   	"out",
 		Help:	   	"TBD",
 	}, []string{"type"})
 	wtConcurrentTransactionsAvailable = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_concur_transactions",
+		Subsystem:	"wiredtiger_concurrent_transactions",
 		Name:		"available",
 		Help:		"TBD",
 	}, []string{"type"})
 	wtConcurrentTransactionsTotalTickets = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_concur_transactions",
+		Subsystem:	"wiredtiger_concurrent_transactions",
 		Name:		"tickets_total",
 		Help:		"TBD",
 	}, []string{"type"})
