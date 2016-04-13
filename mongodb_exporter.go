@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/dcu/mongodb_exporter/collector"
-	"github.com/dcu/mongodb_exporter/shared"
+	"github.com/Percona-Lab/prometheus_mongodb_exporter/collector"
+	"github.com/Percona-Lab/prometheus_mongodb_exporter/shared"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -88,5 +88,6 @@ func main() {
 	flag.Parse()
 	shared.ParseEnabledGroups(*enabledGroupsFlag)
 
+	fmt.Println("### Warning: the exporter is in beta/experimental state and field names are very\n### likely to change in the future and features may change or get removed!\n### See: https://github.com/Percona-Lab/prometheus_mongodb_exporter for updates")
 	startWebServer()
 }

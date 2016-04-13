@@ -1,9 +1,9 @@
 package collector
 
 import (
-	"github.com/dcu/mongodb_exporter/shared"
-	"github.com/dcu/mongodb_exporter/collector/mongod"
-	"github.com/dcu/mongodb_exporter/collector/mongos"
+	"github.com/Percona-Lab/prometheus_mongodb_exporter/shared"
+	"github.com/Percona-Lab/prometheus_mongodb_exporter/collector/mongod"
+	"github.com/Percona-Lab/prometheus_mongodb_exporter/collector/mongos"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/mgo.v2"
@@ -82,10 +82,10 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 		serverStatus.Export(ch)
 	}
 
-	glog.Info("Collecting Mongos Balancer Status")
-	balancerStatus := collector_mongos.GetBalancerStatus(session)
-	if balancerStatus != nil {
-		balancerStatus.Export(ch)
+	glog.Info("Collecting Sharding Status")
+	shardingStatus := collector_mongos.GetShardingStatus(session)
+	if shardingStatus != nil {
+		shardingStatus.Export(ch)
 	}
 }
 
@@ -101,15 +101,15 @@ func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch 
 	exporter.collectMongod(session, ch)
 
 	glog.Info("Collecting Replset Status")
-	oplogStatus := collector_mongod.GetOplogStatus(session)
-	if oplogStatus != nil {
-		oplogStatus.Export(ch)
-	}       
-
-	glog.Info("Collecting Replset Oplog Status")
 	replSetStatus := collector_mongod.GetReplSetStatus(session)
 	if replSetStatus != nil {
 		replSetStatus.Export(ch)
+	}       
+
+	glog.Info("Collecting Replset Oplog Status")
+	oplogStatus := collector_mongod.GetOplogStatus(session)
+	if oplogStatus != nil {
+		oplogStatus.Export(ch)
 	}       
 }
 

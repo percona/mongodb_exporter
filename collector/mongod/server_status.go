@@ -60,6 +60,8 @@ type ServerStatus struct {
 	Metrics        *MetricsStats        `bson:"metrics"`
 
 	Cursors *Cursors `bson:"cursors"`
+
+	WiredTiger *WiredTigerStats `bson:"wiredTiger"`
 }
 
 // Export exports the server status to be consumed by prometheus.
@@ -67,6 +69,9 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	instanceUptimeSeconds.Set(status.Uptime)
 	instanceUptimeEstimateSeconds.Set(status.Uptime)
 	instanceLocalTime.Set(float64(status.LocalTime.Unix()))
+	instanceUptimeSeconds.Collect(ch)
+	instanceUptimeEstimateSeconds.Collect(ch)
+	instanceLocalTime.Collect(ch)
 
 	if status.Asserts != nil {
 		status.Asserts.Export(ch)
@@ -109,6 +114,9 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	}
 	if status.Cursors != nil {
 		status.Cursors.Export(ch)
+	}
+	if status.WiredTiger != nil {
+		status.WiredTiger.Export(ch)
 	}
 }
 
@@ -160,15 +168,14 @@ func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
 	if status.Cursors != nil {
 		status.Cursors.Describe(ch)
 	}
+	if status.WiredTiger != nil {
+		status.WiredTiger.Describe(ch)
+	}
 }
 
 // GetServerStatus returns the server status info.
 func GetServerStatus(session *mgo.Session) *ServerStatus {
 	result := &ServerStatus{}
-	
-	session.SetMode(mgo.Eventual, true)
-	session.SetSocketTimeout(0)
-	
 	err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
 	if err != nil {
 		glog.Error("Failed to get server status.")
