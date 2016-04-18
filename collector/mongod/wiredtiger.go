@@ -9,13 +9,13 @@ var (
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_blockmanager",
 		Name:		"blocks_total",
-		Help:		"TBD",
+		Help:		"The total number of blocks read by the WiredTiger BlockManager",
 	}, []string{"type"})
 	wtBlockManagerBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_blockmanager",
 		Name:		"bytes_total",
-		Help:		"TBD",
+		Help:		"The total number of bytes read by the WiredTiger BlockManager",
 	}, []string{"type"})
 )
 
@@ -24,43 +24,43 @@ var (
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
 		Name:		"pages_total",
-		Help:		"TBD",
+		Help:		"The total number of pages in the WiredTiger Cache",
 	}, []string{"type"})
 	wtCacheBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
 		Name:		"bytes_total",
-		Help:		"TBD",
+		Help:		"The total number of bytes read into/from the WiredTiger Cache",
 	}, []string{"type"})
 	wtCacheEvictedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
 		Name:		"evicted_total",
-		Help:		"TBD",
+		Help:		"The total number of pages evicted from the WiredTiger Cache",
 	}, []string{"type"})
 	wtCacheCurPages = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
 		Name:		"current_pages",
-		Help:		"TBD",
+		Help:		"The current number of pages in the WiredTiger Cache",
 	})
 	wtCacheBytesCached = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
 		Name:		"bytes_cached",
-		Help:		"TBD",
+		Help:		"The total size of cached data in the WiredTiger Cache in bytes",
 	})
 	wtCacheBytesMax = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
 		Name:		"bytes_max",
-		Help:		"TBD",
+		Help:		"The maximum size of cached data in the WiredTiger Cache in bytes",
 	})
 	wtCachePercentOverhead = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
 		Name:		"percent_overhead",
-		Help:		"TBD",
+		Help:		"The percentage overhead of the WiredTiger Cache",
 	})
 )
 
@@ -69,19 +69,19 @@ var(
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_transactions",
 		Name:		"total",
-		Help:		"TBD",
+		Help:		"The total number of transactions WiredTiger has handled",
 	}, []string{"type"})
 	wtTransactionsTotalCheckpointMs = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_transactions",
 		Name:		"total_chkp_ms",
-		Help:		"TBD",
+		Help:		"The total time in milliseconds transactions have checkpointed in WiredTiger",
 	})
 	wtTransactionsCheckpointsRunning = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_transactions",
 		Name:		"chkp_running",
-		Help:		"TBD",
+		Help:		"The total number of checkpointing transactions in WiredTiger",
 	})
 )
 
@@ -90,19 +90,19 @@ var(
 		Namespace:      Namespace,
 		Subsystem:      "wiredtiger_concur_transactions",
 		Name:	   	"out",
-		Help:	   	"TBD",
+		Help:	   	"The number of tickets that are currently in use in WiredTiger",
 	}, []string{"type"})
 	wtConcurrentTransactionsAvailable = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_concur_transactions",
 		Name:		"available",
-		Help:		"TBD",
+		Help:		"The number of tickets that are available in WiredTiger",
 	}, []string{"type"})
 	wtConcurrentTransactionsTotalTickets = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_concur_transactions",
 		Name:		"tickets_total",
-		Help:		"TBD",
+		Help:		"The total number of tickets that is available in WiredTiger",
 	}, []string{"type"})
 )
 
