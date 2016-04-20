@@ -86,21 +86,36 @@ var(
 )
 
 var(
+	wtLogBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+                Namespace:      Namespace,
+                Subsystem:      "wiredtiger_log",
+                Name:           "bytes_total",
+                Help:           "The total number of bytes written to the WiredTiger log",
+        }, []string{"type"})
+	wtLogOperationsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+                Namespace:      Namespace,
+                Subsystem:      "wiredtiger_log",
+                Name:           "operations_total",
+                Help:           "The total number of WiredTiger log operations",
+        }, []string{"type"})
+)
+
+var(
 	wtConcurrentTransactionsOut = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:      Namespace,
-		Subsystem:      "wiredtiger_concur_transactions",
+		Subsystem:      "wiredtiger_concurrent_transactions",
 		Name:	   	"out",
 		Help:	   	"The number of tickets that are currently in use in WiredTiger",
 	}, []string{"type"})
 	wtConcurrentTransactionsAvailable = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_concur_transactions",
+		Subsystem:	"wiredtiger_concurrent_transactions",
 		Name:		"available",
 		Help:		"The number of tickets that are available in WiredTiger",
 	}, []string{"type"})
 	wtConcurrentTransactionsTotalTickets = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_concur_transactions",
+		Subsystem:	"wiredtiger_concurrent_transactions",
 		Name:		"tickets_total",
 		Help:		"The total number of tickets that is available in WiredTiger",
 	}, []string{"type"})
@@ -247,6 +262,23 @@ type WTLogStats struct {
 	LogWrites			float64 `bson:"log write operations"`
 }
 
+func (stats *WTLogStats) Export(ch chan<- prometheus.Metric) {
+        wtLogBytesTotal.WithLabelValues("payload").Set(stats.BytesPayloadData)
+        wtLogBytesTotal.WithLabelValues("written").Set(stats.BytesWritten)
+        wtLogOperationsTotal.WithLabelValues("read").Set(stats.LogReads)
+        wtLogOperationsTotal.WithLabelValues("write").Set(stats.LogWrites)
+        wtLogOperationsTotal.WithLabelValues("scan").Set(stats.LogScans)
+        wtLogOperationsTotal.WithLabelValues("scan_double").Set(stats.LogScansDouble)
+        wtLogOperationsTotal.WithLabelValues("sync").Set(stats.LogSyncs)
+        wtLogOperationsTotal.WithLabelValues("sync_dir").Set(stats.LogSyncDirs)
+        wtLogOperationsTotal.WithLabelValues("flush").Set(stats.LogFlushes)
+}
+
+func (stats *WTLogStats) Describe(ch chan<- *prometheus.Desc) {
+	wtLogBytesTotal.Describe(ch)
+	wtLogOperationsTotal.Describe(ch)
+}
+
 // session stats
 type WTSessionStats struct {
 	Cursors				float64	`bson:"open cursor count"`
@@ -335,6 +367,9 @@ func (stats *WiredTigerStats) Describe(ch chan<- *prometheus.Desc) {
 	if stats.Transaction != nil {
 		stats.Transaction.Describe(ch)
 	}
+	if stats.Log != nil {
+		stats.Log.Describe(ch)
+	}
 	if stats.ConcurrentTransactions != nil {
 		stats.ConcurrentTransactions.Describe(ch)
 	}
@@ -375,6 +410,9 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 	if stats.Transaction != nil {
 		stats.Transaction.Export(ch)
 	}
+	if stats.Log != nil {
+		stats.Log.Export(ch)
+	}
 	if stats.ConcurrentTransactions != nil {
 		stats.ConcurrentTransactions.Export(ch)
 	}
@@ -393,6 +431,9 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 	wtTransactionsTotal.Collect(ch)
 	wtTransactionsTotalCheckpointMs.Collect(ch)
 	wtTransactionsCheckpointsRunning.Collect(ch)
+
+	wtLogBytesTotal.Collect(ch)
+	wtLogOperationsTotal.Collect(ch)
 
 	wtConcurrentTransactionsOut.Collect(ch)
 	wtConcurrentTransactionsAvailable.Collect(ch)
