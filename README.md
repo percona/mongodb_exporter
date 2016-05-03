@@ -28,7 +28,7 @@ It is recommended to define the following options:
 - **-mongodb.uri** - The URI of the MongoDB port (*default: mongodb://localhost:27017*)
 - **-auth.user** - The optional auth username (*default: none*)
 - **-auth.pass** - The optional auth password (*default: none*)
-- **-web.listen-address** - The listen address of the exporter (*default: ":9001"*)
+- **-web.listen-address** - The listen address of the exporter (*default: ":9104"*)
 - **-log_dir** - The directory to write the log file (*default: /tmp*)
 
 *For more options see the help page with '-h' or '--help'*
