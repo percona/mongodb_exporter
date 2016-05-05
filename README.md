@@ -32,6 +32,7 @@ It is recommended to define the following options:
 - **-log_dir** - The directory to write the log file (*default: /tmp*)
 
 If you use [MongoDB Authorization](https://docs.mongodb.org/manual/core/authorization/), you must:
+
 1. Create a user with '*clusterMonitor*' role and '*read*' on the '*local*' database, like the following (*replace password!*):
   ```
   db.getSiblingDB("admin").createUser({
