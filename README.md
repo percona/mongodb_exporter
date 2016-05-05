@@ -51,7 +51,7 @@ db.getSiblingDB("admin").createUser({
 2. Add the username/password to the '*-mongodb.uri*' command-line option for mongodb_exporter, example:
 
 ```
-mongodb_exporter -mongodb.uri mongodb://mongodb_exporter:s3cr3tpassw0rd@mongod1a.example.com:29017
+mongodb_exporter -mongodb.uri mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
 ```
 
 ### Note about how this works
