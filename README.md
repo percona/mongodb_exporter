@@ -35,12 +35,12 @@ It is recommended to define the following options:
 
 If you use [MongoDB Authorization](https://docs.mongodb.org/manual/core/authorization/), you must:
 
-1. Create a user with '*clusterMonitor*' role and '*read*' on the '*local*' database, like the following (*replace password!*):
+1. Create a user with '*clusterMonitor*' role and '*read*' on the '*local*' database, like the following (*replace username/password!*):
 
 ```
 db.getSiblingDB("admin").createUser({
     user: "mongodb_exporter",
-    pwd: "<PASSWORD HERE>",
+    pwd: "s3cr3tpassw0rd",
     roles: [
         { role: "clusterMonitor", db: "admin" },
         { role: "read", db: "local" }
