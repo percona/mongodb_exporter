@@ -31,6 +31,8 @@ It is recommended to define the following options:
 - **-web.listen-address** - The listen address of the exporter (*default: ":9001"*)
 - **-log_dir** - The directory to write the log file (*default: /tmp*)
 
+*For more options see the help page with '-h' or '--help'*
+
 If you use [MongoDB Authorization](https://docs.mongodb.org/manual/core/authorization/), you must:
 
 1. Create a user with '*clusterMonitor*' role and '*read*' on the '*local*' database, like the following (*replace password!*):
@@ -51,9 +53,6 @@ db.getSiblingDB("admin").createUser({
 ```
 mongodb_exporter -mongodb.uri mongodb://mongodb_exporter:s3cr3tpassw0rd@mongod1a.example.com:29017
 ```
-
-*For more options see the help page with '-h' or '--help'*
-
 
 ### Note about how this works
 Point the process to any mongo port and it will detect if it is a mongos, replicaset member, or stand alone mongod and return the appropriate metrics for that type of node. This was done to preent the need to an exporter per type of process.
