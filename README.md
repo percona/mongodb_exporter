@@ -26,12 +26,30 @@ The exporter can be started by running the '*mongodb_exporter*' binary that is c
 It is recommended to define the following options:
 
 - **-mongodb.uri** - The URI of the MongoDB port (*default: mongodb://localhost:27017*)
-- **-auth.user** - The optional auth username (*default: none*)
-- **-auth.pass** - The optional auth password (*default: none*)
+- **-auth.user** - The optional exporter HTTP auth username (*default: none*)
+- **-auth.pass** - The optional exporter HTTP auth password (*default: none*)
 - **-web.listen-address** - The listen address of the exporter (*default: ":9001"*)
 - **-log_dir** - The directory to write the log file (*default: /tmp*)
 
+If you use [MongoDB Authorization](https://docs.mongodb.org/manual/core/authorization/), you must:
+1. Create a user with '*clusterMonitor*' role and '*read*' on the '*local*' database, like the following (*replace password!*):
+  ```
+  db.getSiblingDB("admin").createUser({
+      user: "mongodb_exporter",
+      pwd: "<PASSWORD HERE>",
+      roles: [
+          { role: "clusterMonitor", db: "admin" },
+          { role: "read", db: "local" }
+      ]
+  })
+  ```
+2. Add the username/password to the '*-mongodb.uri*' command-line option, example:
+```
+mongodb_exporter -mongodb.uri mongodb://mongodb_exporter:s3cr3tpassw0rd@mongod1a.example.com
+```
+
 *For more options see the help page with '-h' or '--help'*
+
 
 ### Note about how this works
 Point the process to any mongo port and it will detect if it is a mongos, replicaset member, or stand alone mongod and return the appropriate metrics for that type of node. This was done to preent the need to an exporter per type of process.
