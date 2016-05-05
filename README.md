@@ -62,6 +62,7 @@ Point the process to any mongo port and it will detect if it is a mongos, replic
 - Document more configurations options here
 - Stabilize WiredTiger support (*currently beta/experimental*)
 - Add support for PerconaFT and RocksDB storage engines
+- Move MongoDB user/password/authdb to a file (for security)
 - Write more go tests
 - Version scheme
 
