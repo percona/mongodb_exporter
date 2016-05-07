@@ -101,6 +101,21 @@ var(
 )
 
 var(
+	wtOpenCursors = prometheus.NewGauge(prometheus.GaugeOpts{
+                Namespace:      Namespace,
+                Subsystem:      "wiredtiger_session",
+                Name:           "open_cursors_total",
+                Help:           "The total number of cursors opened in WiredTiger",
+        })
+	wtOpenSessions = prometheus.NewGauge(prometheus.GaugeOpts{
+                Namespace:      Namespace,
+                Subsystem:      "wiredtiger_session",
+                Name:           "open_sessions_total",
+                Help:           "The total number of sessions opened in WiredTiger",
+        })
+)
+
+var(
 	wtConcurrentTransactionsOut = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:      Namespace,
 		Subsystem:      "wiredtiger_concurrent_transactions",
@@ -117,7 +132,7 @@ var(
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_concurrent_transactions",
 		Name:		"tickets_total",
-		Help:		"The total number of tickets that is available in WiredTiger",
+		Help:		"The total number of tickets that are available in WiredTiger",
 	}, []string{"type"})
 )
 
@@ -222,6 +237,16 @@ type WTSessionStats struct {
 	Sessions			float64	`bson:"open session count"`
 }
 
+func (stats *WTSessionStats) Export(ch chan<- prometheus.Metric) {
+	wtOpenCursors.Set(stats.Cursors)
+	wtOpenSessions.Set(stats.Sessions)
+}
+
+func (stats *WTSessionStats) Describe(ch chan<- *prometheus.Desc) {
+	wtOpenCursors.Describe(ch)
+	wtOpenSessions.Describe(ch)
+}
+
 // transaction stats
 type WTTransactionStats struct {
 	Begins				float64 `bson:"transaction begins"`
@@ -301,6 +326,9 @@ func (stats *WiredTigerStats) Describe(ch chan<- *prometheus.Desc) {
 	if stats.Log != nil {
 		stats.Log.Describe(ch)
 	}
+	if stats.Session != nil {
+		stats.Session.Describe(ch)
+	}
 	if stats.ConcurrentTransactions != nil {
 		stats.ConcurrentTransactions.Describe(ch)
 	}
@@ -320,6 +348,12 @@ func (stats *WiredTigerStats) Describe(ch chan<- *prometheus.Desc) {
 	wtTransactionsTotalCheckpointMs.Describe(ch)
 	wtTransactionsCheckpointsRunning.Describe(ch)
 
+	wtLogBytesTotal.Describe(ch)
+	wtLogOperationsTotal.Describe(ch)
+
+	wtOpenCursors.Describe(ch)
+	wtOpenSessions.Describe(ch)
+
 	wtConcurrentTransactionsOut.Describe(ch)
 	wtConcurrentTransactionsAvailable.Describe(ch)
 	wtConcurrentTransactionsTotalTickets.Describe(ch)
@@ -337,6 +371,9 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 	}
 	if stats.Log != nil {
 		stats.Log.Export(ch)
+	}
+	if stats.Session != nil {
+		stats.Session.Export(ch)
 	}
 	if stats.ConcurrentTransactions != nil {
 		stats.ConcurrentTransactions.Export(ch)
@@ -359,6 +396,9 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 
 	wtLogBytesTotal.Collect(ch)
 	wtLogOperationsTotal.Collect(ch)
+
+	wtOpenCursors.Collect(ch)
+	wtOpenSessions.Collect(ch)
 
 	wtConcurrentTransactionsOut.Collect(ch)
 	wtConcurrentTransactionsAvailable.Collect(ch)
