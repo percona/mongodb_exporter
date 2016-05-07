@@ -121,48 +121,6 @@ var(
 	}, []string{"type"})
 )
 
-var(
-	wtAsyncWorkQueueLength = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_async",
-		Name:		"work_queue_length",
-		Help:		"TBD",
-	})
-	wtAsyncMaxWorkQueueLength = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_async",
-		Name:		"max_work_queue_length",
-		Help:		"TBD",
-	})
-)
-
-// async stats
-type WTAsyncStats struct {
-	NumAllocStateRaces		float64	`bson:"number of allocation state races"`
-	NumOpSlotsViewedForAlloc	float64	`bson:"number of operation slots viewed for allocation"`
-	WorkQueueLength			float64	`bson:"current work queue length"`
-	NumFlushCalls			float64	`bson:"number of flush calls"`
-	NumAllocFailed			float64	`bson:"number of times operation allocation failed"`
-	MaxWorkQueueLength		float64	`bson:"maximum work queue length"`
-	NumWorkerNoWork			float64	`bson:"number of times worker found no work"`
-	TotalAlloc			float64	`bson:"total allocations"`
-	TotalCompact			float64	`bson:"total compact calls"`
-	TotalInsert			float64	`bson:"total insert calls"`
-	TotalRemove			float64	`bson:"total remove calls"`
-	TotalSearch			float64	`bson:"total search calls"`
-	TotalUpdate			float64	`bson:"total update calls"`
-}
-
-func (stats *WTAsyncStats) Export(ch chan<- prometheus.Metric) {
-	wtAsyncWorkQueueLength.Set(stats.WorkQueueLength)
-	wtAsyncMaxWorkQueueLength.Set(stats.MaxWorkQueueLength)
-}
-
-func (stats *WTAsyncStats) Describe(ch chan<- *prometheus.Desc) {
-	wtAsyncWorkQueueLength.Describe(ch)
-	wtAsyncMaxWorkQueueLength.Describe(ch)
-}
-
 // blockmanager stats
 type WTBlockManagerStats struct {
 	MappedBytesRead			float64	`bson:"mapped bytes read"`
@@ -222,27 +180,6 @@ func (stats *WTCacheStats) Describe(ch chan<- *prometheus.Desc) {
 	wtCacheBytesCached.Describe(ch)
 	wtCacheBytesMax.Describe(ch)
 	wtCachePercentOverhead.Describe(ch)
-}
-
-// connection stats
-type WTConnectionStats struct {
-	OpenFiles			float64 `bson:"files currently open"`
-	// the slash in "I/Os" breaks bson's flag parser (fixme)
-	//TotalReadIOs			float64 `bson:"total read I/Os"`
-	//TotalWriteIOs			float64 `bson:"total write I/Os"`
-}
-
-// cursor stats
-type WTCursorStats struct {
-	CreateCalls			float64 `bson:"cursor create calls"`
-	InsertCalls			float64 `bson:"cursor insert calls"`
-	NextCalls			float64 `bson:"cursor next calls"`
-	PrevCalls			float64 `bson:"cursor prev calls"`
-	RemoveCalls			float64 `bson:"cursor remove calls"`
-	ResetCalls			float64 `bson:"cursor reset calls"`
-	SearchCalls			float64 `bson:"cursor search calls"`
-	SearchNearCalls			float64 `bson:"cursor search near calls"`
-	UpdateCalls			float64 `bson:"cursor update calls"`
 }
 
 // log stats
@@ -343,11 +280,8 @@ func (stats *WTConcurrentTransactionsStats) Describe(ch chan<- *prometheus.Desc)
 
 // WiredTiger stats
 type WiredTigerStats struct {
-	Async			*WTAsyncStats			`bson:"async"`
 	BlockManager		*WTBlockManagerStats		`bson:"block-manager"`
 	Cache			*WTCacheStats			`bson:"cache"`
-	Connection		*WTConnectionStats		`bson:"connection"`
-	Cursor			*WTCursorStats			`bson:"cursor"`
 	Log			*WTLogStats			`bson:"log"`
 	Session			*WTSessionStats			`bson:"session"`
 	Transaction		*WTTransactionStats		`bson:"transaction"`
@@ -355,9 +289,6 @@ type WiredTigerStats struct {
 }
 
 func (stats *WiredTigerStats) Describe(ch chan<- *prometheus.Desc) {
-	if stats.Async != nil {
-		stats.Async.Describe(ch)
-	}
 	if stats.BlockManager != nil {
 		stats.BlockManager.Describe(ch)
 	}
@@ -392,15 +323,9 @@ func (stats *WiredTigerStats) Describe(ch chan<- *prometheus.Desc) {
 	wtConcurrentTransactionsOut.Describe(ch)
 	wtConcurrentTransactionsAvailable.Describe(ch)
 	wtConcurrentTransactionsTotalTickets.Describe(ch)
-
-	wtAsyncWorkQueueLength.Describe(ch)
-	wtAsyncMaxWorkQueueLength.Describe(ch)
 }
 
 func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
-	if stats.Async != nil {
-		stats.Async.Export(ch)
-	}
 	if stats.BlockManager != nil {
 		stats.BlockManager.Export(ch)
 	}
@@ -438,7 +363,4 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 	wtConcurrentTransactionsOut.Collect(ch)
 	wtConcurrentTransactionsAvailable.Collect(ch)
 	wtConcurrentTransactionsTotalTickets.Collect(ch)
-
-	wtAsyncWorkQueueLength.Collect(ch)
-	wtAsyncMaxWorkQueueLength.Collect(ch)
 }
