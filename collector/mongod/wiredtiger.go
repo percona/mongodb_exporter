@@ -38,6 +38,12 @@ var (
 		Name:		"bytes",
 		Help:		"The current size of data in the WiredTiger Cache in bytes",
 	}, []string{"type"})
+	wtCacheMaxBytes = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace:	Namespace,
+		Subsystem:	"wiredtiger_cache",
+		Name:		"max_bytes",
+		Help:		"The maximum size of data in the WiredTiger Cache in bytes",
+	})
 	wtCacheBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
@@ -86,6 +92,18 @@ var(
 )
 
 var(
+	wtLogRecordsScannedTotal = prometheus.NewCounter(prometheus.CounterOpts{
+                Namespace:      Namespace,
+                Subsystem:      "wiredtiger_log",
+                Name:           "records_scanned_total",
+                Help:           "The total number of records scanned by log scan in the WiredTiger log",
+        })
+	wtLogRecordsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+                Namespace:      Namespace,
+                Subsystem:      "wiredtiger_log",
+                Name:           "records_total",
+                Help:           "The total number of compressed/uncompressed records written to the WiredTiger log",
+        }, []string{"type"})
 	wtLogBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
                 Namespace:      Namespace,
                 Subsystem:      "wiredtiger_log",
@@ -189,7 +207,7 @@ func (stats *WTCacheStats) Export(ch chan<- prometheus.Metric) {
 	wtCachePages.WithLabelValues("dirty").Set(stats.PagesDirty)
 	wtCacheBytes.WithLabelValues("total").Set(stats.BytesTotal)
 	wtCacheBytes.WithLabelValues("dirty").Set(stats.BytesDirty)
-	wtCacheBytes.WithLabelValues("max").Set(stats.MaxBytes)
+	wtCacheMaxBytes.Set(stats.MaxBytes)
 	wtCachePercentOverhead.Set(stats.PercentOverhead)
 }
 
@@ -197,19 +215,22 @@ func (stats *WTCacheStats) Describe(ch chan<- *prometheus.Desc) {
 	wtCachePagesTotal.Describe(ch)
 	wtCacheEvictedTotal.Describe(ch)
 	wtCachePages.Describe(ch)
-	wtCachePages.Describe(ch)
+	wtCacheBytes.Describe(ch)
+	wtCacheMaxBytes.Describe(ch)
 	wtCachePercentOverhead.Describe(ch)
 }
 
 // log stats
 type WTLogStats struct {
 	TotalBufferSize			float64 `bson:"total log buffer size"`
+	TotalSizeCompressed		float64 `bson:"total size of compressed records"`
 	BytesPayloadData		float64 `bson:"log bytes of payload data"`
 	BytesWritten			float64 `bson:"log bytes written"`
 	RecordsUncompressed		float64 `bson:"log records not compressed"`
 	RecordsCompressed		float64 `bson:"log records compressed"`
-	LogFlushes			float64 `bson:"log flush operations"`
+	RecordsProcessedLogScan		float64 `bson:"records processed by log scan"`
 	MaxLogSize			float64 `bson:"maximum log file size"`
+	LogFlushes			float64 `bson:"log flush operations"`
 	LogReads			float64 `bson:"log read operations"`
 	LogScansDouble			float64 `bson:"log scan records requiring two reads"`
 	LogScans			float64 `bson:"log scan operations"`
@@ -219,6 +240,8 @@ type WTLogStats struct {
 }
 
 func (stats *WTLogStats) Export(ch chan<- prometheus.Metric) {
+	wtLogRecordsTotal.WithLabelValues("compressed").Set(stats.RecordsCompressed)
+	wtLogRecordsTotal.WithLabelValues("uncompressed").Set(stats.RecordsUncompressed)
         wtLogBytesTotal.WithLabelValues("payload").Set(stats.BytesPayloadData)
         wtLogBytesTotal.WithLabelValues("written").Set(stats.BytesWritten)
         wtLogOperationsTotal.WithLabelValues("read").Set(stats.LogReads)
@@ -228,11 +251,14 @@ func (stats *WTLogStats) Export(ch chan<- prometheus.Metric) {
         wtLogOperationsTotal.WithLabelValues("sync").Set(stats.LogSyncs)
         wtLogOperationsTotal.WithLabelValues("sync_dir").Set(stats.LogSyncDirs)
         wtLogOperationsTotal.WithLabelValues("flush").Set(stats.LogFlushes)
+	wtLogRecordsScannedTotal.Set(stats.RecordsProcessedLogScan)
 }
 
 func (stats *WTLogStats) Describe(ch chan<- *prometheus.Desc) {
+	wtLogRecordsTotal.Describe(ch)
 	wtLogBytesTotal.Describe(ch)
 	wtLogOperationsTotal.Describe(ch)
+	wtLogRecordsScannedTotal.Describe(ch)
 }
 
 // session stats
@@ -369,6 +395,7 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 	wtCacheEvictedTotal.Collect(ch)
 	wtCachePages.Collect(ch)
 	wtCacheBytes.Collect(ch)
+	wtCacheMaxBytes.Collect(ch)
 	wtCachePercentOverhead.Collect(ch)
 
 	wtTransactionsTotal.Collect(ch)
@@ -376,8 +403,10 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 	wtTransactionsCheckpointMs.Collect(ch)
 	wtTransactionsCheckpointsRunning.Collect(ch)
 
+	wtLogRecordsTotal.Collect(ch)
 	wtLogBytesTotal.Collect(ch)
 	wtLogOperationsTotal.Collect(ch)
+	wtLogRecordsScannedTotal.Collect(ch)
 
 	wtOpenCursors.Collect(ch)
 	wtOpenSessions.Collect(ch)
