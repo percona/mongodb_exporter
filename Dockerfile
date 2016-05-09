@@ -1,6 +1,6 @@
 FROM       alpine:latest
-MAINTAINER David Cuadrado <dacuad@facebook.com>
-EXPOSE     9001
+MAINTAINER Tim Vaillancourt <tim.vaillancourt@percona.com>
+EXPOSE     9104
 
 ENV  GOPATH /go
 ENV APPPATH $GOPATH/src/github.com/Percona-Lab/prometheus_mongodb_exporter

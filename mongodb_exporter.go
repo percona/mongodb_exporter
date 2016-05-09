@@ -20,7 +20,7 @@ func mongodbDefaultUri() string {
 }
 
 var (
-	listenAddressFlag = flag.String("web.listen-address", ":9001", "Address on which to expose metrics and web interface.")
+	listenAddressFlag = flag.String("web.listen-address", ":9104", "Address on which to expose metrics and web interface.")
 	metricsPathFlag   = flag.String("web.metrics-path", "/metrics", "Path under which to expose metrics.")
 
 	mongodbURIFlag    = flag.String("mongodb.uri", mongodbDefaultUri(), "Mongodb URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
