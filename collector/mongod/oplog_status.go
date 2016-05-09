@@ -57,18 +57,38 @@ func BsonMongoTimestampToUnix(timestamp bson.MongoTimestamp) float64 {
 
 func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
 	oplogTimestamps := &OplogTimestamps{}
-	result := struct {
-		TailTimestamp	bson.MongoTimestamp	`bson:"tail"`
-		HeadTimestamp	bson.MongoTimestamp	`bson:"head"`
-	}{}
-	group := bson.M{ "_id" : 1, "tail" : bson.M{ "$min" : "$ts" }, "head" : bson.M{ "$max" : "$ts" } }
-	err := session.DB("local").C("oplog.rs").Pipe([]bson.M{{ "$group" : group  }}).One(&result)
+	var err error
+
+	// retry once if there is an error
+	var tries int64 = 0
+	var head_result struct { Timestamp	bson.MongoTimestamp	`bson:"ts"` }
+	for tries < 2 {
+		err = session.DB("local").C("oplog.rs").Find(nil).Sort("-$natural").Limit(1).One(&head_result)
+		if err == nil {
+			break
+		}
+		tries += 1
+	}
 	if err != nil {
 		return oplogTimestamps, err
 	}
 
-	oplogTimestamps.Tail = BsonMongoTimestampToUnix(result.TailTimestamp)
-	oplogTimestamps.Head = BsonMongoTimestampToUnix(result.HeadTimestamp)
+	// retry once if there is an error
+	tries = 0
+	var tail_result struct { Timestamp	bson.MongoTimestamp	`bson:"ts"` }
+	for tries < 2 {
+		err = session.DB("local").C("oplog.rs").Find(nil).Sort("$natural").Limit(1).One(&tail_result)
+		if err == nil {
+			break
+		}
+		tries += 1
+	}
+	if err != nil {
+		return oplogTimestamps, err
+	}
+
+	oplogTimestamps.Tail = BsonMongoTimestampToUnix(tail_result.Timestamp)
+	oplogTimestamps.Head = BsonMongoTimestampToUnix(head_result.Timestamp)
 	return oplogTimestamps, err
 }
 
