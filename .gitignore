@@ -1,4 +1,3 @@
 .build
 dependencies-stamp
 mongodb_exporter
-prometheus_mongodb_exporter
