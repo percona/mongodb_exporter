@@ -100,5 +100,6 @@ func main() {
 	shared.ParseEnabledGroups(*enabledGroupsFlag)
 
 	fmt.Println("### Warning: the exporter is in beta/experimental state and field names are very\n### likely to change in the future and features may change or get removed!\n### See: https://github.com/Percona-Lab/prometheus_mongodb_exporter for updates")
+	fmt.Printf("Starting mongodb_exporter version: %s, git commit: %s\n", version, versionGitCommit)
 	startWebServer()
 }
