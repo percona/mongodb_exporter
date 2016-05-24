@@ -50,7 +50,7 @@ GO_VERSION ?= 1.5.3
 GOURL      ?= https://golang.org/dl
 GOPKG      ?= go$(GO_VERSION).$(GOOS)-$(GOARCH).tar.gz
 GOPATH     := $(CURDIR)/.build/gopath
-GOFLAGS    := -ldflags "-X main.version=$(VERSION) -X main.versionGitCommit=$(GIT_COMMIT)"
+GOFLAGS    := $(GOFLAGS) -ldflags "-X main.version=$(VERSION) -X main.versionGitCommit=$(GIT_COMMIT)"
 
 
 # Check for the correct version of go in the path. If we find it, use it.
