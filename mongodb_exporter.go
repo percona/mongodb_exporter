@@ -20,7 +20,7 @@ func mongodbDefaultUri() string {
 }
 
 var (
-	version string          = "unknown"
+	version          string = "unknown"
 	versionGitCommit string = "unknown"
 
 	doPrintVersion    = flag.Bool("version", false, "Print version info and exit.")
