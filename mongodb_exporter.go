@@ -91,7 +91,7 @@ func registerCollector() {
 func main() {
 	flag.Parse()
 
-	if *printVersion && version != "" && versionGitCommit != "" {
+	if *printVersion {
 		fmt.Printf("mongodb_exporter version: %s\n", version)
 		fmt.Printf("git commit hash: %s\n", versionGitCommit)
 		os.Exit(0)
