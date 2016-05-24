@@ -20,6 +20,10 @@ func mongodbDefaultUri() string {
 }
 
 var (
+	version string = "unknown"
+	versionGitCommit string = "unknown"
+
+	printVersion      = flag.Bool("version", false, "Print version info and exit.")
 	listenAddressFlag = flag.String("web.listen-address", ":9104", "Address on which to expose metrics and web interface.")
 	metricsPathFlag   = flag.String("web.metrics-path", "/metrics", "Path under which to expose metrics.")
 
@@ -86,6 +90,13 @@ func registerCollector() {
 
 func main() {
 	flag.Parse()
+
+	if *printVersion && version != "" && versionGitCommit != "" {
+		fmt.Printf("mongodb_exporter version: %s\n", version)
+		fmt.Printf("git commit hash: %s\n", versionGitCommit)
+		os.Exit(0)
+	}
+
 	shared.ParseEnabledGroups(*enabledGroupsFlag)
 
 	fmt.Println("### Warning: the exporter is in beta/experimental state and field names are very\n### likely to change in the future and features may change or get removed!\n### See: https://github.com/Percona-Lab/prometheus_mongodb_exporter for updates")
