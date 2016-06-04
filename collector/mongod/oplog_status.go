@@ -1,6 +1,7 @@
 package collector_mongod
 
 import (
+	"time"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/mgo.v2"
@@ -40,13 +41,9 @@ type OplogCollectionStats struct {
 	StorageSize	float64 `bson:"storageSize"`
 }
 
-type OplogTimestamps struct {
-	Tail	float64
-	Head	float64
-}
-
 type OplogStatus struct {
-	OplogTimestamps	*OplogTimestamps
+	TailTimestamp	float64
+	HeadTimestamp	float64
 	CollectionStats	*OplogCollectionStats
 }
 
@@ -55,41 +52,27 @@ func BsonMongoTimestampToUnix(timestamp bson.MongoTimestamp) float64 {
 	return float64(timestamp >> 32)
 }
 
-func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
-	oplogTimestamps := &OplogTimestamps{}
+func GetOplogTimestamp(session *mgo.Session, returnTail bool) (float64, error) {
+	var sortBy string = "$natural"
+	if returnTail {
+		sortBy = "-$natural"
+	}
+
 	var err error
-
-	// retry once if there is an error
-	var tries int64 = 0
-	var head_result struct { Timestamp	bson.MongoTimestamp	`bson:"ts"` }
-	for tries < 2 {
-		err = session.DB("local").C("oplog.rs").Find(nil).Sort("-$natural").Limit(1).One(&head_result)
-		if err == nil {
-			break
+	var tries int    = 0
+	var maxTries int = 2
+	var result struct { Timestamp bson.MongoTimestamp `bson:"ts"` }
+	for tries < maxTries {
+		err = session.DB("local").C("oplog.rs").Find(nil).Sort(sortBy).Limit(1).One(&result)
+		if err != nil {
+			tries += 1
+			time.Sleep(500 * time.Millisecond)
+		} else {
+			return BsonMongoTimestampToUnix(result.Timestamp), err
 		}
-		tries += 1
-	}
-	if err != nil {
-		return oplogTimestamps, err
 	}
 
-	// retry once if there is an error
-	tries = 0
-	var tail_result struct { Timestamp	bson.MongoTimestamp	`bson:"ts"` }
-	for tries < 2 {
-		err = session.DB("local").C("oplog.rs").Find(nil).Sort("$natural").Limit(1).One(&tail_result)
-		if err == nil {
-			break
-		}
-		tries += 1
-	}
-	if err != nil {
-		return oplogTimestamps, err
-	}
-
-	oplogTimestamps.Tail = BsonMongoTimestampToUnix(tail_result.Timestamp)
-	oplogTimestamps.Head = BsonMongoTimestampToUnix(head_result.Timestamp)
-	return oplogTimestamps, err
+	return 0, err
 }
 
 func GetOplogCollectionStats(session *mgo.Session) (*OplogCollectionStats, error) {
@@ -106,9 +89,9 @@ func (status *OplogStatus) Export(ch chan<- prometheus.Metric) {
 		oplogStatusSizeBytes.WithLabelValues("current").Set(status.CollectionStats.Size)
 		oplogStatusSizeBytes.WithLabelValues("storage").Set(status.CollectionStats.StorageSize)
 	}
-	if status.OplogTimestamps != nil {
-		oplogStatusHeadTimestamp.Set(status.OplogTimestamps.Head)
-		oplogStatusTailTimestamp.Set(status.OplogTimestamps.Tail)
+	if status.HeadTimestamp != 0 && status.TailTimestamp != 0 {
+		oplogStatusHeadTimestamp.Set(status.HeadTimestamp)
+		oplogStatusTailTimestamp.Set(status.TailTimestamp)
 	}
 
 	oplogStatusCount.Collect(ch)
@@ -125,12 +108,23 @@ func (status *OplogStatus) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func GetOplogStatus(session *mgo.Session) *OplogStatus {
+	oplogStatus          := &OplogStatus{}
 	collectionStats, err := GetOplogCollectionStats(session)
-	oplogTimestamps, err := GetOplogTimestamps(session)
 	if err != nil {
-		glog.Error("Failed to get oplog status.")
+		glog.Error("Failed to get local.oplog_rs collection stats.")
 		return nil
 	}
 
-	return &OplogStatus{CollectionStats:collectionStats,OplogTimestamps:oplogTimestamps}
+	headTimestamp, err := GetOplogTimestamp(session, false)
+	tailTimestamp, err := GetOplogTimestamp(session, true)
+	if err != nil {
+		glog.Error("Failed to get oplog head or tail timestamps.")
+		return nil
+	}
+
+	oplogStatus.CollectionStats = collectionStats
+	oplogStatus.HeadTimestamp   = headTimestamp
+	oplogStatus.TailTimestamp   = tailTimestamp
+
+	return oplogStatus
 }
