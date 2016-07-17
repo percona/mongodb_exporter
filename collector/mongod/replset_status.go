@@ -141,7 +141,21 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	if replStatus.HeartbeatIntervalMillis != nil {
 		heartbeatIntervalMillis.WithLabelValues(replStatus.Set).Set(*replStatus.HeartbeatIntervalMillis)
 	}
-
+	
+	// clear redundant information
+	myState.Reset()
+	term.Reset()
+	numberOfMembers.Reset()
+	heartbeatIntervalMillis.Reset()
+	memberState.Reset()
+	memberHealth.Reset()
+	memberUptime.Reset()
+	memberOptimeDate.Reset()
+	memberElectionDate.Reset()
+	memberLastHeartbeat.Reset()
+	memberLastHeartbeatRecv.Reset()
+	memberPingMs.Reset()
+	memberConfigVersion.Reset()
 	for _, member := range replStatus.Members {
 		ls := prometheus.Labels{
 			"set":   replStatus.Set,
