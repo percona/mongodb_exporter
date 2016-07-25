@@ -60,11 +60,10 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		glog.Infof("Connected to: %s (node type: %s, server version: %s)", exporter.Opts.URI, nodeType, serverVersion)
+	        exporter.collectServerStatus(mongoSess, ch)
 		switch {
 			case nodeType == "mongos":
 				exporter.collectMongos(mongoSess, ch)
-			case nodeType == "mongod":
-				exporter.collectMongod(mongoSess, ch)
 			case nodeType == "replset":
 				exporter.collectMongodReplSet(mongoSess, ch)
 			default:
@@ -73,13 +72,15 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- prometheus.Metric) {
+func (exporter *MongodbCollector) collectServerStatus(session *mgo.Session, ch chan<- prometheus.Metric) {
 	glog.Info("Collecting Server Status")
 	serverStatus := GetServerStatus(session)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
 	}
+}
 
+func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- prometheus.Metric) {
 	glog.Info("Collecting Sharding Status")
 	shardingStatus := GetShardingStatus(session)
 	if shardingStatus != nil {
@@ -87,17 +88,7 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 	}
 }
 
-func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- prometheus.Metric) {
-	glog.Info("Collecting Server Status")
-	serverStatus := GetServerStatus(session)
-	if serverStatus != nil {
-		serverStatus.Export(ch)
-	}
-}
-
 func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch chan<- prometheus.Metric) {
-	exporter.collectMongod(session, ch)
-
 	glog.Info("Collecting Replset Status")
 	replSetStatus := GetReplSetStatus(session)
 	if replSetStatus != nil {
