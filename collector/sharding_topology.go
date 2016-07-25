@@ -1,4 +1,4 @@
-package collector_mongos
+package collector
 
 import (
 	"github.com/golang/glog"
