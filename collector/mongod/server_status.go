@@ -61,7 +61,8 @@ type ServerStatus struct {
 
 	Cursors *Cursors `bson:"cursors"`
 
-	WiredTiger *WiredTigerStats `bson:"wiredTiger"`
+	RocksDb		*RocksDbStats		`bson:"rocksdb"`
+	WiredTiger	*WiredTigerStats	`bson:"wiredTiger"`
 }
 
 // Export exports the server status to be consumed by prometheus.
@@ -115,6 +116,9 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	if status.Cursors != nil {
 		status.Cursors.Export(ch)
 	}
+	if status.RocksDb != nil {
+		status.RocksDb.Export(ch)
+	}
 	if status.WiredTiger != nil {
 		status.WiredTiger.Export(ch)
 	}
@@ -167,6 +171,9 @@ func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
 	}
 	if status.Cursors != nil {
 		status.Cursors.Describe(ch)
+	}
+	if status.RocksDb != nil {
+		status.RocksDb.Describe(ch)
 	}
 	if status.WiredTiger != nil {
 		status.WiredTiger.Describe(ch)
