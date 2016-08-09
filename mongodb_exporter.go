@@ -20,7 +20,11 @@ func mongodbDefaultUri() string {
 }
 
 var (
-	listenAddressFlag = flag.String("web.listen-address", ":9001", "Address on which to expose metrics and web interface.")
+	version          string = "unknown"
+	versionGitCommit string = "unknown"
+
+	doPrintVersion    = flag.Bool("version", false, "Print version info and exit.")
+	listenAddressFlag = flag.String("web.listen-address", ":9104", "Address on which to expose metrics and web interface.")
 	metricsPathFlag   = flag.String("web.metrics-path", "/metrics", "Path under which to expose metrics.")
 
 	mongodbURIFlag    = flag.String("mongodb.uri", mongodbDefaultUri(), "Mongodb URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
@@ -28,6 +32,10 @@ var (
 	authUserFlag      = flag.String("auth.user", "", "Username for basic auth.")
 	authPassFlag      = flag.String("auth.pass", "", "Password for basic auth.")
 )
+
+func printVersion() {
+	fmt.Printf("mongodb_exporter version: %s, git commit hash: %s\n", version, versionGitCommit)
+}
 
 type basicAuthHandler struct {
 	handler  http.HandlerFunc
@@ -64,6 +72,7 @@ func prometheusHandler() http.Handler {
 }
 
 func startWebServer() {
+	printVersion()
 	fmt.Printf("Listening on %s\n", *listenAddressFlag)
 	handler := prometheusHandler()
 
@@ -86,8 +95,15 @@ func registerCollector() {
 
 func main() {
 	flag.Parse()
+
+	if *doPrintVersion {
+		printVersion()
+		os.Exit(0)
+	}
+
 	shared.ParseEnabledGroups(*enabledGroupsFlag)
 
 	fmt.Println("### Warning: the exporter is in beta/experimental state and field names are very\n### likely to change in the future and features may change or get removed!\n### See: https://github.com/Percona-Lab/prometheus_mongodb_exporter for updates")
+
 	startWebServer()
 }

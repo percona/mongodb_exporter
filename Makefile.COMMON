@@ -40,6 +40,8 @@
 VERSION ?= $(error VERSION not set in including Makefile)
 TARGET  ?= $(error TARGET not set in including Makefile)
 
+GIT_COMMIT := $(shell git rev-parse HEAD)
+
 SRC    ?= $(shell find . -type f -name "*.go" ! -path "./.build/*")
 GOOS   ?= $(shell uname | tr A-Z a-z)
 GOARCH ?= $(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m)))
@@ -48,6 +50,8 @@ GO_VERSION ?= 1.5.3
 GOURL      ?= https://golang.org/dl
 GOPKG      ?= go$(GO_VERSION).$(GOOS)-$(GOARCH).tar.gz
 GOPATH     := $(CURDIR)/.build/gopath
+GOFLAGS    := $(GOFLAGS) -ldflags "-X main.version=$(VERSION) -X main.versionGitCommit=$(GIT_COMMIT)"
+
 
 # Check for the correct version of go in the path. If we find it, use it.
 # Otherwise, prepare to build go locally.
