@@ -12,6 +12,7 @@ The exporter is in beta/experimental state and field names are **very likely to 
 - MongoDB Replica Set metrics (*members, ping, replication lag, etc*)
 - MongoDB Replication Oplog metrics (*size, length in time, etc*)
 - MongoDB Sharding metrics (*shards, chunks, db/collections, balancer operations*)
+- MongoDB RocksDB storage-engine metrics (*levels, compactions, cache usage, i/o rates, etc*)
 - MongoDB WiredTiger storage-engine metrics (*cache, blockmanger, tickets, etc*)
 
 ### Building
@@ -60,8 +61,7 @@ Point the process to any mongo port and it will detect if it is a mongos, replic
 ### Roadmap
 
 - Document more configurations options here
-- Stabilize WiredTiger support (*currently beta/experimental*)
-- Add support for PerconaFT and RocksDB storage engines
+- Stabilize RocksDB and WiredTiger support (*currently beta/experimental*)
 - Move MongoDB user/password/authdb to a file (for security)
 - Write more go tests
 - Version scheme
