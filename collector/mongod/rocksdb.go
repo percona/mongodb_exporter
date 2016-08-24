@@ -265,25 +265,43 @@ var (
 	}, []string{"level"})
 )
 
+type RocksDbStatsCounters struct {
+	NumKeysWritten		float64	`bson:"num-keys-written"`
+	NumKeysRead		float64	`bson:"num-keys-read"`
+	NumSeeks		float64	`bson:"num-seeks"`
+	NumForwardIter		float64	`bson:"num-forward-iterations"`	
+	NumBackwardIter		float64	`bson:"num-backward-iterations"`	
+	BlockCacheMisses	float64	`bson:"block-cache-misses"`
+	BlockCacheHits		float64	`bson:"block-cache-hits"`
+	BloomFilterUseful	float64 `bson:"bloom-filter-useful"`
+	BytesWritten		float64 `bson:"bytes-written"`
+	BytesReadPointLookup	float64	`bson:"bytes-read-point-lookup"`
+	BytesReadIteration	float64 `bson:"bytes-read-iteration"`
+	FlushBytesWritten	float64 `bson:"flush-bytes-written"`
+	CompactionBytesRead	float64	`bson:"compaction-bytes-read"`
+	CompactionBytesWritten	float64	`bson:"compaction-bytes-written"`
+}
+
 type RocksDbStats struct {
-	NumImmutableMemTable		string		`bson:"num-immutable-mem-table"`
-	MemTableFlushPending		string		`bson:"mem-table-flush-pending"`
-	CompactionPending		string		`bson:"compaction-pending"`
-	BackgroundErrors		string		`bson:"background-errors"`
-	CurSizeMemTableActive		string		`bson:"cur-size-active-mem-table"`
-	CurSizeAllMemTables		string		`bson:"cur-size-all-mem-tables"`
-	NumEntriesMemTableActive	string		`bson:"num-entries-active-mem-table"`
-	NumEntriesImmMemTables		string		`bson:"num-entries-imm-mem-tables"`
-	EstimateTableReadersMem		string		`bson:"estimate-table-readers-mem"`
-	NumSnapshots			string		`bson:"num-snapshots"`
-	OldestSnapshotTime		string		`bson:"oldest-snapshot-time"`
-	NumLiveVersions			string		`bson:"num-live-versions"`
-	BlockCacheUsage			string		`bson:"block-cache-usage"`
-	TotalLiveRecoveryUnits		float64		`bson:"total-live-recovery-units"`
-	TransactionEngineKeys		float64		`bson:"transaction-engine-keys"`
-	TransactionEngineSnapshots	float64		`bson:"transaction-engine-snapshots"`
-	Stats				[]string	`bson:"stats"`
-	ThreadStatus			[]string	`bson:"thread-status"`
+	NumImmutableMemTable		string			`bson:"num-immutable-mem-table"`
+	MemTableFlushPending		string			`bson:"mem-table-flush-pending"`
+	CompactionPending		string			`bson:"compaction-pending"`
+	BackgroundErrors		string			`bson:"background-errors"`
+	CurSizeMemTableActive		string			`bson:"cur-size-active-mem-table"`
+	CurSizeAllMemTables		string			`bson:"cur-size-all-mem-tables"`
+	NumEntriesMemTableActive	string			`bson:"num-entries-active-mem-table"`
+	NumEntriesImmMemTables		string			`bson:"num-entries-imm-mem-tables"`
+	EstimateTableReadersMem		string			`bson:"estimate-table-readers-mem"`
+	NumSnapshots			string			`bson:"num-snapshots"`
+	OldestSnapshotTime		string			`bson:"oldest-snapshot-time"`
+	NumLiveVersions			string			`bson:"num-live-versions"`
+	BlockCacheUsage			string			`bson:"block-cache-usage"`
+	TotalLiveRecoveryUnits		float64			`bson:"total-live-recovery-units"`
+	TransactionEngineKeys		float64			`bson:"transaction-engine-keys"`
+	TransactionEngineSnapshots	float64			`bson:"transaction-engine-snapshots"`
+	Stats				[]string		`bson:"stats"`
+	ThreadStatus			[]string		`bson:"thread-status"`
+	Counters			*RocksDbStatsCounters	`bson:"counters,omitempty"`
 }
 
 type RocksDbLevelStatsFiles struct {
