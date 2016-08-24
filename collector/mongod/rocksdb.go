@@ -92,6 +92,12 @@ var (
 		Name:		"compaction_keys_total",
 		Help:		"The number of keys compared during compactions in RocksDB",
 	}, []string{"level", "type"})
+	rocksDbBlockCacheOps = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"block_cache_operations_total",
+		Help:		"The number of operations in the RocksDB Block Cache",
+	}, []string{"type"})
 )
 
 var (
@@ -532,6 +538,16 @@ func (stats *RocksDbStats) ProcessStalls() {
 	}
 }
 
+func (stats *RocksDbStatsCounters) Describe(ch chan<- *prometheus.Desc) {
+	rocksDbBlockCacheOps.Describe(ch)
+}
+
+func (stats *RocksDbStatsCounters) Export(ch chan<- prometheus.Metric) {
+	rocksDbBlockCacheOps.WithLabelValues("hits").Set(stats.BlockCacheHits)
+	rocksDbBlockCacheOps.WithLabelValues("misses").Set(stats.BlockCacheMisses)
+	rocksDbBlockCacheOps.Collect(ch)
+}
+
 func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbWriteOps.Describe(ch)
 	rocksDbWriteKeys.Describe(ch)
@@ -573,6 +589,11 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbTotalLiveRecoveryUnits.Describe(ch)
 	rocksDbTransactionEngineKeys.Describe(ch)
 	rocksDbTransactionEngineSnapshots.Describe(ch)
+
+	// optional RocksDB counters
+	if stats.Counters != nil {
+		stats.Counters.Describe(ch)
+	}
 }
 
 func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
@@ -660,4 +681,9 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbEstimateTableReadersMem.Collect(ch)
 	rocksDbBlockCacheUsage.Collect(ch)
 	rocksDbStalls.Collect(ch)
+
+	// optional RocksDB counters
+	if stats.Counters != nil {
+		stats.Counters.Export(ch)
+	}
 }
