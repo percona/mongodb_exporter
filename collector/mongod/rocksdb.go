@@ -7,12 +7,16 @@ import(
 )
 
 var (
-	// byte size constants:
+	// byte-size and unit constants:
 	kilobyte float64 = 1024
 	megabyte float64 = kilobyte * 1024
 	gigabyte float64 = megabyte * 1024
 	terabyte float64 = gigabyte * 1024
 	petabyte float64 = terabyte * 1024
+	thousand float64 = 1000
+	million	 float64 = thousand * 1000
+	billion  float64 = million * 1000
+	trillion float64 = billion * 1000
 
 	rocksDbWriteOps = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace:	Namespace,
@@ -344,16 +348,34 @@ func ParseStr(str string) float64 {
 	} else if strings.Contains(str, " PB") || strings.HasSuffix(str, "PB") {
 		multiply = petabyte
 		str_remove = "PB"
+	} else if strings.HasSuffix(str, " B") {
+		str_remove = " B"
+	} else if strings.HasSuffix(str, "H:M:S") {
+		return ParseTime(str)
 	} else if strings.Contains(str, "K") {
 		first_field := strings.Split(str, " ")[0]
 		if strings.HasSuffix(first_field, "K") {
-			multiply = 1000
+			multiply = thousand
 			str_remove = "K"
 		}
-	} else if strings.HasSuffix(str, "B") {
-		str_remove = "B"
-	} else if strings.HasSuffix(str, "H:M:S") {
-		return ParseTime(str)
+	} else if strings.Contains(str, "M") {
+		first_field := strings.Split(str, " ")[0]
+		if strings.HasSuffix(first_field, "M") {
+			str_remove = "M"
+			multiply = million
+		}
+	} else if strings.Contains(str, "B") {
+		first_field := strings.Split(str, " ")[0]
+		if strings.HasSuffix(first_field, "B") {
+			str_remove = "B"
+			multiply = billion
+		}
+	} else if strings.Contains(str, "T") {
+		first_field := strings.Split(str, " ")[0]
+		if strings.HasSuffix(first_field, "T") {
+			str_remove = "T"
+			multiply = trillion
+		}
 	}
 
 	if str_remove != "" {
