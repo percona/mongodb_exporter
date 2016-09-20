@@ -684,17 +684,17 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 		stats.Counters.Export(ch)
 
 		// read latency stats get added to 'stats' when in counter-mode
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "count"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 0))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "avg"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 2))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "stddev"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 4))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "min"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 0))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "median"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 2))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "max"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 4))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "P50"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 1))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "P75"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 3))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "P99"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 5))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "P99.9"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 7))
-		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "level0", "type": "P99.99"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 9))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "count"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 0))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "avg"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 2))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "stddev"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 4))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "min"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 0))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "median"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 2))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "max"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 4))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "P50"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 1))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "P75"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 3))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "P99"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 5))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "P99.9"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 7))
+		rocksDbReadLatencyMicros.With(prometheus.Labels{"level": "L0", "type": "P99.99"}).Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 9))
 		rocksDbReadLatencyMicros.Collect(ch)
 	}
 }
