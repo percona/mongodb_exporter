@@ -605,7 +605,7 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	if stats.Counters != nil {
 		stats.Counters.Describe(ch)
 
-		// level0 read latency stats get added to 'stats' when in counter-mode
+		// read latency stats get added to 'stats' when in counter-mode
 		rocksDbReadLatencyMicros.Describe(ch)
 	}
 }
