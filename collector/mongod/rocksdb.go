@@ -14,48 +14,6 @@ var (
 	terabyte float64 = gigabyte * 1024
 	petabyte float64 = terabyte * 1024
 
-	rocksDbWriteOps = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"writes_total",
-		Help:		"The total number of write operations in RocksDB",
-	})
-	rocksDbWriteKeys = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"writes_key_total",
-		Help:		"The total number of key write operations in RocksDB",
-	})
-	rocksDbWriteBatches = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_batches_total",
-		Help:		"The total number of write batches in RocksDB",
-	})
-	rocksDbWriteBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_bytes_total",
-		Help:		"The total number of data written by RocksDB",
-	})
-	rocksDbFlushedBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"flushed_bytes_total",
-		Help:		"The total number of flushed bytes in RocksDB",
-	})
-	rocksDbWALOperations = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_ahead_log_operations_total",
-		Help:		"The total number of Write-Ahead-Log operations in RocksDB",
-	}, []string{"type"})
-	rocksDbWALBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_ahead_log_bytes_total",
-		Help:		"The total number of Write-Ahead-Log syncs in RocksDB",
-	})
 	rocksDbStalledSecs = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
@@ -610,15 +568,8 @@ func (stats *RocksDbStatsCounters) Export(ch chan<- prometheus.Metric) {
 }
 
 func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
-	rocksDbWriteOps.Describe(ch)
-	rocksDbWriteKeys.Describe(ch)
-	rocksDbWriteBatches.Describe(ch)
-	rocksDbWriteBytes.Describe(ch)
 	rocksDbWritesPerBatch.Describe(ch)
 	rocksDbWritesPerSec.Describe(ch)
-	rocksDbFlushedBytes.Describe(ch)
-	rocksDbWALOperations.Describe(ch)
-	rocksDbWALBytes.Describe(ch)
 	rocksDbWALBytesPerSecs.Describe(ch)
 	rocksDbWALWritesPerSync.Describe(ch)
 	rocksDbStallPercent.Describe(ch)
@@ -659,16 +610,8 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 
 func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	// cumulative stats from db.serverStatus().rocksdb.stats (parsed):
-	rocksDbFlushedBytes.Set(stats.GetStatsLineField("** Compaction Stats [default] **", "Flush(GB): ", 0) * gigabyte)
-	rocksDbWriteOps.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 0))
-	rocksDbWriteKeys.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 1))
-	rocksDbWriteBatches.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 2))
 	rocksDbWritesPerBatch.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 3))
-	rocksDbWriteBytes.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 4))
 	rocksDbWritesPerSec.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 5))
-	rocksDbWALOperations.WithLabelValues("write").Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 0))
-	rocksDbWALOperations.WithLabelValues("sync").Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 1))
-	rocksDbWALBytes.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 3))
 	rocksDbWALBytesPerSecs.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 4))
 	rocksDbWALWritesPerSync.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 2))
 	rocksDbStalledSecs.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative stall: ", 0))
@@ -701,15 +644,8 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	// process stall counts into a vector:
 	stats.ProcessStalls()
 
-	rocksDbWriteOps.Collect(ch)
-	rocksDbWriteKeys.Collect(ch)
-	rocksDbWriteBatches.Collect(ch)
-	rocksDbWriteBytes.Collect(ch)
 	rocksDbWritesPerBatch.Collect(ch)
 	rocksDbWritesPerSec.Collect(ch)
-	rocksDbFlushedBytes.Collect(ch)
-	rocksDbWALOperations.Collect(ch)
-	rocksDbWALBytes.Collect(ch)
 	rocksDbWALBytesPerSecs.Collect(ch)
 	rocksDbWALWritesPerSync.Collect(ch)
 	rocksDbStallPercent.Collect(ch)
@@ -719,7 +655,6 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbCompactionThreads.Collect(ch)
 	rocksDbLevelSizeBytes.Collect(ch)
 	rocksDbLevelScore.Collect(ch)
-	rocksDbCompactionBytes.Collect(ch)
 	rocksDbCompactionBytesPerSec.Collect(ch)
 	rocksDbCompactionWriteAmplification.Collect(ch)
 	rocksDbCompactionSecondsTotal.Collect(ch)
