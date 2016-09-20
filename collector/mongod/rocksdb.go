@@ -257,10 +257,10 @@ var (
 		Name:		"compaction_avg_seconds",
 		Help:		"The average time per compaction between levels N and N+1 in RocksDB",
 	}, []string{"level"})
-	rocksDbLevelReadMicros = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	rocksDbLevel0ReadMicros = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"level0_read_latency_micoseconds",
+		Name:		"level0_read_latency_microseconds",
 		Help:		"The Level0 read latency in RocksDB in microseconds",
 	}, []string{"type"})
 )
@@ -370,7 +370,7 @@ func ParseStr(str string) float64 {
 		}
 	} else if strings.HasSuffix(str, "B") {
 		str_remove = "B"
-	} else if strings.HasSuffix(str, "H:M:S") {
+	} else if strings.Count(str, ":") == 2 {
 		return ParseTime(str)
 	}
 
@@ -385,6 +385,7 @@ func ParseStr(str string) float64 {
 			return float * multiply
 		}
 	}
+
 	return float64(-1)
 }
 
@@ -462,7 +463,7 @@ func (stats *RocksDbStats) GetStatsLine(section_prefix string, line_prefix strin
 	for _, line := range stats.GetStatsSection(section_prefix) {
 		if strings.HasPrefix(line, line_prefix) {
 			line = strings.Replace(line, line_prefix, "", 1)
-			line = strings.Replace(line, ", ", " ", 0)
+			line = strings.Replace(line, ", ", " ", -1)
 			fields = SplitByWs(line)
 		}
 	}
@@ -493,26 +494,30 @@ func (stats *RocksDbStats) ProcessLevelStats() {
 		}
 	}
 	for _, level := range levels {
-		if level.Level != "L0" {
-			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "read"}).Set(level.ReadGB * gigabyte)
-			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "read_n"}).Set(level.RnGB * gigabyte)
-			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "read_np1"}).Set(level.Rnp1GB * gigabyte)
-			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "moved"}).Set(level.MovedGB * gigabyte)
-			rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": level.Level, "type": "read"}).Set(level.RdMBPSec * megabyte)
-			rocksDbCompactionWriteAmplification.WithLabelValues(level.Level).Set(level.WAmp)
-			rocksDbCompactionKeys.With(prometheus.Labels{"level": level.Level, "type": "in"}).Set(level.KeyIn)
-			rocksDbCompactionKeys.With(prometheus.Labels{"level": level.Level, "type": "drop"}).Set(level.KeyDrop)
+		levelName := level.Level
+		if levelName == "Sum" {
+			levelName = "total"
 		}
-		rocksDbLevelScore.WithLabelValues(level.Level).Set(level.Score)
-		rocksDbLevelNumFiles.WithLabelValues(level.Level).Set(level.Files.Num)
-		rocksDbCompactionThreads.WithLabelValues(level.Level).Set(level.Files.CompThreads)
-		rocksDbLevelSizeBytes.WithLabelValues(level.Level).Set(level.SizeMB * megabyte)
-		rocksDbCompactionSecondsTotal.WithLabelValues(level.Level).Set(level.CompSec)
-		rocksDbCompactionAvgSeconds.WithLabelValues(level.Level).Set(level.AvgSec)
-		rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "write"}).Set(level.WriteGB * gigabyte)
-		rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "write_new_np1"}).Set(level.WriteGB * gigabyte)
-		rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": level.Level, "type": "write"}).Set(level.WrMBPSec * megabyte)
-		rocksDbCompactionsTotal.WithLabelValues(level.Level).Set(level.CompCnt)
+		if levelName != "L0" {
+			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "read"}).Set(level.ReadGB * gigabyte)
+			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "read_n"}).Set(level.RnGB * gigabyte)
+			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "read_np1"}).Set(level.Rnp1GB * gigabyte)
+			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "moved"}).Set(level.MovedGB * gigabyte)
+			rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": levelName, "type": "read"}).Set(level.RdMBPSec * megabyte)
+			rocksDbCompactionWriteAmplification.WithLabelValues(levelName).Set(level.WAmp)
+			rocksDbCompactionKeys.With(prometheus.Labels{"level": levelName, "type": "in"}).Set(level.KeyIn)
+			rocksDbCompactionKeys.With(prometheus.Labels{"level": levelName, "type": "drop"}).Set(level.KeyDrop)
+		}
+		rocksDbLevelScore.WithLabelValues(levelName).Set(level.Score)
+		rocksDbLevelNumFiles.WithLabelValues(levelName).Set(level.Files.Num)
+		rocksDbCompactionThreads.WithLabelValues(levelName).Set(level.Files.CompThreads)
+		rocksDbLevelSizeBytes.WithLabelValues(levelName).Set(level.SizeMB * megabyte)
+		rocksDbCompactionSecondsTotal.WithLabelValues(levelName).Set(level.CompSec)
+		rocksDbCompactionAvgSeconds.WithLabelValues(levelName).Set(level.AvgSec)
+		rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "write"}).Set(level.WriteGB * gigabyte)
+		rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "write_new_np1"}).Set(level.WriteGB * gigabyte)
+		rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": levelName, "type": "write"}).Set(level.WrMBPSec * megabyte)
+		rocksDbCompactionsTotal.WithLabelValues(levelName).Set(level.CompCnt)
 	}
 }
 
@@ -601,18 +606,18 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 		stats.Counters.Describe(ch)
 
 		// level0 read latency stats get added to 'stats' when in counter-mode
-		rocksDbLevelReadMicros.Describe(ch)
+		rocksDbLevel0ReadMicros.Describe(ch)
 	}
 }
 
 func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	// cumulative stats from db.serverStatus().rocksdb.stats (parsed):
-	rocksDbWritesPerBatch.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 3))
-	rocksDbWritesPerSec.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 5))
+	rocksDbWritesPerBatch.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 4))
+	rocksDbWritesPerSec.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 6))
 	rocksDbWALBytesPerSecs.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 4))
 	rocksDbWALWritesPerSync.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 2))
 	rocksDbStalledSecs.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative stall: ", 0))
-	rocksDbStallPercent.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative stall: ", 1))
+	rocksDbStallPercent.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative stall: ", 2))
 
 	// stats from db.serverStatus().rocksdb (parsed):
 	rocksDbNumImmutableMemTable.Set(ParseStr(stats.NumImmutableMemTable))
@@ -679,17 +684,17 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 		stats.Counters.Export(ch)
 
 		// level0 read latency stats get added to 'stats' when in counter-mode
-		rocksDbLevelReadMicros.WithLabelValues("count").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 0))
-		rocksDbLevelReadMicros.WithLabelValues("avg").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 2))
-		rocksDbLevelReadMicros.WithLabelValues("stddev").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 4))
-		rocksDbLevelReadMicros.WithLabelValues("min").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 0))
-		rocksDbLevelReadMicros.WithLabelValues("median").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 2))
-		rocksDbLevelReadMicros.WithLabelValues("max").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 4))
-		rocksDbLevelReadMicros.WithLabelValues("P50").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 1))
-		rocksDbLevelReadMicros.WithLabelValues("P75").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 3))
-		rocksDbLevelReadMicros.WithLabelValues("P99").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 5))
-		rocksDbLevelReadMicros.WithLabelValues("P99.9").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 7))
-		rocksDbLevelReadMicros.WithLabelValues("P99.99").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 9))
-		rocksDbLevelReadMicros.Collect(ch)
+		rocksDbLevel0ReadMicros.WithLabelValues("count").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 0))
+		rocksDbLevel0ReadMicros.WithLabelValues("avg").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 2))
+		rocksDbLevel0ReadMicros.WithLabelValues("stddev").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 4))
+		rocksDbLevel0ReadMicros.WithLabelValues("min").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 0))
+		rocksDbLevel0ReadMicros.WithLabelValues("median").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 2))
+		rocksDbLevel0ReadMicros.WithLabelValues("max").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 4))
+		rocksDbLevel0ReadMicros.WithLabelValues("P50").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 1))
+		rocksDbLevel0ReadMicros.WithLabelValues("P75").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 3))
+		rocksDbLevel0ReadMicros.WithLabelValues("P99").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 5))
+		rocksDbLevel0ReadMicros.WithLabelValues("P99.9").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 7))
+		rocksDbLevel0ReadMicros.WithLabelValues("P99.99").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 9))
+		rocksDbLevel0ReadMicros.Collect(ch)
 	}
 }
