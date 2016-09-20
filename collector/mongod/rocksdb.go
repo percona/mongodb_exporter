@@ -92,11 +92,47 @@ var (
 		Name:		"compaction_keys_total",
 		Help:		"The number of keys compared during compactions in RocksDB",
 	}, []string{"level", "type"})
-	rocksDbBlockCacheOps = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbBlockCache = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"block_cache_operations_total",
-		Help:		"The number of operations in the RocksDB Block Cache",
+		Name:		"block_cache_total",
+		Help:		"The total number of RocksDB Block Cache operations",
+	}, []string{"type"})
+	rocksDbKeys = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"keys_total",
+		Help:		"The total number of RocksDB key operations",
+	}, []string{"type"})
+	rocksDbSeeks = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"seeks_total",
+		Help:		"The total number of seeks performed by RocksDB",
+	})
+	rocksDbIterations = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"iterations_total",
+		Help:		"The total number of iterations performed by RocksDB",
+	}, []string{"type"})
+	rocksDbBloomFilterUseful = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"bloom_filter_useful_total",
+		Help:		"The total number of times the RocksDB Bloom Filter was useful",
+	})
+	rocksDbBytesWritten = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"bytes_written_total",
+		Help:		"The total number of bytes written by RocksDB",
+	}, []string{"type"})
+	rocksDbBytesRead = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"bytes_read_total",
+		Help:		"The total number of bytes read by RocksDB",
 	}, []string{"type"})
 )
 
@@ -177,7 +213,7 @@ var (
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
 		Name:		"block_cache_bytes",
-		Help:		"The bytes used in the RocksDB Block Cache",
+		Help:		"The current bytes used in the RocksDB Block Cache",
 	}) 
 	rocksDbTransactionEngineKeys = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
@@ -539,13 +575,38 @@ func (stats *RocksDbStats) ProcessStalls() {
 }
 
 func (stats *RocksDbStatsCounters) Describe(ch chan<- *prometheus.Desc) {
-	rocksDbBlockCacheOps.Describe(ch)
+	rocksDbBlockCache.Describe(ch)
+	rocksDbKeys.Describe(ch)
+	rocksDbSeeks.Describe(ch)
+	rocksDbIterations.Describe(ch)
+	rocksDbBloomFilterUseful.Describe(ch)
+	rocksDbBytesWritten.Describe(ch)
+	rocksDbBytesRead.Describe(ch)
 }
 
 func (stats *RocksDbStatsCounters) Export(ch chan<- prometheus.Metric) {
-	rocksDbBlockCacheOps.WithLabelValues("hits").Set(stats.BlockCacheHits)
-	rocksDbBlockCacheOps.WithLabelValues("misses").Set(stats.BlockCacheMisses)
-	rocksDbBlockCacheOps.Collect(ch)
+	rocksDbBlockCache.WithLabelValues("hits").Set(stats.BlockCacheHits)
+	rocksDbBlockCache.WithLabelValues("misses").Set(stats.BlockCacheMisses)
+	rocksDbKeys.WithLabelValues("written").Set(stats.NumKeysWritten)
+	rocksDbKeys.WithLabelValues("read").Set(stats.NumKeysRead)
+	rocksDbSeeks.Set(stats.NumSeeks)
+	rocksDbIterations.WithLabelValues("forward").Set(stats.NumForwardIter)
+	rocksDbIterations.WithLabelValues("backward").Set(stats.NumBackwardIter)
+	rocksDbBloomFilterUseful.Set(stats.BloomFilterUseful)
+	rocksDbBytesWritten.WithLabelValues("total").Set(stats.BytesWritten)
+	rocksDbBytesWritten.WithLabelValues("flush").Set(stats.FlushBytesWritten)
+	rocksDbBytesWritten.WithLabelValues("compaction").Set(stats.CompactionBytesWritten)
+	rocksDbBytesRead.WithLabelValues("point_lookup").Set(stats.BytesReadPointLookup)
+	rocksDbBytesRead.WithLabelValues("iteration").Set(stats.BytesReadIteration)
+	rocksDbBytesRead.WithLabelValues("compation").Set(stats.CompactionBytesRead)
+
+	rocksDbBlockCache.Collect(ch)
+	rocksDbKeys.Collect(ch)
+	rocksDbSeeks.Collect(ch)
+	rocksDbIterations.Collect(ch)
+	rocksDbBloomFilterUseful.Collect(ch)
+	rocksDbBytesWritten.Collect(ch)
+	rocksDbBytesRead.Collect(ch)
 }
 
 func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
