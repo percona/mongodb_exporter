@@ -263,6 +263,12 @@ var (
 		Name:		"compaction_avg_seconds",
 		Help:		"The average time per compaction between levels N and N+1 in RocksDB",
 	}, []string{"level"})
+	rocksDbLevelReadMicros = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"level0_read_latency_micoseconds",
+		Help:		"The Level0 read latency in RocksDB in microseconds",
+	}, []string{"type"})
 )
 
 type RocksDbStatsCounters struct {
@@ -392,7 +398,7 @@ func ParseStr(str string) float64 {
 func SplitByWs(str string) []string {
 	var fields []string
 	for _, field := range strings.Split(str, " ") {
-		if field != "" {
+		if field != "" && field != " " {
 			fields = append(fields, field)
 		}
 	}
@@ -462,7 +468,8 @@ func (stats *RocksDbStats) GetStatsLine(section_prefix string, line_prefix strin
 	for _, line := range stats.GetStatsSection(section_prefix) {
 		if strings.HasPrefix(line, line_prefix) {
 			line = strings.Replace(line, line_prefix, "", 1)
-			fields = strings.Split(line, ", ")
+			line = strings.Replace(line, ", ", " ", 0)
+			fields = SplitByWs(line)
 		}
 	}
 	return fields
@@ -605,6 +612,9 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	// optional RocksDB counters
 	if stats.Counters != nil {
 		stats.Counters.Describe(ch)
+
+		// level0 read latency stats get added to 'stats' when in counter-mode
+		rocksDbLevelReadMicros.Describe(ch)
 	}
 }
 
@@ -681,5 +691,19 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	// optional RocksDB counters
 	if stats.Counters != nil {
 		stats.Counters.Export(ch)
+
+		// level0 read latency stats get added to 'stats' when in counter-mode
+		rocksDbLevelReadMicros.WithLabelValues("count").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 0))
+		rocksDbLevelReadMicros.WithLabelValues("avg").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 2))
+		rocksDbLevelReadMicros.WithLabelValues("stddev").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Count: ", 4))
+		rocksDbLevelReadMicros.WithLabelValues("min").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 0))
+		rocksDbLevelReadMicros.WithLabelValues("median").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 2))
+		rocksDbLevelReadMicros.WithLabelValues("max").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Min: ", 4))
+		rocksDbLevelReadMicros.WithLabelValues("P50").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 1))
+		rocksDbLevelReadMicros.WithLabelValues("P75").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 3))
+		rocksDbLevelReadMicros.WithLabelValues("P99").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 5))
+		rocksDbLevelReadMicros.WithLabelValues("P99.9").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 7))
+		rocksDbLevelReadMicros.WithLabelValues("P99.99").Set(stats.GetStatsLineField("** Level 0 read latency histogram (micros):", "Percentiles: ", 9))
+		rocksDbLevelReadMicros.Collect(ch)
 	}
 }
