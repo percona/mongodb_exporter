@@ -215,12 +215,6 @@ var (
 		Name:		"write_ahead_log_bytes_per_second",
 		Help:		"The number of bytes written per second by the Write-Ahead-Log in RocksDB",
 	}) 
-	rocksDbNumLevels = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"num_levels",
-		Help:		"The number of compaction levels in RocksDB",
-	})
 	rocksDbLevelNumFiles = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
@@ -485,7 +479,6 @@ func (stats *RocksDbStats) GetStatsLineField(section_prefix string, line_prefix 
 }
 
 func (stats *RocksDbStats) ProcessLevelStats() {
-	var maxLvl float64 = 0
 	var levels []*RocksDbLevelStats
 	var is_section bool
 	for _, line := range stats.Stats {
@@ -500,10 +493,6 @@ func (stats *RocksDbStats) ProcessLevelStats() {
 		}
 	}
 	for _, level := range levels {
-		lvlNum := ParseStr(strings.Replace(level.Level, "L", "", 1))
-		if lvlNum > maxLvl {
-			maxLvl = lvlNum
-		}
 		if level.Level != "L0" {
 			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "read"}).Set(level.ReadGB * gigabyte)
 			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "read_n"}).Set(level.RnGB * gigabyte)
@@ -525,7 +514,6 @@ func (stats *RocksDbStats) ProcessLevelStats() {
 		rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": level.Level, "type": "write"}).Set(level.WrMBPSec * megabyte)
 		rocksDbCompactionsTotal.WithLabelValues(level.Level).Set(level.CompCnt)
 	}
-	rocksDbNumLevels.Set(maxLvl + 1)
 }
 
 func (stats *RocksDbStats) ProcessStalls() {
@@ -581,7 +569,6 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbWALWritesPerSync.Describe(ch)
 	rocksDbStallPercent.Describe(ch)
 	rocksDbStalledSecs.Describe(ch)
-	rocksDbNumLevels.Describe(ch)
 	rocksDbLevelNumFiles.Describe(ch)
 	rocksDbCompactionThreads.Describe(ch)
 	rocksDbLevelSizeBytes.Describe(ch)
@@ -660,7 +647,6 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbWALWritesPerSync.Collect(ch)
 	rocksDbStallPercent.Collect(ch)
 	rocksDbStalledSecs.Collect(ch)
-	rocksDbNumLevels.Collect(ch)
 	rocksDbLevelNumFiles.Collect(ch)
 	rocksDbCompactionThreads.Collect(ch)
 	rocksDbLevelSizeBytes.Collect(ch)
