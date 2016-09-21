@@ -362,14 +362,6 @@ func ParseStr(str string) float64 {
 	} else if strings.Contains(str, " PB") || strings.HasSuffix(str, "PB") {
 		multiply = petabyte
 		str_remove = "PB"
-	} else if strings.Contains(str, "K") {
-		first_field := strings.Split(str, " ")[0]
-		if strings.HasSuffix(first_field, "K") {
-			multiply = 1000
-			str_remove = "K"
-		}
-	} else if strings.HasSuffix(str, "B") {
-		str_remove = "B"
 	} else if strings.HasSuffix(str, "H:M:S") {
 		return ParseTime(str)
 	}
@@ -537,9 +529,9 @@ func (stats *RocksDbStats) ProcessStalls() {
 
 func (stats *RocksDbStats) ProcessReadLatencyStats() {
 	for _, level_num := range []string{"0", "1", "2", "3", "4", "5", "6"} {
+		level := "L"+level_num
 		section := "** Level "+level_num+" read latency histogram (micros):"
 		if len(stats.GetStatsSection(section)) > 0 {
-			level := "L"+level_num
 			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "count"}).Set(stats.GetStatsLineField(section, "Count: ", 0))
 			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "avg"}).Set(stats.GetStatsLineField(section, "Count: ", 2))
 			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "stddev"}).Set(stats.GetStatsLineField(section, "Count: ", 4))
