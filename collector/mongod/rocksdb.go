@@ -254,7 +254,7 @@ var (
 	rocksDbCompactionAvgSeconds = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"compaction_avg_seconds",
+		Name:		"compaction_average_seconds",
 		Help:		"The average time per compaction between levels N and N+1 in RocksDB",
 	}, []string{"level"})
 	rocksDbReadLatencyMicros = prometheus.NewGaugeVec(prometheus.GaugeOpts{
