@@ -125,7 +125,7 @@ var (
 		Name:		"memtable_bytes",
 		Help:		"The current number of MemTable bytes in RocksDB",
 	}, []string{"type"}) 
-	rocksDbMemtableItems = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	rocksDbMemtableEntries = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
 		Name:		"memtable_entries",
@@ -596,7 +596,7 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbCompactionPending.Describe(ch)
 	rocksDbBackgroundErrors.Describe(ch)
 	rocksDbMemTableBytes.Describe(ch)
-	rocksDbMemtableItems.Describe(ch)
+	rocksDbMemtableEntries.Describe(ch)
 	rocksDbEstimateTableReadersMem.Describe(ch)
 	rocksDbNumSnapshots.Describe(ch)
 	rocksDbOldestSnapshotTimestamp.Describe(ch)
@@ -630,8 +630,8 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbMemTableFlushPending.Set(ParseStr(stats.MemTableFlushPending))
 	rocksDbCompactionPending.Set(ParseStr(stats.CompactionPending))
 	rocksDbBackgroundErrors.Set(ParseStr(stats.BackgroundErrors))
-	rocksDbMemtableItems.WithLabelValues("active").Set(ParseStr(stats.NumEntriesMemTableActive))
-	rocksDbMemtableItems.WithLabelValues("immutable").Set(ParseStr(stats.NumEntriesImmMemTables))
+	rocksDbMemtableEntries.WithLabelValues("active").Set(ParseStr(stats.NumEntriesMemTableActive))
+	rocksDbMemtableEntries.WithLabelValues("immutable").Set(ParseStr(stats.NumEntriesImmMemTables))
 	rocksDbNumSnapshots.Set(ParseStr(stats.NumSnapshots))
 	rocksDbOldestSnapshotTimestamp.Set(ParseStr(stats.OldestSnapshotTime))
 	rocksDbNumLiveVersions.Set(ParseStr(stats.NumLiveVersions))
@@ -671,7 +671,7 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbMemTableFlushPending.Collect(ch)
 	rocksDbCompactionPending.Collect(ch)
 	rocksDbBackgroundErrors.Collect(ch)
-	rocksDbMemtableItems.Collect(ch)
+	rocksDbMemtableEntries.Collect(ch)
 	rocksDbNumSnapshots.Collect(ch)
 	rocksDbOldestSnapshotTimestamp.Collect(ch)
 	rocksDbNumLiveVersions.Collect(ch)
