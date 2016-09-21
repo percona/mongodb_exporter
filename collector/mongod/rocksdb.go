@@ -4,6 +4,7 @@ import(
 	"strings"
 	"strconv"
 	"github.com/prometheus/client_golang/prometheus"
+	"fmt"
 )
 
 var (
@@ -92,6 +93,12 @@ var (
 		Name:		"bytes_read_total",
 		Help:		"The total number of bytes read by RocksDB",
 	}, []string{"type"})
+	rocksDbReadOps = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"reads_total",
+		Help:		"The total number of read operations in RocksDB",
+	}, []string{"level"})
 )
 
 var (
@@ -438,7 +445,7 @@ func (stats *RocksDbStats) GetStatsSection(section_prefix string) []string {
 	var is_section bool
 	for _, line := range stats.Stats {
 		if is_section {
-			if strings.HasPrefix(line, "** ") && strings.HasSuffix(line, " **") {
+			if line == "" || strings.HasPrefix(line, "** ") && strings.HasSuffix(line, " **") {
 				break
 			} else if line != "" {
 				lines = append(lines, line)
@@ -531,8 +538,9 @@ func (stats *RocksDbStats) ProcessReadLatencyStats() {
 	for _, level_num := range []string{"0", "1", "2", "3", "4", "5", "6"} {
 		level := "L"+level_num
 		section := "** Level "+level_num+" read latency histogram (micros):"
+		fmt.Println(stats.GetStatsSection(section))
 		if len(stats.GetStatsSection(section)) > 0 {
-			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "count"}).Set(stats.GetStatsLineField(section, "Count: ", 0))
+			rocksDbReadOps.With(prometheus.Labels{"level": level}).Set(stats.GetStatsLineField(section, "Count: ", 0))
 			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "avg"}).Set(stats.GetStatsLineField(section, "Count: ", 2))
 			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "stddev"}).Set(stats.GetStatsLineField(section, "Count: ", 4))
 			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "min"}).Set(stats.GetStatsLineField(section, "Min: ", 0))
@@ -622,6 +630,7 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 
 		// read latency stats get added to 'stats' when in counter-mode
 		rocksDbReadLatencyMicros.Describe(ch)
+		rocksDbReadOps.Describe(ch)
 	}
 }
 
@@ -701,5 +710,6 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 		// read latency stats get added to 'stats' when in counter-mode
 		stats.ProcessReadLatencyStats()
 		rocksDbReadLatencyMicros.Collect(ch)
+		rocksDbReadOps.Collect(ch)
 	}
 }
