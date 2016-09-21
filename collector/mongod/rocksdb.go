@@ -125,18 +125,12 @@ var (
 		Name:		"memtable_bytes",
 		Help:		"The current number of MemTable bytes in RocksDB",
 	}, []string{"type"}) 
-	rocksDbNumEntriesMemTableActive = prometheus.NewGauge(prometheus.GaugeOpts{
+	rocksDbMemtableItems = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"memtable_active_entries",
-		Help:		"The current number of cctive MemTable entries in RocksDB",
-	}) 
-	rocksDbNumEntriesImmMemTable = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"immutable_memtable_entries",
-		Help:		"The current number of immutable MemTable entries in RocksDB",
-	}) 
+		Name:		"memtable_entries",
+		Help:		"The current number of Memtable entries in RocksDB",
+	}, []string{"type"}) 
 	rocksDbEstimateTableReadersMem = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
@@ -602,8 +596,7 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbCompactionPending.Describe(ch)
 	rocksDbBackgroundErrors.Describe(ch)
 	rocksDbMemTableBytes.Describe(ch)
-	rocksDbNumEntriesMemTableActive.Describe(ch)
-	rocksDbNumEntriesImmMemTable.Describe(ch)
+	rocksDbMemtableItems.Describe(ch)
 	rocksDbEstimateTableReadersMem.Describe(ch)
 	rocksDbNumSnapshots.Describe(ch)
 	rocksDbOldestSnapshotTimestamp.Describe(ch)
@@ -637,8 +630,8 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbMemTableFlushPending.Set(ParseStr(stats.MemTableFlushPending))
 	rocksDbCompactionPending.Set(ParseStr(stats.CompactionPending))
 	rocksDbBackgroundErrors.Set(ParseStr(stats.BackgroundErrors))
-	rocksDbNumEntriesMemTableActive.Set(ParseStr(stats.NumEntriesMemTableActive))
-	rocksDbNumEntriesImmMemTable.Set(ParseStr(stats.NumEntriesImmMemTables))
+	rocksDbMemtableItems.WithLabelValues("active").Set(ParseStr(stats.NumEntriesMemTableActive))
+	rocksDbMemtableItems.WithLabelValues("immutable").Set(ParseStr(stats.NumEntriesImmMemTables))
 	rocksDbNumSnapshots.Set(ParseStr(stats.NumSnapshots))
 	rocksDbOldestSnapshotTimestamp.Set(ParseStr(stats.OldestSnapshotTime))
 	rocksDbNumLiveVersions.Set(ParseStr(stats.NumLiveVersions))
@@ -678,8 +671,7 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbMemTableFlushPending.Collect(ch)
 	rocksDbCompactionPending.Collect(ch)
 	rocksDbBackgroundErrors.Collect(ch)
-	rocksDbNumEntriesMemTableActive.Collect(ch)
-	rocksDbNumEntriesImmMemTable.Collect(ch)
+	rocksDbMemtableItems.Collect(ch)
 	rocksDbNumSnapshots.Collect(ch)
 	rocksDbOldestSnapshotTimestamp.Collect(ch)
 	rocksDbNumLiveVersions.Collect(ch)
