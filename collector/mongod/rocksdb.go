@@ -370,7 +370,7 @@ func ParseStr(str string) float64 {
 		}
 	} else if strings.HasSuffix(str, "B") {
 		str_remove = "B"
-	} else if strings.Count(str, ":") == 2 {
+	} else if strings.HasSuffix(str, "H:M:S") {
 		return ParseTime(str)
 	}
 
@@ -463,8 +463,11 @@ func (stats *RocksDbStats) GetStatsLine(section_prefix string, line_prefix strin
 	for _, line := range stats.GetStatsSection(section_prefix) {
 		if strings.HasPrefix(line, line_prefix) {
 			line = strings.Replace(line, line_prefix, "", 1)
-			line = strings.Replace(line, ", ", " ", -1)
-			fields = SplitByWs(line)
+			if strings.Contains(line, ", ") {
+				fields = strings.Split(line, ", ")
+			} else {
+				fields = SplitByWs(line)
+			}
 		}
 	}
 	return fields
@@ -633,11 +636,11 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	// cumulative stats from db.serverStatus().rocksdb.stats (parsed):
 	rocksDbWritesPerBatch.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 4))
-	rocksDbWritesPerSec.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 6))
+	rocksDbWritesPerSec.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 5))
 	rocksDbWALBytesPerSecs.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 4))
 	rocksDbWALWritesPerSync.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 2))
 	rocksDbStalledSecs.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative stall: ", 0))
-	rocksDbStallPercent.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative stall: ", 2))
+	rocksDbStallPercent.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative stall: ", 1))
 
 	// stats from db.serverStatus().rocksdb (parsed):
 	rocksDbNumImmutableMemTable.Set(ParseStr(stats.NumImmutableMemTable))
