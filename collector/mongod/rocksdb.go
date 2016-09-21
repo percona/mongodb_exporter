@@ -4,7 +4,6 @@ import(
 	"strings"
 	"strconv"
 	"github.com/prometheus/client_golang/prometheus"
-	"fmt"
 )
 
 var (
@@ -45,12 +44,6 @@ var (
 		Name:		"compactions_total",
 		Help:		"The total number of compactions between levels N and N+1 in RocksDB",
 	}, []string{"level"})
-	rocksDbCompactionKeys = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compaction_keys_total",
-		Help:		"The number of keys compared during compactions in RocksDB",
-	}, []string{"level", "type"})
 	rocksDbBlockCache = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
@@ -222,10 +215,10 @@ var (
 		Name:		"write_ahead_log_bytes_per_second",
 		Help:		"The number of bytes written per second by the Write-Ahead-Log in RocksDB",
 	}) 
-	rocksDbLevelNumFiles = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	rocksDbLevelFiles = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"num_files",
+		Name:		"files",
 		Help:		"The number of files in a RocksDB level",
 	}, []string{"level"})
 	rocksDbCompactionThreads = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -507,11 +500,9 @@ func (stats *RocksDbStats) ProcessLevelStats() {
 			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "moved"}).Set(level.MovedGB * gigabyte)
 			rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": levelName, "type": "read"}).Set(level.RdMBPSec * megabyte)
 			rocksDbCompactionWriteAmplification.WithLabelValues(levelName).Set(level.WAmp)
-			rocksDbCompactionKeys.With(prometheus.Labels{"level": levelName, "type": "in"}).Set(level.KeyIn)
-			rocksDbCompactionKeys.With(prometheus.Labels{"level": levelName, "type": "drop"}).Set(level.KeyDrop)
 		}
 		rocksDbLevelScore.WithLabelValues(levelName).Set(level.Score)
-		rocksDbLevelNumFiles.WithLabelValues(levelName).Set(level.Files.Num)
+		rocksDbLevelFiles.WithLabelValues(levelName).Set(level.Files.Num)
 		rocksDbCompactionThreads.WithLabelValues(levelName).Set(level.Files.CompThreads)
 		rocksDbLevelSizeBytes.WithLabelValues(levelName).Set(level.SizeMB * megabyte)
 		rocksDbCompactionSecondsTotal.WithLabelValues(levelName).Set(level.CompSec)
@@ -538,7 +529,6 @@ func (stats *RocksDbStats) ProcessReadLatencyStats() {
 	for _, level_num := range []string{"0", "1", "2", "3", "4", "5", "6"} {
 		level := "L"+level_num
 		section := "** Level "+level_num+" read latency histogram (micros):"
-		fmt.Println(stats.GetStatsSection(section))
 		if len(stats.GetStatsSection(section)) > 0 {
 			rocksDbReadOps.With(prometheus.Labels{"level": level}).Set(stats.GetStatsLineField(section, "Count: ", 0))
 			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "avg"}).Set(stats.GetStatsLineField(section, "Count: ", 2))
@@ -597,7 +587,7 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbWALWritesPerSync.Describe(ch)
 	rocksDbStallPercent.Describe(ch)
 	rocksDbStalledSecs.Describe(ch)
-	rocksDbLevelNumFiles.Describe(ch)
+	rocksDbLevelFiles.Describe(ch)
 	rocksDbCompactionThreads.Describe(ch)
 	rocksDbLevelSizeBytes.Describe(ch)
 	rocksDbLevelScore.Describe(ch)
@@ -607,7 +597,6 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbCompactionSecondsTotal.Describe(ch)
 	rocksDbCompactionAvgSeconds.Describe(ch)
 	rocksDbCompactionsTotal.Describe(ch)
-	rocksDbCompactionKeys.Describe(ch)
 	rocksDbNumImmutableMemTable.Describe(ch)
 	rocksDbMemTableFlushPending.Describe(ch)
 	rocksDbCompactionPending.Describe(ch)
@@ -629,8 +618,8 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 		stats.Counters.Describe(ch)
 
 		// read latency stats get added to 'stats' when in counter-mode
-		rocksDbReadLatencyMicros.Describe(ch)
 		rocksDbReadOps.Describe(ch)
+		rocksDbReadLatencyMicros.Describe(ch)
 	}
 }
 
@@ -676,7 +665,7 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbWALWritesPerSync.Collect(ch)
 	rocksDbStallPercent.Collect(ch)
 	rocksDbStalledSecs.Collect(ch)
-	rocksDbLevelNumFiles.Collect(ch)
+	rocksDbLevelFiles.Collect(ch)
 	rocksDbCompactionThreads.Collect(ch)
 	rocksDbLevelSizeBytes.Collect(ch)
 	rocksDbLevelScore.Collect(ch)
@@ -685,7 +674,6 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbCompactionSecondsTotal.Collect(ch)
 	rocksDbCompactionAvgSeconds.Collect(ch)
 	rocksDbCompactionsTotal.Collect(ch)
-	rocksDbCompactionKeys.Collect(ch)
 	rocksDbNumImmutableMemTable.Collect(ch)
 	rocksDbMemTableFlushPending.Collect(ch)
 	rocksDbCompactionPending.Collect(ch)
@@ -709,7 +697,7 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 
 		// read latency stats get added to 'stats' when in counter-mode
 		stats.ProcessReadLatencyStats()
-		rocksDbReadLatencyMicros.Collect(ch)
 		rocksDbReadOps.Collect(ch)
+		rocksDbReadLatencyMicros.Collect(ch)
 	}
 }
