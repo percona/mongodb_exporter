@@ -356,6 +356,8 @@ func ParseStr(str string) float64 {
 	} else if strings.Contains(str, " PB") || strings.HasSuffix(str, "PB") {
 		multiply = petabyte
 		str_remove = "PB"
+	} else if strings.Contains(str, " B") || strings.HasSuffix(str, "B") {
+		str_remove = "B"
 	} else if strings.HasSuffix(str, "H:M:S") {
 		return ParseTime(str)
 	}
@@ -637,7 +639,6 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbNumLiveVersions.Set(ParseStr(stats.NumLiveVersions))
 	rocksDbBlockCacheUsage.Set(ParseStr(stats.BlockCacheUsage))
 	rocksDbEstimateTableReadersMem.Set(ParseStr(stats.EstimateTableReadersMem))
-	rocksDbBlockCacheUsage.Set(ParseStr(stats.BlockCacheUsage))
 	rocksDbMemTableBytes.WithLabelValues("active").Set(ParseStr(stats.CurSizeMemTableActive))
 	rocksDbMemTableBytes.WithLabelValues("total").Set(ParseStr(stats.CurSizeAllMemTables))
 
