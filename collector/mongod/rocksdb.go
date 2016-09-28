@@ -44,12 +44,18 @@ var (
 		Name:		"compactions_total",
 		Help:		"The total number of compactions between levels N and N+1 in RocksDB",
 	}, []string{"level"})
-	rocksDbBlockCache = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbBlockCacheHits = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"block_cache_total",
-		Help:		"The total number of RocksDB Block Cache operations",
-	}, []string{"type"})
+		Name:		"block_cache_hits_total",
+		Help:		"The total number of hits to the RocksDB Block Cache",
+	})
+	rocksDbBlockCacheMisses = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"block_cache_misses_total",
+		Help:		"The total number of misses to the RocksDB Block Cache",
+	})
 	rocksDbKeys = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
@@ -542,7 +548,8 @@ func (stats *RocksDbStats) ProcessReadLatencyStats() {
 }
 
 func (stats *RocksDbStatsCounters) Describe(ch chan<- *prometheus.Desc) {
-	rocksDbBlockCache.Describe(ch)
+	rocksDbBlockCacheHits.Describe(ch)
+	rocksDbBlockCacheMisses.Describe(ch)
 	rocksDbKeys.Describe(ch)
 	rocksDbSeeks.Describe(ch)
 	rocksDbIterations.Describe(ch)
@@ -552,8 +559,8 @@ func (stats *RocksDbStatsCounters) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (stats *RocksDbStatsCounters) Export(ch chan<- prometheus.Metric) {
-	rocksDbBlockCache.WithLabelValues("hits").Set(stats.BlockCacheHits)
-	rocksDbBlockCache.WithLabelValues("misses").Set(stats.BlockCacheMisses)
+	rocksDbBlockCacheHits.Set(stats.BlockCacheHits)
+	rocksDbBlockCacheMisses.Set(stats.BlockCacheMisses)
 	rocksDbKeys.WithLabelValues("written").Set(stats.NumKeysWritten)
 	rocksDbKeys.WithLabelValues("read").Set(stats.NumKeysRead)
 	rocksDbSeeks.Set(stats.NumSeeks)
@@ -567,7 +574,8 @@ func (stats *RocksDbStatsCounters) Export(ch chan<- prometheus.Metric) {
 	rocksDbBytesRead.WithLabelValues("iteration").Set(stats.BytesReadIteration)
 	rocksDbBytesRead.WithLabelValues("compation").Set(stats.CompactionBytesRead)
 
-	rocksDbBlockCache.Collect(ch)
+	rocksDbBlockCacheHits.Collect(ch)
+	rocksDbBlockCacheMisses.Collect(ch)
 	rocksDbKeys.Collect(ch)
 	rocksDbSeeks.Collect(ch)
 	rocksDbIterations.Collect(ch)
