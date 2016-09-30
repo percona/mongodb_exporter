@@ -62,6 +62,7 @@ type ServerStatus struct {
 	Cursors *Cursors `bson:"cursors"`
 
 	StorageEngine	*StorageEngineStats	`bson:"storageEngine"`
+	InMemory	*WiredTigerStats	`bson:"inMemory"`
 	RocksDb		*RocksDbStats		`bson:"rocksdb"`
 	WiredTiger	*WiredTigerStats	`bson:"wiredTiger"`
 }
@@ -119,6 +120,9 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	}
 	if status.StorageEngine != nil {
 		status.StorageEngine.Export(ch)
+	}
+	if status.InMemory != nil {
+		status.InMemory.Export(ch)
 	}
 	if status.RocksDb != nil {
 		status.RocksDb.Export(ch)
@@ -178,6 +182,9 @@ func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
 	}
 	if status.StorageEngine != nil {
 		status.StorageEngine.Describe(ch)
+	}
+	if status.InMemory != nil {
+		status.InMemory.Describe(ch)
 	}
 	if status.RocksDb != nil {
 		status.RocksDb.Describe(ch)
