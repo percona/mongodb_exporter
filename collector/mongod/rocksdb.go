@@ -18,48 +18,6 @@ var (
 	billion  float64 = million * 1000
 	trillion float64 = billion * 1000
 
-	rocksDbWriteOps = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"writes_total",
-		Help:		"The total number of write operations in RocksDB",
-	})
-	rocksDbWriteKeys = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"writes_key_total",
-		Help:		"The total number of key write operations in RocksDB",
-	})
-	rocksDbWriteBatches = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_batches_total",
-		Help:		"The total number of write batches in RocksDB",
-	})
-	rocksDbWriteBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_bytes_total",
-		Help:		"The total number of data written by RocksDB",
-	})
-	rocksDbFlushedBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"flushed_bytes_total",
-		Help:		"The total number of flushed bytes in RocksDB",
-	})
-	rocksDbWALOperations = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_ahead_log_operations_total",
-		Help:		"The total number of Write-Ahead-Log operations in RocksDB",
-	}, []string{"type"})
-	rocksDbWALBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_ahead_log_bytes_total",
-		Help:		"The total number of Write-Ahead-Log syncs in RocksDB",
-	})
 	rocksDbStalledSecs = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
@@ -90,12 +48,60 @@ var (
 		Name:		"compactions_total",
 		Help:		"The total number of compactions between levels N and N+1 in RocksDB",
 	}, []string{"level"})
-	rocksDbCompactionKeys = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbBlockCacheHits = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"compaction_keys_total",
-		Help:		"The number of keys compared during compactions in RocksDB",
-	}, []string{"level", "type"})
+		Name:		"block_cache_hits_total",
+		Help:		"The total number of hits to the RocksDB Block Cache",
+	})
+	rocksDbBlockCacheMisses = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"block_cache_misses_total",
+		Help:		"The total number of misses to the RocksDB Block Cache",
+	})
+	rocksDbKeys = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"keys_total",
+		Help:		"The total number of RocksDB key operations",
+	}, []string{"type"})
+	rocksDbSeeks = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"seeks_total",
+		Help:		"The total number of seeks performed by RocksDB",
+	})
+	rocksDbIterations = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"iterations_total",
+		Help:		"The total number of iterations performed by RocksDB",
+	}, []string{"type"})
+	rocksDbBloomFilterUseful = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"bloom_filter_useful_total",
+		Help:		"The total number of times the RocksDB Bloom Filter was useful",
+	})
+	rocksDbBytesWritten = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"bytes_written_total",
+		Help:		"The total number of bytes written by RocksDB",
+	}, []string{"type"})
+	rocksDbBytesRead = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"bytes_read_total",
+		Help:		"The total number of bytes read by RocksDB",
+	}, []string{"type"})
+	rocksDbReadOps = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"reads_total",
+		Help:		"The total number of read operations in RocksDB",
+	}, []string{"level"})
 )
 
 var (
@@ -129,18 +135,12 @@ var (
 		Name:		"memtable_bytes",
 		Help:		"The current number of MemTable bytes in RocksDB",
 	}, []string{"type"}) 
-	rocksDbNumEntriesMemTableActive = prometheus.NewGauge(prometheus.GaugeOpts{
+	rocksDbMemtableEntries = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"memtable_active_entries",
-		Help:		"The current number of cctive MemTable entries in RocksDB",
-	}) 
-	rocksDbNumEntriesImmMemTable = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"immutable_memtable_entries",
-		Help:		"The current number of immutable MemTable entries in RocksDB",
-	}) 
+		Name:		"memtable_entries",
+		Help:		"The current number of Memtable entries in RocksDB",
+	}, []string{"type"}) 
 	rocksDbEstimateTableReadersMem = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
@@ -175,7 +175,7 @@ var (
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
 		Name:		"block_cache_bytes",
-		Help:		"The bytes used in the RocksDB Block Cache",
+		Help:		"The current bytes used in the RocksDB Block Cache",
 	}) 
 	rocksDbTransactionEngineKeys = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
@@ -219,16 +219,10 @@ var (
 		Name:		"write_ahead_log_bytes_per_second",
 		Help:		"The number of bytes written per second by the Write-Ahead-Log in RocksDB",
 	}) 
-	rocksDbNumLevels = prometheus.NewGauge(prometheus.GaugeOpts{
+	rocksDbLevelFiles = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"num_levels",
-		Help:		"The number of compaction levels in RocksDB",
-	})
-	rocksDbLevelNumFiles = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"num_files",
+		Name:		"files",
 		Help:		"The number of files in a RocksDB level",
 	}, []string{"level"})
 	rocksDbCompactionThreads = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -264,30 +258,54 @@ var (
 	rocksDbCompactionAvgSeconds = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"rocksdb",
-		Name:		"compaction_avg_seconds",
+		Name:		"compaction_average_seconds",
 		Help:		"The average time per compaction between levels N and N+1 in RocksDB",
 	}, []string{"level"})
+	rocksDbReadLatencyMicros = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace:	Namespace,
+		Subsystem:	"rocksdb",
+		Name:		"read_latency_microseconds",
+		Help:		"The read latency in RocksDB in microseconds by level",
+	}, []string{"level", "type"})
 )
 
+type RocksDbStatsCounters struct {
+	NumKeysWritten		float64	`bson:"num-keys-written"`
+	NumKeysRead		float64	`bson:"num-keys-read"`
+	NumSeeks		float64	`bson:"num-seeks"`
+	NumForwardIter		float64	`bson:"num-forward-iterations"`	
+	NumBackwardIter		float64	`bson:"num-backward-iterations"`	
+	BlockCacheMisses	float64	`bson:"block-cache-misses"`
+	BlockCacheHits		float64	`bson:"block-cache-hits"`
+	BloomFilterUseful	float64 `bson:"bloom-filter-useful"`
+	BytesWritten		float64 `bson:"bytes-written"`
+	BytesReadPointLookup	float64	`bson:"bytes-read-point-lookup"`
+	BytesReadIteration	float64 `bson:"bytes-read-iteration"`
+	FlushBytesWritten	float64 `bson:"flush-bytes-written"`
+	CompactionBytesRead	float64	`bson:"compaction-bytes-read"`
+	CompactionBytesWritten	float64	`bson:"compaction-bytes-written"`
+}
+
 type RocksDbStats struct {
-	NumImmutableMemTable		string		`bson:"num-immutable-mem-table"`
-	MemTableFlushPending		string		`bson:"mem-table-flush-pending"`
-	CompactionPending		string		`bson:"compaction-pending"`
-	BackgroundErrors		string		`bson:"background-errors"`
-	CurSizeMemTableActive		string		`bson:"cur-size-active-mem-table"`
-	CurSizeAllMemTables		string		`bson:"cur-size-all-mem-tables"`
-	NumEntriesMemTableActive	string		`bson:"num-entries-active-mem-table"`
-	NumEntriesImmMemTables		string		`bson:"num-entries-imm-mem-tables"`
-	EstimateTableReadersMem		string		`bson:"estimate-table-readers-mem"`
-	NumSnapshots			string		`bson:"num-snapshots"`
-	OldestSnapshotTime		string		`bson:"oldest-snapshot-time"`
-	NumLiveVersions			string		`bson:"num-live-versions"`
-	BlockCacheUsage			string		`bson:"block-cache-usage"`
-	TotalLiveRecoveryUnits		float64		`bson:"total-live-recovery-units"`
-	TransactionEngineKeys		float64		`bson:"transaction-engine-keys"`
-	TransactionEngineSnapshots	float64		`bson:"transaction-engine-snapshots"`
-	Stats				[]string	`bson:"stats"`
-	ThreadStatus			[]string	`bson:"thread-status"`
+	NumImmutableMemTable		string			`bson:"num-immutable-mem-table"`
+	MemTableFlushPending		string			`bson:"mem-table-flush-pending"`
+	CompactionPending		string			`bson:"compaction-pending"`
+	BackgroundErrors		string			`bson:"background-errors"`
+	CurSizeMemTableActive		string			`bson:"cur-size-active-mem-table"`
+	CurSizeAllMemTables		string			`bson:"cur-size-all-mem-tables"`
+	NumEntriesMemTableActive	string			`bson:"num-entries-active-mem-table"`
+	NumEntriesImmMemTables		string			`bson:"num-entries-imm-mem-tables"`
+	EstimateTableReadersMem		string			`bson:"estimate-table-readers-mem"`
+	NumSnapshots			string			`bson:"num-snapshots"`
+	OldestSnapshotTime		string			`bson:"oldest-snapshot-time"`
+	NumLiveVersions			string			`bson:"num-live-versions"`
+	BlockCacheUsage			string			`bson:"block-cache-usage"`
+	TotalLiveRecoveryUnits		float64			`bson:"total-live-recovery-units"`
+	TransactionEngineKeys		float64			`bson:"transaction-engine-keys"`
+	TransactionEngineSnapshots	float64			`bson:"transaction-engine-snapshots"`
+	Stats				[]string		`bson:"stats"`
+	ThreadStatus			[]string		`bson:"thread-status"`
+	Counters			*RocksDbStatsCounters	`bson:"counters,omitempty"`
 }
 
 type RocksDbLevelStatsFiles struct {
@@ -348,8 +366,8 @@ func ParseStr(str string) float64 {
 	} else if strings.Contains(str, " PB") || strings.HasSuffix(str, "PB") {
 		multiply = petabyte
 		str_remove = "PB"
-	} else if strings.HasSuffix(str, " B") {
-		str_remove = " B"
+	} else if strings.Contains(str, " B") || strings.HasSuffix(str, "B") {
+		str_remove = "B"
 	} else if strings.HasSuffix(str, "H:M:S") {
 		return ParseTime(str)
 	} else if strings.Contains(str, "K") {
@@ -389,6 +407,7 @@ func ParseStr(str string) float64 {
 			return float * multiply
 		}
 	}
+
 	return float64(-1)
 }
 
@@ -396,7 +415,7 @@ func ParseStr(str string) float64 {
 func SplitByWs(str string) []string {
 	var fields []string
 	for _, field := range strings.Split(str, " ") {
-		if field != "" {
+		if field != "" && field != " " {
 			fields = append(fields, field)
 		}
 	}
@@ -449,7 +468,7 @@ func (stats *RocksDbStats) GetStatsSection(section_prefix string) []string {
 	var is_section bool
 	for _, line := range stats.Stats {
 		if is_section {
-			if strings.HasPrefix(line, "** ") && strings.HasSuffix(line, " **") {
+			if line == "" || strings.HasPrefix(line, "** ") && strings.HasSuffix(line, " **") {
 				break
 			} else if line != "" {
 				lines = append(lines, line)
@@ -466,7 +485,11 @@ func (stats *RocksDbStats) GetStatsLine(section_prefix string, line_prefix strin
 	for _, line := range stats.GetStatsSection(section_prefix) {
 		if strings.HasPrefix(line, line_prefix) {
 			line = strings.Replace(line, line_prefix, "", 1)
-			fields = strings.Split(line, ", ")
+			if strings.Contains(line, ", ") {
+				fields = strings.Split(line, ", ")
+			} else {
+				fields = SplitByWs(line)
+			}
 		}
 	}
 	return fields
@@ -482,7 +505,6 @@ func (stats *RocksDbStats) GetStatsLineField(section_prefix string, line_prefix 
 }
 
 func (stats *RocksDbStats) ProcessLevelStats() {
-	var maxLvl float64 = 0
 	var levels []*RocksDbLevelStats
 	var is_section bool
 	for _, line := range stats.Stats {
@@ -497,32 +519,29 @@ func (stats *RocksDbStats) ProcessLevelStats() {
 		}
 	}
 	for _, level := range levels {
-		lvlNum := ParseStr(strings.Replace(level.Level, "L", "", 1))
-		if lvlNum > maxLvl {
-			maxLvl = lvlNum
+		levelName := level.Level
+		if levelName == "Sum" {
+			levelName = "total"
 		}
-		if level.Level != "L0" {
-			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "read"}).Set(level.ReadGB * gigabyte)
-			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "read_n"}).Set(level.RnGB * gigabyte)
-			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "read_np1"}).Set(level.Rnp1GB * gigabyte)
-			rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "moved"}).Set(level.MovedGB * gigabyte)
-			rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": level.Level, "type": "read"}).Set(level.RdMBPSec * megabyte)
-			rocksDbCompactionWriteAmplification.WithLabelValues(level.Level).Set(level.WAmp)
-			rocksDbCompactionKeys.With(prometheus.Labels{"level": level.Level, "type": "in"}).Set(level.KeyIn)
-			rocksDbCompactionKeys.With(prometheus.Labels{"level": level.Level, "type": "drop"}).Set(level.KeyDrop)
+		if levelName != "L0" {
+			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "read"}).Set(level.ReadGB * gigabyte)
+			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "read_n"}).Set(level.RnGB * gigabyte)
+			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "read_np1"}).Set(level.Rnp1GB * gigabyte)
+			rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "moved"}).Set(level.MovedGB * gigabyte)
+			rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": levelName, "type": "read"}).Set(level.RdMBPSec * megabyte)
+			rocksDbCompactionWriteAmplification.WithLabelValues(levelName).Set(level.WAmp)
 		}
-		rocksDbLevelScore.WithLabelValues(level.Level).Set(level.Score)
-		rocksDbLevelNumFiles.WithLabelValues(level.Level).Set(level.Files.Num)
-		rocksDbCompactionThreads.WithLabelValues(level.Level).Set(level.Files.CompThreads)
-		rocksDbLevelSizeBytes.WithLabelValues(level.Level).Set(level.SizeMB * megabyte)
-		rocksDbCompactionSecondsTotal.WithLabelValues(level.Level).Set(level.CompSec)
-		rocksDbCompactionAvgSeconds.WithLabelValues(level.Level).Set(level.AvgSec)
-		rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "write"}).Set(level.WriteGB * gigabyte)
-		rocksDbCompactionBytes.With(prometheus.Labels{"level": level.Level, "type": "write_new_np1"}).Set(level.WriteGB * gigabyte)
-		rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": level.Level, "type": "write"}).Set(level.WrMBPSec * megabyte)
-		rocksDbCompactionsTotal.WithLabelValues(level.Level).Set(level.CompCnt)
+		rocksDbLevelScore.WithLabelValues(levelName).Set(level.Score)
+		rocksDbLevelFiles.WithLabelValues(levelName).Set(level.Files.Num)
+		rocksDbCompactionThreads.WithLabelValues(levelName).Set(level.Files.CompThreads)
+		rocksDbLevelSizeBytes.WithLabelValues(levelName).Set(level.SizeMB * megabyte)
+		rocksDbCompactionSecondsTotal.WithLabelValues(levelName).Set(level.CompSec)
+		rocksDbCompactionAvgSeconds.WithLabelValues(levelName).Set(level.AvgSec)
+		rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "write"}).Set(level.WriteGB * gigabyte)
+		rocksDbCompactionBytes.With(prometheus.Labels{"level": levelName, "type": "write_new_np1"}).Set(level.WriteGB * gigabyte)
+		rocksDbCompactionBytesPerSec.With(prometheus.Labels{"level": levelName, "type": "write"}).Set(level.WrMBPSec * megabyte)
+		rocksDbCompactionsTotal.WithLabelValues(levelName).Set(level.CompCnt)
 	}
-	rocksDbNumLevels.Set(maxLvl + 1)
 }
 
 func (stats *RocksDbStats) ProcessStalls() {
@@ -536,22 +555,71 @@ func (stats *RocksDbStats) ProcessStalls() {
 	}
 }
 
+func (stats *RocksDbStats) ProcessReadLatencyStats() {
+	for _, level_num := range []string{"0", "1", "2", "3", "4", "5", "6"} {
+		level := "L"+level_num
+		section := "** Level "+level_num+" read latency histogram (micros):"
+		if len(stats.GetStatsSection(section)) > 0 {
+			rocksDbReadOps.With(prometheus.Labels{"level": level}).Set(stats.GetStatsLineField(section, "Count: ", 0))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "avg"}).Set(stats.GetStatsLineField(section, "Count: ", 2))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "stddev"}).Set(stats.GetStatsLineField(section, "Count: ", 4))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "min"}).Set(stats.GetStatsLineField(section, "Min: ", 0))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "median"}).Set(stats.GetStatsLineField(section, "Min: ", 2))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "max"}).Set(stats.GetStatsLineField(section, "Min: ", 4))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "P50"}).Set(stats.GetStatsLineField(section, "Percentiles: ", 1))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "P75"}).Set(stats.GetStatsLineField(section, "Percentiles: ", 3))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "P99"}).Set(stats.GetStatsLineField(section, "Percentiles: ", 5))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "P99.9"}).Set(stats.GetStatsLineField(section, "Percentiles: ", 7))
+			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "P99.99"}).Set(stats.GetStatsLineField(section, "Percentiles: ", 9))
+		}
+	}
+}
+
+func (stats *RocksDbStatsCounters) Describe(ch chan<- *prometheus.Desc) {
+	rocksDbBlockCacheHits.Describe(ch)
+	rocksDbBlockCacheMisses.Describe(ch)
+	rocksDbKeys.Describe(ch)
+	rocksDbSeeks.Describe(ch)
+	rocksDbIterations.Describe(ch)
+	rocksDbBloomFilterUseful.Describe(ch)
+	rocksDbBytesWritten.Describe(ch)
+	rocksDbBytesRead.Describe(ch)
+}
+
+func (stats *RocksDbStatsCounters) Export(ch chan<- prometheus.Metric) {
+	rocksDbBlockCacheHits.Set(stats.BlockCacheHits)
+	rocksDbBlockCacheMisses.Set(stats.BlockCacheMisses)
+	rocksDbKeys.WithLabelValues("written").Set(stats.NumKeysWritten)
+	rocksDbKeys.WithLabelValues("read").Set(stats.NumKeysRead)
+	rocksDbSeeks.Set(stats.NumSeeks)
+	rocksDbIterations.WithLabelValues("forward").Set(stats.NumForwardIter)
+	rocksDbIterations.WithLabelValues("backward").Set(stats.NumBackwardIter)
+	rocksDbBloomFilterUseful.Set(stats.BloomFilterUseful)
+	rocksDbBytesWritten.WithLabelValues("total").Set(stats.BytesWritten)
+	rocksDbBytesWritten.WithLabelValues("flush").Set(stats.FlushBytesWritten)
+	rocksDbBytesWritten.WithLabelValues("compaction").Set(stats.CompactionBytesWritten)
+	rocksDbBytesRead.WithLabelValues("point_lookup").Set(stats.BytesReadPointLookup)
+	rocksDbBytesRead.WithLabelValues("iteration").Set(stats.BytesReadIteration)
+	rocksDbBytesRead.WithLabelValues("compation").Set(stats.CompactionBytesRead)
+
+	rocksDbBlockCacheHits.Collect(ch)
+	rocksDbBlockCacheMisses.Collect(ch)
+	rocksDbKeys.Collect(ch)
+	rocksDbSeeks.Collect(ch)
+	rocksDbIterations.Collect(ch)
+	rocksDbBloomFilterUseful.Collect(ch)
+	rocksDbBytesWritten.Collect(ch)
+	rocksDbBytesRead.Collect(ch)
+}
+
 func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
-	rocksDbWriteOps.Describe(ch)
-	rocksDbWriteKeys.Describe(ch)
-	rocksDbWriteBatches.Describe(ch)
-	rocksDbWriteBytes.Describe(ch)
 	rocksDbWritesPerBatch.Describe(ch)
 	rocksDbWritesPerSec.Describe(ch)
-	rocksDbFlushedBytes.Describe(ch)
-	rocksDbWALOperations.Describe(ch)
-	rocksDbWALBytes.Describe(ch)
 	rocksDbWALBytesPerSecs.Describe(ch)
 	rocksDbWALWritesPerSync.Describe(ch)
 	rocksDbStallPercent.Describe(ch)
 	rocksDbStalledSecs.Describe(ch)
-	rocksDbNumLevels.Describe(ch)
-	rocksDbLevelNumFiles.Describe(ch)
+	rocksDbLevelFiles.Describe(ch)
 	rocksDbCompactionThreads.Describe(ch)
 	rocksDbLevelSizeBytes.Describe(ch)
 	rocksDbLevelScore.Describe(ch)
@@ -561,14 +629,12 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbCompactionSecondsTotal.Describe(ch)
 	rocksDbCompactionAvgSeconds.Describe(ch)
 	rocksDbCompactionsTotal.Describe(ch)
-	rocksDbCompactionKeys.Describe(ch)
 	rocksDbNumImmutableMemTable.Describe(ch)
 	rocksDbMemTableFlushPending.Describe(ch)
 	rocksDbCompactionPending.Describe(ch)
 	rocksDbBackgroundErrors.Describe(ch)
 	rocksDbMemTableBytes.Describe(ch)
-	rocksDbNumEntriesMemTableActive.Describe(ch)
-	rocksDbNumEntriesImmMemTable.Describe(ch)
+	rocksDbMemtableEntries.Describe(ch)
 	rocksDbEstimateTableReadersMem.Describe(ch)
 	rocksDbNumSnapshots.Describe(ch)
 	rocksDbOldestSnapshotTimestamp.Describe(ch)
@@ -577,20 +643,21 @@ func (stats *RocksDbStats) Describe(ch chan<- *prometheus.Desc) {
 	rocksDbTotalLiveRecoveryUnits.Describe(ch)
 	rocksDbTransactionEngineKeys.Describe(ch)
 	rocksDbTransactionEngineSnapshots.Describe(ch)
+
+	// optional RocksDB counters
+	if stats.Counters != nil {
+		stats.Counters.Describe(ch)
+
+		// read latency stats get added to 'stats' when in counter-mode
+		rocksDbReadOps.Describe(ch)
+		rocksDbReadLatencyMicros.Describe(ch)
+	}
 }
 
 func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	// cumulative stats from db.serverStatus().rocksdb.stats (parsed):
-	rocksDbFlushedBytes.Set(stats.GetStatsLineField("** Compaction Stats [default] **", "Flush(GB): ", 0) * gigabyte)
-	rocksDbWriteOps.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 0))
-	rocksDbWriteKeys.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 1))
-	rocksDbWriteBatches.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 2))
-	rocksDbWritesPerBatch.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 3))
-	rocksDbWriteBytes.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 4))
+	rocksDbWritesPerBatch.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 4))
 	rocksDbWritesPerSec.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative writes: ", 5))
-	rocksDbWALOperations.WithLabelValues("write").Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 0))
-	rocksDbWALOperations.WithLabelValues("sync").Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 1))
-	rocksDbWALBytes.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 3))
 	rocksDbWALBytesPerSecs.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 4))
 	rocksDbWALWritesPerSync.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative WAL: ", 2))
 	rocksDbStalledSecs.Set(stats.GetStatsLineField("** DB Stats **", "Cumulative stall: ", 0))
@@ -601,14 +668,13 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbMemTableFlushPending.Set(ParseStr(stats.MemTableFlushPending))
 	rocksDbCompactionPending.Set(ParseStr(stats.CompactionPending))
 	rocksDbBackgroundErrors.Set(ParseStr(stats.BackgroundErrors))
-	rocksDbNumEntriesMemTableActive.Set(ParseStr(stats.NumEntriesMemTableActive))
-	rocksDbNumEntriesImmMemTable.Set(ParseStr(stats.NumEntriesImmMemTables))
+	rocksDbMemtableEntries.WithLabelValues("active").Set(ParseStr(stats.NumEntriesMemTableActive))
+	rocksDbMemtableEntries.WithLabelValues("immutable").Set(ParseStr(stats.NumEntriesImmMemTables))
 	rocksDbNumSnapshots.Set(ParseStr(stats.NumSnapshots))
 	rocksDbOldestSnapshotTimestamp.Set(ParseStr(stats.OldestSnapshotTime))
 	rocksDbNumLiveVersions.Set(ParseStr(stats.NumLiveVersions))
 	rocksDbBlockCacheUsage.Set(ParseStr(stats.BlockCacheUsage))
 	rocksDbEstimateTableReadersMem.Set(ParseStr(stats.EstimateTableReadersMem))
-	rocksDbBlockCacheUsage.Set(ParseStr(stats.BlockCacheUsage))
 	rocksDbMemTableBytes.WithLabelValues("active").Set(ParseStr(stats.CurSizeMemTableActive))
 	rocksDbMemTableBytes.WithLabelValues("total").Set(ParseStr(stats.CurSizeAllMemTables))
 
@@ -623,37 +689,26 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	// process stall counts into a vector:
 	stats.ProcessStalls()
 
-	rocksDbWriteOps.Collect(ch)
-	rocksDbWriteKeys.Collect(ch)
-	rocksDbWriteBatches.Collect(ch)
-	rocksDbWriteBytes.Collect(ch)
 	rocksDbWritesPerBatch.Collect(ch)
 	rocksDbWritesPerSec.Collect(ch)
-	rocksDbFlushedBytes.Collect(ch)
-	rocksDbWALOperations.Collect(ch)
-	rocksDbWALBytes.Collect(ch)
 	rocksDbWALBytesPerSecs.Collect(ch)
 	rocksDbWALWritesPerSync.Collect(ch)
 	rocksDbStallPercent.Collect(ch)
 	rocksDbStalledSecs.Collect(ch)
-	rocksDbNumLevels.Collect(ch)
-	rocksDbLevelNumFiles.Collect(ch)
+	rocksDbLevelFiles.Collect(ch)
 	rocksDbCompactionThreads.Collect(ch)
 	rocksDbLevelSizeBytes.Collect(ch)
 	rocksDbLevelScore.Collect(ch)
-	rocksDbCompactionBytes.Collect(ch)
 	rocksDbCompactionBytesPerSec.Collect(ch)
 	rocksDbCompactionWriteAmplification.Collect(ch)
 	rocksDbCompactionSecondsTotal.Collect(ch)
 	rocksDbCompactionAvgSeconds.Collect(ch)
 	rocksDbCompactionsTotal.Collect(ch)
-	rocksDbCompactionKeys.Collect(ch)
 	rocksDbNumImmutableMemTable.Collect(ch)
 	rocksDbMemTableFlushPending.Collect(ch)
 	rocksDbCompactionPending.Collect(ch)
 	rocksDbBackgroundErrors.Collect(ch)
-	rocksDbNumEntriesMemTableActive.Collect(ch)
-	rocksDbNumEntriesImmMemTable.Collect(ch)
+	rocksDbMemtableEntries.Collect(ch)
 	rocksDbNumSnapshots.Collect(ch)
 	rocksDbOldestSnapshotTimestamp.Collect(ch)
 	rocksDbNumLiveVersions.Collect(ch)
@@ -664,4 +719,14 @@ func (stats *RocksDbStats) Export(ch chan<- prometheus.Metric) {
 	rocksDbEstimateTableReadersMem.Collect(ch)
 	rocksDbBlockCacheUsage.Collect(ch)
 	rocksDbStalls.Collect(ch)
+
+	// optional RocksDB counters
+	if stats.Counters != nil {
+		stats.Counters.Export(ch)
+
+		// read latency stats get added to 'stats' when in counter-mode
+		stats.ProcessReadLatencyStats()
+		rocksDbReadOps.Collect(ch)
+		rocksDbReadLatencyMicros.Collect(ch)
+	}
 }
