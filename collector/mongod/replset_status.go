@@ -58,7 +58,7 @@ var (
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_optime_date",
-		Help:      "The last entry from the oplog that this member applied.",
+		Help:      "The timestamp of the last oplog entry that this member applied.",
 	}, []string{"set", "self", "name", "state"})
 	memberElectionDate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
