@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Percona-Lab/prometheus_mongodb_exporter/collector"
 	"github.com/Percona-Lab/prometheus_mongodb_exporter/shared"
@@ -29,8 +30,6 @@ var (
 
 	mongodbURIFlag    = flag.String("mongodb.uri", mongodbDefaultUri(), "Mongodb URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
-	authUserFlag      = flag.String("auth.user", "", "Username for basic auth.")
-	authPassFlag      = flag.String("auth.pass", "", "Password for basic auth.")
 )
 
 func printVersion() {
@@ -54,17 +53,25 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func hasUserAndPassword() bool {
-	return *authUserFlag != "" && *authPassFlag != ""
-}
-
 func prometheusHandler() http.Handler {
+	var authUser, authPass string
+	httpAuth := os.Getenv("HTTP_AUTH")
+	if httpAuth != "" {
+		data := strings.SplitN(httpAuth, ":", 2)
+		if len(data) != 2 || data[0] == "" || data[1] == "" {
+			panic("HTTP_AUTH should be formatted as user:password")
+		}
+		authUser = data[0]
+		authPass = data[1]
+		fmt.Println("HTTP basic authentication is enabled")
+	}
+
 	handler := prometheus.Handler()
-	if hasUserAndPassword() {
+	if authUser != "" &&  authPass != "" {
 		handler = &basicAuthHandler{
-			handler:  prometheus.Handler().ServeHTTP,
-			user:     *authUserFlag,
-			password: *authPassFlag,
+			handler:  handler.ServeHTTP,
+			user:     authUser,
+			password: authPass,
 		}
 	}
 
@@ -73,12 +80,18 @@ func prometheusHandler() http.Handler {
 
 func startWebServer() {
 	printVersion()
-	fmt.Printf("Listening on %s\n", *listenAddressFlag)
+
+	uri := os.Getenv("MONGODB_URI")
+	if uri != "" {
+		mongodbURIFlag = &uri
+	}
+
 	handler := prometheusHandler()
 
 	registerCollector()
 
 	http.Handle(*metricsPathFlag, handler)
+	fmt.Printf("Listening on %s\n", *listenAddressFlag)
 	err := http.ListenAndServe(*listenAddressFlag, nil)
 
 	if err != nil {
