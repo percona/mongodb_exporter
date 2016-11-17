@@ -25,11 +25,14 @@ The exporter can be started by running the '*mongodb_exporter*' binary that is c
 
 It is recommended to define the following options:
 
-- **-mongodb.uri** - The URI of the MongoDB port (*default: mongodb://localhost:27017*)
-- **-auth.user** - The optional exporter HTTP auth username (*default: none*)
-- **-auth.pass** - The optional exporter HTTP auth password (*default: none*)
 - **-web.listen-address** - The listen address of the exporter (*default: ":9104"*)
 - **-log_dir** - The directory to write the log file (*default: /tmp*)
+
+To define your own MongoDB URI, use environment variable `MONGODB_URI`. If set this variable takes precedence over **-mongodb.uri** flag.
+For example: `export MONGODB_URI=mongodb://localhost:27017`
+
+To enable HTTP basic authentication, set environment variable `HTTP_AUTH` to user:password pair.
+For example: `export HTTP_AUTH="user:password"`
 
 *For more options see the help page with '-h' or '--help'*
 
@@ -48,10 +51,10 @@ db.getSiblingDB("admin").createUser({
 })
 ```
 
-2. Add the username/password to the '*-mongodb.uri*' command-line option for mongodb_exporter, example:
+2. Set environment variable `MONGODB_URI` before starting the exporter:
 
 ```
-mongodb_exporter -mongodb.uri mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
+export MONGODB_URI=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
 ```
 
 ### Note about how this works
