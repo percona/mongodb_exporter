@@ -17,7 +17,7 @@ var (
 		Subsystem: subsystem,
 		Name:      "my_name",
 		Help:      "The replica state name of the current member",
-	}, []string{"name", "set"})
+	}, []string{"set", "name"})
 	myState   = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
