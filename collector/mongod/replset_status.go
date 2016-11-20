@@ -12,6 +12,12 @@ import (
 
 var (
 	subsystem = "replset"
+	myName    = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: subsystem,
+		Name:      "my_name",
+		Help:      "The replica state name of the current member",
+	}, []string{"name"})
 	myState   = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
@@ -41,61 +47,61 @@ var (
 		Subsystem: subsystem,
 		Name:      "member_health",
 		Help:      "This field conveys if the member is up (1) or down (0).",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_state",
 		Help:      "The value of state is an integer between 0 and 10 that represents the replica state of the member.",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberUptime = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_uptime",
 		Help:      "The uptime field holds a value that reflects the number of seconds that this member has been online.",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberOptimeDate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_optime_date",
 		Help:      "The timestamp of the last oplog entry that this member applied.",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberElectionDate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_election_date",
 		Help:      "The timestamp the node was elected as replica leader",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberLastHeartbeat = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_last_heartbeat",
 		Help:      "The lastHeartbeat value provides an ISODate formatted date and time of the transmission time of last heartbeat received from this member",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberLastHeartbeatRecv = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_last_heartbeat_recv",
 		Help:      "The lastHeartbeatRecv value provides an ISODate formatted date and time that the last heartbeat was received from this member",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberPingMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_ping_ms",
 		Help:      "The pingMs represents the number of milliseconds (ms) that a round-trip packet takes to travel between the remote member and the local instance.",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberConfigVersion = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_config_version",
 		Help:      "The configVersion value is the replica set configuration version.",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 	memberOptime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_optime",
 		Help:      "Information regarding the last operation from the operation log that this member has applied.",
-	}, []string{"set", "self", "name", "state"})
+	}, []string{"set", "name", "state"})
 )
 
 // ReplSetStatus keeps the data returned by the GetReplSetStatus method
@@ -130,6 +136,7 @@ type Member struct {
 
 // Export exports the replSetGetStatus stati to be consumed by prometheus
 func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
+	myName.Reset()
 	myState.Reset()
 	term.Reset()
 	numberOfMembers.Reset()
@@ -158,13 +165,11 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	}
 
 	for _, member := range replStatus.Members {
-		var self string = "false"
 		if member.Self != nil {
-			self = "true"
+			myName.WithLabelValues(member.Name).Set(1)
 		}
 		ls := prometheus.Labels{
 			"set":   replStatus.Set,
-			"self":  self,
 			"name":  member.Name,
 			"state": member.StateStr,
 		}
@@ -198,6 +203,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 		}
 	}
 	// collect metrics
+	myName.Collect(ch)
 	myState.Collect(ch)
 	term.Collect(ch)
 	numberOfMembers.Collect(ch)
@@ -215,6 +221,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 
 // Describe describes the replSetGetStatus metrics for prometheus
 func (replStatus *ReplSetStatus) Describe(ch chan<- *prometheus.Desc) {
+	myName.Describe(ch)
 	myState.Describe(ch)
 	term.Describe(ch)
 	numberOfMembers.Describe(ch)
