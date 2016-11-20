@@ -17,7 +17,7 @@ var (
 		Subsystem: subsystem,
 		Name:      "my_name",
 		Help:      "The replica state name of the current member",
-	}, []string{"name"})
+	}, []string{"name","set"})
 	myState   = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
@@ -166,7 +166,11 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 
 	for _, member := range replStatus.Members {
 		if member.Self != nil {
-			myName.WithLabelValues(member.Name).Set(1)
+			labels := prometheus.Labels{
+				"set":  replStatus.Set,
+				"name": member.Name,
+			}
+			myName.With(labels).Set(1)
 		}
 		ls := prometheus.Labels{
 			"set":   replStatus.Set,
