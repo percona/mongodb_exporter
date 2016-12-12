@@ -5,18 +5,14 @@ import(
 )
 
 var (
-	wtBlockManagerBlocksTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_blockmanager",
-		Name:		"blocks_total",
-		Help:		"The total number of blocks read by the WiredTiger BlockManager",
-	}, []string{"type"})
-	wtBlockManagerBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_blockmanager",
-		Name:		"bytes_total",
-		Help:		"The total number of bytes read by the WiredTiger BlockManager",
-	}, []string{"type"})
+	wtBlockManagerBlocksTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_blockmanager", "blocks_total"),
+		"The total number of blocks read by the WiredTiger BlockManager",
+	  []string{"type"}, nil)
+	wtBlockManagerBytesTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_blockmanager", "bytes_total"),
+		"The total number of bytes read by the WiredTiger BlockManager",
+	  []string{"type"}, nil)
 )
 
 var (
@@ -26,12 +22,10 @@ var (
 		Name:		"pages",
 		Help:		"The current number of pages in the WiredTiger Cache",
 	}, []string{"type"})
-	wtCachePagesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_cache",
-		Name:		"pages_total",
-		Help:		"The total number of pages read into/from the WiredTiger Cache",
-	}, []string{"type"})
+	wtCachePagesTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_cache", "pages_total"),
+		"The total number of pages read into/from the WiredTiger Cache",
+	  []string{"type"}, nil)
 	wtCacheBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
@@ -44,18 +38,14 @@ var (
 		Name:		"max_bytes",
 		Help:		"The maximum size of data in the WiredTiger Cache in bytes",
 	})
-	wtCacheBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_cache",
-		Name:		"bytes_total",
-		Help:		"The total number of bytes read into/from the WiredTiger Cache",
-	}, []string{"type"})
-	wtCacheEvictedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_cache",
-		Name:		"evicted_total",
-		Help:		"The total number of pages evicted from the WiredTiger Cache",
-	}, []string{"type"})
+	wtCacheBytesTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_cache", "bytes_total"),
+		"The total number of bytes read into/from the WiredTiger Cache",
+	  []string{"type"}, nil)
+	wtCacheEvictedTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_cache", "evicted_total"),
+		"The total number of pages evicted from the WiredTiger Cache",
+	  []string{"type"}, nil)
 	wtCachePercentOverhead = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_cache",
@@ -65,18 +55,14 @@ var (
 )
 
 var(
-	wtTransactionsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_transactions",
-		Name:		"total",
-		Help:		"The total number of transactions WiredTiger has handled",
-	}, []string{"type"})
-	wtTransactionsTotalCheckpointMs = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"wiredtiger_transactions",
-		Name:		"checkpoint_milliseconds_total",
-		Help:		"The total time in milliseconds transactions have checkpointed in WiredTiger",
-	})
+	wtTransactionsTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_transactions", "total"),
+		"The total number of transactions WiredTiger has handled",
+	  []string{"type"}, nil)
+	wtTransactionsTotalCheckpointMs = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_transactions", "checkpoint_milliseconds_total"),
+		"The total time in milliseconds transactions have checkpointed in WiredTiger",
+		nil, nil)
 	wtTransactionsCheckpointMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:	Namespace,
 		Subsystem:	"wiredtiger_transactions",
@@ -92,30 +78,22 @@ var(
 )
 
 var(
-	wtLogRecordsScannedTotal = prometheus.NewCounter(prometheus.CounterOpts{
-                Namespace:      Namespace,
-                Subsystem:      "wiredtiger_log",
-                Name:           "records_scanned_total",
-                Help:           "The total number of records scanned by log scan in the WiredTiger log",
-        })
-	wtLogRecordsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-                Namespace:      Namespace,
-                Subsystem:      "wiredtiger_log",
-                Name:           "records_total",
-                Help:           "The total number of compressed/uncompressed records written to the WiredTiger log",
-        }, []string{"type"})
-	wtLogBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-                Namespace:      Namespace,
-                Subsystem:      "wiredtiger_log",
-                Name:           "bytes_total",
-                Help:           "The total number of bytes written to the WiredTiger log",
-        }, []string{"type"})
-	wtLogOperationsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-                Namespace:      Namespace,
-                Subsystem:      "wiredtiger_log",
-                Name:           "operations_total",
-                Help:           "The total number of WiredTiger log operations",
-        }, []string{"type"})
+	wtLogRecordsScannedTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_log", "records_scanned_total"),
+    "The total number of records scanned by log scan in the WiredTiger log",
+    nil, nil)
+	wtLogRecordsTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_log", "records_total"),
+    "The total number of compressed/uncompressed records written to the WiredTiger log",
+    []string{"type"}, nil)
+	wtLogBytesTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_log", "bytes_total"),
+    "The total number of bytes written to the WiredTiger log",
+    []string{"type"}, nil)
+	wtLogOperationsTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "wiredtiger_log", "operations_total"),
+    "The total number of WiredTiger log operations",
+    []string{"type"}, nil)
 )
 
 var(
@@ -166,18 +144,18 @@ type WTBlockManagerStats struct {
 }
 
 func (stats *WTBlockManagerStats) Export(ch chan<- prometheus.Metric) {
-	wtBlockManagerBlocksTotal.WithLabelValues("read").Set(stats.BlocksRead)
-	wtBlockManagerBlocksTotal.WithLabelValues("read_mapped").Set(stats.MappedBlocksRead)
-	wtBlockManagerBlocksTotal.WithLabelValues("pre_loaded").Set(stats.BlocksPreLoaded)
-	wtBlockManagerBlocksTotal.WithLabelValues("written").Set(stats.BlocksWritten)
-	wtBlockManagerBytesTotal.WithLabelValues("read").Set(stats.BytesRead)
-	wtBlockManagerBytesTotal.WithLabelValues("read_mapped").Set(stats.MappedBytesRead)
-	wtBlockManagerBytesTotal.WithLabelValues("written").Set(stats.BytesWritten)
+	ch <- prometheus.MustNewConstMetric(wtBlockManagerBlocksTotal, prometheus.CounterValue, stats.BlocksRead, "read")
+	ch <- prometheus.MustNewConstMetric(wtBlockManagerBlocksTotal, prometheus.CounterValue, stats.MappedBlocksRead, "read_mapped")
+	ch <- prometheus.MustNewConstMetric(wtBlockManagerBlocksTotal, prometheus.CounterValue, stats.BlocksPreLoaded, "pre_loaded")
+	ch <- prometheus.MustNewConstMetric(wtBlockManagerBlocksTotal, prometheus.CounterValue, stats.BlocksWritten, "written")
+	ch <- prometheus.MustNewConstMetric(wtBlockManagerBytesTotal, prometheus.CounterValue, stats.BytesRead, "read")
+	ch <- prometheus.MustNewConstMetric(wtBlockManagerBytesTotal, prometheus.CounterValue, stats.MappedBytesRead, "read_mapped")
+	ch <- prometheus.MustNewConstMetric(wtBlockManagerBytesTotal, prometheus.CounterValue, stats.BytesWritten, "written")
 }
 
 func (stats *WTBlockManagerStats) Describe(ch chan<- *prometheus.Desc) {
-	wtBlockManagerBlocksTotal.Describe(ch)
-	wtBlockManagerBytesTotal.Describe(ch)
+	ch <- wtBlockManagerBlocksTotal
+	ch <- wtBlockManagerBytesTotal
 }
 
 // cache stats
@@ -197,12 +175,12 @@ type WTCacheStats struct {
 }
 
 func (stats *WTCacheStats) Export(ch chan<- prometheus.Metric) {
-	wtCachePagesTotal.WithLabelValues("read").Set(stats.PagesReadInto)
-	wtCachePagesTotal.WithLabelValues("written").Set(stats.PagesWrittenFrom)
-	wtCacheBytesTotal.WithLabelValues("read").Set(stats.BytesReadInto)
-	wtCacheBytesTotal.WithLabelValues("written").Set(stats.BytesWrittenFrom)
-	wtCacheEvictedTotal.WithLabelValues("modified").Set(stats.EvictedModified)
-	wtCacheEvictedTotal.WithLabelValues("unmodified").Set(stats.EvictedUnmodified)
+	ch <- prometheus.MustNewConstMetric(wtCachePagesTotal, prometheus.CounterValue, stats.PagesReadInto, "read")
+	ch <- prometheus.MustNewConstMetric(wtCachePagesTotal, prometheus.CounterValue, stats.PagesWrittenFrom, "written")
+	ch <- prometheus.MustNewConstMetric(wtCacheBytesTotal, prometheus.CounterValue, stats.BytesReadInto, "read")
+	ch <- prometheus.MustNewConstMetric(wtCacheBytesTotal, prometheus.CounterValue, stats.BytesWrittenFrom, "written")
+	ch <- prometheus.MustNewConstMetric(wtCacheEvictedTotal, prometheus.CounterValue, stats.EvictedModified, "modified")
+	ch <- prometheus.MustNewConstMetric(wtCacheEvictedTotal, prometheus.CounterValue, stats.EvictedUnmodified, "unmodified")
 	wtCachePages.WithLabelValues("total").Set(stats.PagesTotal)
 	wtCachePages.WithLabelValues("dirty").Set(stats.PagesDirty)
 	wtCacheBytes.WithLabelValues("total").Set(stats.BytesTotal)
@@ -212,8 +190,8 @@ func (stats *WTCacheStats) Export(ch chan<- prometheus.Metric) {
 }
 
 func (stats *WTCacheStats) Describe(ch chan<- *prometheus.Desc) {
-	wtCachePagesTotal.Describe(ch)
-	wtCacheEvictedTotal.Describe(ch)
+	ch <- wtCachePagesTotal
+	ch <- wtCacheEvictedTotal
 	wtCachePages.Describe(ch)
 	wtCacheBytes.Describe(ch)
 	wtCacheMaxBytes.Describe(ch)
@@ -240,25 +218,25 @@ type WTLogStats struct {
 }
 
 func (stats *WTLogStats) Export(ch chan<- prometheus.Metric) {
-	wtLogRecordsTotal.WithLabelValues("compressed").Set(stats.RecordsCompressed)
-	wtLogRecordsTotal.WithLabelValues("uncompressed").Set(stats.RecordsUncompressed)
-        wtLogBytesTotal.WithLabelValues("payload").Set(stats.BytesPayloadData)
-        wtLogBytesTotal.WithLabelValues("written").Set(stats.BytesWritten)
-        wtLogOperationsTotal.WithLabelValues("read").Set(stats.LogReads)
-        wtLogOperationsTotal.WithLabelValues("write").Set(stats.LogWrites)
-        wtLogOperationsTotal.WithLabelValues("scan").Set(stats.LogScans)
-        wtLogOperationsTotal.WithLabelValues("scan_double").Set(stats.LogScansDouble)
-        wtLogOperationsTotal.WithLabelValues("sync").Set(stats.LogSyncs)
-        wtLogOperationsTotal.WithLabelValues("sync_dir").Set(stats.LogSyncDirs)
-        wtLogOperationsTotal.WithLabelValues("flush").Set(stats.LogFlushes)
-	wtLogRecordsScannedTotal.Set(stats.RecordsProcessedLogScan)
+	ch <- prometheus.MustNewConstMetric(wtLogRecordsTotal, prometheus.CounterValue, stats.RecordsCompressed, "compressed")
+	ch <- prometheus.MustNewConstMetric(wtLogRecordsTotal, prometheus.CounterValue, stats.RecordsUncompressed, "uncompressed")
+  ch <- prometheus.MustNewConstMetric(wtLogBytesTotal, prometheus.CounterValue, stats.BytesPayloadData, "payload")
+  ch <- prometheus.MustNewConstMetric(wtLogBytesTotal, prometheus.CounterValue, stats.BytesWritten, "written")
+  ch <- prometheus.MustNewConstMetric(wtLogOperationsTotal, prometheus.CounterValue, stats.LogReads, "read")
+  ch <- prometheus.MustNewConstMetric(wtLogOperationsTotal, prometheus.CounterValue, stats.LogWrites, "write")
+  ch <- prometheus.MustNewConstMetric(wtLogOperationsTotal, prometheus.CounterValue, stats.LogScans, "scan")
+  ch <- prometheus.MustNewConstMetric(wtLogOperationsTotal, prometheus.CounterValue, stats.LogScansDouble, "scan_double")
+  ch <- prometheus.MustNewConstMetric(wtLogOperationsTotal, prometheus.CounterValue, stats.LogSyncs, "sync")
+  ch <- prometheus.MustNewConstMetric(wtLogOperationsTotal, prometheus.CounterValue, stats.LogSyncDirs, "sync_dir")
+  ch <- prometheus.MustNewConstMetric(wtLogOperationsTotal, prometheus.CounterValue, stats.LogFlushes, "flush")
+	ch <- prometheus.MustNewConstMetric(wtLogRecordsScannedTotal, prometheus.CounterValue, stats.RecordsProcessedLogScan)
 }
 
 func (stats *WTLogStats) Describe(ch chan<- *prometheus.Desc) {
-	wtLogRecordsTotal.Describe(ch)
-	wtLogBytesTotal.Describe(ch)
-	wtLogOperationsTotal.Describe(ch)
-	wtLogRecordsScannedTotal.Describe(ch)
+	ch <- wtLogRecordsTotal
+	ch <- wtLogBytesTotal
+	ch <- wtLogOperationsTotal
+	ch <- wtLogRecordsScannedTotal
 }
 
 // session stats
@@ -292,19 +270,19 @@ type WTTransactionStats struct {
 }
 
 func (stats *WTTransactionStats) Export(ch chan<- prometheus.Metric) {
-	wtTransactionsTotal.WithLabelValues("begins").Set(stats.Begins)
-	wtTransactionsTotal.WithLabelValues("checkpoints").Set(stats.Checkpoints)
-	wtTransactionsTotal.WithLabelValues("committed").Set(stats.Committed)
-	wtTransactionsTotal.WithLabelValues("rolledback").Set(stats.RolledBack)
+	ch <- prometheus.MustNewConstMetric(wtTransactionsTotal, prometheus.CounterValue, stats.Begins, "begins")
+	ch <- prometheus.MustNewConstMetric(wtTransactionsTotal, prometheus.CounterValue, stats.Checkpoints, "checkpoints")
+	ch <- prometheus.MustNewConstMetric(wtTransactionsTotal, prometheus.CounterValue, stats.Committed, "committed")
+	ch <- prometheus.MustNewConstMetric(wtTransactionsTotal, prometheus.CounterValue, stats.RolledBack, "rolledback")
 	wtTransactionsCheckpointMs.WithLabelValues("min").Set(stats.CheckpointMinMs)
 	wtTransactionsCheckpointMs.WithLabelValues("max").Set(stats.CheckpointMaxMs)
-	wtTransactionsTotalCheckpointMs.Set(stats.CheckpointTotalMs)
+	ch <- prometheus.MustNewConstMetric(wtTransactionsTotalCheckpointMs, prometheus.CounterValue, stats.CheckpointTotalMs)
 	wtTransactionsCheckpointsRunning.Set(stats.CheckpointsRunning)
 }
 
 func (stats *WTTransactionStats) Describe(ch chan<- *prometheus.Desc) {
-	wtTransactionsTotal.Describe(ch)
-	wtTransactionsTotalCheckpointMs.Describe(ch)
+	ch <- wtTransactionsTotal
+	ch <- wtTransactionsTotalCheckpointMs
 	wtTransactionsCheckpointMs.Describe(ch)
 	wtTransactionsCheckpointsRunning.Describe(ch)
 }
@@ -387,26 +365,13 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 		stats.ConcurrentTransactions.Export(ch)
 	}
 
-	wtBlockManagerBlocksTotal.Collect(ch)
-	wtBlockManagerBytesTotal.Collect(ch)
-
-	wtCachePagesTotal.Collect(ch)
-	wtCacheBytesTotal.Collect(ch)
-	wtCacheEvictedTotal.Collect(ch)
 	wtCachePages.Collect(ch)
 	wtCacheBytes.Collect(ch)
 	wtCacheMaxBytes.Collect(ch)
 	wtCachePercentOverhead.Collect(ch)
 
-	wtTransactionsTotal.Collect(ch)
-	wtTransactionsTotalCheckpointMs.Collect(ch)
 	wtTransactionsCheckpointMs.Collect(ch)
 	wtTransactionsCheckpointsRunning.Collect(ch)
-
-	wtLogRecordsTotal.Collect(ch)
-	wtLogBytesTotal.Collect(ch)
-	wtLogOperationsTotal.Collect(ch)
-	wtLogRecordsScannedTotal.Collect(ch)
 
 	wtOpenCursors.Collect(ch)
 	wtOpenSessions.Collect(ch)
