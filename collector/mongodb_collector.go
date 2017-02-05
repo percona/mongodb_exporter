@@ -16,7 +16,23 @@ var (
 
 // MongodbCollectorOpts is the options of the mongodb collector.
 type MongodbCollectorOpts struct {
-	URI string
+	URI                   string
+	TLSConnection         bool
+	TLSCertificateFile    string
+	TLSPrivateKeyFile     string
+	TLSCaFile             string
+	TLSHostnameValidation bool
+}
+
+func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
+	return shared.MongoSessionOpts{
+		URI:                   in.URI,
+		TLSConnection:         in.TLSConnection,
+		TLSCertificateFile:    in.TLSCertificateFile,
+		TLSPrivateKeyFile:     in.TLSPrivateKeyFile,
+		TLSCaFile:             in.TLSCaFile,
+		TLSHostnameValidation: in.TLSHostnameValidation,
+	}
 }
 
 // MongodbCollector is in charge of collecting mongodb's metrics.
@@ -36,7 +52,7 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 // Describe describes all mongodb's metrics.
 func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 	glog.Info("Describing groups")
-	session := shared.MongoSession(exporter.Opts.URI)
+	session := shared.MongoSession(exporter.Opts.toSessionOps())
 	defer session.Close()
 	if session != nil {
 		serverStatus := collector_mongos.GetServerStatus(session)
@@ -48,7 +64,7 @@ func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect collects all mongodb's metrics.
 func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
-	mongoSess := shared.MongoSession(exporter.Opts.URI)
+	mongoSess := shared.MongoSession(exporter.Opts.toSessionOps())
 	defer mongoSess.Close()
 	if mongoSess != nil {
 		serverVersion, err := shared.MongoSessionServerVersion(mongoSess)
@@ -63,14 +79,14 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 
 		glog.Infof("Connected to: %s (node type: %s, server version: %s)", exporter.Opts.URI, nodeType, serverVersion)
 		switch {
-			case nodeType == "mongos":
-				exporter.collectMongos(mongoSess, ch)
-			case nodeType == "mongod":
-				exporter.collectMongod(mongoSess, ch)
-			case nodeType == "replset":
-				exporter.collectMongodReplSet(mongoSess, ch)
-			default:
-				glog.Infof("Unrecognized node type %s!", nodeType)
+		case nodeType == "mongos":
+			exporter.collectMongos(mongoSess, ch)
+		case nodeType == "mongod":
+			exporter.collectMongod(mongoSess, ch)
+		case nodeType == "replset":
+			exporter.collectMongodReplSet(mongoSess, ch)
+		default:
+			glog.Infof("Unrecognized node type %s!", nodeType)
 		}
 	}
 }
@@ -104,12 +120,11 @@ func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch 
 	replSetStatus := collector_mongod.GetReplSetStatus(session)
 	if replSetStatus != nil {
 		replSetStatus.Export(ch)
-	}       
+	}
 
 	glog.Info("Collecting Replset Oplog Status")
 	oplogStatus := collector_mongod.GetOplogStatus(session)
 	if oplogStatus != nil {
 		oplogStatus.Export(ch)
-	}       
+	}
 }
-
