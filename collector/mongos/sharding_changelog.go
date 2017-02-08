@@ -5,6 +5,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -33,7 +34,7 @@ func (status *ShardingChangelogStats) Export(ch chan<- prometheus.Metric) {
 	// set all expected event types to zero first, so they show in results if there was no events in the current time period
 	outputMetrics := []string{"moveChunk.start", "moveChunk.to", "moveChunk.to_failed", "moveChunk.from", "moveChunk.from_failed", "moveChunk.commit",
 		"addShard", "removeShard.start", "shardCollection", "shardCollection.start", "split", "multi-split"}
-	counts := make(map[string]int)
+	counts := make(map[string]float64)
 	for _, metricName := range outputMetrics {
 		counts[metricName] = 0
 	}
