@@ -17,7 +17,7 @@ The exporter is in beta/experimental state and field names are **very likely to 
 
 ### Building
 
-    go build -o mongodb_exporter github.com/Percona-Lab/prometheus_mongodb_exporter
+    go build -o mongodb_exporter github.com/Percona/mongodb_exporter
 
 ### Usage
 
