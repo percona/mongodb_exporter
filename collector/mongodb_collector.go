@@ -1,9 +1,9 @@
 package collector
 
 import (
-	"github.com/Percona/mongodb_exporter/shared"
-	"github.com/Percona/mongodb_exporter/collector/mongod"
-	"github.com/Percona/mongodb_exporter/collector/mongos"
+	"github.com/percona/mongodb_exporter/shared"
+	"github.com/percona/mongodb_exporter/collector/mongod"
+	"github.com/percona/mongodb_exporter/collector/mongos"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/mgo.v2"
