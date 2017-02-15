@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Percona/mongodb_exporter/collector"
-	"github.com/Percona/mongodb_exporter/shared"
+	"github.com/percona/mongodb_exporter/collector"
+	"github.com/percona/mongodb_exporter/shared"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/yaml.v2"
