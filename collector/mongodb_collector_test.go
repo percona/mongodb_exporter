@@ -3,7 +3,7 @@ package collector
 import (
 	"testing"
 
-	"github.com/Percona/mongodb_exporter/shared"
+	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
