@@ -61,10 +61,10 @@ type ServerStatus struct {
 
 	Cursors *Cursors `bson:"cursors"`
 
-	StorageEngine	*StorageEngineStats	`bson:"storageEngine"`
-	InMemory	*WiredTigerStats	`bson:"inMemory"`
-	RocksDb		*RocksDbStats		`bson:"rocksdb"`
-	WiredTiger	*WiredTigerStats	`bson:"wiredTiger"`
+	StorageEngine *StorageEngineStats `bson:"storageEngine"`
+	InMemory      *WiredTigerStats    `bson:"inMemory"`
+	RocksDb       *RocksDbStats       `bson:"rocksdb"`
+	WiredTiger    *WiredTigerStats    `bson:"wiredTiger"`
 }
 
 // Export exports the server status to be consumed by prometheus.
@@ -118,9 +118,6 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	if status.Cursors != nil {
 		status.Cursors.Export(ch)
 	}
-	if status.StorageEngine != nil {
-		status.StorageEngine.Export(ch)
-	}
 	if status.InMemory != nil {
 		status.InMemory.Export(ch)
 	}
@@ -130,6 +127,14 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	if status.WiredTiger != nil {
 		status.WiredTiger.Export(ch)
 	}
+
+	// if db.serverStatus.storageEngine does not exists, you're on < 3.0, and thus mmapv1
+	if status.StorageEngine == nil {
+		status.StorageEngine = &StorageEngineStats{
+			Name: "mmapv1",
+		}
+	}
+	status.StorageEngine.Export(ch)
 }
 
 // Describe describes the server status for prometheus.
