@@ -128,7 +128,8 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 		status.WiredTiger.Export(ch)
 	}
 
-	// if db.serverStatus.storageEngine does not exists, you're on < 3.0, and thus mmapv1
+	// If db.serverStatus().storageEngine does not exists, you're on < 3.0, and thus mmapv1
+	// https://docs.mongodb.com/v3.0/reference/command/serverStatus/#storageengine
 	if status.StorageEngine == nil {
 		status.StorageEngine = &StorageEngineStats{
 			Name: "mmapv1",
