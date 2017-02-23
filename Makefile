@@ -6,10 +6,11 @@ all: build
 
 build: mongodb_exporter
 
-vendor: glide.yaml glide.lock
+vendor: glide.*
+	go get github.com/Masterminds/glide
 	glide install
 
-mongodb_exporter: vendor mongodb_exporter.go collector/*.go collector/mongod/*.go collector/mongos/*.go shared/*.go
+mongodb_exporter: vendor *.go collector/*.go collector/*/*.go shared/*.go VERSION
 	go build -ldflags $(GO_BUILD_LDFLAGS) -o mongodb_exporter mongodb_exporter.go
 
 clean:

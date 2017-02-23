@@ -17,10 +17,8 @@ The exporter is in beta/experimental state and field names are **very likely to 
 
 ### Building
 
-    go get github.com/Masterminds/glide
     mkdir -p $GOPATH/src/github.com/percona && cd $_
-    git clone https://github.com/percona/mongodb_exporter
-    cd mongodb_exporter
+    git clone https://github.com/percona/mongodb_exporter && cd mongodb_exporter
     make
 
 ### Usage
