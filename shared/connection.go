@@ -14,12 +14,15 @@ const (
 )
 
 func RedactMongoUri(uri string) string {
-	dialInfo, err := mgo.ParseURL(uri)
-	if err != nil {
-		glog.Errorf("Cannot parse mongodb server url: %s", err)
-		return ""
+	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
+		dialInfo, err := mgo.ParseURL(uri)
+		if err != nil {
+			glog.Errorf("Cannot parse mongodb server url: %s", err)
+			return ""
+		}
+		return "mongodb://" + strings.Join(dialInfo.Addrs, ",")
 	}
-	return "mongodb://" + strings.Join(dialInfo.Addrs, ",")
+	return uri
 }
 
 func MongoSession(uri string) *mgo.Session {
