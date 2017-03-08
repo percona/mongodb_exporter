@@ -61,7 +61,7 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 			glog.Errorf("Problem gathering the mongo node type: %s", err)
 		}
 
-		glog.Infof("Connected to: %s (node type: %s, server version: %s)", exporter.Opts.URI, nodeType, serverVersion)
+		glog.Infof("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
 		switch {
 		case nodeType == "mongos":
 			exporter.collectMongos(mongoSess, ch)

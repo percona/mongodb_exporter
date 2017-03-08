@@ -9,15 +9,23 @@ import (
 )
 
 const (
-	dialMongodbTimeout = 10 * time.Second
+	dialMongodbTimeout = 5 * time.Second
 	syncMongodbTimeout = 1 * time.Minute
 )
 
+func RedactMongoUri(uri string) string {
+	dialInfo, err := mgo.ParseURL(uri)
+	if err != nil {
+		glog.Errorf("Cannot parse mongodb server url: %s", err)
+		return ""
+	}
+	return "mongodb://" + strings.Join(dialInfo.Addrs, ",")
+}
+
 func MongoSession(uri string) *mgo.Session {
 	dialInfo, err := mgo.ParseURL(uri)
-	redactedUri := "mongodb://" + strings.Join(dialInfo.Addrs, ",")
 	if err != nil {
-		glog.Errorf("Cannot connect to server using url %s: %s", redactedUri, err)
+		glog.Errorf("Cannot parse mongodb server url: %s", err)
 		return nil
 	}
 
@@ -26,7 +34,7 @@ func MongoSession(uri string) *mgo.Session {
 
 	session, err := mgo.DialWithInfo(dialInfo)
 	if err != nil {
-		glog.Errorf("Cannot connect to server using url %s: %s", redactedUri, err)
+		glog.Errorf("Cannot connect to server using url %s: %s", RedactMongoUri(uri), err)
 		return nil
 	}
 	session.SetMode(mgo.Eventual, true)
