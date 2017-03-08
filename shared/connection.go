@@ -20,7 +20,9 @@ func RedactMongoUri(uri string) string {
 			glog.Errorf("Cannot parse mongodb server url: %s", err)
 			return ""
 		}
-		return "mongodb://" + strings.Join(dialInfo.Addrs, ",")
+		if dialInfo.Username != "" && dialInfo.Password != "" {
+			return "mongodb://****:****@" + strings.Join(dialInfo.Addrs, ",")
+		}
 	}
 	return uri
 }
