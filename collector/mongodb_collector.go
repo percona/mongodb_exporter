@@ -1,10 +1,10 @@
 package collector
 
 import (
-	"github.com/percona/mongodb_exporter/shared"
+	"github.com/golang/glog"
 	"github.com/percona/mongodb_exporter/collector/mongod"
 	"github.com/percona/mongodb_exporter/collector/mongos"
-	"github.com/golang/glog"
+	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/mgo.v2"
 )
@@ -37,8 +37,8 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 	glog.Info("Describing groups")
 	session := shared.MongoSession(exporter.Opts.URI)
-	defer session.Close()
 	if session != nil {
+		defer session.Close()
 		serverStatus := collector_mongos.GetServerStatus(session)
 		if serverStatus != nil {
 			serverStatus.Describe(ch)
@@ -49,8 +49,8 @@ func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect collects all mongodb's metrics.
 func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 	mongoSess := shared.MongoSession(exporter.Opts.URI)
-	defer mongoSess.Close()
 	if mongoSess != nil {
+		defer mongoSess.Close()
 		serverVersion, err := shared.MongoSessionServerVersion(mongoSess)
 		if err != nil {
 			glog.Errorf("Problem gathering the mongo server version: %s", err)
@@ -63,14 +63,14 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 
 		glog.Infof("Connected to: %s (node type: %s, server version: %s)", exporter.Opts.URI, nodeType, serverVersion)
 		switch {
-			case nodeType == "mongos":
-				exporter.collectMongos(mongoSess, ch)
-			case nodeType == "mongod":
-				exporter.collectMongod(mongoSess, ch)
-			case nodeType == "replset":
-				exporter.collectMongodReplSet(mongoSess, ch)
-			default:
-				glog.Infof("Unrecognized node type %s!", nodeType)
+		case nodeType == "mongos":
+			exporter.collectMongos(mongoSess, ch)
+		case nodeType == "mongod":
+			exporter.collectMongod(mongoSess, ch)
+		case nodeType == "replset":
+			exporter.collectMongodReplSet(mongoSess, ch)
+		default:
+			glog.Infof("Unrecognized node type %s!", nodeType)
 		}
 	}
 }
@@ -104,12 +104,11 @@ func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch 
 	replSetStatus := collector_mongod.GetReplSetStatus(session)
 	if replSetStatus != nil {
 		replSetStatus.Export(ch)
-	}       
+	}
 
 	glog.Info("Collecting Replset Oplog Status")
 	oplogStatus := collector_mongod.GetOplogStatus(session)
 	if oplogStatus != nil {
 		oplogStatus.Export(ch)
-	}       
+	}
 }
-
