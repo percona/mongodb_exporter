@@ -64,7 +64,6 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 		glog.Infof("Connected to: %s (node type: %s, server version: %s)", exporter.Opts.URI, nodeType, serverVersion)
 		switch {
 		case nodeType == "mongos":
-			mongoSess.SetMode(mgo.Strong, true)
 			exporter.collectMongos(mongoSess, ch)
 		case nodeType == "mongod":
 			exporter.collectMongod(mongoSess, ch)
@@ -77,6 +76,9 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- prometheus.Metric) {
+	// read from primaries only when using mongos to avoid SERVER-27864
+	session.SetMode(mgo.Strong, true)
+
 	glog.Info("Collecting Server Status")
 	serverStatus := collector_mongos.GetServerStatus(session)
 	if serverStatus != nil {
