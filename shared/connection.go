@@ -18,7 +18,7 @@ func RedactMongoUri(uri string) string {
 		dialInfo, err := mgo.ParseURL(uri)
 		if err != nil {
 			glog.Errorf("Cannot parse mongodb server url: %s", err)
-			return ""
+			return "unknown/error"
 		}
 		if dialInfo.Username != "" && dialInfo.Password != "" {
 			return "mongodb://****:****@" + strings.Join(dialInfo.Addrs, ",")
