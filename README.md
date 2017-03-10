@@ -1,4 +1,4 @@
-# Mongodb Exporter
+# Percona Mongodb Exporter
 
 Based on MongoDB exporter for prometheus.io, written in go (https://github.com/dcu/mongodb_exporter), but forked for full sharded support and structure changes.
 
