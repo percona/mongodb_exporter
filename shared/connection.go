@@ -22,10 +22,16 @@ func MongoSession(uri string) *mgo.Session {
 	dialInfo.Direct = true // Force direct connection
 	dialInfo.Timeout = dialMongodbTimeout
 
-	session, err := mgo.DialWithInfo(dialInfo)
-	if err != nil {
-		glog.Errorf("Cannot connect to server using url %s: %s", uri, err)
-		return nil
+	var session *mgo.Session
+	for {
+		session, err = mgo.DialWithInfo(dialInfo)
+		if err != nil {
+			glog.Errorf("Cannot connect to server using url %s: %s", uri, err)
+			glog.Errorf("Try to reconnect to server using url %s", uri)
+			time.Sleep(time.Duration(5) * time.Second)
+			continue
+		}
+		break
 	}
 	session.SetMode(mgo.Eventual, true)
 	session.SetSyncTimeout(syncMongodbTimeout)
