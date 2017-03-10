@@ -38,11 +38,11 @@ func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 	glog.Info("Describing groups")
 	session := shared.MongoSession(exporter.Opts.URI)
 	if session != nil {
-		defer session.Close()
 		serverStatus := collector_mongos.GetServerStatus(session)
 		if serverStatus != nil {
 			serverStatus.Describe(ch)
 		}
+		session.Close()
 	}
 }
 
