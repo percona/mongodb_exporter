@@ -37,20 +37,20 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 	glog.Info("Describing groups")
 	session := shared.MongoSession(exporter.Opts.URI)
-	defer session.Close()
 	if session != nil {
 		serverStatus := collector_mongos.GetServerStatus(session)
 		if serverStatus != nil {
 			serverStatus.Describe(ch)
 		}
+		session.Close()
 	}
 }
 
 // Collect collects all mongodb's metrics.
 func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 	mongoSess := shared.MongoSession(exporter.Opts.URI)
-	defer mongoSess.Close()
 	if mongoSess != nil {
+		defer mongoSess.Close()
 		serverVersion, err := shared.MongoSessionServerVersion(mongoSess)
 		if err != nil {
 			glog.Errorf("Problem gathering the mongo server version: %s", err)
@@ -61,7 +61,7 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 			glog.Errorf("Problem gathering the mongo node type: %s", err)
 		}
 
-		glog.Infof("Connected to: %s (node type: %s, server version: %s)", exporter.Opts.URI, nodeType, serverVersion)
+		glog.Infof("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
 		switch {
 		case nodeType == "mongos":
 			exporter.collectMongos(mongoSess, ch)
