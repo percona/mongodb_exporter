@@ -1,10 +1,10 @@
 package collector
 
 import (
-	"github.com/Percona/mongodb_exporter/shared"
-	"github.com/Percona/mongodb_exporter/collector/mongod"
-	"github.com/Percona/mongodb_exporter/collector/mongos"
 	"github.com/golang/glog"
+	"github.com/percona/mongodb_exporter/collector/mongod"
+	"github.com/percona/mongodb_exporter/collector/mongos"
+	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/mgo.v2"
 )
@@ -53,20 +53,20 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 	glog.Info("Describing groups")
 	session := shared.MongoSession(exporter.Opts.toSessionOps())
-	defer session.Close()
 	if session != nil {
 		serverStatus := collector_mongos.GetServerStatus(session)
 		if serverStatus != nil {
 			serverStatus.Describe(ch)
 		}
+		session.Close()
 	}
 }
 
 // Collect collects all mongodb's metrics.
 func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 	mongoSess := shared.MongoSession(exporter.Opts.toSessionOps())
-	defer mongoSess.Close()
 	if mongoSess != nil {
+		defer mongoSess.Close()
 		serverVersion, err := shared.MongoSessionServerVersion(mongoSess)
 		if err != nil {
 			glog.Errorf("Problem gathering the mongo server version: %s", err)
@@ -77,7 +77,7 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 			glog.Errorf("Problem gathering the mongo node type: %s", err)
 		}
 
-		glog.Infof("Connected to: %s (node type: %s, server version: %s)", exporter.Opts.URI, nodeType, serverVersion)
+		glog.Infof("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
 		switch {
 		case nodeType == "mongos":
 			exporter.collectMongos(mongoSess, ch)
@@ -92,6 +92,9 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- prometheus.Metric) {
+	// read from primaries only when using mongos to avoid SERVER-27864
+	session.SetMode(mgo.Strong, true)
+
 	glog.Info("Collecting Server Status")
 	serverStatus := collector_mongos.GetServerStatus(session)
 	if serverStatus != nil {

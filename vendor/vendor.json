@@ -93,5 +93,5 @@
 			"revisionTime": "2015-12-01T16:27:45Z"
 		}
 	],
-	"rootPath": "github.com/Percona/mongodb_exporter"
+	"rootPath": "github.com/percona/mongodb_exporter"
 }

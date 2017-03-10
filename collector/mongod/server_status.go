@@ -61,10 +61,10 @@ type ServerStatus struct {
 
 	Cursors *Cursors `bson:"cursors"`
 
-	StorageEngine	*StorageEngineStats	`bson:"storageEngine"`
-	InMemory	*WiredTigerStats	`bson:"inMemory"`
-	RocksDb		*RocksDbStats		`bson:"rocksdb"`
-	WiredTiger	*WiredTigerStats	`bson:"wiredTiger"`
+	StorageEngine *StorageEngineStats `bson:"storageEngine"`
+	InMemory      *WiredTigerStats    `bson:"inMemory"`
+	RocksDb       *RocksDbStats       `bson:"rocksdb"`
+	WiredTiger    *WiredTigerStats    `bson:"wiredTiger"`
 }
 
 // Export exports the server status to be consumed by prometheus.
@@ -118,9 +118,6 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	if status.Cursors != nil {
 		status.Cursors.Export(ch)
 	}
-	if status.StorageEngine != nil {
-		status.StorageEngine.Export(ch)
-	}
 	if status.InMemory != nil {
 		status.InMemory.Export(ch)
 	}
@@ -129,6 +126,17 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	}
 	if status.WiredTiger != nil {
 		status.WiredTiger.Export(ch)
+	}
+
+	// If db.serverStatus().storageEngine does not exist (3.0+ only) and status.BackgroundFlushing does (MMAPv1 only), default to mmapv1
+	// https://docs.mongodb.com/v3.0/reference/command/serverStatus/#storageengine
+	if status.StorageEngine == nil && status.BackgroundFlushing != nil {
+		status.StorageEngine = &StorageEngineStats{
+			Name: "mmapv1",
+		}
+	}
+	if status.StorageEngine != nil {
+		status.StorageEngine.Export(ch)
 	}
 }
 

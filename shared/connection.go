@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"strings"
 	"time"
 
 	"crypto/tls"
@@ -13,9 +14,23 @@ import (
 )
 
 const (
-	dialMongodbTimeout = 10 * time.Second
+	dialMongodbTimeout = 5 * time.Second
 	syncMongodbTimeout = 1 * time.Minute
 )
+
+func RedactMongoUri(uri string) string {
+	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
+		dialInfo, err := mgo.ParseURL(uri)
+		if err != nil {
+			glog.Errorf("Cannot parse mongodb server url: %s", err)
+			return "unknown/error"
+		}
+		if dialInfo.Username != "" && dialInfo.Password != "" {
+			return "mongodb://****:****@" + strings.Join(dialInfo.Addrs, ",")
+		}
+	}
+	return uri
+}
 
 type MongoSessionOpts struct {
 	URI                   string
@@ -29,7 +44,7 @@ type MongoSessionOpts struct {
 func MongoSession(opts MongoSessionOpts) *mgo.Session {
 	dialInfo, err := mgo.ParseURL(opts.URI)
 	if err != nil {
-		glog.Errorf("Cannot connect to server using url %s: %s", opts.URI, err)
+		glog.Errorf("Cannot parse mongodb server url: %s", err)
 		return nil
 	}
 
@@ -44,7 +59,7 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 
 	session, err := mgo.DialWithInfo(dialInfo)
 	if err != nil {
-		glog.Errorf("Cannot connect to server using url %s: %s", opts.URI, err)
+		glog.Errorf("Cannot connect to server using url %s: %s", RedactMongoUri(opts.URI), err)
 		return nil
 	}
 	session.SetMode(mgo.Eventual, true)
