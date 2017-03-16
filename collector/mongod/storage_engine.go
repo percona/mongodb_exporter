@@ -13,7 +13,7 @@ var (
 
 // StorageEngineStats
 type StorageEngineStats struct {
-	Name	string	`bson:"name"`
+	Name string `bson:"name"`
 }
 
 // Export exports the data to prometheus.

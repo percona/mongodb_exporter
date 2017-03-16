@@ -1,4 +1,4 @@
-# Mongodb Exporter
+# Percona Mongodb Exporter
 
 Based on MongoDB exporter for prometheus.io, written in go (https://github.com/dcu/mongodb_exporter), but forked for full sharded support and structure changes.
 
@@ -17,7 +17,7 @@ The exporter is in beta/experimental state and field names are **very likely to 
 
 ### Building
 
-    go build -o mongodb_exporter github.com/Percona-Lab/prometheus_mongodb_exporter
+    go build -o mongodb_exporter github.com/percona/mongodb_exporter
 
 ### Usage
 
@@ -28,8 +28,8 @@ It is recommended to define the following options:
 - **-web.listen-address** - The listen address of the exporter (*default: ":9104"*)
 - **-log_dir** - The directory to write the log file (*default: /tmp*)
 
-To define your own MongoDB URI, use environment variable `MONGODB_URI`. If set this variable takes precedence over **-mongodb.uri** flag.
-For example: `export MONGODB_URI=mongodb://localhost:27017`
+To define your own MongoDB URL, use environment variable `MONGODB_URL`. If set this variable takes precedence over **-mongodb.uri** flag.
+For example: `export MONGODB_URL=mongodb://localhost:27017`
 
 To enable HTTP basic authentication, set environment variable `HTTP_AUTH` to user:password pair.
 For example: `export HTTP_AUTH="user:password"`
@@ -51,10 +51,10 @@ db.getSiblingDB("admin").createUser({
 })
 ```
 
-2. Set environment variable `MONGODB_URI` before starting the exporter:
+2. Set environment variable `MONGODB_URL` before starting the exporter:
 
 ```
-export MONGODB_URI=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
+export MONGODB_URL=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
 ```
 
 ### Note about how this works

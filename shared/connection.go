@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -8,14 +9,28 @@ import (
 )
 
 const (
-	dialMongodbTimeout = 10 * time.Second
+	dialMongodbTimeout = 5 * time.Second
 	syncMongodbTimeout = 1 * time.Minute
 )
+
+func RedactMongoUri(uri string) string {
+	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
+		dialInfo, err := mgo.ParseURL(uri)
+		if err != nil {
+			glog.Errorf("Cannot parse mongodb server url: %s", err)
+			return "unknown/error"
+		}
+		if dialInfo.Username != "" && dialInfo.Password != "" {
+			return "mongodb://****:****@" + strings.Join(dialInfo.Addrs, ",")
+		}
+	}
+	return uri
+}
 
 func MongoSession(uri string) *mgo.Session {
 	dialInfo, err := mgo.ParseURL(uri)
 	if err != nil {
-		glog.Errorf("Cannot connect to server using url %s: %s", uri, err)
+		glog.Errorf("Cannot parse mongodb server url: %s", err)
 		return nil
 	}
 
@@ -24,7 +39,7 @@ func MongoSession(uri string) *mgo.Session {
 
 	session, err := mgo.DialWithInfo(dialInfo)
 	if err != nil {
-		glog.Errorf("Cannot connect to server using url %s: %s", uri, err)
+		glog.Errorf("Cannot connect to server using url %s: %s", RedactMongoUri(uri), err)
 		return nil
 	}
 	session.SetMode(mgo.Eventual, true)

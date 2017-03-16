@@ -18,11 +18,17 @@ var (
 		Name:      "my_name",
 		Help:      "The replica state name of the current member",
 	}, []string{"set", "name"})
-	myState   = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	myState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "my_state",
 		Help:      "An integer between 0 and 10 that represents the replica state of the current member",
+	}, []string{"set"})
+	date = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: subsystem,
+		Name:      "date",
+		Help:      "The value of the date field is an ISODate of the current time, according to the current server.",
 	}, []string{"set"})
 	term = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
@@ -149,6 +155,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	memberConfigVersion.Reset()
 
 	myState.WithLabelValues(replStatus.Set).Set(float64(replStatus.MyState))
+	date.WithLabelValues(replStatus.Set).Set(float64(replStatus.Date.Unix()))
 
 	// new in version 3.2
 	if replStatus.Term != nil {
@@ -207,6 +214,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	myName.Collect(ch)
 	myState.Collect(ch)
 	term.Collect(ch)
+	date.Collect(ch)
 	numberOfMembers.Collect(ch)
 	heartbeatIntervalMillis.Collect(ch)
 	memberState.Collect(ch)
@@ -224,6 +232,7 @@ func (replStatus *ReplSetStatus) Describe(ch chan<- *prometheus.Desc) {
 	myName.Describe(ch)
 	myState.Describe(ch)
 	term.Describe(ch)
+	date.Describe(ch)
 	numberOfMembers.Describe(ch)
 	heartbeatIntervalMillis.Describe(ch)
 	memberState.Describe(ch)
