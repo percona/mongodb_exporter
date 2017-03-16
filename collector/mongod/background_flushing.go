@@ -7,18 +7,14 @@ import (
 )
 
 var (
-	backgroundFlushingflushesTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "background_flushing",
-		Name:      "flushes_total",
-		Help:      "flushes is a counter that collects the number of times the database has flushed all writes to disk. This value will grow as database runs for longer periods of time",
-	})
-	backgroundFlushingtotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "background_flushing",
-		Name:      "total_milliseconds",
-		Help:      "The total_ms value provides the total number of milliseconds (ms) that the mongod processes have spent writing (i.e. flushing) data to disk. Because this is an absolute value, consider the value offlushes and average_ms to provide better context for this datum",
-	})
+	backgroundFlushingflushesTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "background_flushing", "flushes_total"),
+		"flushes is a counter that collects the number of times the database has flushed all writes to disk. This value will grow as database runs for longer periods of time",
+	  nil, nil)
+	backgroundFlushingtotalMilliseconds = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "background_flushing", "total_milliseconds"),
+		"The total_ms value provides the total number of milliseconds (ms) that the mongod processes have spent writing (i.e. flushing) data to disk. Because this is an absolute value, consider the value offlushes and average_ms to provide better context for this datum",
+		nil, nil)
 	backgroundFlushingaverageMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
@@ -50,14 +46,12 @@ type FlushStats struct {
 
 // Export exports the metrics for prometheus.
 func (flushStats *FlushStats) Export(ch chan<- prometheus.Metric) {
-	backgroundFlushingflushesTotal.Set(flushStats.Flushes)
-	backgroundFlushingtotalMilliseconds.Set(flushStats.TotalMs)
+	ch <- prometheus.MustNewConstMetric(backgroundFlushingflushesTotal, prometheus.CounterValue, flushStats.Flushes)
+	ch <- prometheus.MustNewConstMetric(backgroundFlushingtotalMilliseconds, prometheus.CounterValue, flushStats.TotalMs)
 	backgroundFlushingaverageMilliseconds.Set(flushStats.AverageMs)
 	backgroundFlushinglastMilliseconds.Set(flushStats.LastMs)
 	backgroundFlushinglastFinishedTime.Set(float64(flushStats.LastFinished.Unix()))
 
-	backgroundFlushingflushesTotal.Collect(ch)
-	backgroundFlushingtotalMilliseconds.Collect(ch)
 	backgroundFlushingaverageMilliseconds.Collect(ch)
 	backgroundFlushinglastMilliseconds.Collect(ch)
 	backgroundFlushinglastFinishedTime.Collect(ch)
@@ -65,8 +59,8 @@ func (flushStats *FlushStats) Export(ch chan<- prometheus.Metric) {
 
 // Describe describes the metrics for prometheus
 func (flushStats *FlushStats) Describe(ch chan<- *prometheus.Desc) {
-	backgroundFlushingflushesTotal.Describe(ch)
-	backgroundFlushingtotalMilliseconds.Describe(ch)
+	ch <- backgroundFlushingflushesTotal
+	ch <- backgroundFlushingtotalMilliseconds
 	backgroundFlushingaverageMilliseconds.Describe(ch)
 	backgroundFlushinglastMilliseconds.Describe(ch)
 	backgroundFlushinglastFinishedTime.Describe(ch)
