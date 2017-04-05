@@ -113,6 +113,32 @@ var (
 	})
 )
 var (
+	metricsReplExecutorTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: Namespace,
+		Subsystem: "metrics_repl_executor",
+		Name:      "total",
+		Help:      "total number of operations in the replication executor",
+	}, []string{"type"})
+	metricsReplExecutorQueue = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "metrics_repl_executor",
+		Name:      "queue",
+		Help:      "number of queued operations in the replication executor",
+	}, []string{"type"})
+	metricsReplExecutorEventWaiters = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "metrics_repl_executor",
+		Name:      "event_waiters",
+		Help:      "number of event waiters in the replication executor",
+	})
+	metricsReplExecutorUnsignaledEvents = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "metrics_repl_executor",
+		Name:      "unsignaled_events",
+		Help:      "number of unsignaled events in the replication executor",
+	})
+)
+var (
 	metricsReplNetworkGetmoresNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_network_getmores",
@@ -318,6 +344,26 @@ func (bufferStats *BufferStats) Export(ch chan<- prometheus.Metric) {
 	metricsReplBufferSizeBytes.Set(bufferStats.SizeBytes)
 }
 
+// ReplExecutorStats are the stats associated with replication execution
+type ReplExecutorStats struct {
+	Counters         map[string]float64 `bson:"counters"`
+	Queues           map[string]float64 `bson:"queues"`
+	EventWaiters     float64            `bson:"eventWaiters"`
+	UnsignaledEvents float64            `bson:"unsignaledEvents"`
+}
+
+// Export replication executor stats
+func (replExecutorStats *ReplExecutorStats) Export(ch chan<- prometheus.Metric) {
+	for key, val := range replExecutorStats.Counters {
+		metricsReplExecutorTotal.WithLabelValues(key).Set(val)
+	}
+	for key, val := range replExecutorStats.Queues {
+		metricsReplExecutorQueue.WithLabelValues(key).Set(val)
+	}
+	metricsReplExecutorEventWaiters.Set(replExecutorStats.EventWaiters)
+	metricsReplExecutorUnsignaledEvents.Set(replExecutorStats.UnsignaledEvents)
+}
+
 // MetricsNetworkStats are the network stats.
 type MetricsNetworkStats struct {
 	Bytes          float64         `bson:"bytes"`
@@ -340,6 +386,7 @@ func (metricsNetworkStats *MetricsNetworkStats) Export(ch chan<- prometheus.Metr
 type ReplStats struct {
 	Apply        *ApplyStats          `bson:"apply"`
 	Buffer       *BufferStats         `bson:"buffer"`
+	Executor     *ReplExecutorStats   `bson:"executor,omitempty"`
 	Network      *MetricsNetworkStats `bson:"network"`
 	PreloadStats *PreloadStats        `bson:"preload"`
 }
@@ -350,6 +397,10 @@ func (replStats *ReplStats) Export(ch chan<- prometheus.Metric) {
 	replStats.Buffer.Export(ch)
 	replStats.Network.Export(ch)
 	replStats.PreloadStats.Export(ch)
+	// 3.0+ only
+	if replStats.Executor != nil {
+		replStats.Executor.Export(ch)
+	}
 }
 
 // PreloadStats are the stats associated with preload operation.
@@ -383,15 +434,15 @@ func (storageStats *StorageStats) Export(ch chan<- prometheus.Metric) {
 
 // CursorStatsOpen are the stats for open cursors
 type CursorStatsOpen struct {
-	NoTimeout	float64	`bson:"noTimeout"`
-	Pinned		float64 `bson:"pinned"`
-	Total		float64 `bson:"total"`
+	NoTimeout float64 `bson:"noTimeout"`
+	Pinned    float64 `bson:"pinned"`
+	Total     float64 `bson:"total"`
 }
 
 // CursorStats are the stats for cursors
 type CursorStats struct {
-	TimedOut	float64			`bson:"timedOut"`
-	Open		*CursorStatsOpen	`bson:"open"`
+	TimedOut float64          `bson:"timedOut"`
+	Open     *CursorStatsOpen `bson:"open"`
 }
 
 // Export exports the cursor stats.
@@ -456,6 +507,10 @@ func (metricsStats *MetricsStats) Export(ch chan<- prometheus.Metric) {
 	metricsReplBufferCount.Collect(ch)
 	metricsReplBufferMaxSizeBytes.Collect(ch)
 	metricsReplBufferSizeBytes.Collect(ch)
+	metricsReplExecutorTotal.Collect(ch)
+	metricsReplExecutorQueue.Collect(ch)
+	metricsReplExecutorEventWaiters.Collect(ch)
+	metricsReplExecutorUnsignaledEvents.Collect(ch)
 	metricsReplNetworkGetmoresNumTotal.Collect(ch)
 	metricsReplNetworkGetmoresTotalMilliseconds.Collect(ch)
 	metricsReplNetworkBytesTotal.Collect(ch)
@@ -490,6 +545,10 @@ func (metricsStats *MetricsStats) Describe(ch chan<- *prometheus.Desc) {
 	metricsReplBufferCount.Describe(ch)
 	metricsReplBufferMaxSizeBytes.Describe(ch)
 	metricsReplBufferSizeBytes.Describe(ch)
+	metricsReplExecutorTotal.Describe(ch)
+	metricsReplExecutorQueue.Describe(ch)
+	metricsReplExecutorEventWaiters.Describe(ch)
+	metricsReplExecutorUnsignaledEvents.Describe(ch)
 	metricsReplNetworkGetmoresNumTotal.Describe(ch)
 	metricsReplNetworkGetmoresTotalMilliseconds.Describe(ch)
 	metricsReplNetworkBytesTotal.Describe(ch)
