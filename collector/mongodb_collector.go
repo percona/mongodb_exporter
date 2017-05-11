@@ -16,7 +16,23 @@ var (
 
 // MongodbCollectorOpts is the options of the mongodb collector.
 type MongodbCollectorOpts struct {
-	URI string
+	URI                   string
+	TLSConnection         bool
+	TLSCertificateFile    string
+	TLSPrivateKeyFile     string
+	TLSCaFile             string
+	TLSHostnameValidation bool
+}
+
+func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
+	return shared.MongoSessionOpts{
+		URI:                   in.URI,
+		TLSConnection:         in.TLSConnection,
+		TLSCertificateFile:    in.TLSCertificateFile,
+		TLSPrivateKeyFile:     in.TLSPrivateKeyFile,
+		TLSCaFile:             in.TLSCaFile,
+		TLSHostnameValidation: in.TLSHostnameValidation,
+	}
 }
 
 // MongodbCollector is in charge of collecting mongodb's metrics.
@@ -36,7 +52,7 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 // Describe describes all mongodb's metrics.
 func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 	glog.Info("Describing groups")
-	session := shared.MongoSession(exporter.Opts.URI)
+	session := shared.MongoSession(exporter.Opts.toSessionOps())
 	if session != nil {
 		serverStatus := collector_mongos.GetServerStatus(session)
 		if serverStatus != nil {
@@ -48,7 +64,7 @@ func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect collects all mongodb's metrics.
 func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
-	mongoSess := shared.MongoSession(exporter.Opts.URI)
+	mongoSess := shared.MongoSession(exporter.Opts.toSessionOps())
 	if mongoSess != nil {
 		defer mongoSess.Close()
 		serverVersion, err := shared.MongoSessionServerVersion(mongoSess)
