@@ -12,12 +12,10 @@ var (
 	}, []string{"state"})
 )
 var (
-	connectionsMetricsCreatedTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "connections_metrics",
-		Name:      "created_total",
-		Help:      "totalCreated provides a count of all incoming connections created to the server. This number includes connections that have since closed",
-	})
+	connectionsMetricsCreatedTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "connections_metrics", "created_total"),
+		"totalCreated provides a count of all incoming connections created to the server. This number includes connections that have since closed",
+		nil, nil)
 )
 
 // ConnectionStats are connections metrics
@@ -32,13 +30,11 @@ func (connectionStats *ConnectionStats) Export(ch chan<- prometheus.Metric) {
 	connections.WithLabelValues("current").Set(connectionStats.Current)
 	connections.WithLabelValues("available").Set(connectionStats.Available)
 	connections.Collect(ch)
-
-	connectionsMetricsCreatedTotal.Set(connectionStats.TotalCreated)
-	connectionsMetricsCreatedTotal.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(connectionsMetricsCreatedTotal, prometheus.CounterValue, connectionStats.TotalCreated)
 }
 
 // Describe describes the metrics for prometheus
 func (connectionStats *ConnectionStats) Describe(ch chan<- *prometheus.Desc) {
 	connections.Describe(ch)
-	connectionsMetricsCreatedTotal.Describe(ch)
+	ch <- connectionsMetricsCreatedTotal
 }

@@ -11,18 +11,10 @@ var (
 		Name:      "ratio",
 		Help:      "The value of ratio displays the relationship between lockTime and totalTime. Low values indicate that operations have held the globalLock frequently for shorter periods of time. High values indicate that operations have held globalLock infrequently for longer periods of time",
 	})
-	globalLockTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "global_lock",
-		Name:      "total",
-		Help:      "The value of totalTime represents the time, in microseconds, since the database last started and creation of the globalLock. This is roughly equivalent to total server uptime",
-	})
-	globalLockLockTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "global_lock",
-		Name:      "lock_total",
-		Help:      "The value of lockTime represents the time, in microseconds, since the database last started, that the globalLock has been held",
-	})
+	globalLockTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "global_lock", "total"),
+		"The value of totalTime represents the time, in microseconds, since the database last started and creation of the globalLock. This is roughly equivalent to total server uptime",
+	  nil, nil)
 )
 var (
 	globalLockCurrentQueue = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -76,13 +68,12 @@ type GlobalLockStats struct {
 
 // Export exports the metrics to prometheus
 func (globalLock *GlobalLockStats) Export(ch chan<- prometheus.Metric) {
-	globalLockTotal.Set(globalLock.LockTime)
+	ch <- prometheus.MustNewConstMetric(globalLockTotal, prometheus.CounterValue, globalLock.LockTime)
 	globalLockRatio.Set(globalLock.Ratio)
 
 	globalLock.CurrentQueue.Export(ch)
 	globalLock.ActiveClients.Export(ch)
 
-	globalLockTotal.Collect(ch)
 	globalLockRatio.Collect(ch)
 	globalLockCurrentQueue.Collect(ch)
 	globalLockClient.Collect(ch)
@@ -90,7 +81,7 @@ func (globalLock *GlobalLockStats) Export(ch chan<- prometheus.Metric) {
 
 // Describe describes the metrics for prometheus
 func (globalLock *GlobalLockStats) Describe(ch chan<- *prometheus.Desc) {
-	globalLockTotal.Describe(ch)
+	ch <- globalLockTotal
 	globalLockRatio.Describe(ch)
 	globalLockCurrentQueue.Describe(ch)
 	globalLockClient.Describe(ch)
