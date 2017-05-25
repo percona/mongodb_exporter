@@ -15,6 +15,10 @@ var (
 		prometheus.BuildFQName(Namespace, "global_lock", "total"),
 		"The value of totalTime represents the time, in microseconds, since the database last started and creation of the globalLock. This is roughly equivalent to total server uptime",
 	  nil, nil)
+	globalLockLockTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "global_lock", "lock_total"),
+		"The value of lockTime represents the time, in microseconds, since the database last started, that the globalLock has been held",
+	  nil, nil)
 )
 var (
 	globalLockCurrentQueue = prometheus.NewGaugeVec(prometheus.GaugeOpts{
