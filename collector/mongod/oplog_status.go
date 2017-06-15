@@ -9,45 +9,45 @@ import (
 
 var (
 	oplogStatusCount = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"replset_oplog",
-		Name:		"items_total",
-		Help:		"The total number of changes in the oplog",
+		Namespace: Namespace,
+		Subsystem: "replset_oplog",
+		Name:      "items_total",
+		Help:      "The total number of changes in the oplog",
 	})
 	oplogStatusHeadTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"replset_oplog",
-		Name:		"head_timestamp",
-		Help:		"The timestamp of the newest change in the oplog",
+		Namespace: Namespace,
+		Subsystem: "replset_oplog",
+		Name:      "head_timestamp",
+		Help:      "The timestamp of the newest change in the oplog",
 	})
 	oplogStatusTailTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"replset_oplog",
-		Name:		"tail_timestamp",
-		Help:		"The timestamp of the oldest change in the oplog",
+		Namespace: Namespace,
+		Subsystem: "replset_oplog",
+		Name:      "tail_timestamp",
+		Help:      "The timestamp of the oldest change in the oplog",
 	})
 	oplogStatusSizeBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"replset_oplog",
-		Name:		"size_bytes",
-		Help:		"Size of oplog in bytes",
+		Namespace: Namespace,
+		Subsystem: "replset_oplog",
+		Name:      "size_bytes",
+		Help:      "Size of oplog in bytes",
 	}, []string{"type"})
 )
 
 type OplogCollectionStats struct {
-	Count		float64	`bson:"count"`
-	Size		float64	`bson:"size"`
-	StorageSize	float64 `bson:"storageSize"`
+	Count       float64 `bson:"count"`
+	Size        float64 `bson:"size"`
+	StorageSize float64 `bson:"storageSize"`
 }
 
 type OplogTimestamps struct {
-	Tail	float64
-	Head	float64
+	Tail float64
+	Head float64
 }
 
 type OplogStatus struct {
-	OplogTimestamps	*OplogTimestamps
-	CollectionStats	*OplogCollectionStats
+	OplogTimestamps *OplogTimestamps
+	CollectionStats *OplogCollectionStats
 }
 
 // there's gotta be a better way to do this, but it works for now :/
@@ -61,7 +61,9 @@ func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
 
 	// retry once if there is an error
 	var tries int64 = 0
-	var head_result struct { Timestamp	bson.MongoTimestamp	`bson:"ts"` }
+	var head_result struct {
+		Timestamp bson.MongoTimestamp `bson:"ts"`
+	}
 	for tries < 2 {
 		err = session.DB("local").C("oplog.rs").Find(nil).Sort("-$natural").Limit(1).One(&head_result)
 		if err == nil {
@@ -75,7 +77,9 @@ func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
 
 	// retry once if there is an error
 	tries = 0
-	var tail_result struct { Timestamp	bson.MongoTimestamp	`bson:"ts"` }
+	var tail_result struct {
+		Timestamp bson.MongoTimestamp `bson:"ts"`
+	}
 	for tries < 2 {
 		err = session.DB("local").C("oplog.rs").Find(nil).Sort("$natural").Limit(1).One(&tail_result)
 		if err == nil {
@@ -94,7 +98,7 @@ func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
 
 func GetOplogCollectionStats(session *mgo.Session) (*OplogCollectionStats, error) {
 	results := &OplogCollectionStats{}
-	err := session.DB("local").Run(bson.M{ "collStats" : "oplog.rs" }, &results)
+	err := session.DB("local").Run(bson.M{"collStats": "oplog.rs"}, &results)
 	return results, err
 }
 
@@ -132,5 +136,5 @@ func GetOplogStatus(session *mgo.Session) *OplogStatus {
 		return nil
 	}
 
-	return &OplogStatus{CollectionStats:collectionStats,OplogTimestamps:oplogTimestamps}
+	return &OplogStatus{CollectionStats: collectionStats, OplogTimestamps: oplogTimestamps}
 }

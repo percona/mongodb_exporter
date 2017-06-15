@@ -1,81 +1,81 @@
 package collector_mongos
 
 import (
-	"time"
-	"strings"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"strings"
+	"time"
 )
 
 var (
 	balancerIsEnabled = prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace:	Namespace,
-			Subsystem:	"sharding",
-			Name:		"balancer_enabled",
-			Help:		"Boolean reporting if cluster balancer is enabled (1 = enabled/0 = disabled)",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "balancer_enabled",
+		Help:      "Boolean reporting if cluster balancer is enabled (1 = enabled/0 = disabled)",
 	})
 	balancerChunksBalanced = prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace:	Namespace,
-			Subsystem:	"sharding",
-			Name:		"chunks_is_balanced",
-			Help:		"Boolean reporting if cluster chunks are evenly balanced across shards (1 = yes/0 = no)",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "chunks_is_balanced",
+		Help:      "Boolean reporting if cluster chunks are evenly balanced across shards (1 = yes/0 = no)",
 	})
 	mongosUpSecs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace:      Namespace,
-			Subsystem:      "sharding",
-			Name:		"mongos_uptime_seconds",
-			Help:		"The uptime of the Mongos processes in seconds",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "mongos_uptime_seconds",
+		Help:      "The uptime of the Mongos processes in seconds",
 	}, []string{"name"})
 	mongosPing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace:      Namespace,
-			Subsystem:      "sharding",
-			Name:		"mongos_last_ping_timestamp",
-			Help:		"The unix timestamp of the last Mongos ping to the Cluster config servers",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "mongos_last_ping_timestamp",
+		Help:      "The unix timestamp of the last Mongos ping to the Cluster config servers",
 	}, []string{"name"})
 	mongosBalancerLockTimestamp = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace:      Namespace,
-			Subsystem:      "sharding",
-			Name:		"balancer_lock_timestamp",
-			Help:		"The unix timestamp of the last update to the Cluster balancer lock",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "balancer_lock_timestamp",
+		Help:      "The unix timestamp of the last update to the Cluster balancer lock",
 	}, []string{"name"})
 	mongosBalancerLockState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace:      Namespace,
-			Subsystem:      "sharding",
-			Name:		"balancer_lock_state",
-			Help:		"The state of the Cluster balancer lock (-1 = none/0 = unlocked/1 = contention/2 = locked)",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "balancer_lock_state",
+		Help:      "The state of the Cluster balancer lock (-1 = none/0 = unlocked/1 = contention/2 = locked)",
 	}, []string{"name"})
 )
 
 type MongosInfo struct {
-	Name		string		`bson:"_id"`
-	Ping		time.Time       `bson:"ping"`
-	Up		float64		`bson:"up"`
-	Waiting		bool		`bson:"waiting"`
-	MongoVersion    string		`bson:"mongoVersion"`
+	Name         string    `bson:"_id"`
+	Ping         time.Time `bson:"ping"`
+	Up           float64   `bson:"up"`
+	Waiting      bool      `bson:"waiting"`
+	MongoVersion string    `bson:"mongoVersion"`
 }
 
 type MongosBalancerLock struct {
-	State	float64		`bson:"state"`
-	Process	string		`bson:"process"`
-	Who	string		`bson:"who"`
-	When	time.Time	`bson:"when"`
-	Why	string		`bson:"why"`
+	State   float64   `bson:"state"`
+	Process string    `bson:"process"`
+	Who     string    `bson:"who"`
+	When    time.Time `bson:"when"`
+	Why     string    `bson:"why"`
 }
 
 type ShardingStats struct {
-	IsBalanced	float64	
-	BalancerEnabled	float64
-	Changelog	*ShardingChangelogStats	
-	Topology	*ShardingTopoStats
-	BalancerLock	*MongosBalancerLock
-	Mongos		*[]MongosInfo
+	IsBalanced      float64
+	BalancerEnabled float64
+	Changelog       *ShardingChangelogStats
+	Topology        *ShardingTopoStats
+	BalancerLock    *MongosBalancerLock
+	Mongos          *[]MongosInfo
 }
 
 func GetMongosInfo(session *mgo.Session) *[]MongosInfo {
 	mongosInfo := []MongosInfo{}
-	err := session.DB("config").C("mongos").Find(bson.M{ "ping" : bson.M{ "$gte" : time.Now().Add(-10 * time.Minute) } }).All(&mongosInfo)
+	err := session.DB("config").C("mongos").Find(bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}}).All(&mongosInfo)
 	if err != nil {
 		glog.Error("Failed to execute find query on 'config.mongos'!")
 	}
@@ -84,7 +84,7 @@ func GetMongosInfo(session *mgo.Session) *[]MongosInfo {
 
 func GetMongosBalancerLock(session *mgo.Session) *MongosBalancerLock {
 	var balancerLock *MongosBalancerLock
-	err := session.DB("config").C("locks").Find(bson.M{ "_id" : "balancer" }).One(&balancerLock)
+	err := session.DB("config").C("locks").Find(bson.M{"_id": "balancer"}).One(&balancerLock)
 	if err != nil {
 		glog.Error("Failed to execute find query on 'config.locks'!")
 	}
@@ -93,9 +93,9 @@ func GetMongosBalancerLock(session *mgo.Session) *MongosBalancerLock {
 
 func IsBalancerEnabled(session *mgo.Session) float64 {
 	balancerConfig := struct {
-		Stopped	bool	`bson:"stopped"`
+		Stopped bool `bson:"stopped"`
 	}{}
-	err := session.DB("config").C("settings").Find(bson.M{ "_id" : "balancer" }).One(&balancerConfig)
+	err := session.DB("config").C("settings").Find(bson.M{"_id": "balancer"}).One(&balancerConfig)
 	if err != nil {
 		return 1
 	}
@@ -188,7 +188,7 @@ func GetShardingStatus(session *mgo.Session) *ShardingStats {
 
 	results.IsBalanced = IsClusterBalanced(session)
 	results.BalancerEnabled = IsBalancerEnabled(session)
-	results.Changelog = GetShardingChangelogStatus(session) 
+	results.Changelog = GetShardingChangelogStatus(session)
 	results.Topology = GetShardingTopoStatus(session)
 	results.Mongos = GetMongosInfo(session)
 	results.BalancerLock = GetMongosBalancerLock(session)
