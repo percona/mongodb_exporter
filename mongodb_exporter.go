@@ -11,9 +11,13 @@ import (
 
 	"github.com/percona/mongodb_exporter/collector"
 	"github.com/percona/mongodb_exporter/shared"
-
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/version"
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	program = "mongodb_exporter"
 )
 
 func mongodbDefaultUri() string {
@@ -24,10 +28,7 @@ func mongodbDefaultUri() string {
 }
 
 var (
-	version          string = "unknown"
-	versionGitCommit string = "unknown"
-
-	doPrintVersion    = flag.Bool("version", false, "Print version info and exit.")
+	versionF          = flag.Bool("version", false, "Print version information and exit.")
 	listenAddressFlag = flag.String("web.listen-address", ":9216", "Address on which to expose metrics and web interface.")
 	metricsPathFlag   = flag.String("web.metrics-path", "/metrics", "Path under which to expose metrics.")
 	webAuthFile       = flag.String("web.auth-file", "", "Path to YAML file with server_user, server_password options for http basic auth (overrides HTTP_AUTH env var).")
@@ -54,10 +55,6 @@ var landingPage = []byte(`<html>
 </body>
 </html>
 `)
-
-func printVersion() {
-	fmt.Printf("mongodb_exporter version: %s, git commit hash: %s\n", version, versionGitCommit)
-}
 
 type webAuth struct {
 	User     string `yaml:"server_user,omitempty"`
@@ -111,8 +108,6 @@ func prometheusHandler() http.Handler {
 }
 
 func startWebServer() {
-	printVersion()
-
 	uri := os.Getenv("MONGODB_URI")
 	if uri != "" {
 		mongodbURIFlag = &uri
@@ -189,8 +184,8 @@ func registerCollector() {
 func main() {
 	flag.Parse()
 
-	if *doPrintVersion {
-		printVersion()
+	if *versionF {
+		fmt.Println(version.Print(program))
 		os.Exit(0)
 	}
 
