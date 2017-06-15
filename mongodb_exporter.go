@@ -23,7 +23,7 @@ const (
 	program = "mongodb_exporter"
 )
 
-func mongodbDefaultUri() string {
+func mongodbDefaultURI() string {
 	if u := os.Getenv("MONGODB_URL"); u != "" {
 		return u
 	}
@@ -38,17 +38,18 @@ var (
 	sslCertFileF   = flag.String("web.ssl-cert-file", "", "Path to SSL certificate file.")
 	sslKeyFileF    = flag.String("web.ssl-key-file", "", "Path to SSL key file.")
 
-	mongodbURIFlag    = flag.String("mongodb.uri", mongodbDefaultUri(), "Mongodb URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
-	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
-	mongodbTls        = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
-	mongodbTlsCert    = flag.String("mongodb.tls-cert", "", "Path to PEM file that conains the certificate (and opionally also the private key in PEM format).\n"+
+	uriF     = flag.String("mongodb.uri", mongodbDefaultURI(), "Mongodb URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
+	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
+	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the private key in PEM format).\n"+
 		"    \tThis should include the whole certificate chain.\n"+
 		"    \tIf provided: The connection will be opened via TLS to the MongoDB server.")
-	mongodbTlsPrivateKey = flag.String("mongodb.tls-private-key", "", "Path to PEM file that conains the private key (if not contained in mongodb.tls-cert file).")
-	mongodbTlsCa         = flag.String("mongodb.tls-ca", "", "Path to PEM file that conains the CAs that are trused for server connections.\n"+
+	tlsPrivateKeyF = flag.String("mongodb.tls-private-key", "", "Path to PEM file that contains the private key (if not contained in mongodb.tls-cert file).")
+	tlsCAF         = flag.String("mongodb.tls-ca", "", "Path to PEM file that contains the CAs that are trusted for server connections.\n"+
 		"    \tIf provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.\n"+
 		"    \tIf not provided: System default CAs are used.")
-	mongodbTlsDisableHostnameValidation = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
+	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
+
+	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
 )
 
 var landingPage = []byte(`<html>
@@ -134,7 +135,7 @@ func prometheusHandler() http.Handler {
 func startWebServer() {
 	uri := os.Getenv("MONGODB_URI")
 	if uri != "" {
-		mongodbURIFlag = &uri
+		uriF = &uri
 	}
 
 	handler := prometheusHandler()
@@ -195,12 +196,12 @@ func startWebServer() {
 
 func registerCollector() {
 	mongodbCollector := collector.NewMongodbCollector(collector.MongodbCollectorOpts{
-		URI:                   *mongodbURIFlag,
-		TLSConnection:         *mongodbTls,
-		TLSCertificateFile:    *mongodbTlsCert,
-		TLSPrivateKeyFile:     *mongodbTlsPrivateKey,
-		TLSCaFile:             *mongodbTlsCa,
-		TLSHostnameValidation: !(*mongodbTlsDisableHostnameValidation),
+		URI:                   *uriF,
+		TLSConnection:         *tlsF,
+		TLSCertificateFile:    *tlsCertF,
+		TLSPrivateKeyFile:     *tlsPrivateKeyF,
+		TLSCaFile:             *tlsCAF,
+		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
 	})
 	prometheus.MustRegister(mongodbCollector)
 }
