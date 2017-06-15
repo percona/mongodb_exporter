@@ -1,11 +1,11 @@
 package collector
 
 import (
-	"github.com/golang/glog"
 	"github.com/percona/mongodb_exporter/collector/mongod"
 	"github.com/percona/mongodb_exporter/collector/mongos"
 	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 )
 
@@ -51,7 +51,7 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 
 // Describe describes all mongodb's metrics.
 func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
-	glog.Info("Describing groups")
+	log.Info("Describing groups")
 	session := shared.MongoSession(exporter.Opts.toSessionOps())
 	if session != nil {
 		serverStatus := collector_mongos.GetServerStatus(session)
@@ -69,15 +69,15 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 		defer mongoSess.Close()
 		serverVersion, err := shared.MongoSessionServerVersion(mongoSess)
 		if err != nil {
-			glog.Errorf("Problem gathering the mongo server version: %s", err)
+			log.Errorf("Problem gathering the mongo server version: %s", err)
 		}
 
 		nodeType, err := shared.MongoSessionNodeType(mongoSess)
 		if err != nil {
-			glog.Errorf("Problem gathering the mongo node type: %s", err)
+			log.Errorf("Problem gathering the mongo node type: %s", err)
 		}
 
-		glog.Infof("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
+		log.Infof("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
 		switch {
 		case nodeType == "mongos":
 			exporter.collectMongos(mongoSess, ch)
@@ -86,7 +86,7 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 		case nodeType == "replset":
 			exporter.collectMongodReplSet(mongoSess, ch)
 		default:
-			glog.Infof("Unrecognized node type %s!", nodeType)
+			log.Infof("Unrecognized node type %s!", nodeType)
 		}
 	}
 }
@@ -95,13 +95,13 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 	// read from primaries only when using mongos to avoid SERVER-27864
 	session.SetMode(mgo.Strong, true)
 
-	glog.Info("Collecting Server Status")
+	log.Info("Collecting Server Status")
 	serverStatus := collector_mongos.GetServerStatus(session)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
 	}
 
-	glog.Info("Collecting Sharding Status")
+	log.Info("Collecting Sharding Status")
 	shardingStatus := collector_mongos.GetShardingStatus(session)
 	if shardingStatus != nil {
 		shardingStatus.Export(ch)
@@ -109,7 +109,7 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 }
 
 func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- prometheus.Metric) {
-	glog.Info("Collecting Server Status")
+	log.Info("Collecting Server Status")
 	serverStatus := collector_mongod.GetServerStatus(session)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
@@ -119,13 +119,13 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch chan<- prometheus.Metric) {
 	exporter.collectMongod(session, ch)
 
-	glog.Info("Collecting Replset Status")
+	log.Info("Collecting Replset Status")
 	replSetStatus := collector_mongod.GetReplSetStatus(session)
 	if replSetStatus != nil {
 		replSetStatus.Export(ch)
 	}
 
-	glog.Info("Collecting Replset Oplog Status")
+	log.Info("Collecting Replset Oplog Status")
 	oplogStatus := collector_mongod.GetOplogStatus(session)
 	if oplogStatus != nil {
 		oplogStatus.Export(ch)

@@ -12,6 +12,8 @@ import (
 	"github.com/percona/mongodb_exporter/collector"
 	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 	"gopkg.in/yaml.v2"
 )
@@ -78,6 +80,22 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// logger adapts log.Logger interface to promhttp.Logger interface.
+// See https://github.com/prometheus/common/issues/86.
+type logger struct {
+	log.Logger
+}
+
+func (l logger) Println(v ...interface{}) {
+	l.Errorln(v...)
+}
+
+// check interfaces
+var (
+	_ log.Logger      = logger{}
+	_ promhttp.Logger = logger{}
+)
+
 func prometheusHandler() http.Handler {
 	cfg := &webAuth{}
 	httpAuth := os.Getenv("HTTP_AUTH")
@@ -98,7 +116,10 @@ func prometheusHandler() http.Handler {
 		cfg.Password = data[1]
 	}
 
-	handler := prometheus.Handler()
+	handler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{
+		ErrorLog:      logger{log.Base()},
+		ErrorHandling: promhttp.HTTPErrorOnError,
+	})
 	if cfg.User != "" && cfg.Password != "" {
 		handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		fmt.Println("HTTP basic authentication is enabled")

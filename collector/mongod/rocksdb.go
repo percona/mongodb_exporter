@@ -1,9 +1,10 @@
 package collector_mongod
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (

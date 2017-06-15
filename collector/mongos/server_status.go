@@ -3,8 +3,8 @@ package collector_mongos
 import (
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -123,7 +123,7 @@ func GetServerStatus(session *mgo.Session) *ServerStatus {
 	result := &ServerStatus{}
 	err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
 	if err != nil {
-		glog.Error("Failed to get server status.")
+		log.Error("Failed to get server status.")
 		return nil
 	}
 
