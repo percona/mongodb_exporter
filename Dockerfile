@@ -1,6 +1,6 @@
 FROM       alpine:latest
 MAINTAINER Tim Vaillancourt <tim.vaillancourt@percona.com>
-EXPOSE     9104
+EXPOSE     9216
 
 ENV  GOPATH /go
 ENV APPPATH $GOPATH/src/github.com/percona/mongodb_exporter

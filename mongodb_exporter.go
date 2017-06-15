@@ -28,7 +28,7 @@ var (
 	versionGitCommit string = "unknown"
 
 	doPrintVersion    = flag.Bool("version", false, "Print version info and exit.")
-	listenAddressFlag = flag.String("web.listen-address", ":9104", "Address on which to expose metrics and web interface.")
+	listenAddressFlag = flag.String("web.listen-address", ":9216", "Address on which to expose metrics and web interface.")
 	metricsPathFlag   = flag.String("web.metrics-path", "/metrics", "Path under which to expose metrics.")
 	webAuthFile       = flag.String("web.auth-file", "", "Path to YAML file with server_user, server_password options for http basic auth (overrides HTTP_AUTH env var).")
 	sslCertFile       = flag.String("web.ssl-cert-file", "", "Path to SSL certificate file.")

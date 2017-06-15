@@ -30,7 +30,7 @@ The exporter can be started by running the '*mongodb_exporter*' binary that is c
 
 It is recommended to define the following options:
 
-- **-web.listen-address** - The listen address of the exporter (*default: ":9104"*)
+- **-web.listen-address** - The listen address of the exporter (*default: ":9216"*)
 - **-log_dir** - The directory to write the log file (*default: /tmp*)
 
 To define your own MongoDB URL, use environment variable `MONGODB_URL`. If set this variable takes precedence over **-mongodb.uri** flag.
