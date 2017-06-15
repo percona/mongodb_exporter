@@ -17,7 +17,9 @@ The exporter is in beta/experimental state and field names are **very likely to 
 
 ### Building
 
-    go build -o mongodb_exporter github.com/percona/mongodb_exporter
+    go get -d github.com/percona/mongodb_exporter
+    cd $GOPATH/src/github.com/percona/mongodb_exporter
+    make
 
 ### Usage
 

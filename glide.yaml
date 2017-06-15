@@ -1,0 +1,9 @@
+package: github.com/percona/mongodb_exporter
+import:
+- package: github.com/golang/glog
+- package: github.com/prometheus/client_golang
+  subpackages:
+  - prometheus
+- package: gopkg.in/mgo.v2
+  subpackages:
+  - bson
