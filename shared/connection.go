@@ -89,13 +89,13 @@ func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo)
 		dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
 			conn, err := tls.Dial("tcp", addr.String(), config)
 			if err != nil {
-				log.Infof("Could not connect to %v. Got: %v", addr, err)
+				log.Errorf("Could not connect to %v. Got: %v", addr, err)
 				return nil, err
 			}
 			if config.InsecureSkipVerify {
 				err = enrichWithOwnChecks(conn, config)
 				if err != nil {
-					log.Infof("Could not disable hostname validation. Got: %v", err)
+					log.Errorf("Could not disable hostname validation. Got: %v", err)
 				}
 			}
 			return conn, err

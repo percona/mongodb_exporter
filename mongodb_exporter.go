@@ -38,7 +38,7 @@ var (
 	sslCertFileF   = flag.String("web.ssl-cert-file", "", "Path to SSL certificate file.")
 	sslKeyFileF    = flag.String("web.ssl-key-file", "", "Path to SSL key file.")
 
-	uriF     = flag.String("mongodb.uri", mongodbDefaultURI(), "Mongodb URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
+	uriF     = flag.String("mongodb.uri", mongodbDefaultURI(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
 	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the private key in PEM format).\n"+
 		"    \tThis should include the whole certificate chain.\n"+
@@ -207,6 +207,12 @@ func registerCollector() {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s %s exports various MongoDB metrics in Prometheus format.\n", os.Args[0], version.Version)
+		fmt.Fprintf(os.Stderr, "Usage: %s [flags]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
 	if *versionF {
@@ -216,7 +222,9 @@ func main() {
 
 	shared.ParseEnabledGroups(*enabledGroupsFlag)
 
-	fmt.Println("### Warning: the exporter is in beta/experimental state and field names are very\n### likely to change in the future and features may change or get removed!\n### See: https://github.com/percona/mongodb_exporter for updates")
+	log.Infoln("### Warning: the exporter is in beta/experimental state and field names are very")
+	log.Infoln("### likely to change in the future and features may change or get removed!")
+	log.Infoln("### See: https://github.com/percona/mongodb_exporter for updates")
 
 	startWebServer()
 }
