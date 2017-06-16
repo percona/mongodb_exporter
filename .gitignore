@@ -1,4 +1,1 @@
-.idea
 mongodb_exporter
-vendor
-!vendor/vendor.json

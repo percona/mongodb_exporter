@@ -44,9 +44,9 @@ type ServerStatus struct {
 
 	Network *NetworkStats `bson:"network"`
 
-	Opcounters     *OpcountersStats     `bson:"opcounters"`
-	Mem            *MemStats            `bson:"mem"`
-	Metrics        *MetricsStats        `bson:"metrics"`
+	Opcounters *OpcountersStats `bson:"opcounters"`
+	Mem        *MemStats        `bson:"mem"`
+	Metrics    *MetricsStats    `bson:"metrics"`
 
 	Cursors *Cursors `bson:"cursors"`
 }

@@ -1,9 +1,9 @@
 package collector_mongod
 
-import(
-	"strings"
-	"strconv"
+import (
 	"github.com/prometheus/client_golang/prometheus"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -14,324 +14,324 @@ var (
 	terabyte float64 = gigabyte * 1024
 	petabyte float64 = terabyte * 1024
 	thousand float64 = 1000
-	million	 float64 = thousand * 1000
+	million  float64 = thousand * 1000
 	billion  float64 = million * 1000
 	trillion float64 = billion * 1000
 
 	rocksDbStalledSecs = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"stalled_seconds_total",
-		Help:		"The total number of seconds RocksDB has spent stalled",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "stalled_seconds_total",
+		Help:      "The total number of seconds RocksDB has spent stalled",
 	})
 	rocksDbStalls = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"stalls_total",
-		Help:		"The total number of stalls in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "stalls_total",
+		Help:      "The total number of stalls in RocksDB",
 	}, []string{"type"})
 	rocksDbCompactionBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compaction_bytes_total",
-		Help:		"Total bytes processed during compaction between levels N and N+1 in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "compaction_bytes_total",
+		Help:      "Total bytes processed during compaction between levels N and N+1 in RocksDB",
 	}, []string{"level", "type"})
 	rocksDbCompactionSecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compaction_seconds_total",
-		Help:		"The time spent doing compactions between levels N and N+1 in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "compaction_seconds_total",
+		Help:      "The time spent doing compactions between levels N and N+1 in RocksDB",
 	}, []string{"level"})
 	rocksDbCompactionsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compactions_total",
-		Help:		"The total number of compactions between levels N and N+1 in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "compactions_total",
+		Help:      "The total number of compactions between levels N and N+1 in RocksDB",
 	}, []string{"level"})
 	rocksDbBlockCacheHits = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"block_cache_hits_total",
-		Help:		"The total number of hits to the RocksDB Block Cache",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "block_cache_hits_total",
+		Help:      "The total number of hits to the RocksDB Block Cache",
 	})
 	rocksDbBlockCacheMisses = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"block_cache_misses_total",
-		Help:		"The total number of misses to the RocksDB Block Cache",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "block_cache_misses_total",
+		Help:      "The total number of misses to the RocksDB Block Cache",
 	})
 	rocksDbKeys = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"keys_total",
-		Help:		"The total number of RocksDB key operations",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "keys_total",
+		Help:      "The total number of RocksDB key operations",
 	}, []string{"type"})
 	rocksDbSeeks = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"seeks_total",
-		Help:		"The total number of seeks performed by RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "seeks_total",
+		Help:      "The total number of seeks performed by RocksDB",
 	})
 	rocksDbIterations = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"iterations_total",
-		Help:		"The total number of iterations performed by RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "iterations_total",
+		Help:      "The total number of iterations performed by RocksDB",
 	}, []string{"type"})
 	rocksDbBloomFilterUseful = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"bloom_filter_useful_total",
-		Help:		"The total number of times the RocksDB Bloom Filter was useful",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "bloom_filter_useful_total",
+		Help:      "The total number of times the RocksDB Bloom Filter was useful",
 	})
 	rocksDbBytesWritten = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"bytes_written_total",
-		Help:		"The total number of bytes written by RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "bytes_written_total",
+		Help:      "The total number of bytes written by RocksDB",
 	}, []string{"type"})
 	rocksDbBytesRead = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"bytes_read_total",
-		Help:		"The total number of bytes read by RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "bytes_read_total",
+		Help:      "The total number of bytes read by RocksDB",
 	}, []string{"type"})
 	rocksDbReadOps = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"reads_total",
-		Help:		"The total number of read operations in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "reads_total",
+		Help:      "The total number of read operations in RocksDB",
 	}, []string{"level"})
 )
 
 var (
 	rocksDbNumImmutableMemTable = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"immutable_memtables",
-		Help:		"The total number of immutable MemTables in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "immutable_memtables",
+		Help:      "The total number of immutable MemTables in RocksDB",
 	})
 	rocksDbMemTableFlushPending = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"pending_memtable_flushes",
-		Help:		"The total number of MemTable flushes pending in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "pending_memtable_flushes",
+		Help:      "The total number of MemTable flushes pending in RocksDB",
+	})
 	rocksDbCompactionPending = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"pending_compactions",
-		Help:		"The total number of compactions pending in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "pending_compactions",
+		Help:      "The total number of compactions pending in RocksDB",
+	})
 	rocksDbBackgroundErrors = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"background_errors",
-		Help:		"The total number of background errors in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "background_errors",
+		Help:      "The total number of background errors in RocksDB",
+	})
 	rocksDbMemTableBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"memtable_bytes",
-		Help:		"The current number of MemTable bytes in RocksDB",
-	}, []string{"type"}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "memtable_bytes",
+		Help:      "The current number of MemTable bytes in RocksDB",
+	}, []string{"type"})
 	rocksDbMemtableEntries = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"memtable_entries",
-		Help:		"The current number of Memtable entries in RocksDB",
-	}, []string{"type"}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "memtable_entries",
+		Help:      "The current number of Memtable entries in RocksDB",
+	}, []string{"type"})
 	rocksDbEstimateTableReadersMem = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"estimate_table_readers_memory_bytes",
-		Help:		"The estimate RocksDB table-reader memory bytes",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "estimate_table_readers_memory_bytes",
+		Help:      "The estimate RocksDB table-reader memory bytes",
+	})
 	rocksDbNumSnapshots = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"snapshots",
-		Help:		"The current number of snapshots in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "snapshots",
+		Help:      "The current number of snapshots in RocksDB",
+	})
 	rocksDbOldestSnapshotTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"oldest_snapshot_timestamp",
-		Help:		"The timestamp of the oldest snapshot in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "oldest_snapshot_timestamp",
+		Help:      "The timestamp of the oldest snapshot in RocksDB",
+	})
 	rocksDbNumLiveVersions = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"live_versions",
-		Help:		"The current number of live versions in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "live_versions",
+		Help:      "The current number of live versions in RocksDB",
+	})
 	rocksDbTotalLiveRecoveryUnits = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"total_live_recovery_units",
-		Help:		"The total number of live recovery units in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "total_live_recovery_units",
+		Help:      "The total number of live recovery units in RocksDB",
+	})
 	rocksDbBlockCacheUsage = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"block_cache_bytes",
-		Help:		"The current bytes used in the RocksDB Block Cache",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "block_cache_bytes",
+		Help:      "The current bytes used in the RocksDB Block Cache",
+	})
 	rocksDbTransactionEngineKeys = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"transaction_engine_keys",
-		Help:		"The current number of transaction engine keys in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "transaction_engine_keys",
+		Help:      "The current number of transaction engine keys in RocksDB",
+	})
 	rocksDbTransactionEngineSnapshots = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"transaction_engine_snapshots",
-		Help:		"The current number of transaction engine snapshots in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "transaction_engine_snapshots",
+		Help:      "The current number of transaction engine snapshots in RocksDB",
+	})
 	rocksDbWritesPerBatch = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"writes_per_batch",
-		Help:		"The number of writes per batch in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "writes_per_batch",
+		Help:      "The number of writes per batch in RocksDB",
+	})
 	rocksDbWritesPerSec = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"writes_per_second",
-		Help:		"The number of writes per second in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "writes_per_second",
+		Help:      "The number of writes per second in RocksDB",
+	})
 	rocksDbStallPercent = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"stall_percent",
-		Help:		"The percentage of time RocksDB has been stalled",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "stall_percent",
+		Help:      "The percentage of time RocksDB has been stalled",
+	})
 	rocksDbWALWritesPerSync = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_ahead_log_writes_per_sync",
-		Help:		"The number of writes per Write-Ahead-Log sync in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "write_ahead_log_writes_per_sync",
+		Help:      "The number of writes per Write-Ahead-Log sync in RocksDB",
+	})
 	rocksDbWALBytesPerSecs = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"write_ahead_log_bytes_per_second",
-		Help:		"The number of bytes written per second by the Write-Ahead-Log in RocksDB",
-	}) 
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "write_ahead_log_bytes_per_second",
+		Help:      "The number of bytes written per second by the Write-Ahead-Log in RocksDB",
+	})
 	rocksDbLevelFiles = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"files",
-		Help:		"The number of files in a RocksDB level",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "files",
+		Help:      "The number of files in a RocksDB level",
 	}, []string{"level"})
 	rocksDbCompactionThreads = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compaction_file_threads",
-		Help:		"The number of threads currently doing compaction for levels in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "compaction_file_threads",
+		Help:      "The number of threads currently doing compaction for levels in RocksDB",
 	}, []string{"level"})
 	rocksDbLevelScore = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compaction_score",
-		Help:		"The compaction score of RocksDB levels",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "compaction_score",
+		Help:      "The compaction score of RocksDB levels",
 	}, []string{"level"})
 	rocksDbLevelSizeBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"size_bytes",
-		Help:		"The total byte size of levels in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "size_bytes",
+		Help:      "The total byte size of levels in RocksDB",
 	}, []string{"level"})
 	rocksDbCompactionBytesPerSec = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compaction_bytes_per_second",
-		Help:		"The rate at which data is processed during compaction between levels N and N+1 in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "compaction_bytes_per_second",
+		Help:      "The rate at which data is processed during compaction between levels N and N+1 in RocksDB",
 	}, []string{"level", "type"})
 	rocksDbCompactionWriteAmplification = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compaction_write_amplification",
-		Help:		"The write amplification factor from compaction between levels N and N+1 in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "compaction_write_amplification",
+		Help:      "The write amplification factor from compaction between levels N and N+1 in RocksDB",
 	}, []string{"level"})
 	rocksDbCompactionAvgSeconds = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"compaction_average_seconds",
-		Help:		"The average time per compaction between levels N and N+1 in RocksDB",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "compaction_average_seconds",
+		Help:      "The average time per compaction between levels N and N+1 in RocksDB",
 	}, []string{"level"})
 	rocksDbReadLatencyMicros = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:	Namespace,
-		Subsystem:	"rocksdb",
-		Name:		"read_latency_microseconds",
-		Help:		"The read latency in RocksDB in microseconds by level",
+		Namespace: Namespace,
+		Subsystem: "rocksdb",
+		Name:      "read_latency_microseconds",
+		Help:      "The read latency in RocksDB in microseconds by level",
 	}, []string{"level", "type"})
 )
 
 type RocksDbStatsCounters struct {
-	NumKeysWritten		float64	`bson:"num-keys-written"`
-	NumKeysRead		float64	`bson:"num-keys-read"`
-	NumSeeks		float64	`bson:"num-seeks"`
-	NumForwardIter		float64	`bson:"num-forward-iterations"`	
-	NumBackwardIter		float64	`bson:"num-backward-iterations"`	
-	BlockCacheMisses	float64	`bson:"block-cache-misses"`
-	BlockCacheHits		float64	`bson:"block-cache-hits"`
-	BloomFilterUseful	float64 `bson:"bloom-filter-useful"`
-	BytesWritten		float64 `bson:"bytes-written"`
-	BytesReadPointLookup	float64	`bson:"bytes-read-point-lookup"`
-	BytesReadIteration	float64 `bson:"bytes-read-iteration"`
-	FlushBytesWritten	float64 `bson:"flush-bytes-written"`
-	CompactionBytesRead	float64	`bson:"compaction-bytes-read"`
-	CompactionBytesWritten	float64	`bson:"compaction-bytes-written"`
+	NumKeysWritten         float64 `bson:"num-keys-written"`
+	NumKeysRead            float64 `bson:"num-keys-read"`
+	NumSeeks               float64 `bson:"num-seeks"`
+	NumForwardIter         float64 `bson:"num-forward-iterations"`
+	NumBackwardIter        float64 `bson:"num-backward-iterations"`
+	BlockCacheMisses       float64 `bson:"block-cache-misses"`
+	BlockCacheHits         float64 `bson:"block-cache-hits"`
+	BloomFilterUseful      float64 `bson:"bloom-filter-useful"`
+	BytesWritten           float64 `bson:"bytes-written"`
+	BytesReadPointLookup   float64 `bson:"bytes-read-point-lookup"`
+	BytesReadIteration     float64 `bson:"bytes-read-iteration"`
+	FlushBytesWritten      float64 `bson:"flush-bytes-written"`
+	CompactionBytesRead    float64 `bson:"compaction-bytes-read"`
+	CompactionBytesWritten float64 `bson:"compaction-bytes-written"`
 }
 
 type RocksDbStats struct {
-	NumImmutableMemTable		string			`bson:"num-immutable-mem-table"`
-	MemTableFlushPending		string			`bson:"mem-table-flush-pending"`
-	CompactionPending		string			`bson:"compaction-pending"`
-	BackgroundErrors		string			`bson:"background-errors"`
-	CurSizeMemTableActive		string			`bson:"cur-size-active-mem-table"`
-	CurSizeAllMemTables		string			`bson:"cur-size-all-mem-tables"`
-	NumEntriesMemTableActive	string			`bson:"num-entries-active-mem-table"`
-	NumEntriesImmMemTables		string			`bson:"num-entries-imm-mem-tables"`
-	EstimateTableReadersMem		string			`bson:"estimate-table-readers-mem"`
-	NumSnapshots			string			`bson:"num-snapshots"`
-	OldestSnapshotTime		string			`bson:"oldest-snapshot-time"`
-	NumLiveVersions			string			`bson:"num-live-versions"`
-	BlockCacheUsage			string			`bson:"block-cache-usage"`
-	TotalLiveRecoveryUnits		float64			`bson:"total-live-recovery-units"`
-	TransactionEngineKeys		float64			`bson:"transaction-engine-keys"`
-	TransactionEngineSnapshots	float64			`bson:"transaction-engine-snapshots"`
-	Stats				[]string		`bson:"stats"`
-	ThreadStatus			[]string		`bson:"thread-status"`
-	Counters			*RocksDbStatsCounters	`bson:"counters,omitempty"`
+	NumImmutableMemTable       string                `bson:"num-immutable-mem-table"`
+	MemTableFlushPending       string                `bson:"mem-table-flush-pending"`
+	CompactionPending          string                `bson:"compaction-pending"`
+	BackgroundErrors           string                `bson:"background-errors"`
+	CurSizeMemTableActive      string                `bson:"cur-size-active-mem-table"`
+	CurSizeAllMemTables        string                `bson:"cur-size-all-mem-tables"`
+	NumEntriesMemTableActive   string                `bson:"num-entries-active-mem-table"`
+	NumEntriesImmMemTables     string                `bson:"num-entries-imm-mem-tables"`
+	EstimateTableReadersMem    string                `bson:"estimate-table-readers-mem"`
+	NumSnapshots               string                `bson:"num-snapshots"`
+	OldestSnapshotTime         string                `bson:"oldest-snapshot-time"`
+	NumLiveVersions            string                `bson:"num-live-versions"`
+	BlockCacheUsage            string                `bson:"block-cache-usage"`
+	TotalLiveRecoveryUnits     float64               `bson:"total-live-recovery-units"`
+	TransactionEngineKeys      float64               `bson:"transaction-engine-keys"`
+	TransactionEngineSnapshots float64               `bson:"transaction-engine-snapshots"`
+	Stats                      []string              `bson:"stats"`
+	ThreadStatus               []string              `bson:"thread-status"`
+	Counters                   *RocksDbStatsCounters `bson:"counters,omitempty"`
 }
 
 type RocksDbLevelStatsFiles struct {
-	Num		float64
-	CompThreads	float64
+	Num         float64
+	CompThreads float64
 }
 
 type RocksDbLevelStats struct {
-	Level		string
-	Files		*RocksDbLevelStatsFiles
-	Score		float64
-	SizeMB		float64
-	ReadGB		float64
-	RnGB		float64
-	Rnp1GB		float64
-	WriteGB		float64
-	WnewGB		float64
-	MovedGB		float64
-	WAmp		float64
-	RdMBPSec	float64
-	WrMBPSec	float64
-	CompSec		float64
-	CompCnt		float64
-	AvgSec		float64
-	KeyIn		float64
-	KeyDrop		float64
+	Level    string
+	Files    *RocksDbLevelStatsFiles
+	Score    float64
+	SizeMB   float64
+	ReadGB   float64
+	RnGB     float64
+	Rnp1GB   float64
+	WriteGB  float64
+	WnewGB   float64
+	MovedGB  float64
+	WAmp     float64
+	RdMBPSec float64
+	WrMBPSec float64
+	CompSec  float64
+	CompCnt  float64
+	AvgSec   float64
+	KeyIn    float64
+	KeyDrop  float64
 }
 
 // rocksdb time-format string parser: returns float64 of seconds:
@@ -352,7 +352,7 @@ func ParseStr(str string) float64 {
 	var multiply float64 = 1
 	var str_remove string = ""
 	if strings.Contains(str, " KB") || strings.HasSuffix(str, "KB") {
-		multiply = kilobyte 
+		multiply = kilobyte
 		str_remove = "KB"
 	} else if strings.Contains(str, " MB") || strings.HasSuffix(str, "MB") {
 		multiply = megabyte
@@ -430,7 +430,7 @@ func ProcessLevelStatsLineFiles(str string) *RocksDbLevelStatsFiles {
 		return &RocksDbLevelStatsFiles{}
 	}
 	return &RocksDbLevelStatsFiles{
-		Num: numFiles,
+		Num:         numFiles,
 		CompThreads: compThreads,
 	}
 }
@@ -440,24 +440,24 @@ func ProcessLevelStatsLine(line string) *RocksDbLevelStats {
 	if strings.HasPrefix(line, " ") {
 		fields := SplitByWs(line)
 		stats = &RocksDbLevelStats{
-			Level: fields[0],
-			Files: ProcessLevelStatsLineFiles(fields[1]),
-			SizeMB: ParseStr(fields[2]),
-			Score: ParseStr(fields[3]),
-			ReadGB: ParseStr(fields[4]),
-			RnGB: ParseStr(fields[5]),
-			Rnp1GB: ParseStr(fields[6]),
-			WriteGB: ParseStr(fields[7]),
-			WnewGB: ParseStr(fields[8]),
-			MovedGB: ParseStr(fields[9]),
-			WAmp: ParseStr(fields[10]),
+			Level:    fields[0],
+			Files:    ProcessLevelStatsLineFiles(fields[1]),
+			SizeMB:   ParseStr(fields[2]),
+			Score:    ParseStr(fields[3]),
+			ReadGB:   ParseStr(fields[4]),
+			RnGB:     ParseStr(fields[5]),
+			Rnp1GB:   ParseStr(fields[6]),
+			WriteGB:  ParseStr(fields[7]),
+			WnewGB:   ParseStr(fields[8]),
+			MovedGB:  ParseStr(fields[9]),
+			WAmp:     ParseStr(fields[10]),
 			RdMBPSec: ParseStr(fields[11]),
 			WrMBPSec: ParseStr(fields[12]),
-			CompSec: ParseStr(fields[13]),
-			CompCnt: ParseStr(fields[14]),
-			AvgSec: ParseStr(fields[15]),
-			KeyIn: ParseStr(fields[16]),
-			KeyDrop: ParseStr(fields[17]),
+			CompSec:  ParseStr(fields[13]),
+			CompCnt:  ParseStr(fields[14]),
+			AvgSec:   ParseStr(fields[15]),
+			KeyIn:    ParseStr(fields[16]),
+			KeyDrop:  ParseStr(fields[17]),
 		}
 	}
 	return stats
@@ -557,8 +557,8 @@ func (stats *RocksDbStats) ProcessStalls() {
 
 func (stats *RocksDbStats) ProcessReadLatencyStats() {
 	for _, level_num := range []string{"0", "1", "2", "3", "4", "5", "6"} {
-		level := "L"+level_num
-		section := "** Level "+level_num+" read latency histogram (micros):"
+		level := "L" + level_num
+		section := "** Level " + level_num + " read latency histogram (micros):"
 		if len(stats.GetStatsSection(section)) > 0 {
 			rocksDbReadOps.With(prometheus.Labels{"level": level}).Set(stats.GetStatsLineField(section, "Count: ", 0))
 			rocksDbReadLatencyMicros.With(prometheus.Labels{"level": level, "type": "avg"}).Set(stats.GetStatsLineField(section, "Count: ", 2))

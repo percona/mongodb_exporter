@@ -9,65 +9,65 @@ import (
 
 var (
 	shardingTopoInfoTotalShards = prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace:	Namespace,
-			Subsystem:	"sharding",
-			Name:		"shards_total",
-			Help:		"Total # of Shards in the Cluster",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "shards_total",
+		Help:      "Total # of Shards in the Cluster",
 	})
 	shardingTopoInfoDrainingShards = prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace:	Namespace,
-			Subsystem:	"sharding",
-			Name:		"shards_draining_total",
-			Help:		"Total # of Shards in the Cluster in draining state",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "shards_draining_total",
+		Help:      "Total # of Shards in the Cluster in draining state",
 	})
 	shardingTopoInfoTotalChunks = prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace:	Namespace,
-			Subsystem:	"sharding",
-			Name:		"chunks_total",
-			Help:		"Total # of Chunks in the Cluster",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "chunks_total",
+		Help:      "Total # of Chunks in the Cluster",
 	})
 	shardingTopoInfoShardChunks = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace:      Namespace,
-			Subsystem:      "sharding",
-			Name:		"shard_chunks_total",
-			Help:		"Total number of chunks per shard",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "shard_chunks_total",
+		Help:      "Total number of chunks per shard",
 	}, []string{"shard"})
 	shardingTopoInfoTotalDatabases = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace:	Namespace,
-			Subsystem:	"sharding",
-			Name:		"databases_total",
-			Help:		"Total # of Databases in the Cluster",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "databases_total",
+		Help:      "Total # of Databases in the Cluster",
 	}, []string{"type"})
 	shardingTopoInfoTotalCollections = prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace:	Namespace,
-			Subsystem:	"sharding",
-			Name:		"collections_total",
-			Help:		"Total # of Collections with Sharding enabled",
+		Namespace: Namespace,
+		Subsystem: "sharding",
+		Name:      "collections_total",
+		Help:      "Total # of Collections with Sharding enabled",
 	})
 )
 
 type ShardingTopoShardInfo struct {
-	Shard		string	`bson:"_id"`
-	Host		string	`bson:"host"`
-	Draining	bool	`bson:"draining",omitifempty`
+	Shard    string `bson:"_id"`
+	Host     string `bson:"host"`
+	Draining bool   `bson:"draining",omitifempty`
 }
 
 type ShardingTopoChunkInfo struct {
-	Shard	string	`bson:"_id"`
-	Chunks	float64	`bson:"count"`
+	Shard  string  `bson:"_id"`
+	Chunks float64 `bson:"count"`
 }
 
 type ShardingTopoStatsTotalDatabases struct {
-	Partitioned	bool	`bson:"_id"`
-	Total		float64	`bson:"total"`
+	Partitioned bool    `bson:"_id"`
+	Total       float64 `bson:"total"`
 }
 
 type ShardingTopoStats struct {
-	TotalChunks		float64
-	TotalCollections	float64
-	TotalDatabases		*[]ShardingTopoStatsTotalDatabases
-	Shards			*[]ShardingTopoShardInfo
-	ShardChunks		*[]ShardingTopoChunkInfo
+	TotalChunks      float64
+	TotalCollections float64
+	TotalDatabases   *[]ShardingTopoStatsTotalDatabases
+	Shards           *[]ShardingTopoShardInfo
+	ShardChunks      *[]ShardingTopoChunkInfo
 }
 
 func GetShards(session *mgo.Session) *[]ShardingTopoShardInfo {
@@ -89,7 +89,7 @@ func GetTotalChunks(session *mgo.Session) float64 {
 
 func GetTotalChunksByShard(session *mgo.Session) *[]ShardingTopoChunkInfo {
 	var results []ShardingTopoChunkInfo
-	err := session.DB("config").C("chunks").Pipe([]bson.M{{ "$group" : bson.M{ "_id" : "$shard", "count" : bson.M{ "$sum" : 1  } } }}).All(&results)
+	err := session.DB("config").C("chunks").Pipe([]bson.M{{"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}}).All(&results)
 	if err != nil {
 		glog.Error("Failed to execute find query on 'config.chunks'!")
 	}
@@ -98,7 +98,7 @@ func GetTotalChunksByShard(session *mgo.Session) *[]ShardingTopoChunkInfo {
 
 func GetTotalDatabases(session *mgo.Session) *[]ShardingTopoStatsTotalDatabases {
 	results := []ShardingTopoStatsTotalDatabases{}
-	query := []bson.M{ { "$match" : bson.M{ "_id" : bson.M{ "$ne" : "admin" } } },  { "$group" : bson.M{ "_id" : "$partitioned", "total" : bson.M{ "$sum" : 1 } } } }
+	query := []bson.M{{"$match": bson.M{"_id": bson.M{"$ne": "admin"}}}, {"$group": bson.M{"_id": "$partitioned", "total": bson.M{"$sum": 1}}}}
 	err := session.DB("config").C("databases").Pipe(query).All(&results)
 	if err != nil {
 		glog.Error("Failed to execute find query on 'config.databases'!")
@@ -107,7 +107,7 @@ func GetTotalDatabases(session *mgo.Session) *[]ShardingTopoStatsTotalDatabases 
 }
 
 func GetTotalShardedCollections(session *mgo.Session) float64 {
-	collCount, err := session.DB("config").C("collections").Find(bson.M{ "dropped" : false }).Count()
+	collCount, err := session.DB("config").C("collections").Find(bson.M{"dropped": false}).Count()
 	if err != nil {
 		glog.Error("Failed to execute find query on 'config.collections'!")
 	}
@@ -133,10 +133,10 @@ func (status *ShardingTopoStats) Export(ch chan<- prometheus.Metric) {
 	if status.TotalDatabases != nil {
 		for _, item := range *status.TotalDatabases {
 			switch item.Partitioned {
-				case true:
-					shardingTopoInfoTotalDatabases.WithLabelValues("partitioned").Set(item.Total)
-				case false:
-					shardingTopoInfoTotalDatabases.WithLabelValues("unpartitioned").Set(item.Total)
+			case true:
+				shardingTopoInfoTotalDatabases.WithLabelValues("partitioned").Set(item.Total)
+			case false:
+				shardingTopoInfoTotalDatabases.WithLabelValues("unpartitioned").Set(item.Total)
 			}
 		}
 	}
@@ -173,7 +173,7 @@ func GetShardingTopoStatus(session *mgo.Session) *ShardingTopoStats {
 
 	results.Shards = GetShards(session)
 	results.TotalChunks = GetTotalChunks(session)
-	results.ShardChunks = GetTotalChunksByShard(session) 
+	results.ShardChunks = GetTotalChunksByShard(session)
 	results.TotalDatabases = GetTotalDatabases(session)
 	results.TotalCollections = GetTotalShardedCollections(session)
 
