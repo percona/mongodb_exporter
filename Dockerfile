@@ -1,12 +1,7 @@
-FROM       alpine:latest
-MAINTAINER Tim Vaillancourt <tim.vaillancourt@percona.com>
-EXPOSE     9216
+FROM        quay.io/prometheus/busybox:latest
+MAINTAINER  Alexey Palazhchenko <alexey.palazhchenko@percona.com>
 
-ENV  GOPATH /go
-ENV APPPATH $GOPATH/src/github.com/percona/mongodb_exporter
-COPY . $APPPATH
-RUN apk add --update -t build-deps go git mercurial libc-dev gcc libgcc \
-    && cd $APPPATH && go get -d && go build -o /bin/mongodb_exporter \
-    && apk del --purge build-deps && rm -rf $GOPATH
+COPY mongodb_exporter /bin/mongodb_exporter
 
-ENTRYPOINT [ "/bin/mongodb_exporter" ]
+EXPOSE      9216
+ENTRYPOINT  [ "/bin/mongodb_exporter" ]
