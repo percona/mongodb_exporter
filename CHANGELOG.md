@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.0 (2017-06-16)
+## v0.2.0 (2017-06-28)
 
 * Default listen port changed to 9216.
 * All log messages now go to stderr. Logging flags changed.
