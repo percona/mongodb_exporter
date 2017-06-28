@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func Test_SnakeCase(t *testing.T) {
+func TestSnakeCase(t *testing.T) {
 	if SnakeCase("testing-string") != "testing_string" {
 		t.Fail()
 	}
@@ -18,7 +18,7 @@ func Test_SnakeCase(t *testing.T) {
 	}
 }
 
-func Test_ParameterizeString(t *testing.T) {
+func TestParameterizeString(t *testing.T) {
 	if ParameterizeString("testing-string") != "testing_string" {
 		t.Fail()
 	}

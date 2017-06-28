@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func Test_ParseEnabledGroups(t *testing.T) {
+func TestParseEnabledGroups(t *testing.T) {
 	ParseEnabledGroups("a, b,  c")
 	if !EnabledGroups["a"] {
 		t.Error("a was not loaded.")

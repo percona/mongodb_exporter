@@ -7,7 +7,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func Test_ParserServerStatus(t *testing.T) {
+func TestParserServerStatus(t *testing.T) {
 	data, err := ioutil.ReadFile("../fixtures/server_status.bson")
 	if err != nil {
 		t.Fatal(err)
