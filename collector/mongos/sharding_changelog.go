@@ -1,11 +1,12 @@
 package collector_mongos
 
 import (
-	"github.com/golang/glog"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"time"
 )
 
 var (
@@ -83,7 +84,7 @@ func GetShardingChangelogStatus(session *mgo.Session) *ShardingChangelogStats {
 
 	err := coll.Pipe([]bson.M{{"$match": match}, {"$group": group}}).All(&qresults)
 	if err != nil {
-		glog.Error("Failed to execute find query on 'config.changelog'!")
+		log.Error("Failed to execute find query on 'config.changelog'!")
 	}
 
 	results := &ShardingChangelogStats{}

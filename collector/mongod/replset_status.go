@@ -3,11 +3,10 @@ package collector_mongod
 import (
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -254,7 +253,7 @@ func GetReplSetStatus(session *mgo.Session) *ReplSetStatus {
 	result := &ReplSetStatus{}
 	err := session.DB("admin").Run(bson.D{{"replSetGetStatus", 1}}, result)
 	if err != nil {
-		glog.Error("Failed to get replSet status.")
+		log.Error("Failed to get replSet status.")
 		return nil
 	}
 	return result

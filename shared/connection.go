@@ -1,15 +1,14 @@
 package shared
 
 import (
-	"strings"
-	"time"
-
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"net"
+	"strings"
+	"time"
 
-	"github.com/golang/glog"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 )
 
@@ -22,7 +21,7 @@ func RedactMongoUri(uri string) string {
 	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
 		dialInfo, err := mgo.ParseURL(uri)
 		if err != nil {
-			glog.Errorf("Cannot parse mongodb server url: %s", err)
+			log.Errorf("Cannot parse mongodb server url: %s", err)
 			return "unknown/error"
 		}
 		if dialInfo.Username != "" && dialInfo.Password != "" {
@@ -44,7 +43,7 @@ type MongoSessionOpts struct {
 func MongoSession(opts MongoSessionOpts) *mgo.Session {
 	dialInfo, err := mgo.ParseURL(opts.URI)
 	if err != nil {
-		glog.Errorf("Cannot parse mongodb server url: %s", err)
+		log.Errorf("Cannot parse mongodb server url: %s", err)
 		return nil
 	}
 
@@ -53,13 +52,13 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 
 	err = opts.configureDialInfoIfRequired(dialInfo)
 	if err != nil {
-		glog.Errorf("%s", err)
+		log.Errorf("%s", err)
 		return nil
 	}
 
 	session, err := mgo.DialWithInfo(dialInfo)
 	if err != nil {
-		glog.Errorf("Cannot connect to server using url %s: %s", RedactMongoUri(opts.URI), err)
+		log.Errorf("Cannot connect to server using url %s: %s", RedactMongoUri(opts.URI), err)
 		return nil
 	}
 	session.SetMode(mgo.Eventual, true)
@@ -90,13 +89,13 @@ func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo)
 		dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
 			conn, err := tls.Dial("tcp", addr.String(), config)
 			if err != nil {
-				glog.Infof("Could not connect to %v. Got: %v", addr, err)
+				log.Errorf("Could not connect to %v. Got: %v", addr, err)
 				return nil, err
 			}
 			if config.InsecureSkipVerify {
 				err = enrichWithOwnChecks(conn, config)
 				if err != nil {
-					glog.Infof("Could not disable hostname validation. Got: %v", err)
+					log.Errorf("Could not disable hostname validation. Got: %v", err)
 				}
 			}
 			return conn, err
@@ -139,7 +138,7 @@ func enrichWithOwnChecks(conn *tls.Conn, tlsConfig *tls.Config) error {
 func MongoSessionServerVersion(session *mgo.Session) (string, error) {
 	buildInfo, err := session.BuildInfo()
 	if err != nil {
-		glog.Errorf("Could not get MongoDB BuildInfo: %s!", err)
+		log.Errorf("Could not get MongoDB BuildInfo: %s!", err)
 		return "unknown", err
 	}
 	return buildInfo.Version, nil
@@ -153,7 +152,7 @@ func MongoSessionNodeType(session *mgo.Session) (string, error) {
 	}{}
 	err := session.Run("isMaster", &masterDoc)
 	if err != nil {
-		glog.Errorf("Got unknown node type: %s", err)
+		log.Errorf("Got unknown node type: %s", err)
 		return "unknown", err
 	}
 

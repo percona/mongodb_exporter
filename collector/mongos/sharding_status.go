@@ -1,12 +1,13 @@
 package collector_mongos
 
 import (
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 var (
@@ -77,7 +78,7 @@ func GetMongosInfo(session *mgo.Session) *[]MongosInfo {
 	mongosInfo := []MongosInfo{}
 	err := session.DB("config").C("mongos").Find(bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}}).All(&mongosInfo)
 	if err != nil {
-		glog.Error("Failed to execute find query on 'config.mongos'!")
+		log.Error("Failed to execute find query on 'config.mongos'!")
 	}
 	return &mongosInfo
 }
@@ -86,7 +87,7 @@ func GetMongosBalancerLock(session *mgo.Session) *MongosBalancerLock {
 	var balancerLock *MongosBalancerLock
 	err := session.DB("config").C("locks").Find(bson.M{"_id": "balancer"}).One(&balancerLock)
 	if err != nil {
-		glog.Error("Failed to execute find query on 'config.locks'!")
+		log.Error("Failed to execute find query on 'config.locks'!")
 	}
 	return balancerLock
 }

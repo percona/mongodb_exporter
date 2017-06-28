@@ -1,13 +1,17 @@
 package collector_mongod
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"gopkg.in/mgo.v2/bson"
 )
 
 func Test_ParserServerStatus(t *testing.T) {
-	data := LoadFixture("server_status.bson")
+	data, err := ioutil.ReadFile("../fixtures/server_status.bson")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	serverStatus := &ServerStatus{}
 	loadServerStatusFromBson(data, serverStatus)

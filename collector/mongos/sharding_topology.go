@@ -1,8 +1,8 @@
 package collector_mongos
 
 import (
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -74,7 +74,7 @@ func GetShards(session *mgo.Session) *[]ShardingTopoShardInfo {
 	var shards []ShardingTopoShardInfo
 	err := session.DB("config").C("shards").Find(bson.M{}).All(&shards)
 	if err != nil {
-		glog.Error("Failed to execute find query on 'config.shards'!")
+		log.Error("Failed to execute find query on 'config.shards'!")
 	}
 	return &shards
 }
@@ -82,7 +82,7 @@ func GetShards(session *mgo.Session) *[]ShardingTopoShardInfo {
 func GetTotalChunks(session *mgo.Session) float64 {
 	chunkCount, err := session.DB("config").C("chunks").Find(bson.M{}).Count()
 	if err != nil {
-		glog.Error("Failed to execute find query on 'config.chunks'!")
+		log.Error("Failed to execute find query on 'config.chunks'!")
 	}
 	return float64(chunkCount)
 }
@@ -91,7 +91,7 @@ func GetTotalChunksByShard(session *mgo.Session) *[]ShardingTopoChunkInfo {
 	var results []ShardingTopoChunkInfo
 	err := session.DB("config").C("chunks").Pipe([]bson.M{{"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}}).All(&results)
 	if err != nil {
-		glog.Error("Failed to execute find query on 'config.chunks'!")
+		log.Error("Failed to execute find query on 'config.chunks'!")
 	}
 	return &results
 }
@@ -101,7 +101,7 @@ func GetTotalDatabases(session *mgo.Session) *[]ShardingTopoStatsTotalDatabases 
 	query := []bson.M{{"$match": bson.M{"_id": bson.M{"$ne": "admin"}}}, {"$group": bson.M{"_id": "$partitioned", "total": bson.M{"$sum": 1}}}}
 	err := session.DB("config").C("databases").Pipe(query).All(&results)
 	if err != nil {
-		glog.Error("Failed to execute find query on 'config.databases'!")
+		log.Error("Failed to execute find query on 'config.databases'!")
 	}
 	return &results
 }
@@ -109,7 +109,7 @@ func GetTotalDatabases(session *mgo.Session) *[]ShardingTopoStatsTotalDatabases 
 func GetTotalShardedCollections(session *mgo.Session) float64 {
 	collCount, err := session.DB("config").C("collections").Find(bson.M{"dropped": false}).Count()
 	if err != nil {
-		glog.Error("Failed to execute find query on 'config.collections'!")
+		log.Error("Failed to execute find query on 'config.collections'!")
 	}
 	return float64(collCount)
 }

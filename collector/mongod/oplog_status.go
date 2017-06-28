@@ -1,8 +1,8 @@
 package collector_mongod
 
 import (
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -132,7 +132,7 @@ func GetOplogStatus(session *mgo.Session) *OplogStatus {
 	collectionStats, err := GetOplogCollectionStats(session)
 	oplogTimestamps, err := GetOplogTimestamps(session)
 	if err != nil {
-		glog.Error("Failed to get oplog status.")
+		log.Error("Failed to get oplog status.")
 		return nil
 	}
 
