@@ -17,7 +17,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/percona/mongodb_exporter/collector"
-	"github.com/percona/mongodb_exporter/shared"
 )
 
 const (
@@ -50,6 +49,7 @@ var (
 		"    \tIf not provided: System default CAs are used.")
 	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
 
+	// FIXME currently ignored
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
 )
 
@@ -220,8 +220,6 @@ func main() {
 		fmt.Println(version.Print(program))
 		os.Exit(0)
 	}
-
-	shared.ParseEnabledGroups(*enabledGroupsFlag)
 
 	log.Infoln("### Warning: the exporter is in beta/experimental state and field names are very")
 	log.Infoln("### likely to change in the future and features may change or get removed!")
