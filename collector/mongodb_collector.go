@@ -50,20 +50,27 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 	return exporter
 }
 
-// Describe describes all mongodb's metrics.
+// Describe sends the super-set of all possible descriptors of metrics collected by this Collector
+// to the provided channel and returns once the last descriptor has been sent.
+// Part of prometheus.Collector interface.
 func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
-	log.Debug("Describing groups")
-	session := shared.MongoSession(exporter.Opts.toSessionOps())
-	if session != nil {
-		serverStatus := collector_mongos.GetServerStatus(session)
-		if serverStatus != nil {
-			serverStatus.Describe(ch)
+	metricCh := make(chan prometheus.Metric)
+	doneCh := make(chan struct{})
+
+	go func() {
+		for m := range metricCh {
+			ch <- m.Desc()
 		}
-		session.Close()
-	}
+		close(doneCh)
+	}()
+
+	exporter.Collect(metricCh)
+	close(metricCh)
+	<-doneCh
 }
 
-// Collect collects all mongodb's metrics.
+// Collect is called by the Prometheus registry when collecting metrics.
+// Part of prometheus.Collector interface.
 func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 	mongoSess := shared.MongoSession(exporter.Opts.toSessionOps())
 	if mongoSess != nil {
@@ -132,3 +139,6 @@ func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch 
 		oplogStatus.Export(ch)
 	}
 }
+
+// check interface
+var _ prometheus.Collector = (*MongodbCollector)(nil)

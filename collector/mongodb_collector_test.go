@@ -6,24 +6,33 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func TestDescribeCollector(t *testing.T) {
+func TestCollector(t *testing.T) {
 	if testing.Short() {
 		t.Skip("-short is passed, skipping integration test")
 	}
 
 	collector := NewMongodbCollector(MongodbCollectorOpts{URI: "mongodb://localhost:27017"})
 
-	ch := make(chan *prometheus.Desc)
-	go collector.Describe(ch)
-}
+	descCh := make(chan *prometheus.Desc)
+	go func() {
+		collector.Describe(descCh)
+		close(descCh)
+	}()
+	metricCh := make(chan prometheus.Metric)
+	go func() {
+		collector.Collect(metricCh)
+		close(metricCh)
+	}()
 
-func TestCollectCollector(t *testing.T) {
-	if testing.Short() {
-		t.Skip("-short is passed, skipping integration test")
+	var descs, metrics int
+	for range descCh {
+		descs++
+	}
+	for range metricCh {
+		metrics++
 	}
 
-	collector := NewMongodbCollector(MongodbCollectorOpts{URI: "mongodb://localhost:27017"})
-
-	ch := make(chan prometheus.Metric)
-	go collector.Collect(ch)
+	if descs != metrics {
+		t.Errorf("got %d descs and %d metrics", descs, metrics)
+	}
 }
