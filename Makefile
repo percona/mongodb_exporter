@@ -1,3 +1,17 @@
+# Copyright 2015 The Prometheus Authors
+# Copyright 2017 Percona LLC
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 GO           := go
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
 PROMU        := $(FIRST_GOPATH)/bin/promu -v
@@ -17,7 +31,21 @@ style:
 
 test:
 	@echo ">> running tests"
-	@$(GO) test -short -race $(pkgs)
+	rm -f coverage.txt
+	for p in $(pkgs); do \
+		rm -f coverage_temp.txt ; \
+		$(GO) test -v -short -race -covermode atomic -coverprofile coverage_temp.txt $$p ; \
+		cat coverage_temp.txt >> coverage.txt ; \
+	done
+
+testall:
+	@echo ">> running all tests"
+	rm -f coverage.txt
+	for p in $(pkgs); do \
+		rm -f coverage_temp.txt ; \
+		$(GO) test -v -race -covermode atomic -coverprofile coverage_temp.txt $$p ; \
+		cat coverage_temp.txt >> coverage.txt ; \
+	done
 
 format:
 	@echo ">> formatting code"
