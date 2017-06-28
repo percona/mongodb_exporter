@@ -10,13 +10,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/percona/mongodb_exporter/collector"
-	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 	"gopkg.in/yaml.v2"
+
+	"github.com/percona/mongodb_exporter/collector"
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 const (
