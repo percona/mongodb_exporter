@@ -15,6 +15,10 @@
 package collector
 
 import (
+	"errors"
+	"fmt"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
@@ -24,10 +28,7 @@ import (
 	"github.com/percona/mongodb_exporter/shared"
 )
 
-var (
-	// Namespace is the namespace of the metrics
-	Namespace = "mongodb"
-)
+const namespace = "mongodb"
 
 // MongodbCollectorOpts is the options of the mongodb collector.
 type MongodbCollectorOpts struct {
@@ -52,13 +53,35 @@ func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
 
 // MongodbCollector is in charge of collecting mongodb's metrics.
 type MongodbCollector struct {
-	Opts MongodbCollectorOpts
+	Opts                      MongodbCollectorOpts
+	scrapesTotal              prometheus.Counter
+	lastScrapeError           prometheus.Gauge
+	lastScrapeDurationSeconds prometheus.Gauge
 }
 
 // NewMongodbCollector returns a new instance of a MongodbCollector.
 func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 	exporter := &MongodbCollector{
 		Opts: opts,
+
+		scrapesTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "exporter",
+			Name:      "scrapes_total",
+			Help:      "Total number of times MongoDB was scraped for metrics.",
+		}),
+		lastScrapeError: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "exporter",
+			Name:      "last_scrape_error",
+			Help:      "Whether the last scrape of metrics from MongoDB resulted in an error (1 for error, 0 for success).",
+		}),
+		lastScrapeDurationSeconds: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "exporter",
+			Name:      "last_scrape_duration_seconds",
+			Help:      "Duration of the last scrape of metrics from MongoDB.",
+		}),
 	}
 
 	return exporter
@@ -68,6 +91,17 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 // to the provided channel and returns once the last descriptor has been sent.
 // Part of prometheus.Collector interface.
 func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
+	// We cannot know in advance what metrics the exporter will generate
+	// from MongoDB. So we use the poor man's describe method: Run a collect
+	// and send the descriptors of all the collected metrics. The problem
+	// here is that we need to connect to the MongoDB. If it is currently
+	// unavailable, the descriptors will be incomplete. Since this is a
+	// stand-alone exporter and not used as a library within other code
+	// implementing additional metrics, the worst that can happen is that we
+	// don't detect inconsistent metrics created by this exporter
+	// itself. Also, a change in the monitored MongoDB instance may change the
+	// exported metrics during the runtime of the exporter.
+
 	metricCh := make(chan prometheus.Metric)
 	doneCh := make(chan struct{})
 
@@ -86,30 +120,57 @@ func (exporter *MongodbCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect is called by the Prometheus registry when collecting metrics.
 // Part of prometheus.Collector interface.
 func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
+	exporter.scrape(ch)
+
+	exporter.scrapesTotal.Collect(ch)
+	exporter.lastScrapeError.Collect(ch)
+	exporter.lastScrapeDurationSeconds.Collect(ch)
+}
+
+func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
+	exporter.scrapesTotal.Inc()
+	var err error
+	defer func(begun time.Time) {
+		exporter.lastScrapeDurationSeconds.Set(time.Since(begun).Seconds())
+		if err == nil {
+			exporter.lastScrapeError.Set(0)
+		} else {
+			exporter.lastScrapeError.Set(1)
+		}
+	}(time.Now())
+
 	mongoSess := shared.MongoSession(exporter.Opts.toSessionOps())
-	if mongoSess != nil {
-		defer mongoSess.Close()
-		serverVersion, err := shared.MongoSessionServerVersion(mongoSess)
-		if err != nil {
-			log.Errorf("Problem gathering the mongo server version: %s", err)
-		}
+	if mongoSess == nil {
+		err = errors.New("can't create mongo session")
+		return
+	}
+	defer mongoSess.Close()
 
-		nodeType, err := shared.MongoSessionNodeType(mongoSess)
-		if err != nil {
-			log.Errorf("Problem gathering the mongo node type: %s", err)
-		}
+	var serverVersion string
+	serverVersion, err = shared.MongoSessionServerVersion(mongoSess)
+	if err != nil {
+		log.Errorf("Problem gathering the mongo server version: %s", err)
+		return
+	}
 
-		log.Debugf("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
-		switch {
-		case nodeType == "mongos":
-			exporter.collectMongos(mongoSess, ch)
-		case nodeType == "mongod":
-			exporter.collectMongod(mongoSess, ch)
-		case nodeType == "replset":
-			exporter.collectMongodReplSet(mongoSess, ch)
-		default:
-			log.Errorf("Unrecognized node type %s!", nodeType)
-		}
+	var nodeType string
+	nodeType, err = shared.MongoSessionNodeType(mongoSess)
+	if err != nil {
+		log.Errorf("Problem gathering the mongo node type: %s", err)
+		return
+	}
+
+	log.Debugf("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
+	switch {
+	case nodeType == "mongos":
+		exporter.collectMongos(mongoSess, ch)
+	case nodeType == "mongod":
+		exporter.collectMongod(mongoSess, ch)
+	case nodeType == "replset":
+		exporter.collectMongodReplSet(mongoSess, ch)
+	default:
+		err = fmt.Errorf("Unrecognized node type %s", nodeType)
+		log.Error(err)
 	}
 }
 
