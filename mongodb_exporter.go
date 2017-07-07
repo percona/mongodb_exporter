@@ -172,7 +172,6 @@ func startWebServer() {
 		log.Infoln("HTTPS/TLS is enabled")
 	}
 
-	log.Infoln("Listening on", *listenAddressF)
 	if ssl {
 		// https
 		mux := http.NewServeMux()
@@ -198,6 +197,7 @@ func startWebServer() {
 			TLSConfig:    tlsCfg,
 			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 		}
+		log.Infof("Starting HTTPS server on https://%s%s ...", *listenAddressF, *metricsPathF)
 		log.Fatal(srv.ListenAndServeTLS(*sslCertFileF, *sslKeyFileF))
 	} else {
 		// http
@@ -205,6 +205,7 @@ func startWebServer() {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			w.Write(landingPage)
 		})
+		log.Infof("Starting HTTP server on http://%s%s ...", *listenAddressF, *metricsPathF)
 		log.Fatal(http.ListenAndServe(*listenAddressF, nil))
 	}
 }
