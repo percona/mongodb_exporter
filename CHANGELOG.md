@@ -1,8 +1,8 @@
 # Changelog
 
-## v0.3.0 (not released yet)
+## v0.3.0 (2017-07-07)
 
-* Add standrad metrics:
+* Add standard metrics:
   * `mongodb_exporter_scrapes_total`
   * `mongodb_exporter_last_scrape_error`
   * `mongodb_exporter_last_scrape_duration_seconds`
