@@ -52,7 +52,7 @@ If you use [MongoDB Authorization](https://docs.mongodb.org/manual/core/authoriz
 
 1. Create a user with '*clusterMonitor*' role and '*read*' on the '*local*' database, like the following (*replace username/password!*):
 
-```json
+```js
 db.getSiblingDB("admin").createUser({
     user: "mongodb_exporter",
     pwd: "s3cr3tpassw0rd",

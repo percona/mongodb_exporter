@@ -1,46 +1,24 @@
+// Copyright 2017 Percona LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package shared
 
 import (
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
-	"regexp"
-	"strconv"
-	"strings"
 )
-
-var (
-	snakeRegexp        = regexp.MustCompile("\\B[A-Z]+[^_$]")
-	parameterizeRegexp = regexp.MustCompile("[^A-Za-z0-9_]+")
-)
-
-// SnakeCase converts the given text to snakecase/underscore syntax.
-func SnakeCase(text string) string {
-	result := snakeRegexp.ReplaceAllStringFunc(text, func(match string) string {
-		return "_" + match
-	})
-
-	return ParameterizeString(result)
-}
-
-// ParameterizeString parameterizes the given string.
-func ParameterizeString(text string) string {
-	result := parameterizeRegexp.ReplaceAllString(text, "_")
-	return strings.ToLower(result)
-}
-
-func IsVersionGreater(version string, major int, minor int, release int) bool {
-	split := strings.Split(version, ".")
-	cmp_major, _ := strconv.Atoi(split[0])
-	cmp_minor, _ := strconv.Atoi(split[1])
-	cmp_release, _ := strconv.Atoi(split[2])
-
-	if cmp_major >= major && cmp_minor >= minor && cmp_release >= release {
-		return true
-	}
-
-	return false
-}
 
 func LoadCaFrom(pemFile string) (*x509.CertPool, error) {
 	caCert, err := ioutil.ReadFile(pemFile)

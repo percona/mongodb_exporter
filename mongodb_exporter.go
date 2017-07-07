@@ -1,3 +1,17 @@
+// Copyright 2017 Percona LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -10,13 +24,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/percona/mongodb_exporter/collector"
-	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 	"gopkg.in/yaml.v2"
+
+	"github.com/percona/mongodb_exporter/collector"
 )
 
 const (
@@ -49,6 +63,7 @@ var (
 		"    \tIf not provided: System default CAs are used.")
 	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
 
+	// FIXME currently ignored
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
 )
 
@@ -157,7 +172,6 @@ func startWebServer() {
 		log.Infoln("HTTPS/TLS is enabled")
 	}
 
-	log.Infoln("Listening on", *listenAddressF)
 	if ssl {
 		// https
 		mux := http.NewServeMux()
@@ -183,6 +197,7 @@ func startWebServer() {
 			TLSConfig:    tlsCfg,
 			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 		}
+		log.Infof("Starting HTTPS server on https://%s%s ...", *listenAddressF, *metricsPathF)
 		log.Fatal(srv.ListenAndServeTLS(*sslCertFileF, *sslKeyFileF))
 	} else {
 		// http
@@ -190,6 +205,7 @@ func startWebServer() {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			w.Write(landingPage)
 		})
+		log.Infof("Starting HTTP server on http://%s%s ...", *listenAddressF, *metricsPathF)
 		log.Fatal(http.ListenAndServe(*listenAddressF, nil))
 	}
 }
@@ -219,8 +235,6 @@ func main() {
 		fmt.Println(version.Print(program))
 		os.Exit(0)
 	}
-
-	shared.ParseEnabledGroups(*enabledGroupsFlag)
 
 	log.Infoln("### Warning: the exporter is in beta/experimental state and field names are very")
 	log.Infoln("### likely to change in the future and features may change or get removed!")

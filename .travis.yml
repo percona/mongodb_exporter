@@ -1,10 +1,25 @@
-sudo: false
+dist: trusty
+sudo: required
 language: go
 
 go:
-  - 1.7.x
   - 1.8.x
   - tip
 
+env:
+  - MONGODB_IMAGE=mongo:3.4
+  - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
+
+services:
+  - docker
+
+before_script:
+  - docker --version
+  - docker-compose --version
+  - docker-compose up -d
+
 script:
-  - make
+  - make format build testall
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

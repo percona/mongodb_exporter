@@ -1,0 +1,8 @@
+# see CONTRIBUTING.md
+---
+version: '3'
+services:
+  mongo:
+    image: ${MONGODB_IMAGE:-mongo:3.4}
+    ports:
+      - 127.0.0.1:27017:27017

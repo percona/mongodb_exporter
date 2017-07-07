@@ -1,0 +1,9 @@
+Percona MongoDB Exporter.
+Copyright 2017 Percona LLC
+
+The following components are included in this product:
+
+mongodb_exporter
+https://github.com/dcu/mongodb_exporter
+Copyright (c) 2015 David Cuadrado
+Licensed under the MIT License

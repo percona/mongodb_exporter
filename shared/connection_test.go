@@ -12,9 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_mongos
+package shared
 
-var (
-	// Namespace is the namespace of the metrics
-	Namespace = "mongodb_mongos"
+import (
+	"testing"
 )
+
+func TestRedactMongoUri(t *testing.T) {
+	uri := "mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017"
+	expected := "mongodb://****:****@localhost:27017"
+	actual := RedactMongoUri(uri)
+	if expected != actual {
+		t.Errorf("%q != %q", expected, actual)
+	}
+}
