@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	dialMongodbTimeout = 5 * time.Second
+	dialMongodbTimeout = 3 * time.Second
 	syncMongodbTimeout = 1 * time.Minute
 )
 
