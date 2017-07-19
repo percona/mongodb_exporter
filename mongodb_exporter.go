@@ -30,7 +30,7 @@ import (
 	"github.com/prometheus/common/version"
 	"gopkg.in/yaml.v2"
 
-	"github.com/percona/mongodb_exporter/collector"
+	"github.com/utilitywarehouse/mongodb_exporter/collector"
 )
 
 const (
