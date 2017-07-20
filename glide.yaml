@@ -1,4 +1,4 @@
-package: github.com/percona/mongodb_exporter
+package: github.com/utilitywarehouse/mongodb_exporter
 import:
 - package: github.com/prometheus/client_golang
   subpackages:

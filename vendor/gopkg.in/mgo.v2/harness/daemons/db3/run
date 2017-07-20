@@ -9,3 +9,4 @@ exec mongod $COMMONDOPTS \
 	--sslMode preferSSL \
 	--sslCAFile ../../certs/server.pem \
 	--sslPEMKeyFile ../../certs/server.pem
+

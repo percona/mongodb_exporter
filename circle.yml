@@ -1,0 +1,60 @@
+machine:
+  # uncomment for docker-compose
+  #pre:
+   #- curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
+   #- sudo pip install --upgrade pip
+   #- sudo pip install docker-compose
+  environment:
+    NAMESPACE: telecom
+    SERVICE: mongodb-exporter
+    UW_DOCKER_REGISTRY: registry.uw.systems
+    UW_DOCKER_USERNAME: telco
+    #LINT_EXCLUDE: #TODO - space seperated folder names (no path prefix like './')
+  services:
+    - docker
+dependencies:
+  pre:
+    - docker login -e none@none.com -u $UW_DOCKER_USERNAME
+      -p $UW_DOCKER_PASSWORD $UW_DOCKER_REGISTRY
+    - sudo add-apt-repository ppa:masterminds/glide && sudo apt-get update
+    - sudo apt-get install glide
+  override:
+    #- docker-compose up -d
+    #- sleep 5
+    #- docker-compose logs
+    - /bin/true
+test:
+  override:
+    # start a bare alpine+go container, map $PWD into it, and build the
+    # application artifact in the container
+    - docker run --rm -e GH_USERNAME -e GH_PASSWORD -e CIRCLE_SHA1 -e SERVICE
+      -e LINT_EXCLUDE -v $PWD:/go/src/github.com/utilitywarehouse/$SERVICE
+      golang:1.8-alpine sh -c 'apk update && apk add make git gcc musl-dev &&
+      cd /go/src/github.com/utilitywarehouse/$SERVICE && make all'
+
+deployment:
+  master:
+    branch:
+      - master
+    commands:
+      - glide install
+      # rebuild the docker image (will include the application binary generated
+      # in the overridden `test` task above)
+      - docker build --build-arg SERVICE=$SERVICE -t
+        $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE:$CIRCLE_SHA1 .
+      - docker tag -f $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE:$CIRCLE_SHA1
+        $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE:latest
+      - docker push $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE
+      # enable this when ready to auto deploy
+      #- docker run -it -e KUBERNETES_TOKEN=$KUBERNETES_TOKEN
+      #  quay.io/guidesmiths/kube-deploy --insecure-https
+      #  --url https://elb.master.k8s.dev.uw.systems
+      #  --namespace $NAMESPACE deployment/$SERVICE $SERVICE
+      #  $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE:$CIRCLE_SHA1
+  any:
+    branch:
+      - /^(?!master$).*$/ # anything but master branch
+    commands:
+      - docker build --build-arg SERVICE=$SERVICE -t $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE:$CIRCLE_SHA1 .
+      - docker tag -f $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE:$CIRCLE_SHA1 $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE:$CIRCLE_BRANCH
+      - docker push $UW_DOCKER_REGISTRY/$NAMESPACE/$SERVICE

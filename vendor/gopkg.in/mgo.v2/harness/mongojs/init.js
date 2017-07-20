@@ -68,7 +68,7 @@ function configAuth() {
             try {
                 db.createUser({user: "root", pwd: "rapadura", roles: ["root"]})
             } catch (err) {
-                // 3.2 consistently fails replication of creds on 40031 (config server)
+                // 3.2 consistently fails replication of creds on 40031 (config server) 
                 print("createUser command returned an error: " + err)
                 if (String(err).indexOf("timed out") >= 0) {
                     timedOut = true;

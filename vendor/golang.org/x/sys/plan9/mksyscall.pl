@@ -185,7 +185,7 @@ while(<>) {
 			}
 		} elsif($type eq "int64" && $_32bit ne "") {
 			if(@args % 2 && $arm) {
-				# arm abi specifies 64-bit argument uses
+				# arm abi specifies 64-bit argument uses 
 				# (even, odd) pair
 				push @args, "0"
 			}
@@ -285,7 +285,7 @@ while(<>) {
 		$text .= "\t$use\n";
 	}
 	$text .= $body;
-
+	
 	if ($plan9 && $ret[2] eq "e1") {
 		$text .= "\tif int32(r0) == -1 {\n";
 		$text .= "\t\terr = e1\n";
