@@ -16,6 +16,8 @@ dependencies:
   pre:
     - docker login -e none@none.com -u $UW_DOCKER_USERNAME
       -p $UW_DOCKER_PASSWORD $UW_DOCKER_REGISTRY
+    - sudo add-apt-repository ppa:masterminds/glide && sudo apt-get update
+    - sudo apt-get install glide
   override:
     #- docker-compose up -d
     #- sleep 5
@@ -35,6 +37,7 @@ deployment:
     branch:
       - master
     commands:
+      - glide install
       # rebuild the docker image (will include the application binary generated
       # in the overridden `test` task above)
       - docker build --build-arg SERVICE=$SERVICE -t
