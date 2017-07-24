@@ -31,21 +31,11 @@ style:
 
 test:
 	@echo ">> running tests"
-	rm -f coverage.txt
-	for p in $(pkgs); do \
-		rm -f coverage_temp.txt ; \
-		$(GO) test -v -short -race -covermode atomic -coverprofile coverage_temp.txt $$p ; \
-		cat coverage_temp.txt >> coverage.txt ; \
-	done
+	gocovermerge -coverprofile=coverage.txt test -short -v -race -covermode=atomic $(pkgs)
 
 testall:
 	@echo ">> running all tests"
-	rm -f coverage.txt
-	for p in $(pkgs); do \
-		rm -f coverage_temp.txt ; \
-		$(GO) test -v -race -covermode atomic -coverprofile coverage_temp.txt $$p ; \
-		cat coverage_temp.txt >> coverage.txt ; \
-	done
+	gocovermerge -coverprofile=coverage.txt test -v -race -covermode=atomic $(pkgs)
 
 format:
 	@echo ">> formatting code"
@@ -55,11 +45,11 @@ vet:
 	@echo ">> vetting code"
 	@$(GO) vet $(pkgs)
 
-build: promu
+build: init
 	@echo ">> building binaries"
 	@$(PROMU) build --prefix $(PREFIX)
 
-tarball: promu
+tarball: init
 	@echo ">> building release tarball"
 	@$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
 
@@ -67,10 +57,11 @@ docker:
 	@echo ">> building docker image"
 	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
 
-promu:
+init:
+	$(GO) get -u github.com/AlekSi/gocovermerge
 	@GOOS=$(shell uname -s | tr A-Z a-z) \
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
 		$(GO) get -u github.com/prometheus/promu
 
 
-.PHONY: all style format build test vet tarball docker promu
+.PHONY: all style format build test vet tarball docker init
