@@ -31,11 +31,11 @@ style:
 
 test:
 	@echo ">> running tests"
-	gocovermerge -coverprofile=coverage.txt test -short -v -race -covermode=atomic $(pkgs)
+	gocovermerge -coverprofile=coverage.txt test -short -v -race $(pkgs)
 
 testall:
 	@echo ">> running all tests"
-	gocovermerge -coverprofile=coverage.txt test -v -race -covermode=atomic $(pkgs)
+	gocovermerge -coverprofile=coverage.txt test -v -race $(pkgs)
 
 format:
 	@echo ">> formatting code"
@@ -59,7 +59,7 @@ docker:
 
 init:
 	$(GO) get -u github.com/AlekSi/gocovermerge
-	@GOOS=$(shell uname -s | tr A-Z a-z) \
+	GOOS=$(shell uname -s | tr A-Z a-z) \
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
 		$(GO) get -u github.com/prometheus/promu
 
