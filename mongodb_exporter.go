@@ -154,8 +154,8 @@ func startWebServer() {
 	}
 
 	handler := prometheusHandler()
-
-	registerCollector()
+	collector := registerCollector()
+	defer collector.Close()
 
 	if (*sslCertFileF == "") != (*sslKeyFileF == "") {
 		log.Fatal("One of the flags -web.ssl-cert-file or -web.ssl-key-file is missing to enable HTTPS/TLS")
@@ -210,7 +210,7 @@ func startWebServer() {
 	}
 }
 
-func registerCollector() {
+func registerCollector() *collector.MongodbCollector {
 	mongodbCollector := collector.NewMongodbCollector(collector.MongodbCollectorOpts{
 		URI:                   *uriF,
 		TLSConnection:         *tlsF,
@@ -220,6 +220,7 @@ func registerCollector() {
 		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
 	})
 	prometheus.MustRegister(mongodbCollector)
+	return mongodbCollector
 }
 
 func main() {
