@@ -105,6 +105,8 @@ func (exporter *MongodbCollector) getSession() *mgo.Session {
 // Close cleanly closes the mongo session if it exists.
 func (exporter *MongodbCollector) Close() {
 	if exporter.mongoSess != nil {
+		exporter.mongoSessLock.Lock()
+		defer exporter.mongoSessLock.Unlock()
 		exporter.mongoSess.Close()
 	}
 }
