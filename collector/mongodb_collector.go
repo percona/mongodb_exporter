@@ -15,7 +15,6 @@
 package collector
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -57,6 +56,7 @@ type MongodbCollector struct {
 	scrapesTotal              prometheus.Counter
 	lastScrapeError           prometheus.Gauge
 	lastScrapeDurationSeconds prometheus.Gauge
+	mongoSess                 *mgo.Session
 }
 
 // NewMongodbCollector returns a new instance of a MongodbCollector.
@@ -85,6 +85,28 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 	}
 
 	return exporter
+}
+
+// getSession returns the cached *mgo.Session (after a test ping)
+// or creates a new session and returns it. The cached session is
+// reconnected if the ping to it fails.
+func (exporter *MongodbCollector) getSession() *mgo.Session {
+	if exporter.mongoSess != nil {
+		err := exporter.mongoSess.Ping()
+		if err == nil {
+			return exporter.mongoSess
+		}
+		exporter.mongoSess.Close()
+	}
+	exporter.mongoSess = shared.MongoSession(exporter.Opts.toSessionOps())
+	return exporter.mongoSess
+}
+
+// Close cleanly closes the mongo session if it exists.
+func (exporter *MongodbCollector) Close() {
+	if exporter.mongoSess != nil {
+		exporter.mongoSess.Close()
+	}
 }
 
 // Describe sends the super-set of all possible descriptors of metrics collected by this Collector
@@ -139,12 +161,11 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 		}
 	}(time.Now())
 
-	mongoSess := shared.MongoSession(exporter.Opts.toSessionOps())
+	mongoSess := exporter.getSession()
 	if mongoSess == nil {
-		err = errors.New("can't create mongo session")
+		log.Errorf("can't create mongo session")
 		return
 	}
-	defer mongoSess.Close()
 
 	var serverVersion string
 	serverVersion, err = shared.MongoSessionServerVersion(mongoSess)
