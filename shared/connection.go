@@ -52,6 +52,7 @@ type MongoSessionOpts struct {
 	TLSPrivateKeyFile     string
 	TLSCaFile             string
 	TLSHostnameValidation bool
+	PoolLimit             int
 }
 
 func MongoSession(opts MongoSessionOpts) *mgo.Session {
@@ -76,7 +77,7 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 		return nil
 	}
 	session.SetMode(mgo.Eventual, true)
-	session.SetPoolLimit(2)
+	session.SetPoolLimit(opts.PoolLimit)
 	session.SetPrefetch(0.00)
 	session.SetSyncTimeout(syncMongodbTimeout)
 	session.SetSocketTimeout(0)

@@ -63,6 +63,8 @@ var (
 		"    \tIf not provided: System default CAs are used.")
 	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
 
+	dbPoolLimit = flag.Int("mongodb.max-connections", 2, "Max number of pooled connections to the database.")
+
 	// FIXME currently ignored
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
 )
@@ -218,6 +220,7 @@ func registerCollector() *collector.MongodbCollector {
 		TLSPrivateKeyFile:     *tlsPrivateKeyF,
 		TLSCaFile:             *tlsCAF,
 		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
+		DbPoolLimit:           *dbPoolLimit,
 	})
 	prometheus.MustRegister(mongodbCollector)
 	return mongodbCollector
