@@ -87,16 +87,10 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 	return exporter
 }
 
-// getSession returns the cached *mgo.Session (after a test ping)
-// or creates a new session and returns it. The cached session is
-// reconnected if the ping to it fails.
+// getSession returns the cached *mgo.Session or creates a new session and returns it.
 func (exporter *MongodbCollector) getSession() *mgo.Session {
 	if exporter.mongoSess != nil {
-		err := exporter.mongoSess.Ping()
-		if err == nil {
-			return exporter.mongoSess
-		}
-		exporter.mongoSess.Close()
+		return exporter.mongoSess
 	}
 	exporter.mongoSess = shared.MongoSession(exporter.Opts.toSessionOps())
 	return exporter.mongoSess
@@ -163,7 +157,7 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 
 	mongoSess := exporter.getSession()
 	if mongoSess == nil {
-		log.Errorf("can't create mongo session")
+		log.Errorf("can't create mongo session to %s", exporter.Opts.URI)
 		return
 	}
 
