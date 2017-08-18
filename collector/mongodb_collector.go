@@ -106,8 +106,8 @@ func (exporter *MongodbCollector) getSession() *mgo.Session {
 func (exporter *MongodbCollector) Close() {
 	if exporter.mongoSess != nil {
 		exporter.mongoSessLock.Lock()
-		defer exporter.mongoSessLock.Unlock()
 		exporter.mongoSess.Close()
+		exporter.mongoSessLock.Unlock()
 	}
 }
 
