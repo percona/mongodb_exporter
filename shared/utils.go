@@ -20,13 +20,8 @@ import (
 	"io/ioutil"
 	"runtime"
 	"strconv"
-	"strings"
 
 	"gopkg.in/mgo.v2"
-)
-
-var (
-	queryCommentProgName = "mongodb_exporter"
 )
 
 func LoadCaFrom(pemFile string) (*x509.CertPool, error) {
@@ -47,8 +42,7 @@ func LoadKeyPairFrom(pemFile string, privateKeyPemFile string) (tls.Certificate,
 	return tls.LoadX509KeyPair(pemFile, targetPrivateKeyPemFile)
 }
 
-func QueryWithCodeComment(query *mgo.Query) *mgo.Query {
+func AddCodeCommentToQuery(query *mgo.Query) *mgo.Query {
 	_, fileName, lineNum, _ := runtime.Caller(1)
-	fields := []string{queryCommentProgName, fileName, strconv.Itoa(lineNum)}
-	return query.Comment(strings.Join(fields, ":"))
+	return query.Comment(fileName + ":" + strconv.Itoa(lineNum))
 }

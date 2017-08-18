@@ -87,7 +87,7 @@ func getOplogTailOrHeadTimestamp(session *mgo.Session, returnHead bool) (float64
 	var tries int64 = 0
 	for tries < 2 {
 		findQuery := session.DB(oplogDb).C(oplogCollection).Find(nil).Sort(sortCond).Limit(1)
-		err = shared.QueryWithCodeComment(findQuery).One(&result)
+		err = shared.AddCodeCommentToQuery(findQuery).One(&result)
 		if err == nil {
 			break
 		}
