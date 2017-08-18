@@ -16,6 +16,7 @@ package collector
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -57,6 +58,7 @@ type MongodbCollector struct {
 	lastScrapeError           prometheus.Gauge
 	lastScrapeDurationSeconds prometheus.Gauge
 	mongoSess                 *mgo.Session
+	mongoSessLock             sync.Mutex
 }
 
 // NewMongodbCollector returns a new instance of a MongodbCollector.
@@ -89,6 +91,10 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 
 // getSession returns the cached *mgo.Session or creates a new session and returns it.
 func (exporter *MongodbCollector) getSession() *mgo.Session {
+	// avoid race condition around session creation
+	exporter.mongoSessLock.Lock()
+	defer exporter.mongoSessLock.Unlock()
+
 	if exporter.mongoSess != nil {
 		return exporter.mongoSess
 	}
