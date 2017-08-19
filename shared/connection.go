@@ -80,7 +80,7 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 	session.SetPoolLimit(opts.PoolLimit)
 	session.SetPrefetch(0.00)
 	session.SetSyncTimeout(syncMongodbTimeout)
-	session.SetSocketTimeout(0)
+	session.SetSocketTimeout(dialMongodbTimeout)
 	return session
 }
 

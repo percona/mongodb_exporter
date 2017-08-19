@@ -92,16 +92,16 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 }
 
 // getSession returns the cached *mgo.Session or creates a new session and returns it.
+// Use sync.Mutex to avoid race condition around session creation.
 func (exporter *MongodbCollector) getSession() *mgo.Session {
-	// avoid race condition around session creation
 	exporter.mongoSessLock.Lock()
 	defer exporter.mongoSessLock.Unlock()
 
 	if exporter.mongoSess != nil {
-		return exporter.mongoSess
+		return exporter.mongoSess.Copy()
 	}
 	exporter.mongoSess = shared.MongoSession(exporter.Opts.toSessionOps())
-	return exporter.mongoSess
+	return exporter.mongoSess.Copy()
 }
 
 // Close cleanly closes the mongo session if it exists.
