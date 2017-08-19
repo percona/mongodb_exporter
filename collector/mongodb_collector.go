@@ -170,6 +170,7 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 		log.Errorf("can't create mongo session to %s", exporter.Opts.URI)
 		return
 	}
+	defer mongoSess.Close()
 
 	var serverVersion string
 	serverVersion, err = shared.MongoSessionServerVersion(mongoSess)
