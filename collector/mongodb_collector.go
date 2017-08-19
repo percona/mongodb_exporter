@@ -101,7 +101,10 @@ func (exporter *MongodbCollector) getSession() *mgo.Session {
 		return exporter.mongoSess.Copy()
 	}
 	exporter.mongoSess = shared.MongoSession(exporter.Opts.toSessionOps())
-	return exporter.mongoSess.Copy()
+	if exporter.mongoSess != nil {
+		return exporter.mongoSess.Copy()
+	}
+	return nil
 }
 
 // Close cleanly closes the mongo session if it exists.
