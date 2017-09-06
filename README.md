@@ -64,6 +64,12 @@ db.getSiblingDB("admin").createUser({
 export MONGODB_URL=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
 ```
 
+If you use [x.509 Certificates to Authenticate Clients](https://docs.mongodb.com/manual/tutorial/configure-x509-client-authentication/), pass in username and `authMechanism` via [connection options](https://docs.mongodb.com/manual/reference/connection-string/#connections-connection-options) to the MongoDB uri. Eg:
+
+```
+mongodb://CN=myName,OU=myOrgUnit,O=myOrg,L=myLocality,ST=myState,C=myCountry@localhost:27017/?authMechanism=MONGODB-X509
+```
+
 ## Note about how this works
 
 Point the process to any mongo port and it will detect if it is a mongos, replicaset member, or stand alone mongod and return the appropriate metrics for that type of node. This was done to preent the need to an exporter per type of process.
