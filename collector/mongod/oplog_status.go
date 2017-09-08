@@ -146,7 +146,7 @@ func GetOplogStatus(session *mgo.Session) *OplogStatus {
 	collectionStats, err := GetOplogCollectionStats(session)
 	oplogTimestamps, err := GetOplogTimestamps(session)
 	if err != nil {
-		log.Error("Failed to get oplog status.")
+		log.Errorf("Failed to get oplog status: %s", err)
 		return nil
 	}
 
