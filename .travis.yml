@@ -4,7 +4,8 @@ language: go
 
 go:
   - 1.8.x
-  - tip
+  - 1.9.x
+  - master
 
 env:
   - MONGODB_IMAGE=mongo:3.4
