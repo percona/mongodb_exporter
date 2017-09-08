@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.1 (2017-09-08)
+
+* Better logging for scrape errors.
+
 ## v0.3.0 (2017-07-07)
 
 * Add standard metrics:

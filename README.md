@@ -7,11 +7,6 @@
 
 Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado (@dcu), but forked for full sharded support and structure changes.
 
-
-## Experimental
-
-The exporter is in beta/experimental state and field names are **very likely to change** and features may change or get removed!
-
 ## Features
 
 - MongoDB Server Status metrics (*cursors, operations, indexes, storage, etc*)
@@ -76,10 +71,9 @@ Point the process to any mongo port and it will detect if it is a mongos, replic
 ## Roadmap
 
 - Document more configurations options here
-- Stabilize RocksDB and WiredTiger support (*currently beta/experimental*)
+- Stabilize RocksDB and WiredTiger support
 - Move MongoDB user/password/authdb to a file (for security)
 - Write more go tests
-- Version scheme
 
 
 ## Submitting Bug Reports
