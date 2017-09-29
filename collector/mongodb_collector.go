@@ -197,6 +197,14 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 	if serverStatus != nil {
 		serverStatus.Export(ch)
 	}
+
+	log.Debug("Collecting Collection Metrics")
+	topOutput, err := collector_mongod.GetTop(session)
+	if err != nil {
+		log.Errorf("error in GetTop (err=%s)", err)
+	} else {
+		topOutput.Export(ch)
+	}
 }
 
 func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch chan<- prometheus.Metric) {
