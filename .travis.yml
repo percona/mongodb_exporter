@@ -7,6 +7,10 @@ go:
   - 1.9.x
   - master
 
+matrix:
+  allow_failures:
+    - go: master
+
 env:
   - MONGODB_IMAGE=mongo:3.4
   - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
