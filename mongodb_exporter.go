@@ -236,9 +236,5 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Infoln("### Warning: the exporter is in beta/experimental state and field names are very")
-	log.Infoln("### likely to change in the future and features may change or get removed!")
-	log.Infoln("### See: https://github.com/percona/mongodb_exporter for updates")
-
 	startWebServer()
 }
