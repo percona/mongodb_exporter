@@ -54,10 +54,10 @@ var (
 
 	uriF     = flag.String("mongodb.uri", mongodbDefaultURI(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
-	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the private key in PEM format).\n"+
+	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).\n"+
 		"    \tThis should include the whole certificate chain.\n"+
 		"    \tIf provided: The connection will be opened via TLS to the MongoDB server.")
-	tlsPrivateKeyF = flag.String("mongodb.tls-private-key", "", "Path to PEM file that contains the private key (if not contained in mongodb.tls-cert file).")
+	tlsPrivateKeyF = flag.String("mongodb.tls-private-key", "", "Path to PEM file that contains the decrypted private key (if not contained in mongodb.tls-cert file).")
 	tlsCAF         = flag.String("mongodb.tls-ca", "", "Path to PEM file that contains the CAs that are trusted for server connections.\n"+
 		"    \tIf provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.\n"+
 		"    \tIf not provided: System default CAs are used.")
