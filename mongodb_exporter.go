@@ -52,6 +52,8 @@ var (
 	sslCertFileF   = flag.String("web.ssl-cert-file", "", "Path to SSL certificate file.")
 	sslKeyFileF    = flag.String("web.ssl-key-file", "", "Path to SSL key file.")
 
+	DbF      = flag.Bool("collect.database", false, "Enable collection of Database metrics")
+	CollF    = flag.Bool("collect.collection", false, "Enable collection of Collection metrics")
 	uriF     = flag.String("mongodb.uri", mongodbDefaultURI(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
 	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the private key in PEM format).\n"+
@@ -218,6 +220,8 @@ func registerCollector() {
 		TLSPrivateKeyFile:     *tlsPrivateKeyF,
 		TLSCaFile:             *tlsCAF,
 		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
+		CollectDatabaseMetrics:   *DbF,
+		CollectCollectionMetrics: *CollF,
 	})
 	prometheus.MustRegister(mongodbCollector)
 }
