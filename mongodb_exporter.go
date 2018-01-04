@@ -63,6 +63,8 @@ var (
 		"    \tIf not provided: System default CAs are used.")
 	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
 
+	dbPoolLimit = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
+
 	// FIXME currently ignored
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
 )
@@ -154,8 +156,8 @@ func startWebServer() {
 	}
 
 	handler := prometheusHandler()
-
-	registerCollector()
+	collector := registerCollector()
+	defer collector.Close()
 
 	if (*sslCertFileF == "") != (*sslKeyFileF == "") {
 		log.Fatal("One of the flags -web.ssl-cert-file or -web.ssl-key-file is missing to enable HTTPS/TLS")
@@ -210,7 +212,7 @@ func startWebServer() {
 	}
 }
 
-func registerCollector() {
+func registerCollector() *collector.MongodbCollector {
 	mongodbCollector := collector.NewMongodbCollector(collector.MongodbCollectorOpts{
 		URI:                   *uriF,
 		TLSConnection:         *tlsF,
@@ -218,8 +220,10 @@ func registerCollector() {
 		TLSPrivateKeyFile:     *tlsPrivateKeyF,
 		TLSCaFile:             *tlsCAF,
 		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
+		DbPoolLimit:           *dbPoolLimit,
 	})
 	prometheus.MustRegister(mongodbCollector)
+	return mongodbCollector
 }
 
 func main() {
