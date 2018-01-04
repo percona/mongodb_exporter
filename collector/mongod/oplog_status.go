@@ -15,11 +15,12 @@
 package collector_mongod
 
 import (
-	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 var (

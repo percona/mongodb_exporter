@@ -43,6 +43,9 @@ func LoadKeyPairFrom(pemFile string, privateKeyPemFile string) (tls.Certificate,
 }
 
 func AddCodeCommentToQuery(query *mgo.Query) *mgo.Query {
-	_, fileName, lineNum, _ := runtime.Caller(1)
+	_, fileName, lineNum, ok := runtime.Caller(1)
+	if !ok {
+		return query
+	}
 	return query.Comment(fileName + ":" + strconv.Itoa(lineNum))
 }
