@@ -56,14 +56,16 @@ var (
 	CollF    = flag.Bool("collect.collection", false, "Enable collection of Collection metrics")
 	uriF     = flag.String("mongodb.uri", mongodbDefaultURI(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
-	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the private key in PEM format).\n"+
+	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).\n"+
 		"    \tThis should include the whole certificate chain.\n"+
 		"    \tIf provided: The connection will be opened via TLS to the MongoDB server.")
-	tlsPrivateKeyF = flag.String("mongodb.tls-private-key", "", "Path to PEM file that contains the private key (if not contained in mongodb.tls-cert file).")
+	tlsPrivateKeyF = flag.String("mongodb.tls-private-key", "", "Path to PEM file that contains the decrypted private key (if not contained in mongodb.tls-cert file).")
 	tlsCAF         = flag.String("mongodb.tls-ca", "", "Path to PEM file that contains the CAs that are trusted for server connections.\n"+
 		"    \tIf provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.\n"+
 		"    \tIf not provided: System default CAs are used.")
 	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
+
+	dbPoolLimit = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
 
 	// FIXME currently ignored
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
@@ -156,8 +158,8 @@ func startWebServer() {
 	}
 
 	handler := prometheusHandler()
-
-	registerCollector()
+	collector := registerCollector()
+	defer collector.Close()
 
 	if (*sslCertFileF == "") != (*sslKeyFileF == "") {
 		log.Fatal("One of the flags -web.ssl-cert-file or -web.ssl-key-file is missing to enable HTTPS/TLS")
@@ -212,7 +214,7 @@ func startWebServer() {
 	}
 }
 
-func registerCollector() {
+func registerCollector() *collector.MongodbCollector {
 	mongodbCollector := collector.NewMongodbCollector(collector.MongodbCollectorOpts{
 		URI:                   *uriF,
 		TLSConnection:         *tlsF,
@@ -222,8 +224,10 @@ func registerCollector() {
 		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
 		CollectDatabaseMetrics:   *DbF,
 		CollectCollectionMetrics: *CollF,
+		DBPoolLimit:           *dbPoolLimit,
 	})
 	prometheus.MustRegister(mongodbCollector)
+	return mongodbCollector
 }
 
 func main() {
@@ -239,10 +243,6 @@ func main() {
 		fmt.Println(version.Print(program))
 		os.Exit(0)
 	}
-
-	log.Infoln("### Warning: the exporter is in beta/experimental state and field names are very")
-	log.Infoln("### likely to change in the future and features may change or get removed!")
-	log.Infoln("### See: https://github.com/percona/mongodb_exporter for updates")
 
 	startWebServer()
 }

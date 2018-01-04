@@ -18,6 +18,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
+	"runtime"
+	"strconv"
+
+	"gopkg.in/mgo.v2"
 )
 
 func LoadCaFrom(pemFile string) (*x509.CertPool, error) {
@@ -36,4 +40,12 @@ func LoadKeyPairFrom(pemFile string, privateKeyPemFile string) (tls.Certificate,
 		targetPrivateKeyPemFile = pemFile
 	}
 	return tls.LoadX509KeyPair(pemFile, targetPrivateKeyPemFile)
+}
+
+func AddCodeCommentToQuery(query *mgo.Query) *mgo.Query {
+	_, fileName, lineNum, ok := runtime.Caller(1)
+	if !ok {
+		return query
+	}
+	return query.Comment(fileName + ":" + strconv.Itoa(lineNum))
 }

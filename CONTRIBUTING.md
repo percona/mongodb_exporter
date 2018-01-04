@@ -16,5 +16,5 @@ export MONGODB_URL='mongodb://localhost:27017'
 
 ## Vendoring
 
-We use [Glide](https://glide.sh) to vendor dependencies. Please use released version of Glide (i.e. do not `go get`
-from `master` branch). Also please use `--strip-vendor` flag.
+We use [dep](https://github.com/golang/dep) to vendor dependencies.
+Please use released version of dep (i.e. do not `go get` from `master` branch).
