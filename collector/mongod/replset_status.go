@@ -115,12 +115,6 @@ var (
 		Name:      "member_config_version",
 		Help:      "The configVersion value is the replica set configuration version.",
 	}, []string{"set", "name", "state"})
-	memberOptime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: subsystem,
-		Name:      "member_optime",
-		Help:      "Information regarding the last operation from the operation log that this member has applied.",
-	}, []string{"set", "name", "state"})
 )
 
 // ReplSetStatus keeps the data returned by the GetReplSetStatus method
