@@ -38,7 +38,7 @@ type MongodbCollectorOpts struct {
 	TLSPrivateKeyFile     string
 	TLSCaFile             string
 	TLSHostnameValidation bool
-	DbPoolLimit           int
+	DBPoolLimit           int
 }
 
 func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
@@ -49,18 +49,20 @@ func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
 		TLSPrivateKeyFile:     in.TLSPrivateKeyFile,
 		TLSCaFile:             in.TLSCaFile,
 		TLSHostnameValidation: in.TLSHostnameValidation,
-		PoolLimit:             in.DbPoolLimit,
+		PoolLimit:             in.DBPoolLimit,
 	}
 }
 
 // MongodbCollector is in charge of collecting mongodb's metrics.
 type MongodbCollector struct {
-	Opts                      MongodbCollectorOpts
+	Opts MongodbCollectorOpts
+
 	scrapesTotal              prometheus.Counter
 	lastScrapeError           prometheus.Gauge
 	lastScrapeDurationSeconds prometheus.Gauge
-	mongoSess                 *mgo.Session
-	mongoSessLock             sync.Mutex
+
+	mongoSessLock sync.Mutex
+	mongoSess     *mgo.Session
 }
 
 // NewMongodbCollector returns a new instance of a MongodbCollector.
@@ -97,22 +99,22 @@ func (exporter *MongodbCollector) getSession() *mgo.Session {
 	exporter.mongoSessLock.Lock()
 	defer exporter.mongoSessLock.Unlock()
 
-	if exporter.mongoSess != nil {
-		return exporter.mongoSess.Copy()
+	if exporter.mongoSess == nil {
+		exporter.mongoSess = shared.MongoSession(exporter.Opts.toSessionOps())
 	}
-	exporter.mongoSess = shared.MongoSession(exporter.Opts.toSessionOps())
-	if exporter.mongoSess != nil {
-		return exporter.mongoSess.Copy()
+	if exporter.mongoSess == nil {
+		return nil
 	}
-	return nil
+	return exporter.mongoSess.Copy()
 }
 
 // Close cleanly closes the mongo session if it exists.
 func (exporter *MongodbCollector) Close() {
+	exporter.mongoSessLock.Lock()
+	defer exporter.mongoSessLock.Unlock()
+
 	if exporter.mongoSess != nil {
-		exporter.mongoSessLock.Lock()
 		exporter.mongoSess.Close()
-		exporter.mongoSessLock.Unlock()
 	}
 }
 
@@ -170,7 +172,8 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 
 	mongoSess := exporter.getSession()
 	if mongoSess == nil {
-		log.Errorf("can't create mongo session to %s", exporter.Opts.URI)
+		err = fmt.Errorf("Can't create mongo session to %s", exporter.Opts.URI)
+		log.Error(err)
 		return
 	}
 	defer mongoSess.Close()

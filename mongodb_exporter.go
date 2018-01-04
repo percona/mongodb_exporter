@@ -220,7 +220,7 @@ func registerCollector() *collector.MongodbCollector {
 		TLSPrivateKeyFile:     *tlsPrivateKeyF,
 		TLSCaFile:             *tlsCAF,
 		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
-		DbPoolLimit:           *dbPoolLimit,
+		DBPoolLimit:           *dbPoolLimit,
 	})
 	prometheus.MustRegister(mongodbCollector)
 	return mongodbCollector
