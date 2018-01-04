@@ -169,8 +169,10 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 	exporter.scrape(ch)
 
 	exporter.scrapesTotal.Collect(ch)
+	exporter.scrapeErrorsTotal.Collect(ch)
 	exporter.lastScrapeError.Collect(ch)
 	exporter.lastScrapeDurationSeconds.Collect(ch)
+	exporter.mongoUp.Collect(ch)
 }
 
 func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
@@ -194,14 +196,15 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 		return
 	}
 	defer mongoSess.Close()
-	exporter.mongoUp.Set(1)
 
 	var serverVersion string
 	serverVersion, err = shared.MongoSessionServerVersion(mongoSess)
 	if err != nil {
 		log.Errorf("Problem gathering the mongo server version: %s", err)
+		exporter.mongoUp.Set(0)
 		return
 	}
+	exporter.mongoUp.Set(1)
 
 	var nodeType string
 	nodeType, err = shared.MongoSessionNodeType(mongoSess)

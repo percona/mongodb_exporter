@@ -62,8 +62,10 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 		return nil
 	}
 
-	dialInfo.Direct = true // Force direct connection
+	// connect directly, fail faster, do not retry - for faster responses and accurate metrics, including mongoUp
+	dialInfo.Direct = true
 	dialInfo.Timeout = dialMongodbTimeout
+	dialInfo.FailFast = true
 
 	err = opts.configureDialInfoIfRequired(dialInfo)
 	if err != nil {
