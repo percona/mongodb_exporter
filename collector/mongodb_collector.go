@@ -38,6 +38,8 @@ type MongodbCollectorOpts struct {
 	TLSPrivateKeyFile     string
 	TLSCaFile             string
 	TLSHostnameValidation bool
+	CollectDatabaseMetrics   bool
+	CollectCollectionMetrics bool
 	DBPoolLimit           int
 }
 
@@ -221,6 +223,22 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 	if shardingStatus != nil {
 		shardingStatus.Export(ch)
 	}
+
+	if exporter.Opts.CollectDatabaseMetrics {
+		log.Debug("Collecting Database Status From Mongos")
+		dbStatList := collector_mongos.GetDatabaseStatList(session)
+		if dbStatList != nil {
+			dbStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectCollectionMetrics {
+		log.Debug("Collecting Collection Status From Mongos")
+		collStatList := collector_mongos.GetCollectionStatList(session)
+		if collStatList != nil {
+			collStatList.Export(ch)
+		}
+	}
 }
 
 func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- prometheus.Metric) {
@@ -228,6 +246,22 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 	serverStatus := collector_mongod.GetServerStatus(session)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
+	}
+
+	if exporter.Opts.CollectDatabaseMetrics {
+		log.Debug("Collecting Database Status From Mongod")
+		dbStatList := collector_mongod.GetDatabaseStatList(session)
+		if dbStatList != nil {
+			dbStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectCollectionMetrics {
+		log.Debug("Collecting Collection Status From Mongod")
+		collStatList := collector_mongod.GetCollectionStatList(session)
+		if collStatList != nil {
+			collStatList.Export(ch)
+		}
 	}
 }
 
