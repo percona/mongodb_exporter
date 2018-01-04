@@ -15,6 +15,7 @@
 package collector_mongod
 
 import (
+	"github.com/percona/mongodb_exporter/shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
@@ -22,6 +23,8 @@ import (
 )
 
 var (
+	oplogDb          = "local"
+	oplogCollection  = "oplog.rs"
 	oplogStatusCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "replset_oplog",
@@ -69,44 +72,44 @@ func BsonMongoTimestampToUnix(timestamp bson.MongoTimestamp) float64 {
 	return float64(timestamp >> 32)
 }
 
-func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
-	oplogTimestamps := &OplogTimestamps{}
+func getOplogTailOrHeadTimestamp(session *mgo.Session, returnHead bool) (float64, error) {
+	var result struct {
+		Timestamp bson.MongoTimestamp `bson:"ts"`
+	}
+
+	var sortCond string = "$natural"
+	if returnHead {
+		sortCond = "-$natural"
+	}
+
+	// retry once if there is an error
 	var err error
-
-	// retry once if there is an error
 	var tries int64 = 0
-	var head_result struct {
-		Timestamp bson.MongoTimestamp `bson:"ts"`
-	}
 	for tries < 2 {
-		err = session.DB("local").C("oplog.rs").Find(nil).Sort("-$natural").Limit(1).One(&head_result)
+		findQuery := session.DB(oplogDb).C(oplogCollection).Find(nil).Sort(sortCond).Limit(1)
+		err = shared.AddCodeCommentToQuery(findQuery).One(&result)
 		if err == nil {
 			break
 		}
 		tries += 1
 	}
-	if err != nil {
-		return oplogTimestamps, err
-	}
 
-	// retry once if there is an error
-	tries = 0
-	var tail_result struct {
-		Timestamp bson.MongoTimestamp `bson:"ts"`
-	}
-	for tries < 2 {
-		err = session.DB("local").C("oplog.rs").Find(nil).Sort("$natural").Limit(1).One(&tail_result)
-		if err == nil {
-			break
-		}
-		tries += 1
-	}
-	if err != nil {
-		return oplogTimestamps, err
-	}
+	return BsonMongoTimestampToUnix(result.Timestamp), err
+}
 
-	oplogTimestamps.Tail = BsonMongoTimestampToUnix(tail_result.Timestamp)
-	oplogTimestamps.Head = BsonMongoTimestampToUnix(head_result.Timestamp)
+func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
+	headTs, err := getOplogTailOrHeadTimestamp(session, true)
+	if err != nil {
+		return nil, err
+	}
+	tailTs, err := getOplogTailOrHeadTimestamp(session, false)
+	if err != nil {
+		return nil, err
+	}
+	oplogTimestamps := &OplogTimestamps{
+		Head: headTs,
+		Tail: tailTs,
+	}
 	return oplogTimestamps, err
 }
 
