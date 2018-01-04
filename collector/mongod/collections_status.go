@@ -1,8 +1,8 @@
 package collector_mongod
 
 import (
-	"github.com/prometheus/common/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -13,37 +13,37 @@ var (
 		Subsystem: "db_coll",
 		Name:      "size",
 		Help:      "The total size in memory of all records in a collection",
-	}, []string{"db","coll"})
+	}, []string{"db", "coll"})
 	collectionObjectCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "count",
 		Help:      "The number of objects or documents in this collection",
-	}, []string{"db","coll"})
+	}, []string{"db", "coll"})
 	collectionAvgObjSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "avgobjsize",
 		Help:      "The average size of an object in the collection (plus any padding)",
-	}, []string{"db","coll"})
+	}, []string{"db", "coll"})
 	collectionStorageSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "storage_size",
 		Help:      "The total amount of storage allocated to this collection for document storage",
-	}, []string{"db","coll"})
+	}, []string{"db", "coll"})
 	collectionIndexes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "indexes",
 		Help:      "The number of indexes on the collection",
-	}, []string{"db","coll"})
+	}, []string{"db", "coll"})
 	collectionIndexesSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "indexes_size",
 		Help:      "The total size of all indexes",
-	}, []string{"db","coll"})
+	}, []string{"db", "coll"})
 )
 
 // CollectionStatList contains stats from all collections
@@ -53,22 +53,21 @@ type CollectionStatList struct {
 
 // CollectionStatus represents stats about a collection in database (mongod and raw from mongos)
 type CollectionStatus struct {
-	Database    string 
+	Database    string
 	Name        string
-	Size        int    `bson:"size,omitempty"`
-	Count       int    `bson:"count,omitempty"`
-	AvgObjSize  int    `bson:"avgObjSize,omitempty"`
-	StorageSize int    `bson:"storageSize,omitempty"`
-	Indexes     int    `bson:"indexSizes,omitempty"`
-	IndexesSize int    `bson:"totalIndexSize,omitempty"`
+	Size        int `bson:"size,omitempty"`
+	Count       int `bson:"count,omitempty"`
+	AvgObjSize  int `bson:"avgObjSize,omitempty"`
+	StorageSize int `bson:"storageSize,omitempty"`
+	Indexes     int `bson:"indexSizes,omitempty"`
+	IndexesSize int `bson:"totalIndexSize,omitempty"`
 }
-
 
 // Export exports database stats to prometheus
 func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 	for _, member := range collStatList.Members {
-		ls := prometheus.Labels{ 
-			"db": member.Database,
+		ls := prometheus.Labels{
+			"db":   member.Database,
 			"coll": member.Name,
 		}
 		collectionSize.With(ls).Set(float64(member.Size))
@@ -105,7 +104,9 @@ func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
 		return nil
 	}
 	for _, db := range database_names {
-		if db == "admin" || db == "test" || db == "local" { continue }
+		if db == "admin" || db == "test" || db == "local" {
+			continue
+		}
 		collection_names, err := session.DB(db).CollectionNames()
 		if err != nil {
 			log.Error("Failed to get collection names for db=" + db)
@@ -120,7 +121,7 @@ func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
 				log.Error("Failed to get collection status.")
 				return nil
 			}
-			collectionStatList.Members = append(collectionStatList.Members,collStatus)
+			collectionStatList.Members = append(collectionStatList.Members, collStatus)
 		}
 	}
 

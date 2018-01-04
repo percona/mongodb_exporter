@@ -3,8 +3,8 @@ package collector_mongos
 import (
 	"strings"
 
-	"github.com/prometheus/common/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -42,7 +42,6 @@ var (
 	}, []string{"db", "shard"})
 )
 
-
 // DatabaseStatList contains stats from all databases
 type DatabaseStatList struct {
 	Members []DatabaseStatus
@@ -69,8 +68,8 @@ func (dbStatList *DatabaseStatList) Export(ch chan<- prometheus.Metric) {
 	for _, member := range dbStatList.Members {
 		if len(member.Shards) > 0 {
 			for shard, stats := range member.Shards {
-				ls := prometheus.Labels{ 
-					"db": stats.Name,
+				ls := prometheus.Labels{
+					"db":    stats.Name,
 					"shard": strings.Split(shard, "/")[0],
 				}
 				indexSize.With(ls).Set(float64(stats.IndexSize))
@@ -113,14 +112,16 @@ func GetDatabaseStatList(session *mgo.Session) *DatabaseStatList {
 		return nil
 	}
 	for _, db := range database_names {
-		if db == "admin" || db == "test" || db == "local" { continue }
+		if db == "admin" || db == "test" || db == "local" {
+			continue
+		}
 		dbStatus := DatabaseStatus{}
 		err := session.DB(db).Run(bson.D{{"dbStats", 1}, {"scale", 1}}, &dbStatus)
 		if err != nil {
 			log.Error("Failed to get database status.")
 			return nil
 		}
-		dbStatList.Members = append(dbStatList.Members,dbStatus)
+		dbStatList.Members = append(dbStatList.Members, dbStatus)
 	}
 
 	return dbStatList

@@ -1,8 +1,8 @@
 package collector_mongod
 
 import (
-	"github.com/prometheus/common/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -40,7 +40,6 @@ var (
 	}, []string{"db"})
 )
 
-
 // DatabaseStatList contains stats from all databases
 type DatabaseStatList struct {
 	Members []DatabaseStatus
@@ -59,7 +58,7 @@ type DatabaseStatus struct {
 // Export exports database stats to prometheus
 func (dbStatList *DatabaseStatList) Export(ch chan<- prometheus.Metric) {
 	for _, member := range dbStatList.Members {
-		ls := prometheus.Labels{ "db": member.Name }
+		ls := prometheus.Labels{"db": member.Name}
 		indexSize.With(ls).Set(float64(member.IndexSize))
 		dataSize.With(ls).Set(float64(member.DataSize))
 		collectionsTotal.With(ls).Set(float64(member.Collections))
@@ -92,14 +91,16 @@ func GetDatabaseStatList(session *mgo.Session) *DatabaseStatList {
 		return nil
 	}
 	for _, db := range database_names {
-		if db == "admin" || db == "test" || db == "local" { continue }
+		if db == "admin" || db == "test" || db == "local" {
+			continue
+		}
 		dbStatus := DatabaseStatus{}
 		err := session.DB(db).Run(bson.D{{"dbStats", 1}, {"scale", 1}}, &dbStatus)
 		if err != nil {
 			log.Error("Failed to get database status.")
 			return nil
 		}
-		dbStatList.Members = append(dbStatList.Members,dbStatus)
+		dbStatList.Members = append(dbStatList.Members, dbStatus)
 	}
 
 	return dbStatList
