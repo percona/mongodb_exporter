@@ -52,8 +52,9 @@ var (
 	sslCertFileF   = flag.String("web.ssl-cert-file", "", "Path to SSL certificate file.")
 	sslKeyFileF    = flag.String("web.ssl-key-file", "", "Path to SSL key file.")
 
-	DbF      = flag.Bool("collect.database", false, "Enable collection of Database metrics")
-	CollF    = flag.Bool("collect.collection", false, "Enable collection of Collection metrics")
+	collectDatabaseF   = flag.Bool("collect.database", false, "Enable collection of Database metrics")
+	collectCollectionF = flag.Bool("collect.collection", false, "Enable collection of Collection metrics")
+
 	uriF     = flag.String("mongodb.uri", mongodbDefaultURI(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
 	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).\n"+
@@ -64,8 +65,7 @@ var (
 		"    \tIf provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.\n"+
 		"    \tIf not provided: System default CAs are used.")
 	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
-
-	dbPoolLimit = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
+	maxConnectionsF               = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
 
 	// FIXME currently ignored
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
@@ -222,9 +222,9 @@ func registerCollector() *collector.MongodbCollector {
 		TLSPrivateKeyFile:        *tlsPrivateKeyF,
 		TLSCaFile:                *tlsCAF,
 		TLSHostnameValidation:    !(*tlsDisableHostnameValidationF),
-		DBPoolLimit:              *dbPoolLimit,
-		CollectDatabaseMetrics:   *DbF,
-		CollectCollectionMetrics: *CollF,
+		DBPoolLimit:              *maxConnectionsF,
+		CollectDatabaseMetrics:   *collectDatabaseF,
+		CollectCollectionMetrics: *collectCollectionF,
 	})
 	prometheus.MustRegister(mongodbCollector)
 	return mongodbCollector
