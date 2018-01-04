@@ -41,3 +41,4 @@ message Multi1 {
   optional Multi2.Color color = 2;
   optional Multi3.HatType hat_type = 3;
 }
+

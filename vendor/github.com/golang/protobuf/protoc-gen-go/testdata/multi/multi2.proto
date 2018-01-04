@@ -43,3 +43,4 @@ message Multi2 {
   };
   optional Color color = 2;
 }
+

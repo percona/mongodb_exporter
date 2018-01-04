@@ -190,10 +190,10 @@ my_summary{n1="val3", quantile="0.2"} 4711
   my_summary{n1="val1",n2="val2",quantile="-12.34",} NaN
 # some
 # funny comments
-# HELP
+# HELP 
 # HELP
 # HELP my_summary
-# HELP my_summary
+# HELP my_summary 
 `,
 			out: []*dto.MetricFamily{
 				&dto.MetricFamily{
@@ -558,6 +558,11 @@ metric 4.12
 metric_bucket{le="bla"} 3.14
 `,
 			err: "text format parsing error in line 3: expected float as value for 'le' label",
+		},
+		// 19: Invalid UTF-8 in label value.
+		{
+			in:  "metric{l=\"\xbd\"} 3.14\n",
+			err: "text format parsing error in line 1: invalid label value \"\\xbd\"",
 		},
 	}
 
