@@ -85,7 +85,7 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 }
 
 func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
-	if opts.TLSConnection == true {
+	if opts.TLSConnection {
 		config := &tls.Config{
 			InsecureSkipVerify: !opts.TLSHostnameValidation,
 		}
