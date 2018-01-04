@@ -60,8 +60,10 @@ type MongodbCollector struct {
 	Opts MongodbCollectorOpts
 
 	scrapesTotal              prometheus.Counter
+	scrapeErrorsTotal         prometheus.Counter
 	lastScrapeError           prometheus.Gauge
 	lastScrapeDurationSeconds prometheus.Gauge
+	mongoUp                   prometheus.Gauge
 
 	mongoSessLock sync.Mutex
 	mongoSess     *mgo.Session
@@ -78,6 +80,12 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 			Name:      "scrapes_total",
 			Help:      "Total number of times MongoDB was scraped for metrics.",
 		}),
+		scrapeErrorsTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "exporter",
+			Name:      "scrape_errors_total",
+			Help:      "Total number of times an error occurred scraping a MongoDB.",
+		}),
 		lastScrapeError: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: "exporter",
@@ -89,6 +97,11 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 			Subsystem: "exporter",
 			Name:      "last_scrape_duration_seconds",
 			Help:      "Duration of the last scrape of metrics from MongoDB.",
+		}),
+		mongoUp: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "up",
+			Help:      "Whether MongoDB is up.",
 		}),
 	}
 
@@ -168,6 +181,7 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 		if err == nil {
 			exporter.lastScrapeError.Set(0)
 		} else {
+			exporter.scrapeErrorsTotal.Inc()
 			exporter.lastScrapeError.Set(1)
 		}
 	}(time.Now())
@@ -176,9 +190,11 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 	if mongoSess == nil {
 		err = fmt.Errorf("Can't create mongo session to %s", exporter.Opts.URI)
 		log.Error(err)
+		exporter.mongoUp.Set(0)
 		return
 	}
 	defer mongoSess.Close()
+	exporter.mongoUp.Set(1)
 
 	var serverVersion string
 	serverVersion, err = shared.MongoSessionServerVersion(mongoSess)
