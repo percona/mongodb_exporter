@@ -15,17 +15,26 @@
 package collector
 
 import (
+	"os"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+func testMongoURL() string {
+	val, exists := os.LookupEnv("TEST_MONGODB_URL")
+	if exists {
+		return val
+	}
+	return "mongodb://localhost:27017"
+}
 
 func TestCollector(t *testing.T) {
 	if testing.Short() {
 		t.Skip("-short is passed, skipping integration test")
 	}
 
-	collector := NewMongodbCollector(MongodbCollectorOpts{URI: "mongodb://localhost:27017"})
+	collector := NewMongodbCollector(MongodbCollectorOpts{URI: testMongoURL()})
 
 	descCh := make(chan *prometheus.Desc)
 	go func() {
