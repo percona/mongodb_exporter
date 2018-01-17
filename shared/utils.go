@@ -42,6 +42,8 @@ func LoadKeyPairFrom(pemFile string, privateKeyPemFile string) (tls.Certificate,
 	return tls.LoadX509KeyPair(pemFile, targetPrivateKeyPemFile)
 }
 
+// AddCodeCommentToQuery adds location of the caller in the source code (e.g. "oplog_status.go:91")
+// to the given query as a comment.
 func AddCodeCommentToQuery(query *mgo.Query) *mgo.Query {
 	_, fileName, lineNum, ok := runtime.Caller(1)
 	if !ok {
