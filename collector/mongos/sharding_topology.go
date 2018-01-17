@@ -132,7 +132,7 @@ func (status *ShardingTopoStats) Export(ch chan<- prometheus.Metric) {
 	if status.Shards != nil {
 		var drainingShards float64 = 0
 		for _, shard := range *status.Shards {
-			if shard.Draining == true {
+			if shard.Draining {
 				drainingShards = drainingShards + 1
 			}
 		}

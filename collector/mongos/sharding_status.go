@@ -114,7 +114,7 @@ func IsBalancerEnabled(session *mgo.Session) float64 {
 	if err != nil {
 		return 1
 	}
-	if balancerConfig.Stopped == true {
+	if balancerConfig.Stopped {
 		return 0
 	}
 	return 1

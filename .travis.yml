@@ -14,6 +14,7 @@ env:
   - MONGODB_IMAGE=mongo:3.4
   - MONGODB_IMAGE=mongo:3.6
   - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
+  - MONGODB_IMAGE=perconalab/percona-server-mongodb:3.6
 
 services:
   - docker

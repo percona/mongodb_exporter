@@ -52,6 +52,7 @@ type MongoSessionOpts struct {
 	TLSPrivateKeyFile     string
 	TLSCaFile             string
 	TLSHostnameValidation bool
+	PoolLimit             int
 }
 
 func MongoSession(opts MongoSessionOpts) *mgo.Session {
@@ -61,8 +62,10 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 		return nil
 	}
 
-	dialInfo.Direct = true // Force direct connection
+	// connect directly, fail faster, do not retry - for faster responses and accurate metrics, including mongoUp
+	dialInfo.Direct = true
 	dialInfo.Timeout = dialMongodbTimeout
+	dialInfo.FailFast = true
 
 	err = opts.configureDialInfoIfRequired(dialInfo)
 	if err != nil {
@@ -76,13 +79,15 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 		return nil
 	}
 	session.SetMode(mgo.Eventual, true)
+	session.SetPoolLimit(opts.PoolLimit)
+	session.SetPrefetch(0.00)
 	session.SetSyncTimeout(syncMongodbTimeout)
-	session.SetSocketTimeout(0)
+	session.SetSocketTimeout(dialMongodbTimeout)
 	return session
 }
 
 func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
-	if opts.TLSConnection == true {
+	if opts.TLSConnection {
 		config := &tls.Config{
 			InsecureSkipVerify: !opts.TLSHostnameValidation,
 		}

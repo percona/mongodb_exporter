@@ -15,8 +15,8 @@
 package collector
 
 import (
-	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,12 +32,15 @@ const namespace = "mongodb"
 
 // MongodbCollectorOpts is the options of the mongodb collector.
 type MongodbCollectorOpts struct {
-	URI                   string
-	TLSConnection         bool
-	TLSCertificateFile    string
-	TLSPrivateKeyFile     string
-	TLSCaFile             string
-	TLSHostnameValidation bool
+	URI                      string
+	TLSConnection            bool
+	TLSCertificateFile       string
+	TLSPrivateKeyFile        string
+	TLSCaFile                string
+	TLSHostnameValidation    bool
+	DBPoolLimit              int
+	CollectDatabaseMetrics   bool
+	CollectCollectionMetrics bool
 }
 
 func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
@@ -48,15 +51,22 @@ func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
 		TLSPrivateKeyFile:     in.TLSPrivateKeyFile,
 		TLSCaFile:             in.TLSCaFile,
 		TLSHostnameValidation: in.TLSHostnameValidation,
+		PoolLimit:             in.DBPoolLimit,
 	}
 }
 
 // MongodbCollector is in charge of collecting mongodb's metrics.
 type MongodbCollector struct {
-	Opts                      MongodbCollectorOpts
+	Opts MongodbCollectorOpts
+
 	scrapesTotal              prometheus.Counter
+	scrapeErrorsTotal         prometheus.Counter
 	lastScrapeError           prometheus.Gauge
 	lastScrapeDurationSeconds prometheus.Gauge
+	mongoUp                   prometheus.Gauge
+
+	mongoSessLock sync.Mutex
+	mongoSess     *mgo.Session
 }
 
 // NewMongodbCollector returns a new instance of a MongodbCollector.
@@ -70,6 +80,12 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 			Name:      "scrapes_total",
 			Help:      "Total number of times MongoDB was scraped for metrics.",
 		}),
+		scrapeErrorsTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "exporter",
+			Name:      "scrape_errors_total",
+			Help:      "Total number of times an error occurred scraping a MongoDB.",
+		}),
 		lastScrapeError: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: "exporter",
@@ -82,9 +98,39 @@ func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
 			Name:      "last_scrape_duration_seconds",
 			Help:      "Duration of the last scrape of metrics from MongoDB.",
 		}),
+		mongoUp: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "up",
+			Help:      "Whether MongoDB is up.",
+		}),
 	}
 
 	return exporter
+}
+
+// getSession returns the cached *mgo.Session or creates a new session and returns it.
+// Use sync.Mutex to avoid race condition around session creation.
+func (exporter *MongodbCollector) getSession() *mgo.Session {
+	exporter.mongoSessLock.Lock()
+	defer exporter.mongoSessLock.Unlock()
+
+	if exporter.mongoSess == nil {
+		exporter.mongoSess = shared.MongoSession(exporter.Opts.toSessionOps())
+	}
+	if exporter.mongoSess == nil {
+		return nil
+	}
+	return exporter.mongoSess.Copy()
+}
+
+// Close cleanly closes the mongo session if it exists.
+func (exporter *MongodbCollector) Close() {
+	exporter.mongoSessLock.Lock()
+	defer exporter.mongoSessLock.Unlock()
+
+	if exporter.mongoSess != nil {
+		exporter.mongoSess.Close()
+	}
 }
 
 // Describe sends the super-set of all possible descriptors of metrics collected by this Collector
@@ -123,8 +169,10 @@ func (exporter *MongodbCollector) Collect(ch chan<- prometheus.Metric) {
 	exporter.scrape(ch)
 
 	exporter.scrapesTotal.Collect(ch)
+	exporter.scrapeErrorsTotal.Collect(ch)
 	exporter.lastScrapeError.Collect(ch)
 	exporter.lastScrapeDurationSeconds.Collect(ch)
+	exporter.mongoUp.Collect(ch)
 }
 
 func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
@@ -135,13 +183,16 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 		if err == nil {
 			exporter.lastScrapeError.Set(0)
 		} else {
+			exporter.scrapeErrorsTotal.Inc()
 			exporter.lastScrapeError.Set(1)
 		}
 	}(time.Now())
 
-	mongoSess := shared.MongoSession(exporter.Opts.toSessionOps())
+	mongoSess := exporter.getSession()
 	if mongoSess == nil {
-		err = errors.New("can't create mongo session")
+		err = fmt.Errorf("Can't create mongo session to %s", exporter.Opts.URI)
+		log.Error(err)
+		exporter.mongoUp.Set(0)
 		return
 	}
 	defer mongoSess.Close()
@@ -150,8 +201,10 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 	serverVersion, err = shared.MongoSessionServerVersion(mongoSess)
 	if err != nil {
 		log.Errorf("Problem gathering the mongo server version: %s", err)
+		exporter.mongoUp.Set(0)
 		return
 	}
+	exporter.mongoUp.Set(1)
 
 	var nodeType string
 	nodeType, err = shared.MongoSessionNodeType(mongoSess)
@@ -189,6 +242,22 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 	if shardingStatus != nil {
 		shardingStatus.Export(ch)
 	}
+
+	if exporter.Opts.CollectDatabaseMetrics {
+		log.Debug("Collecting Database Status From Mongos")
+		dbStatList := collector_mongos.GetDatabaseStatList(session)
+		if dbStatList != nil {
+			dbStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectCollectionMetrics {
+		log.Debug("Collecting Collection Status From Mongos")
+		collStatList := collector_mongos.GetCollectionStatList(session)
+		if collStatList != nil {
+			collStatList.Export(ch)
+		}
+	}
 }
 
 func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- prometheus.Metric) {
@@ -196,6 +265,22 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 	serverStatus := collector_mongod.GetServerStatus(session)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
+	}
+
+	if exporter.Opts.CollectDatabaseMetrics {
+		log.Debug("Collecting Database Status From Mongod")
+		dbStatList := collector_mongod.GetDatabaseStatList(session)
+		if dbStatList != nil {
+			dbStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectCollectionMetrics {
+		log.Debug("Collecting Collection Status From Mongod")
+		collStatList := collector_mongod.GetCollectionStatList(session)
+		if collStatList != nil {
+			collStatList.Export(ch)
+		}
 	}
 }
 
