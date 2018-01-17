@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.5.0 (not released yet)
+
 ## v0.4.0 (2017-01-17)
 
 * New flags `-collect.database` and `-collect.collection` can be used to enable collection of database and collection
