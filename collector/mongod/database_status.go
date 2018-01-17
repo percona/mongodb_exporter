@@ -91,9 +91,6 @@ func GetDatabaseStatList(session *mgo.Session) *DatabaseStatList {
 		return nil
 	}
 	for _, db := range database_names {
-		if db == "admin" || db == "test" || db == "local" {
-			continue
-		}
 		dbStatus := DatabaseStatus{}
 		err := session.DB(db).Run(bson.D{{"dbStats", 1}, {"scale", 1}}, &dbStatus)
 		if err != nil {

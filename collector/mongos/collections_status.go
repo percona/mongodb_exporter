@@ -104,9 +104,6 @@ func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
 		return nil
 	}
 	for _, db := range database_names {
-		if db == "admin" || db == "test" || db == "local" {
-			continue
-		}
 		collection_names, err := session.DB(db).CollectionNames()
 		if err != nil {
 			log.Error("Failed to get collection names for db=" + db)
