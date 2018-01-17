@@ -83,18 +83,8 @@ func getOplogTailOrHeadTimestamp(session *mgo.Session, returnHead bool) (float64
 		sortCond = "-$natural"
 	}
 
-	// retry once if there is an error
-	var err error
-	var tries int64 = 0
-	for tries < 2 {
-		findQuery := session.DB(oplogDb).C(oplogCollection).Find(nil).Sort(sortCond).Limit(1)
-		err = shared.AddCodeCommentToQuery(findQuery).One(&result)
-		if err == nil {
-			break
-		}
-		tries += 1
-	}
-
+	findQuery := session.DB(oplogDb).C(oplogCollection).Find(nil).Sort(sortCond).Limit(1)
+	err := shared.AddCodeCommentToQuery(findQuery).One(&result)
 	return BsonMongoTimestampToUnix(result.Timestamp), err
 }
 
