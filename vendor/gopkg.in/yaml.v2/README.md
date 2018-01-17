@@ -48,6 +48,8 @@ The yaml package is licensed under the Apache License 2.0. Please see the LICENS
 Example
 -------
 
+Some more examples can be found in the "examples" folder.
+
 ```Go
 package main
 
@@ -75,27 +77,27 @@ type T struct {
 
 func main() {
         t := T{}
-
+    
         err := yaml.Unmarshal([]byte(data), &t)
         if err != nil {
                 log.Fatalf("error: %v", err)
         }
         fmt.Printf("--- t:\n%v\n\n", t)
-
+    
         d, err := yaml.Marshal(&t)
         if err != nil {
                 log.Fatalf("error: %v", err)
         }
         fmt.Printf("--- t dump:\n%s\n\n", string(d))
-
+    
         m := make(map[interface{}]interface{})
-
+    
         err = yaml.Unmarshal([]byte(data), &m)
         if err != nil {
                 log.Fatalf("error: %v", err)
         }
         fmt.Printf("--- m:\n%v\n\n", m)
-
+    
         d, err = yaml.Marshal(&m)
         if err != nil {
                 log.Fatalf("error: %v", err)
@@ -128,3 +130,4 @@ b:
   - 3
   - 4
 ```
+

@@ -25,18 +25,18 @@ import (
 )
 
 func init() {
-	setEventlogFormatter = func(name string, debugAsInfo bool) error {
+	setEventlogFormatter = func(l logger, name string, debugAsInfo bool) error {
 		if name == "" {
 			return fmt.Errorf("missing name parameter")
 		}
 
-		fmter, err := newEventlogger(name, debugAsInfo, origLogger.Formatter)
+		fmter, err := newEventlogger(name, debugAsInfo, l.entry.Logger.Formatter)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating eventlog formatter: %v\n", err)
-			origLogger.Errorf("can't connect logger to eventlog: %v", err)
+			l.Errorf("can't connect logger to eventlog: %v", err)
 			return err
 		}
-		origLogger.Formatter = fmter
+		l.entry.Logger.Formatter = fmter
 		return nil
 	}
 }

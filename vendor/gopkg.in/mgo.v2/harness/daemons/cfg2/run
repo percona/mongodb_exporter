@@ -5,3 +5,4 @@
 exec mongod $COMMONCOPTS \
 	--port 40102 \
 	--configsvr
+

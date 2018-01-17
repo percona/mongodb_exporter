@@ -19,9 +19,13 @@ import (
 	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 var (
+	oplogDb          = "local"
+	oplogCollection  = "oplog.rs"
 	oplogStatusCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "replset_oplog",
@@ -69,44 +73,34 @@ func BsonMongoTimestampToUnix(timestamp bson.MongoTimestamp) float64 {
 	return float64(timestamp >> 32)
 }
 
+func getOplogTailOrHeadTimestamp(session *mgo.Session, returnHead bool) (float64, error) {
+	var result struct {
+		Timestamp bson.MongoTimestamp `bson:"ts"`
+	}
+
+	var sortCond string = "$natural"
+	if returnHead {
+		sortCond = "-$natural"
+	}
+
+	findQuery := session.DB(oplogDb).C(oplogCollection).Find(nil).Sort(sortCond).Limit(1)
+	err := shared.AddCodeCommentToQuery(findQuery).One(&result)
+	return BsonMongoTimestampToUnix(result.Timestamp), err
+}
+
 func GetOplogTimestamps(session *mgo.Session) (*OplogTimestamps, error) {
-	oplogTimestamps := &OplogTimestamps{}
-	var err error
-
-	// retry once if there is an error
-	var tries int64 = 0
-	var head_result struct {
-		Timestamp bson.MongoTimestamp `bson:"ts"`
-	}
-	for tries < 2 {
-		err = session.DB("local").C("oplog.rs").Find(nil).Sort("-$natural").Limit(1).One(&head_result)
-		if err == nil {
-			break
-		}
-		tries += 1
-	}
+	headTs, err := getOplogTailOrHeadTimestamp(session, true)
 	if err != nil {
-		return oplogTimestamps, err
+		return nil, err
 	}
-
-	// retry once if there is an error
-	tries = 0
-	var tail_result struct {
-		Timestamp bson.MongoTimestamp `bson:"ts"`
-	}
-	for tries < 2 {
-		err = session.DB("local").C("oplog.rs").Find(nil).Sort("$natural").Limit(1).One(&tail_result)
-		if err == nil {
-			break
-		}
-		tries += 1
-	}
+	tailTs, err := getOplogTailOrHeadTimestamp(session, false)
 	if err != nil {
-		return oplogTimestamps, err
+		return nil, err
 	}
-
-	oplogTimestamps.Tail = BsonMongoTimestampToUnix(tail_result.Timestamp)
-	oplogTimestamps.Head = BsonMongoTimestampToUnix(head_result.Timestamp)
+	oplogTimestamps := &OplogTimestamps{
+		Head: headTs,
+		Tail: tailTs,
+	}
 	return oplogTimestamps, err
 }
 

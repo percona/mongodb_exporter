@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.0 (2017-01-17)
+
+* New flags `-collect.database` and `-collect.collection` can be used to enable collection of database and collection
+  metrics. They are disabled by default.
+* MongoDB connections are now kept between the scrapes. New flag `-mongodb.max-connections` (with the default value `1`)
+  controls the maximum number of established connections.
+* Add standard metrics:
+  * `mongodb_scrape_errors_total`
+  * `mongodb_up`
+* Some queries now contain [cursor comments](https://www.percona.com/blog/2017/06/21/tracing-mongodb-queries-to-code-with-cursor-comments/)
+  with source code locations.
+* Go vendoring switched to [dep](https://github.com/golang/dep).
+
 ## v0.3.1 (2017-09-08)
 
 * Better logging for scrape errors.

@@ -31,12 +31,6 @@ var (
 		Name:      "total",
 		Help:      "The value of totalTime represents the time, in microseconds, since the database last started and creation of the globalLock. This is roughly equivalent to total server uptime",
 	})
-	globalLockLockTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "global_lock",
-		Name:      "lock_total",
-		Help:      "The value of lockTime represents the time, in microseconds, since the database last started, that the globalLock has been held",
-	})
 )
 var (
 	globalLockCurrentQueue = prometheus.NewGaugeVec(prometheus.GaugeOpts{
