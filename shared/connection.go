@@ -33,6 +33,10 @@ const (
 
 func RedactMongoUri(uri string) string {
 	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
+		if strings.Contains(uri, "ssl=true") {
+			uri = strings.Replace(uri, "ssl=true", "", 1)
+
+		}
 		dialInfo, err := mgo.ParseURL(uri)
 		if err != nil {
 			log.Errorf("Cannot parse mongodb server url: %s", err)
