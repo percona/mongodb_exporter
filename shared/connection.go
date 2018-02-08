@@ -48,6 +48,7 @@ func RedactMongoUri(uri string) string {
 type MongoSessionOpts struct {
 	URI                   string
 	TLSConnection         bool
+	TLSBasicConnection    bool
 	TLSCertificateFile    string
 	TLSPrivateKeyFile     string
 	TLSCaFile             string
@@ -56,6 +57,10 @@ type MongoSessionOpts struct {
 }
 
 func MongoSession(opts MongoSessionOpts) *mgo.Session {
+	if strings.Contains(opts.URI, "ssl=true") {
+		opts.URI = strings.Replace(opts.URI, "ssl=true", "", 1)
+		opts.TLSBasicConnection = true
+	}
 	dialInfo, err := mgo.ParseURL(opts.URI)
 	if err != nil {
 		log.Errorf("Cannot parse mongodb server url: %s", err)
@@ -87,10 +92,9 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 }
 
 func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
-	if opts.TLSConnection {
-		config := &tls.Config{
-			InsecureSkipVerify: !opts.TLSHostnameValidation,
-		}
+	config := &tls.Config{}
+	if opts.TLSConnection && !opts.TLSBasicConnection {
+		config.InsecureSkipVerify = !opts.TLSHostnameValidation
 		if len(opts.TLSCertificateFile) > 0 {
 			certificates, err := LoadKeyPairFrom(opts.TLSCertificateFile, opts.TLSPrivateKeyFile)
 			if err != nil {
@@ -105,20 +109,20 @@ func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo)
 			}
 			config.RootCAs = ca
 		}
-		dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-			conn, err := tls.Dial("tcp", addr.String(), config)
-			if err != nil {
-				log.Errorf("Could not connect to %v. Got: %v", addr, err)
-				return nil, err
-			}
-			if config.InsecureSkipVerify {
-				err = enrichWithOwnChecks(conn, config)
-				if err != nil {
-					log.Errorf("Could not disable hostname validation. Got: %v", err)
-				}
-			}
-			return conn, err
+	}
+	dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
+		conn, err := tls.Dial("tcp", addr.String(), config)
+		if err != nil {
+			log.Errorf("Could not connect to %v. Got: %v", addr, err)
+			return nil, err
 		}
+		if config.InsecureSkipVerify && !opts.TLSBasicConnection {
+			err = enrichWithOwnChecks(conn, config)
+			if err != nil {
+				log.Errorf("Could not disable hostname validation. Got: %v", err)
+			}
+		}
+		return conn, err
 	}
 	return nil
 }
