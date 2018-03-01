@@ -24,16 +24,18 @@ services:
   - docker
 
 before_script:
-  # wait for MongoDB to become available
+  # Start docker containers.
+  - docker-compose up -d
+  # Wait for MongoDB to become available.
   - |
     until docker-compose exec mongo mongo --quiet --eval 'db.runCommand("ping").ok' > /dev/null; do
       >&2 echo "MongoDB is unavailable - sleeping"
       sleep 1
     done
     >&2 echo "MongoDB is up"
+  # Display versions.
   - docker --version
   - docker-compose --version
-  - docker-compose up -d
   - docker-compose exec mongo mongo --version
 
 script:
