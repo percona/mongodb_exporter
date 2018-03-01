@@ -34,6 +34,8 @@ before_script:
       sleep 1
     done
     >&2 echo "MongoDB is up"
+  # Display logs for debug purposes.
+  - docker-compose logs
   # Display versions.
   - docker --version
   - docker-compose --version
@@ -51,3 +53,4 @@ notifications:
     on_failure: always
     rooms:
       secure: updWrOALfF29z30ogJ4m21WX0oOSYbRX/+abuEqXCC9zZ2QI7EoRR61hrAgNXJXUTffmUIM0vCrToYlybMsdcZHwCXWN8vr2yW3fyypfs/+rUng1qigEy1wVVIFgAC/6NruhmuUMWo1qwe4tUenQmegBiSpYRVRI10Qsnj6TggCNVz0cuoxpmzpVvNH78s1elnU4P1REWhjStuqQvKgG5cWOsvI+9l2Z+t9HdpYE7E7N3Ec73t2Z4wKhlpScbLF+mhnTWV6zgCkLaVdMshFeBEuYWmRr3D2QJWMntl/DrVaRoW76kX9nm2PQ/P4q0BdQslf5WsAiONWPOOWqK6n9RM9SegGSEXnXiqkWtmJQspa3zhjkNZStaD/g5E4yP5QnTbk4WP8ma18yQfMthXeQiQOEWj6zOTzBslu6Iyyc9QzbNijnYy3ZBBBAWGaKjFKmTrMTgl19SbAsvgi41A+zrVL5LeCwAR0/2QUdMegHZSla9WBiURgT/quA8EnA3N+ObNQBpqBETJmSPpJbqrkZI8+7oo4nFxLkwCRVyI4/XInTl5aKsRNYP95kPX3zJuUEe8x39qYhG5QcGV8G8AK0B+jrGoEB2qSN2p+Ye1XE6+Z38KktVzM3GmMOt/v+ts1ZjiaZvK0zlb7vRTMuiBmAjAnB5l5vmNSjkP6+ZL832Og=
+  email: false
