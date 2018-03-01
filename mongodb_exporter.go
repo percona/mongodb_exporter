@@ -163,6 +163,9 @@ func testMongoDBConnection() error {
 		TLSCaFile:             *tlsCAF,
 		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
 	})
+	if sess == nil {
+		return fmt.Errorf("Cannot connect using uri: %s", *uriF)
+	}
 	buildInfo, err := sess.BuildInfo()
 	if err != nil {
 		return fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", *uriF, err)
