@@ -23,6 +23,7 @@ before_script:
   - docker --version
   - docker-compose --version
   - docker-compose up -d
+  - docker-compose exec mongo mongo --version
 
 script:
   - make format build testall
