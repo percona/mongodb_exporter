@@ -17,6 +17,7 @@ package main
 import (
 	"crypto/subtle"
 	"crypto/tls"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -31,6 +32,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/percona/mongodb_exporter/collector"
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 const (
@@ -66,6 +68,7 @@ var (
 		"    \tIf not provided: System default CAs are used.")
 	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
 	maxConnectionsF               = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
+	testF                         = flag.Bool("test", false, "Check MongoDB connection and return buildInfo().")
 
 	// FIXME currently ignored
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
@@ -151,12 +154,30 @@ func prometheusHandler() http.Handler {
 	return handler
 }
 
-func startWebServer() {
-	uri := os.Getenv("MONGODB_URI")
-	if uri != "" {
-		uriF = &uri
+func testMongoDBConnection() error {
+	sess := shared.MongoSession(shared.MongoSessionOpts{
+		URI:                   *uriF,
+		TLSConnection:         *tlsF,
+		TLSCertificateFile:    *tlsCertF,
+		TLSPrivateKeyFile:     *tlsPrivateKeyF,
+		TLSCaFile:             *tlsCAF,
+		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
+	})
+	buildInfo, err := sess.BuildInfo()
+	if err != nil {
+		return fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", *uriF, err)
 	}
 
+	b, err := json.MarshalIndent(buildInfo, "", "  ")
+	if err != nil {
+		return fmt.Errorf("Cannot create json: %s", err)
+	}
+	fmt.Println(string(b))
+
+	return nil
+}
+
+func startWebServer() {
 	handler := prometheusHandler()
 	collector := registerCollector()
 	defer collector.Close()
@@ -239,6 +260,18 @@ func main() {
 	}
 	flag.Parse()
 
+	uri := os.Getenv("MONGODB_URI")
+	if uri != "" {
+		uriF = &uri
+	}
+
+	if *testF {
+		err := testMongoDBConnection()
+		if err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	if *versionF {
 		fmt.Println(version.Print(program))
 		os.Exit(0)
