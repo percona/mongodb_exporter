@@ -9,6 +9,7 @@ go:
 matrix:
   allow_failures:
     - go: master
+    - env: MONGODB_IMAGE=perconalab/percona-server-mongodb:3.6
 
 env:
   - MONGODB_IMAGE=mongo:3.0
