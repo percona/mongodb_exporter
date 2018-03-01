@@ -239,6 +239,7 @@ func testTestFlag(t *testing.T, data bin) {
 
 	b, err := cmd.CombinedOutput()
 	if err != nil {
+		t.Log(string(b))
 		t.Fatal(err)
 	}
 	buildInfo := mgo.BuildInfo{}
