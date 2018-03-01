@@ -78,7 +78,7 @@ func TestBin(t *testing.T) {
 		testTestFlag,
 	}
 
-	portStart := 66000
+	portStart := 56000
 	t.Run(binName, func(t *testing.T) {
 		for _, f := range tests {
 			f := f // capture range variable
@@ -163,7 +163,6 @@ func testLandingPage(t *testing.T, data bin) {
 		data.path,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
 	)
-	cmd.Env = append(os.Environ(), "DATA_SOURCE_NAME=127.0.0.1:3306")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -247,9 +246,8 @@ func testTestFlag(t *testing.T, data bin) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Print(string(b))
 
-	if !reflect.DeepEqual(buildInfo, mgo.BuildInfo{}) {
+	if reflect.DeepEqual(buildInfo, mgo.BuildInfo{}) {
 		t.Fatalf("buildInfo is empty")
 	}
 }
