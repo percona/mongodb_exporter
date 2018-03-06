@@ -68,7 +68,7 @@ var (
 		"    \tIf not provided: System default CAs are used.")
 	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Do hostname validation for server connection.")
 	maxConnectionsF               = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
-	testF                         = flag.Bool("test", false, "Check MongoDB connection and return buildInfo().")
+	testF                         = flag.Bool("test", false, "Check MongoDB connection, print buildInfo() information and exit.")
 
 	// FIXME currently ignored
 	enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
@@ -154,7 +154,7 @@ func prometheusHandler() http.Handler {
 	return handler
 }
 
-func testMongoDBConnection() error {
+func testMongoDBConnection() ([]byte, error) {
 	sess := shared.MongoSession(shared.MongoSessionOpts{
 		URI:                   *uriF,
 		TLSConnection:         *tlsF,
@@ -164,20 +164,19 @@ func testMongoDBConnection() error {
 		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
 	})
 	if sess == nil {
-		return fmt.Errorf("Cannot connect using uri: %s", *uriF)
+		return nil, fmt.Errorf("Cannot connect using uri: %s", *uriF)
 	}
 	buildInfo, err := sess.BuildInfo()
 	if err != nil {
-		return fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", *uriF, err)
+		return nil, fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", *uriF, err)
 	}
 
 	b, err := json.MarshalIndent(buildInfo, "", "  ")
 	if err != nil {
-		return fmt.Errorf("Cannot create json: %s", err)
+		return nil, fmt.Errorf("Cannot create json: %s", err)
 	}
-	fmt.Println(string(b))
 
-	return nil
+	return b, nil
 }
 
 func startWebServer() {
@@ -269,10 +268,12 @@ func main() {
 	}
 
 	if *testF {
-		err := testMongoDBConnection()
+		buildInfo, err := testMongoDBConnection()
 		if err != nil {
+			log.Errorf("Can't connect to MongoDB: %s", err)
 			os.Exit(1)
 		}
+		fmt.Println(string(buildInfo))
 		os.Exit(0)
 	}
 	if *versionF {
