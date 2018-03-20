@@ -2,6 +2,8 @@
 
 ## v0.5.0 (not released yet)
 
+* Removed tests for EOL'ed MongoDB 3.0 and Percona Server for MongoDB 3.0.
+
 ## v0.4.0 (2018-01-17)
 
 * New flags `-collect.database` and `-collect.collection` can be used to enable collection of database and collection
