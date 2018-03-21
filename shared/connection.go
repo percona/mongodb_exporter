@@ -55,7 +55,7 @@ type MongoSessionOpts struct {
 	PoolLimit             int
 }
 
-func MongoSession(opts MongoSessionOpts) *mgo.Session {
+func MongoSession(opts *MongoSessionOpts) *mgo.Session {
 	dialInfo, err := mgo.ParseURL(opts.URI)
 	if err != nil {
 		log.Errorf("Cannot parse mongodb server url: %s", err)
@@ -86,7 +86,7 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 	return session
 }
 
-func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
+func (opts *MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
 	if opts.TLSConnection {
 		config := &tls.Config{
 			InsecureSkipVerify: !opts.TLSHostnameValidation,

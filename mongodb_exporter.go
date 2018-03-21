@@ -68,7 +68,7 @@ var (
 )
 
 func testMongoDBConnection() ([]byte, error) {
-	sess := shared.MongoSession(shared.MongoSessionOpts{
+	sess := shared.MongoSession(&shared.MongoSessionOpts{
 		URI:                   *uriF,
 		TLSConnection:         *tlsF,
 		TLSCertificateFile:    *tlsCertF,
@@ -120,7 +120,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	mongodbCollector := collector.NewMongodbCollector(collector.MongodbCollectorOpts{
+	mongodbCollector := collector.NewMongodbCollector(&collector.MongodbCollectorOpts{
 		URI:                      *uriF,
 		TLSConnection:            *tlsF,
 		TLSCertificateFile:       *tlsCertF,
