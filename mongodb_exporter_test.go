@@ -31,6 +31,10 @@ type bin struct {
 
 // TestBin builds, runs and tests binary.
 func TestBin(t *testing.T) {
+	if testing.Short() {
+		t.Skip("-short is passed, skipping integration test")
+	}
+
 	var err error
 	binName := "mongodb_exporter"
 

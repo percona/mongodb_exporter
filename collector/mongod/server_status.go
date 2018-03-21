@@ -94,6 +94,7 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	instanceUptimeSeconds.Set(status.Uptime)
 	instanceUptimeEstimateSeconds.Set(status.Uptime)
 	instanceLocalTime.Set(float64(status.LocalTime.Unix()))
+	versionInfo.Collect(ch)
 	instanceUptimeSeconds.Collect(ch)
 	instanceUptimeEstimateSeconds.Collect(ch)
 	instanceLocalTime.Collect(ch)
@@ -164,6 +165,7 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 
 // Describe describes the server status for prometheus.
 func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
+	versionInfo.Describe(ch)
 	instanceUptimeSeconds.Describe(ch)
 	instanceUptimeEstimateSeconds.Describe(ch)
 	instanceLocalTime.Describe(ch)
