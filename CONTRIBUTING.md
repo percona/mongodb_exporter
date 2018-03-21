@@ -11,7 +11,8 @@ export MONGODB_URL='mongodb://localhost:27017'
 ./mongodb_exporter
 ```
 
-`testall` make target will run integration tests.
+`testall` make target will run integration tests. Set `TEST_MONGODB_URL` to run
+against a non-localhost mongodb.
 
 
 ## Vendoring
