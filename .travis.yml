@@ -4,6 +4,7 @@ language: go
 
 go:
   - 1.9.x
+  - 1.10.x
   - master
 
 matrix:
@@ -11,8 +12,10 @@ matrix:
     - go: master
 
 env:
+  - MONGODB_IMAGE=mongo:3.2
   - MONGODB_IMAGE=mongo:3.4
   - MONGODB_IMAGE=mongo:3.6
+  - MONGODB_IMAGE=percona/percona-server-mongodb:3.2
   - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
   - MONGODB_IMAGE=perconalab/percona-server-mongodb:3.6
 
@@ -20,11 +23,29 @@ services:
   - docker
 
 before_script:
+  # Start docker containers.
+  - docker-compose up -d
+  # Wait for MongoDB to become available.
+  - |
+    until docker-compose exec mongo mongo --quiet --eval 'db.runCommand("ping").ok' > /dev/null; do
+      >&2 echo "MongoDB is unavailable - sleeping"
+      sleep 1
+    done
+    >&2 echo "MongoDB is up"
+  # Display logs for debug purposes.
+  - docker-compose logs
+  # Display versions.
   - docker --version
   - docker-compose --version
-  - docker-compose up -d
+  - docker-compose exec mongo mongo --version
 
 script:
+  # ensure that vendor/ is in sync with code and Gopkg.*
+  - curl https://github.com/golang/dep/releases/download/v0.4.1/dep-linux-amd64 -L -o ~/dep && chmod +x ~/dep
+  - rm -fr vendor/
+  - ~/dep ensure -v
+  - git diff --exit-code
+
   - make format build testall
 
 after_success:
@@ -36,3 +57,4 @@ notifications:
     on_failure: always
     rooms:
       secure: updWrOALfF29z30ogJ4m21WX0oOSYbRX/+abuEqXCC9zZ2QI7EoRR61hrAgNXJXUTffmUIM0vCrToYlybMsdcZHwCXWN8vr2yW3fyypfs/+rUng1qigEy1wVVIFgAC/6NruhmuUMWo1qwe4tUenQmegBiSpYRVRI10Qsnj6TggCNVz0cuoxpmzpVvNH78s1elnU4P1REWhjStuqQvKgG5cWOsvI+9l2Z+t9HdpYE7E7N3Ec73t2Z4wKhlpScbLF+mhnTWV6zgCkLaVdMshFeBEuYWmRr3D2QJWMntl/DrVaRoW76kX9nm2PQ/P4q0BdQslf5WsAiONWPOOWqK6n9RM9SegGSEXnXiqkWtmJQspa3zhjkNZStaD/g5E4yP5QnTbk4WP8ma18yQfMthXeQiQOEWj6zOTzBslu6Iyyc9QzbNijnYy3ZBBBAWGaKjFKmTrMTgl19SbAsvgi41A+zrVL5LeCwAR0/2QUdMegHZSla9WBiURgT/quA8EnA3N+ObNQBpqBETJmSPpJbqrkZI8+7oo4nFxLkwCRVyI4/XInTl5aKsRNYP95kPX3zJuUEe8x39qYhG5QcGV8G8AK0B+jrGoEB2qSN2p+Ye1XE6+Z38KktVzM3GmMOt/v+ts1ZjiaZvK0zlb7vRTMuiBmAjAnB5l5vmNSjkP6+ZL832Og=
+  email: false
