@@ -43,7 +43,10 @@
 [[projects]]
   branch = "master"
   name = "github.com/percona/exporter_shared"
-  packages = ["helpers"]
+  packages = [
+    ".",
+    "helpers"
+  ]
   revision = "7d9e9cc0256a3fbb559aa2f3fb9d8d37e3bd1bf5"
 
 [[projects]]
@@ -146,6 +149,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "902c186b49d0be06331f33385c0990b5d5c89c203fde6db677b8e6be1e3d099c"
+  inputs-digest = "a303edcf5b507756df1dba89522b27dddc0e041f9e72503af17f6ebbe2ab1735"
   solver-name = "gps-cdcl"
   solver-version = 1
