@@ -1,7 +1,7 @@
 # editor temp files
 *.sw[nop]
 
-# build artefacts
+# build artifacts
 mongodb_exporter
 coverage.txt
 coverage_temp.txt
