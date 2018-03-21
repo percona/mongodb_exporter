@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 )
 
@@ -182,16 +183,15 @@ func testLandingPage(t *testing.T, data bin) {
 	got := string(body)
 
 	expected := `<html>
-<head><title>MongoDB exporter</title></head>
+<head>
+	<title>MongoDB exporter</title>
+</head>
 <body>
-<h1>MongoDB exporter</h1>
-<p><a href='/metrics'>Metrics</a></p>
+	<h1>MongoDB exporter</h1>
+	<p><a href="/metrics">Metrics</a></p>
 </body>
-</html>
-`
-	if got != expected {
-		t.Fatalf("got '%s' but expected '%s'", got, expected)
-	}
+</html>`
+	assert.Equal(t, expected, got)
 }
 
 func testDefaultGatherer(t *testing.T, data bin) {
