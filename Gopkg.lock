@@ -23,6 +23,12 @@
   revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
 
 [[projects]]
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   revision = "925541529c1fa6821df4e44ce2723319eb2be768"
@@ -32,6 +38,18 @@
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
   revision = "3247c84500bff8d9fb6d579d800f20b3e091582c"
+  version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/percona/exporter_shared"
+  packages = ["helpers"]
+  revision = "7d9e9cc0256a3fbb559aa2f3fb9d8d37e3bd1bf5"
+
+[[projects]]
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
 
 [[projects]]
@@ -79,6 +97,12 @@
   version = "v1.0.5"
 
 [[projects]]
+  name = "github.com/stretchr/testify"
+  packages = ["assert"]
+  revision = "12b6f73e6084dad08a7c6e575284b177ecafbc71"
+  version = "v1.2.1"
+
+[[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
@@ -122,6 +146,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d43a434d1b65385b5811636b2ef87659da54de5bcf1cdc558b920e2ba948b977"
+  inputs-digest = "902c186b49d0be06331f33385c0990b5d5c89c203fde6db677b8e6be1e3d099c"
   solver-name = "gps-cdcl"
   solver-version = 1
