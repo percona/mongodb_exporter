@@ -41,6 +41,7 @@ type MongodbCollectorOpts struct {
 	DBPoolLimit              int
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
+	CollectTopMetrics        bool
 }
 
 func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
@@ -282,6 +283,15 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 			collStatList.Export(ch)
 		}
 	}
+
+	if exporter.Opts.CollectTopMetrics {
+		log.Debug("Collecting Top Metrics")
+		topStatus := collector_mongod.GetTopStatus(session)
+		if topStatus != nil {
+			topStatus.Export(ch)
+		}
+	}
+
 }
 
 func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch chan<- prometheus.Metric) {
