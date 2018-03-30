@@ -20,9 +20,13 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -175,6 +179,40 @@ func startWebServer() {
 		ssl = true
 		log.Infoln("HTTPS/TLS is enabled")
 	}
+	var listenerNet, listenerRepr string
+	if u, err := url.Parse(*listenAddressF); err != nil {
+		listenerNet = "tcp"
+		listenerRepr = *listenAddressF
+
+	} else {
+		listenerNet = u.Scheme
+		*listenAddressF = u.Path
+		if listenerNet == "unix" {
+			listenerRepr = fmt.Sprintf("unix%s", u.Path)
+
+		}
+
+	}
+	var (
+		listener net.Listener
+		err      error
+	)
+	if listener, err = net.Listen(listenerNet, *listenAddressF); err != nil {
+		log.Fatal("failed on listenener: %s", err)
+
+	}
+	if listenerNet == "unix" {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, syscall.SIGINT)
+		signal.Notify(c, syscall.SIGTERM)
+
+		go func() {
+			<-c
+			listener.Close()
+			os.Remove(*listenAddressF)
+			log.Infof("removing socket file: %s", *listenAddressF)
+		}()
+	}
 
 	if ssl {
 		// https
@@ -196,21 +234,21 @@ func startWebServer() {
 			},
 		}
 		srv := &http.Server{
-			Addr:         *listenAddressF,
 			Handler:      mux,
 			TLSConfig:    tlsCfg,
 			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 		}
-		log.Infof("Starting HTTPS server on https://%s%s ...", *listenAddressF, *metricsPathF)
-		log.Fatal(srv.ListenAndServeTLS(*sslCertFileF, *sslKeyFileF))
+
+		log.Infof("Starting HTTPS server on https://%s%s ...", listenerRepr, *metricsPathF)
+		log.Info(srv.ServeTLS(listener, *sslCertFileF, *sslKeyFileF))
 	} else {
 		// http
 		http.Handle(*metricsPathF, handler)
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			w.Write(landingPage)
 		})
-		log.Infof("Starting HTTP server on http://%s%s ...", *listenAddressF, *metricsPathF)
-		log.Fatal(http.ListenAndServe(*listenAddressF, nil))
+		log.Infof("Starting HTTP server on http://%s%s ...", listenerRepr, *metricsPathF)
+		log.Info(http.Serve(listener, nil))
 	}
 }
 
