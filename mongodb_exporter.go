@@ -54,6 +54,7 @@ var (
 
 	collectDatabaseF   = flag.Bool("collect.database", false, "Enable collection of Database metrics")
 	collectCollectionF = flag.Bool("collect.collection", false, "Enable collection of Collection metrics")
+	collectIndexUsageF = flag.Bool("collect.indexusage", false, "Enable collection of per index usage stats")
 
 	uriF     = flag.String("mongodb.uri", mongodbDefaultURI(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
@@ -225,6 +226,7 @@ func registerCollector() *collector.MongodbCollector {
 		DBPoolLimit:              *maxConnectionsF,
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
+		CollectIndexUsageStats:   *collectIndexUsageF,
 	})
 	prometheus.MustRegister(mongodbCollector)
 	return mongodbCollector

@@ -41,6 +41,7 @@ type MongodbCollectorOpts struct {
 	DBPoolLimit              int
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
+	CollectIndexUsageStats   bool
 }
 
 func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
@@ -280,6 +281,14 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 		collStatList := collector_mongod.GetCollectionStatList(session)
 		if collStatList != nil {
 			collStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectIndexUsageStats {
+		log.Debug("Collecting Index Statistics")
+		indexStatList := collector_mongod.GetIndexUsageStatList(session)
+		if indexStatList != nil {
+			indexStatList.Export(ch)
 		}
 	}
 }
