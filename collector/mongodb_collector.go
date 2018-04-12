@@ -41,6 +41,8 @@ type MongodbCollectorOpts struct {
 	DBPoolLimit              int
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
+	SocketTimeout            time.Duration
+	SyncTimeout              time.Duration
 }
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
@@ -52,6 +54,8 @@ func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
 		TLSCaFile:             in.TLSCaFile,
 		TLSHostnameValidation: in.TLSHostnameValidation,
 		PoolLimit:             in.DBPoolLimit,
+		SocketTimeout:         in.SocketTimeout,
+		SyncTimeout:           in.SyncTimeout,
 	}
 }
 
