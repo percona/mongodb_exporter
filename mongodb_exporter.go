@@ -63,8 +63,11 @@ var (
 	maxConnectionsF               = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
 	testF                         = flag.Bool("test", false, "Check MongoDB connection, print buildInfo() information and exit.")
 
-	socketTimeoutF = flag.Int64("mongodb.socket-timeout", int64(3*time.Second), "Amount of time in ms to wait for a non-responding socket to the database before it is forcefully closed")
-	syncTimeoutF   = flag.Int64("mongodb.sync-timeout", int64(1*time.Minute), "Amount of time in ms an operation with this session will wait before returning an error in case a connection to a usable server can't be established")
+	socketTimeoutF = flag.Duration("mongodb.socket-timeout", 3*time.Second, "Amount of time to wait for a non-responding socket to the database before it is forcefully closed.\n"+
+		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.")
+	syncTimeoutF = flag.Duration("mongodb.sync-timeout", time.Minute, "Amount of time an operation with this session will wait before returning an error in case\n"+
+		"    \ta connection to a usable server can't be established.\n"+
+		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.")
 
 	// FIXME currently ignored
 	// enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
