@@ -55,6 +55,7 @@ type MongoSessionOpts struct {
 	PoolLimit             int
 }
 
+// MongoSession connects to MongoDB and returns ready to MongoDB session.
 func MongoSession(opts *MongoSessionOpts) *mgo.Session {
 	dialInfo, err := mgo.ParseURL(opts.URI)
 	if err != nil {
