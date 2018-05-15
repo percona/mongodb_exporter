@@ -26,3 +26,11 @@ func TestRedactMongoUri(t *testing.T) {
 		t.Errorf("%q != %q", expected, actual)
 	}
 }
+
+func TestMongoSession(t *testing.T) {
+	mso := &MongoSessionOpts{}
+	session := MongoSession(mso)
+	if session == nil {
+		t.Error("session is nil")
+	}
+}
