@@ -16,6 +16,9 @@ package shared
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRedactMongoUri(t *testing.T) {
@@ -30,7 +33,15 @@ func TestRedactMongoUri(t *testing.T) {
 func TestMongoSession(t *testing.T) {
 	mso := &MongoSessionOpts{}
 	session := MongoSession(mso)
+	require.NotNil(t, session)
 	if session == nil {
 		t.Error("session is nil")
 	}
+	serverVersion, err := MongoSessionServerVersion(session)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, serverVersion)
+
+	nodeType, err := MongoSessionNodeType(session)
+	assert.NoError(t, err)
+	assert.Equal(t, "mongod", nodeType)
 }
