@@ -190,7 +190,7 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 
 	mongoSess := exporter.getSession()
 	if mongoSess == nil {
-		err = fmt.Errorf("Can't create mongo session to %s", exporter.Opts.URI)
+		err = fmt.Errorf("Can't create mongo session to %s", shared.RedactMongoUri(exporter.Opts.URI))
 		log.Error(err)
 		exporter.mongoUp.Set(0)
 		return
