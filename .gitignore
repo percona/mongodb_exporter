@@ -5,3 +5,5 @@
 mongodb_exporter
 coverage.txt
 coverage_temp.txt
+/.history
+/.idea
