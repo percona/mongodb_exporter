@@ -60,7 +60,8 @@ type MongoSessionOpts struct {
 	PoolLimit             int
 }
 
-func MongoSession(opts MongoSessionOpts) *mgo.Session {
+// MongoSession connects to MongoDB and returns ready to MongoDB session.
+func MongoSession(opts *MongoSessionOpts) *mgo.Session {
 	if strings.Contains(opts.URI, "ssl=true") {
 		opts.URI = strings.Replace(opts.URI, "ssl=true", "", 1)
 		opts.TLSBasicConnection = true
@@ -95,7 +96,7 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 	return session
 }
 
-func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
+func (opts *MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
 	config := &tls.Config{}
 	if opts.TLSConnection && !opts.TLSBasicConnection {
 		config.InsecureSkipVerify = !opts.TLSHostnameValidation

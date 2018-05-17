@@ -22,6 +22,8 @@ BIN_DIR             ?= $(shell pwd)
 DOCKER_IMAGE_NAME   ?= mongodb-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
+# Race detector is only supported on amd64.
+RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
 
 all: format build test
 
@@ -31,11 +33,11 @@ style:
 
 test:
 	@echo ">> running tests"
-	gocoverutil -coverprofile=coverage.txt test -short -v -race $(pkgs)
+	gocoverutil -coverprofile=coverage.txt test -short -v $(RACE) $(pkgs)
 
 testall:
 	@echo ">> running all tests"
-	gocoverutil -coverprofile=coverage.txt test -v -race $(pkgs)
+	gocoverutil -coverprofile=coverage.txt test -v $(RACE) $(pkgs)
 
 format:
 	@echo ">> formatting code"
@@ -60,7 +62,7 @@ docker:
 init:
 	$(GO) get -u github.com/AlekSi/gocoverutil
 	GOOS=$(shell uname -s | tr A-Z a-z) \
-		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
+		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(subst aarch64,arm64,$(shell uname -m)))) \
 		$(GO) get -u github.com/prometheus/promu
 
 
