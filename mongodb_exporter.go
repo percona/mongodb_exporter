@@ -137,6 +137,8 @@ func main() {
 		DBPoolLimit:              *maxConnectionsF,
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
+		SocketTimeout:            *socketTimeoutF,
+		SyncTimeout:              *syncTimeoutF,
 	})
 	prometheus.MustRegister(mongodbCollector)
 
