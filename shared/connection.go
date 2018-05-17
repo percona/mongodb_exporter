@@ -26,11 +26,6 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-const (
-	dialMongodbTimeout = 3 * time.Second
-	syncMongodbTimeout = 1 * time.Minute
-)
-
 func RedactMongoUri(uri string) string {
 	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
 		dialInfo, err := mgo.ParseURL(uri)
@@ -53,9 +48,12 @@ type MongoSessionOpts struct {
 	TLSCaFile             string
 	TLSHostnameValidation bool
 	PoolLimit             int
+	SocketTimeout         time.Duration
+	SyncTimeout           time.Duration
 }
 
-func MongoSession(opts MongoSessionOpts) *mgo.Session {
+// MongoSession connects to MongoDB and returns ready to MongoDB session.
+func MongoSession(opts *MongoSessionOpts) *mgo.Session {
 	dialInfo, err := mgo.ParseURL(opts.URI)
 	if err != nil {
 		log.Errorf("Cannot parse mongodb server url: %s", err)
@@ -64,7 +62,7 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 
 	// connect directly, fail faster, do not retry - for faster responses and accurate metrics, including mongoUp
 	dialInfo.Direct = true
-	dialInfo.Timeout = dialMongodbTimeout
+	dialInfo.Timeout = opts.SocketTimeout
 	dialInfo.FailFast = true
 
 	err = opts.configureDialInfoIfRequired(dialInfo)
@@ -81,12 +79,12 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 	session.SetMode(mgo.Eventual, true)
 	session.SetPoolLimit(opts.PoolLimit)
 	session.SetPrefetch(0.00)
-	session.SetSyncTimeout(syncMongodbTimeout)
-	session.SetSocketTimeout(dialMongodbTimeout)
+	session.SetSyncTimeout(opts.SyncTimeout)
+	session.SetSocketTimeout(opts.SocketTimeout)
 	return session
 }
 
-func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
+func (opts *MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
 	if opts.TLSConnection {
 		config := &tls.Config{
 			InsecureSkipVerify: !opts.TLSHostnameValidation,

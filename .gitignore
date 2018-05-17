@@ -1,3 +1,9 @@
+# editor temp files
+*.sw[nop]
+
+# build artifacts
 mongodb_exporter
 coverage.txt
 coverage_temp.txt
+/.history
+/.idea
