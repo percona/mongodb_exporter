@@ -139,6 +139,8 @@ func main() {
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
 		CollectIndexUsageStats:   *collectIndexUsageF,
+		SocketTimeout:            *socketTimeoutF,
+		SyncTimeout:              *syncTimeoutF,
 	})
 	prometheus.MustRegister(mongodbCollector)
 
