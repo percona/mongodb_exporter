@@ -22,6 +22,8 @@ import (
 	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 var (
@@ -90,18 +92,18 @@ type ShardingStats struct {
 
 func GetMongosInfo(session *mgo.Session) *[]MongosInfo {
 	mongosInfo := []MongosInfo{}
-	err := session.DB("config").C("mongos").Find(bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}}).All(&mongosInfo)
-	if err != nil {
-		log.Error("Failed to execute find query on 'config.mongos'!")
+	q := session.DB("config").C("mongos").Find(bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}})
+	if err := shared.AddCodeCommentToQuery(q).All(&mongosInfo); err != nil {
+		log.Errorf("Failed to execute find query on 'config.mongos': %s.", err)
 	}
 	return &mongosInfo
 }
 
 func GetMongosBalancerLock(session *mgo.Session) *MongosBalancerLock {
 	var balancerLock *MongosBalancerLock
-	err := session.DB("config").C("locks").Find(bson.M{"_id": "balancer"}).One(&balancerLock)
-	if err != nil {
-		log.Error("Failed to execute find query on 'config.locks'!")
+	q := session.DB("config").C("locks").Find(bson.M{"_id": "balancer"})
+	if err := shared.AddCodeCommentToQuery(q).One(&balancerLock); err != nil {
+		log.Errorf("Failed to execute find query on 'config.locks': %s.", err)
 	}
 	return balancerLock
 }
@@ -110,8 +112,8 @@ func IsBalancerEnabled(session *mgo.Session) float64 {
 	balancerConfig := struct {
 		Stopped bool `bson:"stopped"`
 	}{}
-	err := session.DB("config").C("settings").Find(bson.M{"_id": "balancer"}).One(&balancerConfig)
-	if err != nil {
+	q := session.DB("config").C("settings").Find(bson.M{"_id": "balancer"})
+	if err := shared.AddCodeCommentToQuery(q).One(&balancerConfig); err != nil {
 		return 1
 	}
 	if balancerConfig.Stopped {
