@@ -41,6 +41,7 @@ type MongodbCollectorOpts struct {
 	DBPoolLimit              int
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
+	CollectTopMetrics        bool
 	CollectIndexUsageStats   bool
 	SocketTimeout            time.Duration
 	SyncTimeout              time.Duration
@@ -285,6 +286,14 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 		collStatList := collector_mongod.GetCollectionStatList(session)
 		if collStatList != nil {
 			collStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectTopMetrics {
+		log.Debug("Collecting Top Metrics")
+		topStatus := collector_mongod.GetTopStatus(session)
+		if topStatus != nil {
+			topStatus.Export(ch)
 		}
 	}
 
