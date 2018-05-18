@@ -42,6 +42,7 @@ type MongodbCollectorOpts struct {
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
 	CollectTopMetrics        bool
+	CollectIndexUsageStats   bool
 	SocketTimeout            time.Duration
 	SyncTimeout              time.Duration
 }
@@ -296,6 +297,13 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 		}
 	}
 
+	if exporter.Opts.CollectIndexUsageStats {
+		log.Debug("Collecting Index Statistics")
+		indexStatList := collector_mongod.GetIndexUsageStatList(session)
+		if indexStatList != nil {
+			indexStatList.Export(ch)
+		}
+	}
 }
 
 func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch chan<- prometheus.Metric) {
