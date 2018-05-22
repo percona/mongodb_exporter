@@ -6,4 +6,5 @@ services:
     image: ${MONGODB_IMAGE:-mongo:3.6}
     ports:
       - 127.0.0.1:27017:27017
-    command: [ "--bind_ip=0.0.0.0" ]
+    command:
+      - --bind_ip=0.0.0.0
