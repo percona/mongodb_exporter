@@ -81,6 +81,7 @@ func TestBin(t *testing.T) {
 		testVersion,
 		testDefaultGatherer,
 		testTestFlag,
+		testTestFlagWithTLS,
 	}
 
 	portStart := 56000
@@ -238,6 +239,35 @@ func testTestFlag(t *testing.T, data bin) {
 	cmd := exec.CommandContext(
 		ctx,
 		data.path,
+		"--test",
+	)
+
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Log(string(b))
+		t.Fatal(err)
+	}
+	buildInfo := mgo.BuildInfo{}
+	err = json.Unmarshal(b, &buildInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if reflect.DeepEqual(buildInfo, mgo.BuildInfo{}) {
+		t.Fatalf("buildInfo is empty")
+	}
+}
+
+func testTestFlagWithTLS(t *testing.T, data bin) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(
+		ctx,
+		data.path,
+		"--mongodb.tls",
+		"--mongodb.tls-ca=testdata/ca.crt",
+		"--mongodb.tls-cert=testdata/client.pem",
 		"--test",
 	)
 

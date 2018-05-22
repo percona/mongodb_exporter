@@ -35,7 +35,6 @@ func RedactMongoUri(uri string) string {
 	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
 		if strings.Contains(uri, "ssl=true") {
 			uri = strings.Replace(uri, "ssl=true", "", 1)
-
 		}
 		dialInfo, err := mgo.ParseURL(uri)
 		if err != nil {
@@ -59,7 +58,7 @@ type MongoSessionOpts struct {
 	PoolLimit             int
 }
 
-// MongoSession connects to MongoDB and returns ready to MongoDB session.
+// MongoSession connects to MongoDB and returns ready to use MongoDB session.
 func MongoSession(opts *MongoSessionOpts) *mgo.Session {
 	if strings.Contains(opts.URI, "ssl=true") {
 		opts.URI = strings.Replace(opts.URI, "ssl=true", "", 1)
