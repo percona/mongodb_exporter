@@ -43,8 +43,8 @@ type MongodbCollectorOpts struct {
 	CollectCollectionMetrics bool
 }
 
-func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
-	return shared.MongoSessionOpts{
+func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
+	return &shared.MongoSessionOpts{
 		URI:                   in.URI,
 		TLSConnection:         in.TLSConnection,
 		TLSCertificateFile:    in.TLSCertificateFile,
@@ -57,7 +57,7 @@ func (in MongodbCollectorOpts) toSessionOps() shared.MongoSessionOpts {
 
 // MongodbCollector is in charge of collecting mongodb's metrics.
 type MongodbCollector struct {
-	Opts MongodbCollectorOpts
+	Opts *MongodbCollectorOpts
 
 	scrapesTotal              prometheus.Counter
 	scrapeErrorsTotal         prometheus.Counter
@@ -70,7 +70,7 @@ type MongodbCollector struct {
 }
 
 // NewMongodbCollector returns a new instance of a MongodbCollector.
-func NewMongodbCollector(opts MongodbCollectorOpts) *MongodbCollector {
+func NewMongodbCollector(opts *MongodbCollectorOpts) *MongodbCollector {
 	exporter := &MongodbCollector{
 		Opts: opts,
 
@@ -190,7 +190,7 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 
 	mongoSess := exporter.getSession()
 	if mongoSess == nil {
-		err = fmt.Errorf("Can't create mongo session to %s", exporter.Opts.URI)
+		err = fmt.Errorf("Can't create mongo session to %s", shared.RedactMongoUri(exporter.Opts.URI))
 		log.Error(err)
 		exporter.mongoUp.Set(0)
 		return
