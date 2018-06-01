@@ -1,4 +1,4 @@
-package collector_mongod
+package mongod
 
 import (
 	"io/ioutil"

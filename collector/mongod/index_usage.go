@@ -1,4 +1,4 @@
-package collector_mongod
+package mongod
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
