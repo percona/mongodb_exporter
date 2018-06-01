@@ -50,6 +50,17 @@
   revision = "7d9e9cc0256a3fbb559aa2f3fb9d8d37e3bd1bf5"
 
 [[projects]]
+  name = "github.com/percona/mongodb_exporter"
+  packages = [
+    "collector",
+    "collector/mongod",
+    "collector/mongos",
+    "shared"
+  ]
+  revision = "8136fdd3628a63985edf3b9a30ceec757638ff53"
+  version = "v0.5.0"
+
+[[projects]]
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
@@ -152,6 +163,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c8cb19131231afba9e69d3f55681e4a00b9feadd7de161bb20b1cd6f2e00561d"
+  inputs-digest = "2f32c15dcec6bbe11f0496b0f25a868e3088c8fb7fffb6a720778c0b08e3a0ee"
   solver-name = "gps-cdcl"
   solver-version = 1
