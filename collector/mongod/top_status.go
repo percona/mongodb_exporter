@@ -15,18 +15,13 @@ type TopStatus struct {
 // GetTopStats fetches top stats
 func GetTopStats(session *mgo.Session) (*TopStatus, error) {
 	results := &TopStatus{}
-	err := session.DB("admin").Run(bson.D{{"top", 1}}, &results)
+	err := session.DB("admin").Run(bson.D{{Name: "top", Value: 1}}, &results)
 	return results, err
 }
 
 // Export exports metrics to Prometheus
 func (status *TopStatus) Export(ch chan<- prometheus.Metric) {
 	status.TopStats.Export(ch)
-}
-
-// Describe describes metrics collected
-func (status *TopStatus) Describe(ch chan<- *prometheus.Desc) {
-	status.TopStats.Describe(ch)
 }
 
 // GetTopStatus fetches top stats

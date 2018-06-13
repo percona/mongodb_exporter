@@ -8,16 +8,17 @@ import (
 )
 
 var (
-	topTimeSecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "top_time_seconds_total",
-		Help:      "The top command provides operation time, in seconds, for each database collection",
-	}, []string{"type", "database", "collection"})
-	topCountTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "top_count_total",
-		Help:      "The top command provides operation count for each database collection",
-	}, []string{"type", "database", "collection"})
+	topCountTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "top_count_total"),
+		"The top command provides operation count for each database collection",
+		[]string{"type", "database", "collection"}, nil,
+	)
+
+	topTimeSecondsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "top_time_seconds_total"),
+		"The top command provides operation time, in seconds, for each database collection",
+		[]string{"type", "database", "collection"}, nil,
+	)
 )
 
 // TopStatsMap is a map of top stats.
@@ -56,21 +57,11 @@ func (topStats TopStatsMap) Export(ch chan<- prometheus.Metric) {
 			metricType := topStatTypes.Field(i).Name
 
 			opCount := topStatValues.Field(i).Field(1).Float()
+			ch <- prometheus.MustNewConstMetric(topCountTotalDesc, prometheus.CounterValue, opCount, metricType, database, collection)
 
 			opTimeMicrosecond := topStatValues.Field(i).Field(0).Float()
 			opTimeSecond := opTimeMicrosecond / 1e6
-
-			topTimeSecondsTotal.WithLabelValues(metricType, database, collection).Set(opTimeSecond)
-			topCountTotal.WithLabelValues(metricType, database, collection).Set(opCount)
+			ch <- prometheus.MustNewConstMetric(topTimeSecondsTotalDesc, prometheus.CounterValue, opTimeSecond, metricType, database, collection)
 		}
 	}
-
-	topTimeSecondsTotal.Collect(ch)
-	topCountTotal.Collect(ch)
-}
-
-// Describe describes the metrics for prometheus.
-func (topStats TopStatsMap) Describe(ch chan<- *prometheus.Desc) {
-	topTimeSecondsTotal.Describe(ch)
-	topCountTotal.Describe(ch)
 }
