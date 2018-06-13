@@ -15,7 +15,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -76,31 +75,6 @@ var (
 	enabledGroupsFlag = flag.String("groups.enabled", "", "Currently ignored")
 )
 
-func testMongoDBConnection() ([]byte, error) {
-	sess := shared.MongoSession(&shared.MongoSessionOpts{
-		URI:                   *uriF,
-		TLSConnection:         *tlsF,
-		TLSCertificateFile:    *tlsCertF,
-		TLSPrivateKeyFile:     *tlsPrivateKeyF,
-		TLSCaFile:             *tlsCAF,
-		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
-	})
-	if sess == nil {
-		return nil, fmt.Errorf("Cannot connect using uri: %s", *uriF)
-	}
-	buildInfo, err := sess.BuildInfo()
-	if err != nil {
-		return nil, fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", *uriF, err)
-	}
-
-	b, err := json.MarshalIndent(buildInfo, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("Cannot create json: %s", err)
-	}
-
-	return b, nil
-}
-
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s %s exports various MongoDB metrics in Prometheus format.\n", os.Args[0], version.Version)
@@ -116,7 +90,16 @@ func main() {
 	}
 
 	if *testF {
-		buildInfo, err := testMongoDBConnection()
+		buildInfo, err := shared.TestConnection(
+			shared.MongoSessionOpts{
+				URI:                   *uriF,
+				TLSConnection:         *tlsF,
+				TLSCertificateFile:    *tlsCertF,
+				TLSPrivateKeyFile:     *tlsPrivateKeyF,
+				TLSCaFile:             *tlsCAF,
+				TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
+			},
+		)
 		if err != nil {
 			log.Errorf("Can't connect to MongoDB: %s", err)
 			os.Exit(1)

@@ -17,6 +17,7 @@ package shared
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -188,4 +189,23 @@ func MongoSessionNodeType(session *mgo.Session) (string, error) {
 		return "mongos", nil
 	}
 	return "mongod", nil
+}
+
+// TestConnection connects to MongoDB and returns BuildInfo.
+func TestConnection(opts MongoSessionOpts) ([]byte, error) {
+	session := MongoSession(&opts)
+	if session == nil {
+		return nil, fmt.Errorf("Cannot connect using uri: %s", opts.URI)
+	}
+	buildInfo, err := session.BuildInfo()
+	if err != nil {
+		return nil, fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", opts.URI, err)
+	}
+
+	b, err := json.MarshalIndent(buildInfo, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("Cannot create json: %s", err)
+	}
+
+	return b, nil
 }
