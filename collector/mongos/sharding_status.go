@@ -174,8 +174,8 @@ func (status *ShardingStats) Export(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
-	balancerIsEnabled.Set(status.IsBalanced)
-	balancerChunksBalanced.Set(status.BalancerEnabled)
+	balancerIsEnabled.Set(status.BalancerEnabled)
+	balancerChunksBalanced.Set(status.IsBalanced)
 
 	balancerIsEnabled.Collect(ch)
 	balancerChunksBalanced.Collect(ch)
