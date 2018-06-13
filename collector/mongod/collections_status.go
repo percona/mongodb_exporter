@@ -1,4 +1,4 @@
-package collector_mongod
+package mongod
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
@@ -44,6 +44,12 @@ var (
 		Name:      "indexes_size",
 		Help:      "The total size of all indexes",
 	}, []string{"db", "coll"})
+	collectionIndexSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "db_coll",
+		Name:      "index_size",
+		Help:      "The individual index size",
+	}, []string{"db", "coll", "index"})
 )
 
 // CollectionStatList contains stats from all collections
@@ -55,12 +61,12 @@ type CollectionStatList struct {
 type CollectionStatus struct {
 	Database    string
 	Name        string
-	Size        int `bson:"size,omitempty"`
-	Count       int `bson:"count,omitempty"`
-	AvgObjSize  int `bson:"avgObjSize,omitempty"`
-	StorageSize int `bson:"storageSize,omitempty"`
-	Indexes     int `bson:"indexSizes,omitempty"`
-	IndexesSize int `bson:"totalIndexSize,omitempty"`
+	Size        int                `bson:"size,omitempty"`
+	Count       int                `bson:"count,omitempty"`
+	AvgObjSize  int                `bson:"avgObjSize,omitempty"`
+	StorageSize int                `bson:"storageSize,omitempty"`
+	IndexesSize int                `bson:"totalIndexSize,omitempty"`
+	IndexSizes  map[string]float64 `bson:"indexSizes,omitempty"`
 }
 
 // Export exports database stats to prometheus
@@ -74,8 +80,16 @@ func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 		collectionObjectCount.With(ls).Set(float64(member.Count))
 		collectionAvgObjSize.With(ls).Set(float64(member.AvgObjSize))
 		collectionStorageSize.With(ls).Set(float64(member.StorageSize))
-		collectionIndexes.With(ls).Set(float64(member.Indexes))
+		collectionIndexes.With(ls).Set(float64(len(member.IndexSizes)))
 		collectionIndexesSize.With(ls).Set(float64(member.IndexesSize))
+		for indexName, size := range member.IndexSizes {
+			ls = prometheus.Labels{
+				"db":    member.Database,
+				"coll":  member.Name,
+				"index": indexName,
+			}
+			collectionIndexSize.With(ls).Set(size)
+		}
 	}
 	collectionSize.Collect(ch)
 	collectionObjectCount.Collect(ch)
@@ -83,6 +97,7 @@ func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 	collectionStorageSize.Collect(ch)
 	collectionIndexes.Collect(ch)
 	collectionIndexesSize.Collect(ch)
+	collectionIndexSize.Collect(ch)
 }
 
 // Describe describes database stats for prometheus

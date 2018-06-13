@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_mongos
+package mongos
 
 import (
 	"strings"
@@ -174,8 +174,8 @@ func (status *ShardingStats) Export(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
-	balancerIsEnabled.Set(status.IsBalanced)
-	balancerChunksBalanced.Set(status.BalancerEnabled)
+	balancerIsEnabled.Set(status.BalancerEnabled)
+	balancerChunksBalanced.Set(status.IsBalanced)
 
 	balancerIsEnabled.Collect(ch)
 	balancerChunksBalanced.Collect(ch)

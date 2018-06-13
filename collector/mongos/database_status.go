@@ -1,4 +1,4 @@
-package collector_mongos
+package mongos
 
 import (
 	"strings"

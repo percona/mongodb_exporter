@@ -41,6 +41,10 @@ type MongodbCollectorOpts struct {
 	DBPoolLimit              int
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
+	CollectTopMetrics        bool
+	CollectIndexUsageStats   bool
+	SocketTimeout            time.Duration
+	SyncTimeout              time.Duration
 }
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
@@ -52,6 +56,8 @@ func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
 		TLSCaFile:             in.TLSCaFile,
 		TLSHostnameValidation: in.TLSHostnameValidation,
 		PoolLimit:             in.DBPoolLimit,
+		SocketTimeout:         in.SocketTimeout,
+		SyncTimeout:           in.SyncTimeout,
 	}
 }
 
@@ -232,20 +238,20 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 	session.SetMode(mgo.Strong, true)
 
 	log.Debug("Collecting Server Status")
-	serverStatus := collector_mongos.GetServerStatus(session)
+	serverStatus := mongos.GetServerStatus(session)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
 	}
 
 	log.Debug("Collecting Sharding Status")
-	shardingStatus := collector_mongos.GetShardingStatus(session)
+	shardingStatus := mongos.GetShardingStatus(session)
 	if shardingStatus != nil {
 		shardingStatus.Export(ch)
 	}
 
 	if exporter.Opts.CollectDatabaseMetrics {
 		log.Debug("Collecting Database Status From Mongos")
-		dbStatList := collector_mongos.GetDatabaseStatList(session)
+		dbStatList := mongos.GetDatabaseStatList(session)
 		if dbStatList != nil {
 			dbStatList.Export(ch)
 		}
@@ -253,7 +259,7 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 
 	if exporter.Opts.CollectCollectionMetrics {
 		log.Debug("Collecting Collection Status From Mongos")
-		collStatList := collector_mongos.GetCollectionStatList(session)
+		collStatList := mongos.GetCollectionStatList(session)
 		if collStatList != nil {
 			collStatList.Export(ch)
 		}
@@ -262,14 +268,14 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 
 func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- prometheus.Metric) {
 	log.Debug("Collecting Server Status")
-	serverStatus := collector_mongod.GetServerStatus(session)
+	serverStatus := mongod.GetServerStatus(session)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
 	}
 
 	if exporter.Opts.CollectDatabaseMetrics {
 		log.Debug("Collecting Database Status From Mongod")
-		dbStatList := collector_mongod.GetDatabaseStatList(session)
+		dbStatList := mongod.GetDatabaseStatList(session)
 		if dbStatList != nil {
 			dbStatList.Export(ch)
 		}
@@ -277,9 +283,25 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 
 	if exporter.Opts.CollectCollectionMetrics {
 		log.Debug("Collecting Collection Status From Mongod")
-		collStatList := collector_mongod.GetCollectionStatList(session)
+		collStatList := mongod.GetCollectionStatList(session)
 		if collStatList != nil {
 			collStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectTopMetrics {
+		log.Debug("Collecting Top Metrics")
+		topStatus := mongod.GetTopStatus(session)
+		if topStatus != nil {
+			topStatus.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectIndexUsageStats {
+		log.Debug("Collecting Index Statistics")
+		indexStatList := mongod.GetIndexUsageStatList(session)
+		if indexStatList != nil {
+			indexStatList.Export(ch)
 		}
 	}
 }
@@ -288,13 +310,13 @@ func (exporter *MongodbCollector) collectMongodReplSet(session *mgo.Session, ch 
 	exporter.collectMongod(session, ch)
 
 	log.Debug("Collecting Replset Status")
-	replSetStatus := collector_mongod.GetReplSetStatus(session)
+	replSetStatus := mongod.GetReplSetStatus(session)
 	if replSetStatus != nil {
 		replSetStatus.Export(ch)
 	}
 
 	log.Debug("Collecting Replset Oplog Status")
-	oplogStatus := collector_mongod.GetOplogStatus(session)
+	oplogStatus := mongod.GetOplogStatus(session)
 	if oplogStatus != nil {
 		oplogStatus.Export(ch)
 	}

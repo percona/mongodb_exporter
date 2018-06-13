@@ -15,7 +15,7 @@
 GO           := go
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
 PROMU        := $(FIRST_GOPATH)/bin/promu -v
-pkgs          = $(shell $(GO) list ./... | grep -v /vendor/)
+pkgs          = ./...
 
 PREFIX              ?= $(shell pwd)
 BIN_DIR             ?= $(shell pwd)

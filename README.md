@@ -15,6 +15,7 @@ Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cu
 - MongoDB Sharding metrics (*shards, chunks, db/collections, balancer operations*)
 - MongoDB RocksDB storage-engine metrics (*levels, compactions, cache usage, i/o rates, etc*)
 - MongoDB WiredTiger storage-engine metrics (*cache, blockmanger, tickets, etc*)
+- MongoDB Top Metrics per collection (writeLock, readLock, query, etc*)
 
 
 ## Building and running

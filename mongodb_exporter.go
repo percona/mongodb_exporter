@@ -15,10 +15,10 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
@@ -48,6 +48,8 @@ var (
 
 	collectDatabaseF   = flag.Bool("collect.database", false, "Enable collection of Database metrics")
 	collectCollectionF = flag.Bool("collect.collection", false, "Enable collection of Collection metrics")
+	collectTopF        = flag.Bool("collect.topmetrics", false, "Enable collection of table top metrics")
+	collectIndexUsageF = flag.Bool("collect.indexusage", false, "Enable collection of per index usage stats")
 
 	uriF     = flag.String("mongodb.uri", defaultMongoDBURL(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
@@ -62,35 +64,16 @@ var (
 	maxConnectionsF               = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
 	testF                         = flag.Bool("test", false, "Check MongoDB connection, print buildInfo() information and exit.")
 
+	socketTimeoutF = flag.Duration("mongodb.socket-timeout", 3*time.Second, "Amount of time to wait for a non-responding socket to the database before it is forcefully closed.\n"+
+		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.")
+	syncTimeoutF = flag.Duration("mongodb.sync-timeout", time.Minute, "Amount of time an operation with this session will wait before returning an error in case\n"+
+		"    \ta connection to a usable server can't be established.\n"+
+		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.")
+
 	// FIXME currently ignored
 	// enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
 	enabledGroupsFlag = flag.String("groups.enabled", "", "Currently ignored")
 )
-
-func testMongoDBConnection() ([]byte, error) {
-	sess := shared.MongoSession(&shared.MongoSessionOpts{
-		URI:                   *uriF,
-		TLSConnection:         *tlsF,
-		TLSCertificateFile:    *tlsCertF,
-		TLSPrivateKeyFile:     *tlsPrivateKeyF,
-		TLSCaFile:             *tlsCAF,
-		TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
-	})
-	if sess == nil {
-		return nil, fmt.Errorf("Cannot connect using uri: %s", *uriF)
-	}
-	buildInfo, err := sess.BuildInfo()
-	if err != nil {
-		return nil, fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", *uriF, err)
-	}
-
-	b, err := json.MarshalIndent(buildInfo, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("Cannot create json: %s", err)
-	}
-
-	return b, nil
-}
 
 func main() {
 	flag.Usage = func() {
@@ -107,7 +90,16 @@ func main() {
 	}
 
 	if *testF {
-		buildInfo, err := testMongoDBConnection()
+		buildInfo, err := shared.TestConnection(
+			shared.MongoSessionOpts{
+				URI:                   *uriF,
+				TLSConnection:         *tlsF,
+				TLSCertificateFile:    *tlsCertF,
+				TLSPrivateKeyFile:     *tlsPrivateKeyF,
+				TLSCaFile:             *tlsCAF,
+				TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
+			},
+		)
 		if err != nil {
 			log.Errorf("Can't connect to MongoDB: %s", err)
 			os.Exit(1)
@@ -130,6 +122,10 @@ func main() {
 		DBPoolLimit:              *maxConnectionsF,
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
+		CollectTopMetrics:        *collectTopF,
+		CollectIndexUsageStats:   *collectIndexUsageF,
+		SocketTimeout:            *socketTimeoutF,
+		SyncTimeout:              *syncTimeoutF,
 	})
 	prometheus.MustRegister(mongodbCollector)
 

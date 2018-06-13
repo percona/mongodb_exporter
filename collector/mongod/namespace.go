@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_mongod
+package mongod
 
 var (
 	// Namespace is the namespace of the metrics

@@ -45,3 +45,9 @@ func TestMongoSession(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "mongod", nodeType)
 }
+
+func TestTestConnection(t *testing.T) {
+	mso := MongoSessionOpts{}
+	_, err := TestConnection(mso)
+	require.NoError(t, err)
+}
