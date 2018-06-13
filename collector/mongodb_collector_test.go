@@ -36,7 +36,13 @@ func TestCollector(t *testing.T) {
 		t.Skip("-short is passed, skipping functional test")
 	}
 
-	collector := NewMongodbCollector(&MongodbCollectorOpts{URI: testMongoDBURL()})
+	collector := NewMongodbCollector(&MongodbCollectorOpts{
+		URI: testMongoDBURL(),
+		CollectDatabaseMetrics:   true,
+		CollectCollectionMetrics: true,
+		CollectTopMetrics:        true,
+		CollectIndexUsageStats:   true,
+	})
 
 	descCh := make(chan *prometheus.Desc)
 	go func() {
