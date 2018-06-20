@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -20,9 +22,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andreyvit/diff"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 )
+
+var Update = flag.Bool("update", false, "update .golden files")
 
 // bin stores information about path of executable and attached port
 type bin struct {
@@ -77,11 +82,12 @@ func TestBin(t *testing.T) {
 	}
 
 	tests := []func(*testing.T, bin){
+		testFlagHelp,
+		testFlagTest,
+		testFlagTestWithTLS,
+		testFlagVersion,
 		testLandingPage,
-		testVersion,
 		testDefaultGatherer,
-		testTestFlag,
-		testTestFlagWithTLS,
 	}
 
 	portStart := 56000
@@ -102,7 +108,31 @@ func TestBin(t *testing.T) {
 	})
 }
 
-func testVersion(t *testing.T, data bin) {
+func testFlagHelp(t *testing.T, data bin) {
+	cmd := exec.Command(
+		data.path,
+		"--help",
+	)
+
+	output, _ := cmd.CombinedOutput()
+	output = regexp.MustCompile(regexp.QuoteMeta(data.path)).ReplaceAll(output, []byte("mongodb_exporter"))
+	actual := string(output)
+
+	filename := path.Join("testdata", path.Base(t.Name())+".golden")
+	if *Update {
+		err := ioutil.WriteFile(filename, output, 0600)
+		assert.NoError(t, err)
+	}
+	b, err := ioutil.ReadFile(filename)
+	assert.NoError(t, err)
+	expected := string(b)
+
+	if actual != expected {
+		t.Errorf("diff:\n%s", diff.LineDiff(expected, actual))
+	}
+}
+
+func testFlagVersion(t *testing.T, data bin) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
@@ -232,7 +262,7 @@ func testDefaultGatherer(t *testing.T, data bin) {
 	}
 }
 
-func testTestFlag(t *testing.T, data bin) {
+func testFlagTest(t *testing.T, data bin) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -258,7 +288,7 @@ func testTestFlag(t *testing.T, data bin) {
 	}
 }
 
-func testTestFlagWithTLS(t *testing.T, data bin) {
+func testFlagTestWithTLS(t *testing.T, data bin) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
