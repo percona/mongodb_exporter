@@ -84,7 +84,7 @@ func main() {
 	}
 	flag.Parse()
 
-	uri := os.Getenv("MONGODB_URI")
+	uri := os.Getenv("MONGODB_URL")
 	if uri != "" {
 		uriF = &uri
 	}
