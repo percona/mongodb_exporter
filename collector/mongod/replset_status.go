@@ -85,6 +85,12 @@ var (
 		Name:      "member_optime_date",
 		Help:      "The timestamp of the last oplog entry that this member applied.",
 	}, []string{"set", "name", "state"})
+	memberRepLag = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: subsystem,
+		Name:      "member_replication_lag",
+		Help:      "The replication lag that this member has with the primary.",
+	}, []string{"set", "name", "state"})
 	memberElectionDate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
@@ -115,6 +121,7 @@ var (
 		Name:      "member_config_version",
 		Help:      "The configVersion value is the replica set configuration version.",
 	}, []string{"set", "name", "state"})
+	PrimaryOptimeDate float64
 )
 
 // ReplSetStatus keeps the data returned by the GetReplSetStatus method
@@ -158,6 +165,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	memberHealth.Reset()
 	memberUptime.Reset()
 	memberOptimeDate.Reset()
+	memberRepLag.Reset()
 	memberElectionDate.Reset()
 	memberLastHeartbeat.Reset()
 	memberLastHeartbeatRecv.Reset()
@@ -176,6 +184,15 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	// new in version 3.2
 	if replStatus.HeartbeatIntervalMillis != nil {
 		heartbeatIntervalMillis.WithLabelValues(replStatus.Set).Set(*replStatus.HeartbeatIntervalMillis)
+	}
+
+	// Find the Optime for the Primary. This is neede to
+	// calcule the replication lag for secondaries.
+	for _, member := range replStatus.Members {
+		if member.StateStr == "PRIMARY" {
+			PrimaryOptimeDate = float64(member.OptimeDate.Unix())
+			break
+		}
 	}
 
 	for _, member := range replStatus.Members {
@@ -202,6 +219,10 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 		memberUptime.With(ls).Set(member.Uptime)
 
 		memberOptimeDate.With(ls).Set(float64(member.OptimeDate.Unix()))
+
+		if member.StateStr == "SECONDARY" {
+			memberRepLag.With(ls).Set(PrimaryOptimeDate - float64(member.OptimeDate.Unix()))
+		}
 
 		// ReplSetGetStatus.Member.ElectionTime is only available on the PRIMARY
 		if member.ElectionDate != nil {
@@ -231,6 +252,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	memberHealth.Collect(ch)
 	memberUptime.Collect(ch)
 	memberOptimeDate.Collect(ch)
+	memberRepLag.Collect(ch)
 	memberElectionDate.Collect(ch)
 	memberLastHeartbeat.Collect(ch)
 	memberLastHeartbeatRecv.Collect(ch)
@@ -250,6 +272,7 @@ func (replStatus *ReplSetStatus) Describe(ch chan<- *prometheus.Desc) {
 	memberHealth.Describe(ch)
 	memberUptime.Describe(ch)
 	memberOptimeDate.Describe(ch)
+	memberRepLag.Describe(ch)
 	memberElectionDate.Describe(ch)
 	memberLastHeartbeatRecv.Describe(ch)
 	memberPingMs.Describe(ch)
