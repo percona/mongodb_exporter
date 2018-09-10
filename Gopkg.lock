@@ -18,6 +18,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/andreyvit/diff"
+  packages = ["."]
+  revision = "c7f18ee00883bfd3b00e0a2bf7607827e0148ad4"
+
+[[projects]]
+  branch = "master"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
   revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
@@ -94,6 +100,12 @@
   revision = "54d17b57dd7d4a3aa092476596b3f8a933bde349"
 
 [[projects]]
+  name = "github.com/sergi/go-diff"
+  packages = ["diffmatchpatch"]
+  revision = "1744e2970ca51c86172c8190fadad617561ed6e7"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/sirupsen/logrus"
   packages = ["."]
   revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
@@ -152,6 +164,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c8cb19131231afba9e69d3f55681e4a00b9feadd7de161bb20b1cd6f2e00561d"
+  inputs-digest = "3a7818c26b419880b9e69c84d319c3c7b1a874c9037e96a7b806d38131c83a0a"
   solver-name = "gps-cdcl"
   solver-version = 1
