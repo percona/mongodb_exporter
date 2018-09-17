@@ -29,13 +29,13 @@ make
 
 ### Running
 
-To define your own MongoDB URL, use environment variable `MONGODB_URL`. If set this variable takes precedence over `-mongodb.uri` flag.
+To define your own MongoDB URL, use environment variable `MONGODB_URI`. If set this variable takes precedence over `-mongodb.uri` flag.
 
 To enable HTTP basic authentication, set environment variable `HTTP_AUTH` to user:password pair. Alternatively, you can
 use YAML file with `server_user` and `server_password` fields.
 
 ```bash
-export MONGODB_URL='mongodb://localhost:27017'
+export MONGODB_URI='mongodb://localhost:27017'
 export HTTP_AUTH='user:password'
 ./mongodb_exporter <flags>
 ```
@@ -59,10 +59,10 @@ db.getSiblingDB("admin").createUser({
 })
 ```
 
-2. Set environment variable `MONGODB_URL` before starting the exporter:
+2. Set environment variable `MONGODB_URI` before starting the exporter:
 
 ```bash
-export MONGODB_URL=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
+export MONGODB_URI=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
 ```
 
 If you use [x.509 Certificates to Authenticate Clients](https://docs.mongodb.com/manual/tutorial/configure-x509-client-authentication/), pass in username and `authMechanism` via [connection options](https://docs.mongodb.com/manual/reference/connection-string/#connections-connection-options) to the MongoDB uri. Eg:
