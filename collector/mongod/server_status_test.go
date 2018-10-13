@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_mongod
+package mongod
 
 import (
 	"io/ioutil"
@@ -29,6 +29,10 @@ func TestParserServerStatus(t *testing.T) {
 
 	serverStatus := &ServerStatus{}
 	loadServerStatusFromBson(data, serverStatus)
+
+	if serverStatus.Version != "2.6.7" {
+		t.Errorf("Server version incorrect: %s", serverStatus.Version)
+	}
 
 	if serverStatus.Asserts == nil {
 		t.Error("Asserts group was not loaded")

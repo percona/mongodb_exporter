@@ -1,7 +1,0 @@
-#!/bin/sh
-
-. ../.env
-
-exec mongod $COMMONCOPTS \
-	--port 40101 \
-	--configsvr

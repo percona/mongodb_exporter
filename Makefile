@@ -15,13 +15,15 @@
 GO           := go
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
 PROMU        := $(FIRST_GOPATH)/bin/promu -v
-pkgs          = $(shell $(GO) list ./... | grep -v /vendor/)
+pkgs          = ./...
 
 PREFIX              ?= $(shell pwd)
 BIN_DIR             ?= $(shell pwd)
 DOCKER_IMAGE_NAME   ?= mongodb-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
+# Race detector is only supported on amd64.
+RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
 
 all: format build test
 
@@ -31,21 +33,11 @@ style:
 
 test:
 	@echo ">> running tests"
-	rm -f coverage.txt
-	for p in $(pkgs); do \
-		rm -f coverage_temp.txt ; \
-		$(GO) test -v -short -race -covermode atomic -coverprofile coverage_temp.txt $$p ; \
-		cat coverage_temp.txt >> coverage.txt ; \
-	done
+	gocoverutil -coverprofile=coverage.txt test -short -v $(RACE) $(pkgs)
 
 testall:
 	@echo ">> running all tests"
-	rm -f coverage.txt
-	for p in $(pkgs); do \
-		rm -f coverage_temp.txt ; \
-		$(GO) test -v -race -covermode atomic -coverprofile coverage_temp.txt $$p ; \
-		cat coverage_temp.txt >> coverage.txt ; \
-	done
+	gocoverutil -coverprofile=coverage.txt test -v $(RACE) $(pkgs)
 
 format:
 	@echo ">> formatting code"
@@ -55,11 +47,11 @@ vet:
 	@echo ">> vetting code"
 	@$(GO) vet $(pkgs)
 
-build: promu
+build: init
 	@echo ">> building binaries"
 	@$(PROMU) build --prefix $(PREFIX)
 
-tarball: promu
+tarball: init
 	@echo ">> building release tarball"
 	@$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
 
@@ -67,10 +59,11 @@ docker:
 	@echo ">> building docker image"
 	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
 
-promu:
-	@GOOS=$(shell uname -s | tr A-Z a-z) \
-		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
+init:
+	$(GO) get -u github.com/AlekSi/gocoverutil
+	GOOS=$(shell uname -s | tr A-Z a-z) \
+		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(subst aarch64,arm64,$(shell uname -m)))) \
 		$(GO) get -u github.com/prometheus/promu
 
 
-.PHONY: all style format build test vet tarball docker promu
+.PHONY: all style format build test vet tarball docker init

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_mongod
+package mongod
 
 import (
 	"time"
@@ -114,12 +114,6 @@ var (
 		Subsystem: subsystem,
 		Name:      "member_config_version",
 		Help:      "The configVersion value is the replica set configuration version.",
-	}, []string{"set", "name", "state"})
-	memberOptime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: subsystem,
-		Name:      "member_optime",
-		Help:      "Information regarding the last operation from the operation log that this member has applied.",
 	}, []string{"set", "name", "state"})
 )
 
@@ -267,7 +261,7 @@ func GetReplSetStatus(session *mgo.Session) *ReplSetStatus {
 	result := &ReplSetStatus{}
 	err := session.DB("admin").Run(bson.D{{"replSetGetStatus", 1}}, result)
 	if err != nil {
-		log.Error("Failed to get replSet status.")
+		log.Errorf("Failed to get replSet status: %s", err)
 		return nil
 	}
 	return result

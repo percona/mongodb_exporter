@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_mongod
+package mongod
 
 import (
 	"time"
@@ -24,6 +24,12 @@ import (
 )
 
 var (
+	versionInfo = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "version",
+		Name:      "info",
+		Help:      "Software version information for mongodb process.",
+	}, []string{"mongodb"})
 	instanceUptimeSeconds = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: "instance",
@@ -46,6 +52,7 @@ var (
 
 // ServerStatus keeps the data returned by the serverStatus() method.
 type ServerStatus struct {
+	Version        string    `bson:"version"`
 	Uptime         float64   `bson:"uptime"`
 	UptimeEstimate float64   `bson:"uptimeEstimate"`
 	LocalTime      time.Time `bson:"localTime"`
@@ -83,9 +90,11 @@ type ServerStatus struct {
 
 // Export exports the server status to be consumed by prometheus.
 func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
+	versionInfo.WithLabelValues(status.Version).Set(1)
 	instanceUptimeSeconds.Set(status.Uptime)
 	instanceUptimeEstimateSeconds.Set(status.Uptime)
 	instanceLocalTime.Set(float64(status.LocalTime.Unix()))
+	versionInfo.Collect(ch)
 	instanceUptimeSeconds.Collect(ch)
 	instanceUptimeEstimateSeconds.Collect(ch)
 	instanceLocalTime.Collect(ch)
@@ -156,6 +165,7 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 
 // Describe describes the server status for prometheus.
 func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
+	versionInfo.Describe(ch)
 	instanceUptimeSeconds.Describe(ch)
 	instanceUptimeEstimateSeconds.Describe(ch)
 	instanceLocalTime.Describe(ch)
@@ -221,7 +231,7 @@ func GetServerStatus(session *mgo.Session) *ServerStatus {
 	result := &ServerStatus{}
 	err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
 	if err != nil {
-		log.Error("Failed to get server status.")
+		log.Errorf("Failed to get server status: %s", err)
 		return nil
 	}
 

@@ -7,11 +7,6 @@
 
 Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado (@dcu), but forked for full sharded support and structure changes.
 
-
-## Experimental
-
-The exporter is in beta/experimental state and field names are **very likely to change** and features may change or get removed!
-
 ## Features
 
 - MongoDB Server Status metrics (*cursors, operations, indexes, storage, etc*)
@@ -20,6 +15,7 @@ The exporter is in beta/experimental state and field names are **very likely to 
 - MongoDB Sharding metrics (*shards, chunks, db/collections, balancer operations*)
 - MongoDB RocksDB storage-engine metrics (*levels, compactions, cache usage, i/o rates, etc*)
 - MongoDB WiredTiger storage-engine metrics (*cache, blockmanger, tickets, etc*)
+- MongoDB Top Metrics per collection (writeLock, readLock, query, etc*)
 
 
 ## Building and running
@@ -69,17 +65,22 @@ db.getSiblingDB("admin").createUser({
 export MONGODB_URL=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
 ```
 
+If you use [x.509 Certificates to Authenticate Clients](https://docs.mongodb.com/manual/tutorial/configure-x509-client-authentication/), pass in username and `authMechanism` via [connection options](https://docs.mongodb.com/manual/reference/connection-string/#connections-connection-options) to the MongoDB uri. Eg:
+
+```
+mongodb://CN=myName,OU=myOrgUnit,O=myOrg,L=myLocality,ST=myState,C=myCountry@localhost:27017/?authMechanism=MONGODB-X509
+```
+
 ## Note about how this works
 
-Point the process to any mongo port and it will detect if it is a mongos, replicaset member, or stand alone mongod and return the appropriate metrics for that type of node. This was done to preent the need to an exporter per type of process.
+Point the process to any mongo port and it will detect if it is a mongos, replicaset member, or stand alone mongod and return the appropriate metrics for that type of node. This was done to prevent the need to an exporter per type of process.
 
 ## Roadmap
 
 - Document more configurations options here
-- Stabilize RocksDB and WiredTiger support (*currently beta/experimental*)
+- Stabilize RocksDB and WiredTiger support
 - Move MongoDB user/password/authdb to a file (for security)
 - Write more go tests
-- Version scheme
 
 
 ## Submitting Bug Reports
