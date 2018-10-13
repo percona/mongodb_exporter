@@ -306,9 +306,8 @@ func (exporter *MongodbCollector) collectMongod(session *mgo.Session, ch chan<- 
 
 	}
 
-
 	log.Debug("Collecting Collection Metrics")
-	topOutput, err := collector_mongod.GetTop(session)
+	topOutput, err := mongod.GetTop(session)
 	if err != nil {
 		log.Errorf("error in GetTop (err=%s)", err)
 	} else {
