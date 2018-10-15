@@ -15,17 +15,34 @@
 package collector
 
 import (
+	"os"
 	"testing"
+
+	"github.com/percona/exporter_shared/helpers"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+func testMongoDBURL() string {
+	if u := os.Getenv("TEST_MONGODB_URL"); u != "" {
+		return u
+	}
+	return "mongodb://localhost:27017"
+}
+
 func TestCollector(t *testing.T) {
 	if testing.Short() {
-		t.Skip("-short is passed, skipping integration test")
+		t.Skip("-short is passed, skipping functional test")
 	}
 
-	collector := NewMongodbCollector(MongodbCollectorOpts{URI: "mongodb://localhost:27017"})
+	collector := NewMongodbCollector(&MongodbCollectorOpts{
+		URI: testMongoDBURL(),
+		CollectDatabaseMetrics:   true,
+		CollectCollectionMetrics: true,
+		CollectTopMetrics:        true,
+		CollectIndexUsageStats:   true,
+	})
 
 	descCh := make(chan *prometheus.Desc)
 	go func() {
@@ -38,15 +55,22 @@ func TestCollector(t *testing.T) {
 		close(metricCh)
 	}()
 
-	var descs, metrics int
+	var descs int
 	for range descCh {
 		descs++
 	}
-	for range metricCh {
+
+	var metrics int
+	var versionInfoFound bool
+	for m := range metricCh {
+		m := helpers.ReadMetric(m)
+		switch m.Name {
+		case "mongodb_mongod_version_info":
+			versionInfoFound = true
+		}
 		metrics++
 	}
 
-	if descs != metrics {
-		t.Errorf("got %d descs and %d metrics", descs, metrics)
-	}
+	assert.Equalf(t, descs, metrics, "got %d descs and %d metrics", descs, metrics)
+	assert.True(t, versionInfoFound, "version info metric not found")
 }

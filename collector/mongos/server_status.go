@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_mongos
+package mongos
 
 import (
 	"time"
@@ -137,7 +137,7 @@ func GetServerStatus(session *mgo.Session) *ServerStatus {
 	result := &ServerStatus{}
 	err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
 	if err != nil {
-		log.Error("Failed to get server status.")
+		log.Errorf("Failed to get server status: %s", err)
 		return nil
 	}
 

@@ -18,6 +18,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
+	"runtime"
+	"strconv"
+
+	"gopkg.in/mgo.v2"
 )
 
 func LoadCaFrom(pemFile string) (*x509.CertPool, error) {
@@ -36,4 +40,14 @@ func LoadKeyPairFrom(pemFile string, privateKeyPemFile string) (tls.Certificate,
 		targetPrivateKeyPemFile = pemFile
 	}
 	return tls.LoadX509KeyPair(pemFile, targetPrivateKeyPemFile)
+}
+
+// AddCodeCommentToQuery adds location of the caller in the source code (e.g. "oplog_status.go:91")
+// to the given query as a comment.
+func AddCodeCommentToQuery(query *mgo.Query) *mgo.Query {
+	_, fileName, lineNum, ok := runtime.Caller(1)
+	if !ok {
+		return query
+	}
+	return query.Comment(fileName + ":" + strconv.Itoa(lineNum))
 }

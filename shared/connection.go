@@ -17,6 +17,7 @@ package shared
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -26,13 +27,11 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-const (
-	dialMongodbTimeout = 3 * time.Second
-	syncMongodbTimeout = 1 * time.Minute
-)
-
 func RedactMongoUri(uri string) string {
 	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
+		if strings.Contains(uri, "ssl=true") {
+			uri = strings.Replace(uri, "ssl=true", "", 1)
+		}
 		dialInfo, err := mgo.ParseURL(uri)
 		if err != nil {
 			log.Errorf("Cannot parse mongodb server url: %s", err)
@@ -52,17 +51,27 @@ type MongoSessionOpts struct {
 	TLSPrivateKeyFile     string
 	TLSCaFile             string
 	TLSHostnameValidation bool
+	PoolLimit             int
+	SocketTimeout         time.Duration
+	SyncTimeout           time.Duration
 }
 
-func MongoSession(opts MongoSessionOpts) *mgo.Session {
+// MongoSession connects to MongoDB and returns ready to use MongoDB session.
+func MongoSession(opts *MongoSessionOpts) *mgo.Session {
+	if strings.Contains(opts.URI, "ssl=true") {
+		opts.URI = strings.Replace(opts.URI, "ssl=true", "", 1)
+		opts.TLSConnection = true
+	}
 	dialInfo, err := mgo.ParseURL(opts.URI)
 	if err != nil {
 		log.Errorf("Cannot parse mongodb server url: %s", err)
 		return nil
 	}
 
-	dialInfo.Direct = true // Force direct connection
-	dialInfo.Timeout = dialMongodbTimeout
+	// connect directly, fail faster, do not retry - for faster responses and accurate metrics, including mongoUp
+	dialInfo.Direct = true
+	dialInfo.Timeout = opts.SocketTimeout
+	dialInfo.FailFast = true
 
 	err = opts.configureDialInfoIfRequired(dialInfo)
 	if err != nil {
@@ -76,13 +85,15 @@ func MongoSession(opts MongoSessionOpts) *mgo.Session {
 		return nil
 	}
 	session.SetMode(mgo.Eventual, true)
-	session.SetSyncTimeout(syncMongodbTimeout)
-	session.SetSocketTimeout(0)
+	session.SetPoolLimit(opts.PoolLimit)
+	session.SetPrefetch(0.00)
+	session.SetSyncTimeout(opts.SyncTimeout)
+	session.SetSocketTimeout(opts.SocketTimeout)
 	return session
 }
 
-func (opts MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
-	if opts.TLSConnection == true {
+func (opts *MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
+	if opts.TLSConnection {
 		config := &tls.Config{
 			InsecureSkipVerify: !opts.TLSHostnameValidation,
 		}
@@ -178,4 +189,23 @@ func MongoSessionNodeType(session *mgo.Session) (string, error) {
 		return "mongos", nil
 	}
 	return "mongod", nil
+}
+
+// TestConnection connects to MongoDB and returns BuildInfo.
+func TestConnection(opts MongoSessionOpts) ([]byte, error) {
+	session := MongoSession(&opts)
+	if session == nil {
+		return nil, fmt.Errorf("Cannot connect using uri: %s", opts.URI)
+	}
+	buildInfo, err := session.BuildInfo()
+	if err != nil {
+		return nil, fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", opts.URI, err)
+	}
+
+	b, err := json.MarshalIndent(buildInfo, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("Cannot create json: %s", err)
+	}
+
+	return b, nil
 }

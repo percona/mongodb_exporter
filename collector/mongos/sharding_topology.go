@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_mongos
+package mongos
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 var (
@@ -86,17 +88,18 @@ type ShardingTopoStats struct {
 
 func GetShards(session *mgo.Session) *[]ShardingTopoShardInfo {
 	var shards []ShardingTopoShardInfo
-	err := session.DB("config").C("shards").Find(bson.M{}).All(&shards)
-	if err != nil {
-		log.Error("Failed to execute find query on 'config.shards'!")
+	q := session.DB("config").C("shards").Find(bson.M{})
+	if err := shared.AddCodeCommentToQuery(q).All(&shards); err != nil {
+		log.Errorf("Failed to execute find query on 'config.shards': %s.", err)
 	}
 	return &shards
 }
 
 func GetTotalChunks(session *mgo.Session) float64 {
-	chunkCount, err := session.DB("config").C("chunks").Find(bson.M{}).Count()
+	q := session.DB("config").C("chunks").Find(bson.M{})
+	chunkCount, err := shared.AddCodeCommentToQuery(q).Count()
 	if err != nil {
-		log.Error("Failed to execute find query on 'config.chunks'!")
+		log.Errorf("Failed to execute find query on 'config.chunks': %s.", err)
 	}
 	return float64(chunkCount)
 }
@@ -105,7 +108,7 @@ func GetTotalChunksByShard(session *mgo.Session) *[]ShardingTopoChunkInfo {
 	var results []ShardingTopoChunkInfo
 	err := session.DB("config").C("chunks").Pipe([]bson.M{{"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}}).All(&results)
 	if err != nil {
-		log.Error("Failed to execute find query on 'config.chunks'!")
+		log.Errorf("Failed to execute find query on 'config.chunks': %s.", err)
 	}
 	return &results
 }
@@ -115,15 +118,16 @@ func GetTotalDatabases(session *mgo.Session) *[]ShardingTopoStatsTotalDatabases 
 	query := []bson.M{{"$match": bson.M{"_id": bson.M{"$ne": "admin"}}}, {"$group": bson.M{"_id": "$partitioned", "total": bson.M{"$sum": 1}}}}
 	err := session.DB("config").C("databases").Pipe(query).All(&results)
 	if err != nil {
-		log.Error("Failed to execute find query on 'config.databases'!")
+		log.Errorf("Failed to execute find query on 'config.databases': %s.", err)
 	}
 	return &results
 }
 
 func GetTotalShardedCollections(session *mgo.Session) float64 {
-	collCount, err := session.DB("config").C("collections").Find(bson.M{"dropped": false}).Count()
+	q := session.DB("config").C("collections").Find(bson.M{"dropped": false})
+	collCount, err := shared.AddCodeCommentToQuery(q).Count()
 	if err != nil {
-		log.Error("Failed to execute find query on 'config.collections'!")
+		log.Errorf("Failed to execute find query on 'config.collections': %s.", err)
 	}
 	return float64(collCount)
 }
@@ -132,7 +136,7 @@ func (status *ShardingTopoStats) Export(ch chan<- prometheus.Metric) {
 	if status.Shards != nil {
 		var drainingShards float64 = 0
 		for _, shard := range *status.Shards {
-			if shard.Draining == true {
+			if shard.Draining {
 				drainingShards = drainingShards + 1
 			}
 		}
