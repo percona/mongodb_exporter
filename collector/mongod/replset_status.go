@@ -121,7 +121,7 @@ var (
 		Name:      "member_config_version",
 		Help:      "The configVersion value is the replica set configuration version.",
 	}, []string{"set", "name", "state"})
-	PrimaryOptimeDate float64
+	primaryOptimeDate float64
 )
 
 // ReplSetStatus keeps the data returned by the GetReplSetStatus method
@@ -186,11 +186,11 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 		heartbeatIntervalMillis.WithLabelValues(replStatus.Set).Set(*replStatus.HeartbeatIntervalMillis)
 	}
 
-	// Find the Optime for the Primary. This is neede to
+	// Find the Optime for the Primary. This is needed to
 	// calcule the replication lag for secondaries.
 	for _, member := range replStatus.Members {
 		if member.StateStr == "PRIMARY" {
-			PrimaryOptimeDate = float64(member.OptimeDate.Unix())
+			primaryOptimeDate = float64(member.OptimeDate.Unix())
 			break
 		}
 	}
@@ -221,7 +221,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 		memberOptimeDate.With(ls).Set(float64(member.OptimeDate.Unix()))
 
 		if member.StateStr == "SECONDARY" {
-			memberRepLag.With(ls).Set(PrimaryOptimeDate - float64(member.OptimeDate.Unix()))
+			memberRepLag.With(ls).Set(primaryOptimeDate - float64(member.OptimeDate.Unix()))
 		}
 
 		// ReplSetGetStatus.Member.ElectionTime is only available on the PRIMARY
