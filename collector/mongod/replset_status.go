@@ -199,8 +199,12 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 		if member.StateStr == "PRIMARY" {
 			// Needed to calcule the replication lag for secondaries.
 			primaryOptimeDate = float64(member.OptimeDate.Unix())
-			// Needed to calcule the operationl lag
-			primaryLastHeartbeatRecv = float64((*member.LastHeartbeatRecv).Unix())
+			// Needed to calcule the operationl lag.
+			if member.LastHeartbeatRecv != nil {
+				primaryLastHeartbeatRecv = float64((*member.LastHeartbeatRecv).Unix())
+			} else {
+				primaryLastHeartbeatRecv = 0
+			}
 			break
 		}
 	}
