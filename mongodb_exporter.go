@@ -73,6 +73,7 @@ var (
 	// FIXME currently ignored
 	// enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
 	enabledGroupsFlag = flag.String("groups.enabled", "", "Currently ignored")
+	loglevel = flag.String("log.level", "info", "Default Log Level for logs")
 )
 
 func main() {
@@ -84,6 +85,12 @@ func main() {
 	}
 	flag.Parse()
 
+	// See if we have a different log level passed, then use that..
+	if *loglevel == "debug" || *loglevel == "fatal" || *loglevel == "error" || *loglevel == "warn"  {
+		log.Base().SetLevel(*loglevel)
+	}else {
+		log.Base().SetLevel("info") // default level
+	}
 	uri := os.Getenv("MONGODB_URI")
 	if uri != "" {
 		uriF = &uri
