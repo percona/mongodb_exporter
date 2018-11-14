@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"strings"
 )
 
 var (
@@ -119,18 +120,24 @@ func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
 		return nil
 	}
 	for _, db := range database_names {
+		if db == "admin" || db == "config" || "db" == "local" {
+			continue
+		}
 		collection_names, err := session.DB(db).CollectionNames()
 		if err != nil {
 			log.Error("Failed to get collection names for db=" + db)
 			return nil
 		}
 		for _, collection_name := range collection_names {
+			if strings.HasPrefix(collection_name, "system.") {
+				continue
+			}
 			collStatus := CollectionStatus{}
 			err := session.DB(db).Run(bson.D{{"collStats", collection_name}, {"scale", 1}}, &collStatus)
 			collStatus.Database = db
 			collStatus.Name = collection_name
 			if err != nil {
-				log.Error("Failed to get collection status.")
+				log.Error("Failed to get collection status for " + db + "." + collection_name)
 				return nil
 			}
 			collectionStatList.Members = append(collectionStatList.Members, collStatus)

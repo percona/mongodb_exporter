@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/common/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"strings"
 )
 
 var (
@@ -46,7 +47,7 @@ func (indexStats *IndexStatsList) Describe(ch chan<- *prometheus.Desc) {
 	indexUsage.Describe(ch)
 }
 
-// GetIndexUsageStatList returns stats for a given collection in a database
+// GetIndexUsageStatList returns stats for all non-system collections
 func GetIndexUsageStatList(session *mgo.Session) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	log.Info("collecting index stats")
@@ -56,17 +57,22 @@ func GetIndexUsageStatList(session *mgo.Session) *IndexStatsList {
 		return nil
 	}
 	for _, db := range databaseNames {
+		if db == "admin" || db == "config" || "db" == "local" {
+			continue
+		}
 		collectionNames, err := session.DB(db).CollectionNames()
 		if err != nil {
 			log.Error("Failed to get collection names for db=" + db)
 			return nil
 		}
 		for _, collectionName := range collectionNames {
-
+			if strings.HasPrefix(collectionName, "system.") {
+				continue
+			}
 			collIndexUsageStats := IndexStatsList{}
 			err := session.DB(db).C(collectionName).Pipe([]bson.M{{"$indexStats": bson.M{}}}).All(&collIndexUsageStats.Items)
 			if err != nil {
-				log.Error("Failed to collect index stats for coll=" + collectionName)
+				log.Error("Failed to collect index stats for " + db + "." + collectionName)
 				return nil
 			}
 			// Label index stats with corresponding db.collection
