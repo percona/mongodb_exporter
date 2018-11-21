@@ -34,8 +34,8 @@ const (
 	program = "mongodb_exporter"
 )
 
-func defaultMongoDBURL() string {
-	if u := os.Getenv("MONGODB_URL"); u != "" {
+func defaultMongoDBURI() string {
+	if u := os.Getenv("MONGODB_URI"); u != "" {
 		return u
 	}
 	return "mongodb://localhost:27017"
@@ -51,7 +51,7 @@ var (
 	collectTopF        = flag.Bool("collect.topmetrics", false, "Enable collection of table top metrics")
 	collectIndexUsageF = flag.Bool("collect.indexusage", false, "Enable collection of per index usage stats")
 
-	uriF     = flag.String("mongodb.uri", defaultMongoDBURL(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
+	uriF     = flag.String("mongodb.uri", defaultMongoDBURI(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
 	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
 	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).\n"+
 		"    \tThis should include the whole certificate chain.\n"+

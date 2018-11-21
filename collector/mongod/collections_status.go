@@ -71,6 +71,14 @@ type CollectionStatus struct {
 
 // Export exports database stats to prometheus
 func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
+	// reset previously collected values
+	collectionSize.Reset()
+	collectionObjectCount.Reset()
+	collectionAvgObjSize.Reset()
+	collectionStorageSize.Reset()
+	collectionIndexes.Reset()
+	collectionIndexesSize.Reset()
+	collectionIndexSize.Reset()
 	for _, member := range collStatList.Members {
 		ls := prometheus.Labels{
 			"db":   member.Database,
