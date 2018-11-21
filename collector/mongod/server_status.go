@@ -75,6 +75,7 @@ type ServerStatus struct {
 
 	Network *NetworkStats `bson:"network"`
 
+	OpLatencies    *OpLatenciesStat     `bson:"opLatencies"`
 	Opcounters     *OpcountersStats     `bson:"opcounters"`
 	OpcountersRepl *OpcountersReplStats `bson:"opcountersRepl"`
 	Mem            *MemStats            `bson:"mem"`
@@ -122,6 +123,9 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	}
 	if status.Network != nil {
 		status.Network.Export(ch)
+	}
+	if status.OpLatencies != nil {
+		status.OpLatencies.Export(ch)
 	}
 	if status.Opcounters != nil {
 		status.Opcounters.Export(ch)
@@ -194,6 +198,9 @@ func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
 	if status.Network != nil {
 		status.Network.Describe(ch)
 	}
+	if status.OpLatencies != nil {
+		status.OpLatencies.Describe(ch)
+	}
 	if status.Opcounters != nil {
 		status.Opcounters.Describe(ch)
 	}
@@ -229,7 +236,11 @@ func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
 // GetServerStatus returns the server status info.
 func GetServerStatus(session *mgo.Session) *ServerStatus {
 	result := &ServerStatus{}
-	err := session.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
+	err := session.DB("admin").Run(bson.D{
+		{Name: "serverStatus", Value: 1},
+		{Name: "recordStats", Value: 0},
+		{Name: "opLatencies", Value: bson.M{"histograms": true}},
+	}, result)
 	if err != nil {
 		log.Errorf("Failed to get server status: %s", err)
 		return nil
