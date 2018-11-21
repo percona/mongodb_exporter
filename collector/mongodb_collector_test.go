@@ -25,7 +25,7 @@ import (
 )
 
 func testMongoDBURL() string {
-	if u := os.Getenv("TEST_MONGODB_URL"); u != "" {
+	if u := os.Getenv("TEST_MONGODB_URI"); u != "" {
 		return u
 	}
 	return "mongodb://localhost:27017"
