@@ -28,7 +28,13 @@ import (
 	"github.com/percona/mongodb_exporter/shared"
 )
 
-const namespace = "mongodb"
+const (
+	namespace     = "mongodb"
+	nodeMongos    = "mongos"
+	nodeMongod    = "mongod"
+	nodeReplset   = "replset"
+	bodeConfigSvr = "configsvr"
+)
 
 // MongodbCollectorOpts is the options of the mongodb collector.
 type MongodbCollectorOpts struct {
@@ -45,6 +51,7 @@ type MongodbCollectorOpts struct {
 	CollectIndexUsageStats   bool
 	SocketTimeout            time.Duration
 	SyncTimeout              time.Duration
+	ShardingStatFrom         string
 }
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
@@ -58,6 +65,7 @@ func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
 		PoolLimit:             in.DBPoolLimit,
 		SocketTimeout:         in.SocketTimeout,
 		SyncTimeout:           in.SyncTimeout,
+		ShardingStatFrom:      in.ShardingStatFrom,
 	}
 }
 
@@ -221,12 +229,14 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 
 	log.Debugf("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
 	switch {
-	case nodeType == "mongos":
+	case nodeType == nodeMongos:
 		exporter.collectMongos(mongoSess, ch)
-	case nodeType == "mongod":
+	case nodeType == nodeMongod:
 		exporter.collectMongod(mongoSess, ch)
-	case nodeType == "replset":
+	case nodeType == nodeReplset:
 		exporter.collectMongodReplSet(mongoSess, ch)
+	case nodeType == bodeConfigSvr:
+		exporter.collectConfigSvr(mongoSess, ch)
 	default:
 		err = fmt.Errorf("Unrecognized node type %s", nodeType)
 		log.Error(err)
@@ -243,10 +253,12 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 		serverStatus.Export(ch)
 	}
 
-	log.Debug("Collecting Sharding Status")
-	shardingStatus := mongos.GetShardingStatus(session)
-	if shardingStatus != nil {
-		shardingStatus.Export(ch)
+	if exporter.Opts.ShardingStatFrom == nodeMongos {
+		log.Debug("Collecting Sharding Status")
+		shardingStatus := mongos.GetShardingStatus(session)
+		if shardingStatus != nil {
+			shardingStatus.Export(ch)
+		}
 	}
 
 	if exporter.Opts.CollectDatabaseMetrics {
@@ -262,6 +274,18 @@ func (exporter *MongodbCollector) collectMongos(session *mgo.Session, ch chan<- 
 		collStatList := mongos.GetCollectionStatList(session)
 		if collStatList != nil {
 			collStatList.Export(ch)
+		}
+	}
+}
+
+func (exporter *MongodbCollector) collectConfigSvr(session *mgo.Session, ch chan<- prometheus.Metric) {
+	exporter.collectMongod(session, ch)
+
+	if exporter.Opts.ShardingStatFrom == bodeConfigSvr {
+		log.Debug("Collecting Sharding Status")
+		shardingStatus := mongos.GetShardingStatus(session)
+		if shardingStatus != nil {
+			shardingStatus.Export(ch)
 		}
 	}
 }

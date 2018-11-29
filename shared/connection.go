@@ -54,6 +54,7 @@ type MongoSessionOpts struct {
 	PoolLimit             int
 	SocketTimeout         time.Duration
 	SyncTimeout           time.Duration
+	ShardingStatFrom      string
 }
 
 // MongoSession connects to MongoDB and returns ready to use MongoDB session.
@@ -171,9 +172,11 @@ func MongoSessionServerVersion(session *mgo.Session) (string, error) {
 
 func MongoSessionNodeType(session *mgo.Session) (string, error) {
 	masterDoc := struct {
-		SetName interface{} `bson:"setName"`
-		Hosts   interface{} `bson:"hosts"`
-		Msg     string      `bson:"msg"`
+		SetName      interface{} `bson:"setName"`
+		Hosts        interface{} `bson:"hosts"`
+		Msg          string      `bson:"msg"`
+		ConfigServer int         `bson:"configsvr"`
+		IsMaster     bool        `bson:"ismaster"`
 	}{}
 	err := session.Run("isMaster", &masterDoc)
 	if err != nil {
@@ -182,6 +185,9 @@ func MongoSessionNodeType(session *mgo.Session) (string, error) {
 	}
 
 	if masterDoc.SetName != nil || masterDoc.Hosts != nil {
+		if masterDoc.IsMaster && masterDoc.ConfigServer != 0 {
+			return "configsvr", nil
+		}
 		return "replset", nil
 	} else if masterDoc.Msg == "isdbgrid" {
 		// isdbgrid is always the msg value when calling isMaster on a mongos
