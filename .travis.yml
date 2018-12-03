@@ -49,6 +49,23 @@ script:
 after_success:
   - bash <(curl -s https://codecov.io/bash) -X fix
 
+before_deploy:
+  - go get -v github.com/prometheus/promu
+  - promu crossbuild
+  - promu crossbuild tarballs
+  - promu checksum .tarballs
+
+deploy:
+  skip_cleanup: true
+  provider: releases
+  api_key: $GITHUB_OAUTH_TOKEN
+  file_glob: true
+  file: .tarballs/*
+  on:
+    tags: true
+    branch: master
+    condition: $MONGODB_IMAGE = mongo:3.6 # onyl do it once
+
 notifications:
   slack:
     on_success: change
