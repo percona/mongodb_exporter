@@ -12,7 +12,7 @@ var (
 		Namespace: Namespace,
 		Name:      "index_usage_count",
 		Help:      "Contains a usage count of each index",
-	}, []string{"collection", "index"})
+	}, []string{"db", "coll", "index"})
 )
 
 // IndexStatsList represents index usage information
@@ -22,9 +22,10 @@ type IndexStatsList struct {
 
 // IndexUsageStats represents stats about an Index
 type IndexUsageStats struct {
-	Name       string         `bson:"name"`
-	Accesses   IndexUsageInfo `bson:"accesses"`
-	Collection string
+	Database string
+	Coll     string
+	Name     string         `bson:"name"`
+	Accesses IndexUsageInfo `bson:"accesses"`
 }
 
 // IndexUsageInfo represents a single index stats of an Index
@@ -36,7 +37,12 @@ type IndexUsageInfo struct {
 func (indexStats *IndexStatsList) Export(ch chan<- prometheus.Metric) {
 	indexUsage.Reset()
 	for _, indexStat := range indexStats.Items {
-		indexUsage.WithLabelValues(indexStat.Collection, indexStat.Name).Add(indexStat.Accesses.Ops)
+		labels := prometheus.Labels{
+			"db":    indexStat.Database,
+			"coll":  indexStat.Coll,
+			"index": indexStat.Name,
+		}
+		indexUsage.With(labels).Add(indexStat.Accesses.Ops)
 	}
 	indexUsage.Collect(ch)
 }
@@ -70,8 +76,9 @@ func GetIndexUsageStatList(session *mgo.Session) *IndexStatsList {
 				return nil
 			}
 			// Label index stats with corresponding db.collection
-			for _, stat := range collIndexUsageStats.Items {
-				stat.Collection = db + "." + collectionName
+			for i := range collIndexUsageStats.Items {
+				collIndexUsageStats.Items[i].Database = db
+				collIndexUsageStats.Items[i].Coll = collectionName
 			}
 			indexUsageStatsList.Items = append(indexUsageStatsList.Items, collIndexUsageStats.Items...)
 		}
