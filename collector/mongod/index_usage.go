@@ -52,54 +52,35 @@ func (indexStats *IndexStatsList) Describe(ch chan<- *prometheus.Desc) {
 	indexUsage.Describe(ch)
 }
 
-var (
-	logSuppressIS = make(map[string]bool)
-)
-
 // GetIndexUsageStatList returns stats for a given collection in a database
 func GetIndexUsageStatList(session *mgo.Session) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	log.Info("collecting index stats")
 	databaseNames, err := session.DatabaseNames()
 	if err != nil {
-		_, logSFound := logSuppressIS[""]
-		if !logSFound {
-			log.Errorf("%s. Index usage stats will not be collected. This log message will be suppressed from now.", err)
-			logSuppressIS[""] = true
-		}
+		log.Error("Failed to get database names")
 		return nil
 	}
-	delete(logSuppressIS, "")
-	for _, dbName := range databaseNames {
-		collNames, err := session.DB(dbName).CollectionNames()
+	for _, db := range databaseNames {
+		collectionNames, err := session.DB(db).CollectionNames()
 		if err != nil {
-			_, logSFound := logSuppressIS[dbName]
-			if !logSFound {
-				log.Errorf("%s. Index usage stats will not be collected for this db. This log message will be suppressed from now.", err)
-				logSuppressIS[dbName] = true
-			}
-		} else {
-			delete(logSuppressIS, dbName)
-			for _, collName := range collNames {
+			log.Error("Failed to get collection names for db=" + db)
+			return nil
+		}
+		for _, collectionName := range collectionNames {
 
-				collIndexUsageStats := IndexStatsList{}
-				err := session.DB(dbName).C(collName).Pipe([]bson.M{{"$indexStats": bson.M{}}}).All(&collIndexUsageStats.Items)
-				if err != nil {
-					_, logSFound := logSuppressIS[dbName+"."+collName]
-					if !logSFound {
-						log.Errorf("%s. Index usage stats will not be collected for this collection. This log message will be suppressed from now.", err)
-						logSuppressIS[dbName+"."+collName] = true
-					}
-				} else {
-					delete(logSuppressIS, dbName+"."+collName)
-					// Label index stats with corresponding db.collection
-					for i := 0; i < len(collIndexUsageStats.Items); i++ {
-						collIndexUsageStats.Items[i].Database = dbName
-						collIndexUsageStats.Items[i].Collection = collName
-					}
-					indexUsageStatsList.Items = append(indexUsageStatsList.Items, collIndexUsageStats.Items...)
-				}
+			collIndexUsageStats := IndexStatsList{}
+			err := session.DB(db).C(collectionName).Pipe([]bson.M{{"$indexStats": bson.M{}}}).All(&collIndexUsageStats.Items)
+			if err != nil {
+				log.Error("Failed to collect index stats for coll=" + collectionName)
+				return nil
 			}
+			// Label index stats with corresponding db.collection
+			for i := 0; i < len(collIndexUsageStats.Items); i++ {
+				collIndexUsageStats.Items[i].Database = db
+				collIndexUsageStats.Items[i].Collection = collectionName
+			}
+			indexUsageStatsList.Items = append(indexUsageStatsList.Items, collIndexUsageStats.Items...)
 		}
 	}
 
