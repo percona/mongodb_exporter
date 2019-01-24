@@ -118,30 +118,49 @@ func (collStatList *CollectionStatList) Describe(ch chan<- *prometheus.Desc) {
 	collectionIndexesSize.Describe(ch)
 }
 
+var (
+	logSuppressCS = make(map[string]bool)
+)
+
 // GetDatabaseStatus returns stats for a given database
 func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	database_names, err := session.DatabaseNames()
 	if err != nil {
-		log.Error("Failed to get database names")
+		_, logSFound := logSuppressCS[""]
+		if !logSFound {
+			log.Errorf("%s. Collection stats will not be collected. This log message will be suppressed from now.", err)
+			logSuppressCS[""] = true
+		}
 		return nil
 	}
-	for _, db := range database_names {
-		collection_names, err := session.DB(db).CollectionNames()
+	delete(logSuppressCS, "")
+	for _, dbName := range database_names {
+		collNames, err := session.DB(dbName).CollectionNames()
 		if err != nil {
-			log.Error("Failed to get collection names for db=" + db)
-			return nil
-		}
-		for _, collection_name := range collection_names {
-			collStatus := CollectionStatus{}
-			err := session.DB(db).Run(bson.D{{"collStats", collection_name}, {"scale", 1}}, &collStatus)
-			collStatus.Database = db
-			collStatus.Name = collection_name
-			if err != nil {
-				log.Error("Failed to get collection status.")
-				return nil
+			_, logSFound := logSuppressCS[dbName]
+			if !logSFound {
+				log.Errorf("%s. Collection stats will not be collected for this db. This log message will be suppressed from now.", err)
+				logSuppressCS[dbName] = true
 			}
-			collectionStatList.Members = append(collectionStatList.Members, collStatus)
+		} else {
+			delete(logSuppressCS, dbName)
+			for _, collName := range collNames {
+				collStatus := CollectionStatus{}
+				err := session.DB(dbName).Run(bson.D{{"collStats", collName}, {"scale", 1}}, &collStatus)
+				if err != nil {
+					_, logSFound := logSuppressCS[dbName+"."+collName]
+					if !logSFound {
+						log.Errorf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
+						logSuppressCS[dbName+"."+collName] = true
+					}
+				} else {
+					delete(logSuppressCS, dbName+"."+collName)
+					collStatus.Database = dbName
+					collStatus.Name = collName
+					collectionStatList.Members = append(collectionStatList.Members, collStatus)
+				}
+			}
 		}
 	}
 
