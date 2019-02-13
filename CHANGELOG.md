@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- PMM-3401: Added collection of TTL metrics
+- Added some new metrics:
+  - `member_replication_lag`
+  - `member_operational_lag`
+  - `op_latencies_latency_total`
+  - `op_latencies_ops_total`
+  - `op_latencies_histogram`
+
+### Fixed
+- Fix for broken labels on `index_usage` metrics
+- Fix SIGSEGV when running connected to a Primary, thx [@anas-aso](https://github.com/anas-aso)
+
 ### Changed
 - Move CHANGELOG.md to "Keep a Changelog" format.
 
@@ -20,14 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - 2018-06-13
 ### Added
-- Add required testify dependency #107, thx @RubenHoms
-- Add timeout flags #100, thx @unguiculus
-- Enable collection of table top metrics #94, thx @bobera
-- Individual index usage stats and index sizes added #97, thx @martinhoefling
-- Support `&ssl=true` #105 #90, thx @dbmurphy
+- Add required testify dependency #107, thx [@RubenHoms](https://github.com/RubenHoms)
+- Add timeout flags #100, thx [@unguiculus](https://github.com/unguiculus)
+- Enable collection of table top metrics #94, thx [@bobera](https://github.com/bobera)
+- Individual index usage stats and index sizes added #97, thx [@martinhoefling](https://github.com/martinhoefling)
+- Support `&ssl=true` #105 #90, thx [@dbmurphy](https://github.com/dbmurphy)
 
 ### Fixed
-- Fix `balancerIsEnabled` & `balancerChunksBalanced` values #106, thx @jmsantorum
+- Fix `balancerIsEnabled` & `balancerChunksBalanced` values #106, thx [@jmsantorum](https://github.com/jmsantorum)
 
 ## [0.5.0] - 2018-05-24
 ### Added
