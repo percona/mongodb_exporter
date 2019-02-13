@@ -59,7 +59,6 @@ var (
 // GetIndexUsageStatList returns stats for a given collection in a database
 func GetIndexUsageStatList(session *mgo.Session) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
-	log.Info("collecting index stats")
 	databaseNames, err := session.DatabaseNames()
 	if err != nil {
 		_, logSFound := logSuppressIS[""]
