@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.3] - 2019-02-13
 ### Added
-- PMM-3401: Added collection of TTL metrics
+- PMM-3401: Added collection of TTL metrics #127, thx [@fastest963](https://github.com/fastest963)
 - Added some new metrics:
   - `member_replication_lag`
   - `member_operational_lag`
