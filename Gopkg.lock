@@ -216,6 +216,7 @@
     "github.com/prometheus/common/version",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
+    "gopkg.in/alecthomas/kingpin.v2",
     "gopkg.in/mgo.v2",
     "gopkg.in/mgo.v2/bson",
   ]
