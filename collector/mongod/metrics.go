@@ -467,6 +467,18 @@ func (cursorStats *CursorStats) Export(ch chan<- prometheus.Metric) {
 	metricsCursorOpen.WithLabelValues("total").Set(cursorStats.Open.Total)
 }
 
+// TTLStats are the stats for ttl indexes
+type TTLStats struct {
+	DeletedDocuments float64 `bson:"deletedDocuments"`
+	Passes           float64 `bson:"passes"`
+}
+
+// Export exports the cursor stats.
+func (ttlStats *TTLStats) Export(ch chan<- prometheus.Metric) {
+	metricsTTLDeletedDocumentsTotal.Set(ttlStats.DeletedDocuments)
+	metricsTTLPassesTotal.Set(ttlStats.Passes)
+}
+
 // MetricsStats are all stats associated with metrics of the system
 type MetricsStats struct {
 	Document      *DocumentStats      `bson:"document"`
@@ -477,6 +489,7 @@ type MetricsStats struct {
 	Repl          *ReplStats          `bson:"repl"`
 	Storage       *StorageStats       `bson:"storage"`
 	Cursor        *CursorStats        `bson:"cursor"`
+	TTL           *TTLStats           `bson:"ttl"`
 }
 
 // Export exports the metrics stats.
@@ -504,6 +517,9 @@ func (metricsStats *MetricsStats) Export(ch chan<- prometheus.Metric) {
 	}
 	if metricsStats.Cursor != nil {
 		metricsStats.Cursor.Export(ch)
+	}
+	if metricsStats.TTL != nil {
+		metricsStats.TTL.Export(ch)
 	}
 
 	metricsCursorTimedOutTotal.Collect(ch)

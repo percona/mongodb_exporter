@@ -1,6 +1,8 @@
 repository:
   path: github.com/percona/mongodb_exporter
 build:
+  binaries:
+    - name: mongodb_exporter
   flags: -v -a -tags netgo
   ldflags: |
     -X {{repoPath}}/vendor/github.com/prometheus/common/version.Version={{.Version}}
@@ -13,3 +15,13 @@ tarball:
     - README.md
     - CHANGELOG.md
     - LICENSE
+crossbuild:
+  platforms:
+    - linux/amd64
+    - linux/386
+    - darwin/amd64
+    - darwin/386
+    - netbsd/amd64
+    - netbsd/386
+    - linux/arm
+    - linux/arm64
