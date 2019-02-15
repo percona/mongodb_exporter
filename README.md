@@ -26,6 +26,11 @@ Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cu
 make
 ```
 
+If you don't have or don't want to install the whole GO stuff, use this docker build that creates a container with a freshly built `mongodb_exporter` binary:
+
+```bash
+make docker
+```
 
 ### Running
 
