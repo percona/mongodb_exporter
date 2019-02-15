@@ -1,4 +1,4 @@
-FROM golang:1.10
+FROM golang:1.11
 
 LABEL maintainer="Meik Minks <mminks@inoxio.de>"
 
