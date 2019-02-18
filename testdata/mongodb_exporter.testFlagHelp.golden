@@ -6,7 +6,6 @@ exports various MongoDB metrics in Prometheus format.
 Flags:
   -h, --help                     Show context-sensitive help (also try
                                  --help-long and --help-man).
-      --version                  Print version information and exit.
       --web.listen-address=":9216"  
                                  Address to listen on for web interface and
                                  telemetry.
@@ -54,4 +53,5 @@ Flags:
                                    a connection to a usable server can't be established.
                                    Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.
       --groups.enabled=""        Currently ignored
+      --version                  Show application version.
 

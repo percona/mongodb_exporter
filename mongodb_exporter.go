@@ -34,7 +34,6 @@ const (
 )
 
 var (
-	versionF       = kingpin.Flag("version", "Print version information and exit.").Bool()
 	listenAddressF = kingpin.Flag("web.listen-address", "Address to listen on for web interface and telemetry.").Default(":9216").String()
 	metricsPathF   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
@@ -75,6 +74,7 @@ var (
 func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.CommandLine.Help = fmt.Sprintf("%s %s exports various MongoDB metrics in Prometheus format.\n", os.Args[0], version.Version)
+	kingpin.Version(version.Print(program))
 	kingpin.Parse()
 
 	if *testF {
@@ -93,10 +93,6 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(string(buildInfo))
-		os.Exit(0)
-	}
-	if *versionF {
-		fmt.Println(version.Print(program))
 		os.Exit(0)
 	}
 
