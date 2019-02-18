@@ -41,7 +41,7 @@ func defaultMongoDBURI() string {
 }
 
 var (
-	versionF       = kingpin.Flag("version", "Print version information and exit.").Short('v').Bool()
+	versionF       = kingpin.Flag("version", "Print version information and exit.").Bool()
 	listenAddressF = kingpin.Flag("web.listen-address", "Address to listen on for web interface and telemetry.").Default(":9216").String()
 	metricsPathF   = kingpin.Flag("web.metrics-path", "Path under which to expose metrics.").Default("/metrics").String()
 
