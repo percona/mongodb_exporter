@@ -65,7 +65,7 @@ func TestCollector(t *testing.T) {
 	for m := range metricCh {
 		m := helpers.ReadMetric(m)
 		switch m.Name {
-		case "mongodb_mongod_version_info":
+		case "mongodb_version_info":
 			versionInfoFound = true
 		}
 		metrics++

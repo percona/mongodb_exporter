@@ -46,16 +46,16 @@ func TestParserServerStatus(t *testing.T) {
 		t.Error("Network group was not loaded")
 	}
 
-	if serverStatus.Opcounters == nil {
-		t.Error("Opcounters group was not loaded")
-	}
-
 	if serverStatus.Mem == nil {
 		t.Error("Mem group was not loaded")
 	}
 
 	if serverStatus.Connections == nil {
 		t.Error("Connections group was not loaded")
+	}
+
+	if serverStatus.Metrics == nil {
+		t.Error("Metrics group was not loaded")
 	}
 }
 
