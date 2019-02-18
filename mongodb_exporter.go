@@ -75,6 +75,7 @@ var (
 )
 
 func main() {
+	kingpin.HelpFlag.Short('h')
 	kingpin.CommandLine.Help = fmt.Sprintf("%s %s exports various MongoDB metrics in Prometheus format.\n", os.Args[0], version.Version)
 	kingpin.Parse()
 

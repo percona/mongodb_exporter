@@ -4,13 +4,13 @@ mongodb_exporter gotest-version
 exports various MongoDB metrics in Prometheus format.
 
 Flags:
-      --help                     Show context-sensitive help (also try
+  -h, --help                     Show context-sensitive help (also try
                                  --help-long and --help-man).
-  -v, --version                  Print version information and exit.
+      --version                  Print version information and exit.
       --web.listen-address=":9216"  
                                  Address to listen on for web interface and
                                  telemetry.
-      --web.metrics-path="/metrics"  
+      --web.telemetry-path="/metrics"  
                                  Path under which to expose metrics.
       --collect.database         Enable collection of Database metrics
       --collect.collection       Enable collection of Collection metrics
