@@ -33,13 +33,6 @@ const (
 	program = "mongodb_exporter"
 )
 
-func defaultMongoDBURI() string {
-	if u := os.Getenv("MONGODB_URI"); u != "" {
-		return u
-	}
-	return "mongodb://localhost:27017"
-}
-
 var (
 	versionF       = kingpin.Flag("version", "Print version information and exit.").Bool()
 	listenAddressF = kingpin.Flag("web.listen-address", "Address to listen on for web interface and telemetry.").Default(":9216").String()
@@ -50,7 +43,12 @@ var (
 	collectTopF        = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
 	collectIndexUsageF = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
 
-	uriF     = kingpin.Flag("mongodb.uri", "MongoDB URI, format").PlaceHolder("[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]").Default(defaultMongoDBURI()).String()
+	uriF = kingpin.Flag("mongodb.uri", "MongoDB URI, format").
+		PlaceHolder("[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]").
+		Default("mongodb://localhost:27017").
+		Envar("MONGODB_URI").
+		String()
+
 	tlsF     = kingpin.Flag("mongodb.tls", "Enable tls connection with mongo server").Bool()
 	tlsCertF = kingpin.Flag("mongodb.tls-cert", "Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).\n"+
 		"    \tThis should include the whole certificate chain.\n"+
@@ -78,11 +76,6 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.CommandLine.Help = fmt.Sprintf("%s %s exports various MongoDB metrics in Prometheus format.\n", os.Args[0], version.Version)
 	kingpin.Parse()
-
-	uri := os.Getenv("MONGODB_URI")
-	if uri != "" {
-		uriF = &uri
-	}
 
 	if *testF {
 		buildInfo, err := shared.TestConnection(
