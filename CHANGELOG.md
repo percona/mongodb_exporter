@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - PMM-3512: Switched to [kingpin](https://github.com/alecthomas/kingpin) library.
-This is **BREAKING CHANGE** because kingpin uses `--` neither `-` for long flags, so be careful when update.
+This is a **BREAKING CHANGE** because kingpin uses `--` instead of `-` for long flags, so be careful when updating.
 
 ## [0.6.3] - 2019-02-13
 ### Added
