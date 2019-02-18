@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - [PMM-3512](https://jira.percona.com/browse/PMM-3512): Switched to [kingpin](https://github.com/alecthomas/kingpin) library.
 This is a **BREAKING CHANGE** because kingpin uses `--` instead of `-` for long flags, so be careful when updating.
+- [PMM-2261](https://jira.percona.com/browse/PMM-2261) Unify common mongod and mongos server metrics, thx [@bz2](https://github.com/bz2)
+This is a **BREAKING CHANGE**. The labels of these metrics are now prefixed with just `mongodb_` rather than `mongodb_mongo[ds]_`.
 
 ## [0.6.3] - 2019-02-13
 ### Added
