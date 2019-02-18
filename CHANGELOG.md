@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- [PMM-2261](https://jira.percona.com/browse/PMM-2261) Unify common mongod and mongos server metrics, thx [@bz2](https://github.com/bz2)
+This is **BREAKING CHANGE**. The labels of these metrics are now prefixed with just `mongodb_` rather than `mongodb_mongo[ds]_`.
 
 ## [0.6.3] - 2019-02-13
 ### Added
