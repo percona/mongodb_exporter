@@ -233,7 +233,7 @@ func testDefaultGatherer(t *testing.T, data bin) {
 	cmd := exec.CommandContext(
 		ctx,
 		data.path,
-		"--web.metrics-path", metricPath,
+		"--web.telemetry-path", metricPath,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
 	)
 
