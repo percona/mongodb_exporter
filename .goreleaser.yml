@@ -10,17 +10,34 @@ builds:
   - binary: mongodb_exporter
     env:
       - CGO_ENABLED=0
-      - HOSTNAME=test
+    goos:
+      - linux
+      - darwin
+      - netbsd
+    goarch:
+      - 386
+      - amd64
+      - arm
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: arm
+      - goos: netbsd
+        goarch: arm
+      - goos: darwin
+        goarch: arm64
+      - goos: netbsd
+        goarch: arm64
     flags:
       - -v
       - -a
       - -tags=netgo
     ldflags: |
-        -X ./vendor/github.com/prometheus/common/version.Version={{.Version}}
-        -X ./vendor/github.com/prometheus/common/version.Revision={{.FullCommit}}
-        -X ./vendor/github.com/prometheus/common/version.Branch={{.Tag}}
-        -X ./vendor/github.com/prometheus/common/version.BuildUser={{.Env.USER}}@{{.Env.USER}}
-        -X ./vendor/github.com/prometheus/common/version.BuildDate={{time "20060102-15:04:05"}}
+        -X github.com/percona/mongodb_exporter/vendor/github.com/prometheus/common/version.Version={{.Version}}
+        -X github.com/percona/mongodb_exporter/vendor/github.com/prometheus/common/version.Revision={{.FullCommit}}
+        -X github.com/percona/mongodb_exporter/vendor/github.com/prometheus/common/version.Branch={{.Tag}}
+        -X github.com/percona/mongodb_exporter/vendor/github.com/prometheus/common/version.BuildUser={{.Env.USER}}@{{.Tag}}
+        -X github.com/percona/mongodb_exporter/vendor/github.com/prometheus/common/version.BuildDate={{time "20060102-15:04:05"}}
 archive:
   replacements:
     darwin: Darwin
@@ -31,7 +48,7 @@ archive:
 checksum:
   name_template: 'checksums.txt'
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  name_template: "{{ .Tag }}"
 changelog:
   sort: asc
   filters:
