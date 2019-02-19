@@ -1,0 +1,40 @@
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
+    # you may remove this if you don't use vgo
+    # - go mod download
+    # you may remove this if you don't need go generate
+    # - go generate ./...
+builds:
+  - binary: mongodb_exporter
+    env:
+      - CGO_ENABLED=0
+      - HOSTNAME=test
+    flags:
+      - -v
+      - -a
+      - -tags=netgo
+    ldflags: |
+        -X ./vendor/github.com/prometheus/common/version.Version={{.Version}}
+        -X ./vendor/github.com/prometheus/common/version.Revision={{.FullCommit}}
+        -X ./vendor/github.com/prometheus/common/version.Branch={{.Tag}}
+        -X ./vendor/github.com/prometheus/common/version.BuildUser={{.Env.USER}}@{{.Env.USER}}
+        -X ./vendor/github.com/prometheus/common/version.BuildDate={{time "20060102-15:04:05"}}
+archive:
+  replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
