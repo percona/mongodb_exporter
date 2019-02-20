@@ -25,7 +25,7 @@ DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 # Race detector is only supported on amd64.
 RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
 
-all: format build test
+all: clean format build test
 
 style:
 	@echo ">> checking code style"
@@ -65,5 +65,11 @@ init:
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(subst aarch64,arm64,$(shell uname -m)))) \
 		$(GO) get -u github.com/prometheus/promu
 
+clean:
+	@echo ">> removing build artifacts"
+	@rm -f $(PREFIX)/coverage.txt
+	@rm -f  $(PREFIX)mongodb_exporter
+	@rm -Rf $(PREFIX)/dist
 
-.PHONY: all style format build test vet tarball docker init
+
+.PHONY: all style format build test vet tarball docker init clean
