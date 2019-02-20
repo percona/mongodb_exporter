@@ -37,7 +37,7 @@ func TestCollector(t *testing.T) {
 	}
 
 	collector := NewMongodbCollector(&MongodbCollectorOpts{
-		URI: testMongoDBURL(),
+		URI:                      testMongoDBURL(),
 		CollectDatabaseMetrics:   true,
 		CollectCollectionMetrics: true,
 		CollectTopMetrics:        true,

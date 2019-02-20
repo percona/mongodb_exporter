@@ -335,8 +335,8 @@ type WTConcurrentTransactionsTypeStats struct {
 }
 
 type WTConcurrentTransactionsStats struct {
-	Read *WTConcurrentTransactionsTypeStats `bson:"read"`
-	Write  *WTConcurrentTransactionsTypeStats `bson:"write"`
+	Read  *WTConcurrentTransactionsTypeStats `bson:"read"`
+	Write *WTConcurrentTransactionsTypeStats `bson:"write"`
 }
 
 func (stats *WTConcurrentTransactionsStats) Export(ch chan<- prometheus.Metric) {
