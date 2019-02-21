@@ -26,6 +26,7 @@ jobs:
       script:
         - make check-vendor-synced style build
     - stage: test
+      go: 1.11.x
       env:
         # https://www.mongodb.com/support-policy
         - MONGODB_IMAGE=mongo:3.4
