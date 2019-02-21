@@ -45,7 +45,7 @@ jobs:
         provider: script
         script: make release
         on:
-          branch: PMM-3513-goreleaser
+          tags: true
 
 after_success: bash <(curl -s https://codecov.io/bash) -X fix
 
