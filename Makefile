@@ -74,7 +74,7 @@ snapshot: init
 
 release: vendor
 	@echo ">> building release"
-	@$(GORELEASER)
+	goreleaser release --rm-dist
 
 docker:
 	@echo ">> building docker image"
