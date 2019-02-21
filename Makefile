@@ -33,7 +33,7 @@ export APP_VERSION	   := $(shell echo $(TRAVIS_TAG) | sed -e 's/v//g')
 export APP_REVISION    := $(shell git show --format='%H' HEAD -q)
 export BUILD_TIME	   := $(shell date '+%Y%m%d-%H:%M:%S')
 
-all: clean format test build
+all: clean format build test
 
 style:
 	@echo ">> checking code style"
