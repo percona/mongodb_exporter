@@ -81,12 +81,15 @@ docker:
 	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
 
 $(GOPATH)/bin/dep:
-	curl https://raw.githubusercontent.com/golang/dep/v0.5.0/install.sh | sh
+	curl -s https://raw.githubusercontent.com/golang/dep/v0.5.0/install.sh | sh
 
 $(GOPATH)/bin/gocoverutil:
 	$(GO) get -u github.com/AlekSi/gocoverutil
 
-init: $(GOPATH)/bin/dep $(GOPATH)/bin/gocoverutil
+$(GOPATH)/bin/goreleaser:
+	curl -s https://git.io/goreleaser | sh --version && cp $(TMPDIR)/goreleaser $(GOPATH)/bin/goreleaser
+
+init: $(GOPATH)/bin/dep $(GOPATH)/bin/gocoverutil $(GOPATH)/bin/goreleaser
 
 # Ensure that vendor/ is in sync with code and Gopkg.*
 check-vendor-synced: init

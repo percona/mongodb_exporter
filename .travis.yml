@@ -41,7 +41,7 @@ before_script:
   - docker-compose exec mongo mongo --version
 
 script:
-  - make check-vendor-synced style testall build
+  - make check-vendor-synced style testall build snapshot
 
 after_success:
   - bash <(curl -s https://codecov.io/bash) -X fix
