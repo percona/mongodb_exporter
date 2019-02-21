@@ -31,14 +31,13 @@ env:
 services:
   - docker
 
+script: make test-all
+
 jobs:
   include:
     - stage: build
       script:
         - make check-vendor-synced style build
-
-    - stage: test
-      script: make test-all
 
     - stage: deploy
       script: skip
