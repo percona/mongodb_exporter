@@ -38,9 +38,7 @@ jobs:
         - make check-vendor-synced style build
 
     - stage: test
-      env: MONGODB_IMAGE=mongo:3.4
       script: make test-all
-      after_success: bash <(curl -s https://codecov.io/bash) -X fix
 
     - stage: deploy
       script: skip
@@ -49,6 +47,8 @@ jobs:
         script: make release
         on:
           branch: PMM-3513-goreleaser
+
+after_success: bash <(curl -s https://codecov.io/bash) -X fix
 
 notifications:
   slack:
