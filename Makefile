@@ -68,11 +68,11 @@ build: init
 		'\
 	 	-o $(BIN_DIR)/$(BIN_NAME) .
 
-snapshot: init
+snapshot: $(GOPATH)/bin/goreleaser
 	@echo ">> building snapshot"
 	goreleaser --snapshot --skip-sign --skip-validate --skip-publish --rm-dist
 
-release: vendor
+release: $(GOPATH)/bin/goreleaser
 	@echo ">> building release"
 	goreleaser release --rm-dist
 

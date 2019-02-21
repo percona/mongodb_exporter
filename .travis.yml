@@ -2,6 +2,10 @@ dist: trusty
 sudo: required
 language: go
 
+stages:
+  - build
+  - test
+
 go:
   - 1.11.x
 
@@ -12,42 +16,54 @@ matrix:
 env:
   global:
     - TMPDIR=/tmp
-  matrix:
-    # https://www.mongodb.com/support-policy
-    - MONGODB_IMAGE=mongo:3.4
-    - MONGODB_IMAGE=mongo:3.6
-    - MONGODB_IMAGE=mongo:4.0
-
-    # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
-    - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
-    - MONGODB_IMAGE=percona/percona-server-mongodb:3.6
-    - MONGODB_IMAGE=percona/percona-server-mongodb:4.0
 
 services:
   - docker
 
-before_script:
-  # Start docker containers.
-  - docker-compose up -d
-  # Wait for MongoDB to become available.
-  - |
-    until docker-compose exec mongo mongo --quiet --eval 'db.runCommand("ping").ok' > /dev/null; do
-      >&2 echo "MongoDB is unavailable - sleeping"
-      sleep 1
-    done
-    >&2 echo "MongoDB is up"
-  # Display logs for debug purposes.
-  - docker-compose logs
-  # Display versions.
-  - docker --version
-  - docker-compose --version
-  - docker-compose exec mongo mongo --version
+jobs:
+  include:
+    - stage: build
+      script:
+        - make check-vendor-synced style build
+    - stage: test
+      env:
+        # https://www.mongodb.com/support-policy
+        - MONGODB_IMAGE=mongo:3.4
+        - MONGODB_IMAGE=mongo:3.6
+        - MONGODB_IMAGE=mongo:4.0
 
-script:
-  - make check-vendor-synced style testall build snapshot
+        # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
+        - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
+        - MONGODB_IMAGE=percona/percona-server-mongodb:3.6
+        - MONGODB_IMAGE=percona/percona-server-mongodb:4.0
+      before_script:
+        # Start docker containers.
+        - docker-compose up -d
+        # Wait for MongoDB to become available.
+        - |
+          until docker-compose exec mongo mongo --quiet --eval 'db.runCommand("ping").ok' > /dev/null; do
+            >&2 echo "MongoDB is unavailable - sleeping"
+            sleep 1
+          done
+          >&2 echo "MongoDB is up"
+        # Display logs for debug purposes.
+        - docker-compose logs
+        # Display versions.
+        - docker --version
+        - docker-compose --version
+        - docker-compose exec mongo mongo --version
 
-after_success:
-  - bash <(curl -s https://codecov.io/bash) -X fix
+      script:
+        - make testall
+
+      after_success:
+        - bash <(curl -s https://codecov.io/bash) -X fix
+
+deploy:
+  provider: script
+  script: make release
+  on:
+    branch: PMM-3513-goreleaser
 
 notifications:
   slack:
