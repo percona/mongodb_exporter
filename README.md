@@ -42,7 +42,7 @@ use YAML file with `server_user` and `server_password` fields.
 ```bash
 export MONGODB_URI='mongodb://localhost:27017'
 export HTTP_AUTH='user:password'
-./mongodb_exporter <flags>
+./dist/mongodb_exporter [<flags>]
 ```
 
 ### Flags
