@@ -26,40 +26,30 @@ jobs:
     - stage: build
       script:
         - make check-vendor-synced style build
+
+    # https://www.mongodb.com/support-policy
     - stage: test
-      env:
-        matrix:
-          # https://www.mongodb.com/support-policy
-          - MONGODB_IMAGE=mongo:3.4
-          - MONGODB_IMAGE=mongo:3.6
-          - MONGODB_IMAGE=mongo:4.0
+      env: MONGODB_IMAGE=mongo:3.4
+      script: make test-all
+      after_success: bash <(curl -s https://codecov.io/bash) -X fix
+    - stage: test
+      env: MONGODB_IMAGE=mongo:3.6
+      script: make test-all
+    - stage: test
+      env: MONGODB_IMAGE=mongo:4.0
+      script: make test-all
 
-          # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
-          - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
-          - MONGODB_IMAGE=percona/percona-server-mongodb:3.6
-          - MONGODB_IMAGE=percona/percona-server-mongodb:4.0
-      before_script:
-        # Start docker containers.
-        - docker-compose up -d
-        # Wait for MongoDB to become available.
-        - |
-          until docker-compose exec mongo mongo --quiet --eval 'db.runCommand("ping").ok' > /dev/null; do
-            >&2 echo "MongoDB is unavailable - sleeping"
-            sleep 1
-          done
-          >&2 echo "MongoDB is up"
-        # Display logs for debug purposes.
-        - docker-compose logs
-        # Display versions.
-        - docker --version
-        - docker-compose --version
-        - docker-compose exec mongo mongo --version
-
-      script:
-        - make testall
-
-      after_success:
-        - bash <(curl -s https://codecov.io/bash) -X fix
+    # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
+    - stage: test
+      env: MONGODB_IMAGE=percona/percona-server-mongodb:3.4
+      script: make test-all
+      after_success: bash <(curl -s https://codecov.io/bash) -X fix
+    - stage: test
+      env: MONGODB_IMAGE=percona/percona-server-mongodb:3.6
+      script: make test-all
+    - stage: test
+      env: MONGODB_IMAGE=percona/percona-server-mongodb:4.0
+      script: make test-all
 
     - stage: deploy
       script: skip

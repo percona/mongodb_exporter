@@ -39,11 +39,11 @@ style:
 	@echo ">> checking code style"
 	@! gofmt -s -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
-test: init
+test: init mongo-db-in-docker
 	@echo ">> running tests"
 	gocoverutil -coverprofile=coverage.txt test -short -v $(RACE) $(pkgs)
 
-testall: init
+test-all: init mongo-db-in-docker
 	@echo ">> running all tests"
 	gocoverutil -coverprofile=coverage.txt test -v $(RACE) $(pkgs)
 
@@ -102,5 +102,16 @@ clean:
 	@rm -f $(PREFIX)/coverage.txt
 	@rm -Rf $(PREFIX)/dist
 
+mongo-db-in-docker:
+	# Start docker containers.
+	docker-compose up -d
+	# Wait for MongoDB to become available.
+	./wait-for-mongo.sh
+	# Display logs for debug purposes.
+	docker-compose logs
+	# Display versions.
+	docker --version
+	docker-compose --version
+	docker-compose exec mongo mongo --version
 
-.PHONY: init all style format build test vet release docker clean check-vendor-synced
+.PHONY: init all style format build test vet release docker clean check-vendor-synced mongo-db-in-docker
