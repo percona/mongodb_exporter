@@ -57,7 +57,7 @@ vet:
 
 build: init
 	@echo ">> building binaries"
-	CGO_ENABLED=0 @$(GO) build -v -a \
+	@CGO_ENABLED=0 $(GO) build -v -a \
 		-tags 'netgo' \
 		-ldflags '\
 		-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Version=$(APP_VERSION) \
