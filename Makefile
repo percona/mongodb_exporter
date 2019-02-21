@@ -39,11 +39,11 @@ style:
 	@echo ">> checking code style"
 	@! gofmt -s -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
-test:
+test: init
 	@echo ">> running tests"
 	gocoverutil -coverprofile=coverage.txt test -short -v $(RACE) $(pkgs)
 
-testall:
+testall: init
 	@echo ">> running all tests"
 	gocoverutil -coverprofile=coverage.txt test -v $(RACE) $(pkgs)
 
