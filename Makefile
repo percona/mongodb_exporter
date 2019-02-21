@@ -74,7 +74,7 @@ snapshot: $(GOPATH)/bin/goreleaser
 
 release: $(GOPATH)/bin/goreleaser
 	@echo ">> building release"
-	goreleaser release --rm-dist
+	goreleaser release --rm-dist --skip-validate
 
 docker:
 	@echo ">> building docker image"
