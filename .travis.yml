@@ -17,6 +17,16 @@ matrix:
 env:
   global:
     - TMPDIR=/tmp
+  matrix:
+    # https://www.mongodb.com/support-policy
+    - MONGODB_IMAGE=mongo:3.4
+    - MONGODB_IMAGE=mongo:3.6
+    - MONGODB_IMAGE=mongo:4.0
+
+    # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
+    - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
+    - MONGODB_IMAGE=percona/percona-server-mongodb:3.6
+    - MONGODB_IMAGE=percona/percona-server-mongodb:4.0
 
 services:
   - docker
@@ -27,29 +37,10 @@ jobs:
       script:
         - make check-vendor-synced style build
 
-    # https://www.mongodb.com/support-policy
     - stage: test
       env: MONGODB_IMAGE=mongo:3.4
       script: make test-all
       after_success: bash <(curl -s https://codecov.io/bash) -X fix
-    - stage: test
-      env: MONGODB_IMAGE=mongo:3.6
-      script: make test-all
-    - stage: test
-      env: MONGODB_IMAGE=mongo:4.0
-      script: make test-all
-
-    # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
-    - stage: test
-      env: MONGODB_IMAGE=percona/percona-server-mongodb:3.4
-      script: make test-all
-      after_success: bash <(curl -s https://codecov.io/bash) -X fix
-    - stage: test
-      env: MONGODB_IMAGE=percona/percona-server-mongodb:3.6
-      script: make test-all
-    - stage: test
-      env: MONGODB_IMAGE=percona/percona-server-mongodb:4.0
-      script: make test-all
 
     - stage: deploy
       script: skip
