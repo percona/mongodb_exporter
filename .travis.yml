@@ -10,15 +10,18 @@ matrix:
     - go: master
 
 env:
-  # https://www.mongodb.com/support-policy
-  - MONGODB_IMAGE=mongo:3.4
-  - MONGODB_IMAGE=mongo:3.6
-  - MONGODB_IMAGE=mongo:4.0
+  global:
+    - TMPDIR=/tmp
+  matrix:
+    # https://www.mongodb.com/support-policy
+    - MONGODB_IMAGE=mongo:3.4
+    - MONGODB_IMAGE=mongo:3.6
+    - MONGODB_IMAGE=mongo:4.0
 
-  # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
-  - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
-  - MONGODB_IMAGE=percona/percona-server-mongodb:3.6
-  - MONGODB_IMAGE=percona/percona-server-mongodb:4.0
+    # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
+    - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
+    - MONGODB_IMAGE=percona/percona-server-mongodb:3.6
+    - MONGODB_IMAGE=percona/percona-server-mongodb:4.0
 
 services:
   - docker
