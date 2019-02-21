@@ -12,20 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GO           := go
-FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
-PROMU        := $(FIRST_GOPATH)/bin/promu -v
-pkgs          = ./...
+GO          := go
+GOPATH      := $(shell $(GO) env GOPATH)
+pkgs		= ./...
+BIN_NAME	:= mongodb_exporter
 
 PREFIX              ?= $(shell pwd)
-BIN_DIR             ?= $(shell pwd)
+BIN_DIR             ?= $(PREFIX)/dist
 DOCKER_IMAGE_NAME   ?= mongodb-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
 # Race detector is only supported on amd64.
 RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
 
-all: clean format build test
+export TRAVIS_APP_HOST ?= $(shell hostname)
+export TRAVIS_BRANCH   ?= $(shell git rev-parse --abbrev-ref HEAD)
+export TRAVIS_TAG 	   ?= $(shell git describe --tags --abbrev=0)
+export GO_PACKAGE 	   := github.com/percona/mongodb_exporter
+export APP_VERSION	   := $(shell echo $(TRAVIS_TAG) | sed -e 's/v//g')
+export APP_REVISION    := $(shell git show --format='%H' HEAD -q)
+export BUILD_TIME	   := $(shell date '+%Y%m%d-%H:%M:%S')
+
+all: clean format test build
 
 style:
 	@echo ">> checking code style"
@@ -49,27 +57,47 @@ vet:
 
 build: init
 	@echo ">> building binaries"
-	@$(PROMU) build --prefix $(PREFIX)
+	CGO_ENABLED=0 @$(GO) build -v -a \
+		-tags 'netgo' \
+		-ldflags '\
+		-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Version=$(APP_VERSION) \
+    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Revision=$(GIT_REVISION) \
+    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Branch=$(TRAVIS_BRANCH) \
+    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.BuildUser=$(USER)@$(TRAVIS_APP_HOST) \
+    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.BuildDate=$(BUILD_TIME) \
+		'\
+	 	-o $(BIN_DIR)/$(BIN_NAME) .
 
-tarball: init
-	@echo ">> building release tarball"
-	@$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
+snapshot: init
+	@echo ">> building snapshot"
+	goreleaser --snapshot --skip-sign --skip-validate --skip-publish --rm-dist
+
+release: vendor
+	@echo ">> building release"
+	@$(GORELEASER)
 
 docker:
 	@echo ">> building docker image"
 	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
 
-init:
+$(GOPATH)/bin/dep:
+	curl https://raw.githubusercontent.com/golang/dep/v0.5.0/install.sh | sh
+
+$(GOPATH)/bin/gocoverutil:
 	$(GO) get -u github.com/AlekSi/gocoverutil
-	GOOS=$(shell uname -s | tr A-Z a-z) \
-		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(subst aarch64,arm64,$(shell uname -m)))) \
-		$(GO) get -u github.com/prometheus/promu
+
+init: $(GOPATH)/bin/dep $(GOPATH)/bin/gocoverutil
+
+# Ensure that vendor/ is in sync with code and Gopkg.*
+check-vendor-synced: init
+	rm -fr vendor/
+	dep ensure -v
+	git diff --exit-code
 
 clean:
 	@echo ">> removing build artifacts"
 	@rm -f $(PREFIX)/coverage.txt
-	@rm -f  $(PREFIX)mongodb_exporter
 	@rm -Rf $(PREFIX)/dist
 
 
-.PHONY: all style format build test vet tarball docker init clean
+.PHONY: init all style format build test vet release docker clean check-vendor-synced
