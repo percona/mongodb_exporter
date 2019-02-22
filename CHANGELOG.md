@@ -12,7 +12,7 @@ This is a **BREAKING CHANGE** because kingpin uses `--` instead of `-` for long 
 - [PMM-2261](https://jira.percona.com/browse/PMM-2261) Unify common mongod and mongos server metrics, thx [@bz2](https://github.com/bz2)
 This is a **BREAKING CHANGE**. The labels of these metrics are now prefixed with just `mongodb_` rather than `mongodb_mongo[ds]_`.
 
-## Added
+### Added
 - Fine grained error handling for index usage and collection stats (#128), thx [@akira-kurogane](https://github.com/akira-kurogane)
 - Introduce a docker go build that creates a mongodb_exporter binary within a container (#112), thx [@mminks](https://github.com/mminks)
 
