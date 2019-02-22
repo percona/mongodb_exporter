@@ -87,7 +87,7 @@ $(GOPATH)/bin/gocoverutil:
 	$(GO) get -u github.com/AlekSi/gocoverutil
 
 $(GOPATH)/bin/goreleaser:
-	curl -sL https://git.io/goreleaser | sh -s -- --version && cp $(TMPDIR)/goreleaser $(GOPATH)/bin/goreleaser
+	curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | BINDIR=$(GOPATH)/bin sh
 
 init: $(GOPATH)/bin/dep $(GOPATH)/bin/gocoverutil $(GOPATH)/bin/goreleaser
 
