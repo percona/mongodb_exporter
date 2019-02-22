@@ -106,7 +106,7 @@ mongo-db-in-docker:
 	# Start docker containers.
 	docker-compose up -d
 	# Wait for MongoDB to become available.
-	./wait-for-mongo.sh
+	./scripts/wait-for-mongo.sh
 	# Display logs for debug purposes.
 	docker-compose logs
 	# Display versions.

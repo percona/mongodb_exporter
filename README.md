@@ -5,7 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
 [![CLA assistant](https://cla-assistant.io/readme/badge/percona/mongodb_exporter)](https://cla-assistant.io/percona/mongodb_exporter)
 
-Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado (@dcu), but forked for full sharded support and structure changes.
+Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado ([@dcu](https://github.com/dcu)), but forked for full sharded support and structure changes.
 
 ## Features
 
