@@ -1,8 +1,7 @@
-# This is an example goreleaser.yaml file with some sane defaults.
+# This is an goreleaser.yaml file which builds mongodb_exporter releases.
 # Make sure to check the documentation at http://goreleaser.com
-before:
-  hooks:
-    #- make check-vendor-synced
+# You can run it locally or with your CI, but you should use `make release` or `make snapshot` commands
+# because some init steps should be done before it runs.
 builds:
   - binary: mongodb_exporter
     env:
@@ -29,6 +28,8 @@ builds:
       - -v
       - -a
       - -tags=netgo
+    # We don't use internal `GoReleaser` variables because of consistency with `Makefile` and
+    # because we can't change it behaviour.
     ldflags: |
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/prometheus/common/version.Version={{.Env.APP_VERSION}}
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/prometheus/common/version.Revision={{.Env.APP_REVISION}}
