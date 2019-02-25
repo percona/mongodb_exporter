@@ -37,14 +37,9 @@ builds:
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/prometheus/common/version.BuildUser={{.Env.USER}}@{{.Env.TRAVIS_APP_HOST}}
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/prometheus/common/version.BuildDate={{.Env.BUILD_TIME}}
 archive:
-  replacements:
-    darwin: Darwin
-    linux: Linux
-    netbsd: NetBSD
-    386: i386
-    amd64: x86_64
+  name_template: "{{ .ProjectName }}-{{ .Env.APP_VERSION }}.{{ .Os }}-{{ .Arch }}"
 checksum:
-  name_template: '{{ .ProjectName }}_{{ .Env.APP_VERSION }}_checksums.txt'
+  name_template: '{{ .ProjectName }}-{{ .Env.APP_VERSION }}-checksums.txt'
 snapshot:
   name_template: "{{ .ShortCommit }}"
 changelog:
