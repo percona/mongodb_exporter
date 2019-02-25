@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -56,13 +57,18 @@ func TestCollector(t *testing.T) {
 	}()
 
 	var descs int
-	for range descCh {
+	var descsAsString string
+	for d := range descCh {
+		descsAsString += fmt.Sprintf("%s\n", d.String())
 		descs++
 	}
 
 	var metrics int
+	var metricsAsString string
 	var versionInfoFound bool
 	for m := range metricCh {
+		metricsAsString += fmt.Sprintf("%s\n", m.Desc().String())
+
 		m := helpers.ReadMetric(m)
 		switch m.Name {
 		case "mongodb_version_info":
@@ -71,6 +77,8 @@ func TestCollector(t *testing.T) {
 		metrics++
 	}
 
-	assert.Equalf(t, descs, metrics, "got %d descs and %d metrics", descs, metrics)
+	assert.Equalf(t, descsAsString, metricsAsString, "Number of descriptors collected and described should be the same. "+
+		"Got '%d' Descriptors from collector.Describe()"+
+		" and '%d' from collector.Collect().", descs, metrics)
 	assert.True(t, versionInfoFound, "version info metric not found")
 }
