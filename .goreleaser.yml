@@ -43,28 +43,14 @@ archive:
     386: i386
     amd64: x86_64
 checksum:
-  name_template: 'checksums.txt'
+  name_template: '{{ .ProjectName }}_{{ .Env.APP_VERSION }}_checksums.txt'
 snapshot:
   name_template: "{{ .ShortCommit }}"
 changelog:
-  sort: asc
-  filters:
-    exclude:
-    - '^docs:'
-    - '^test:'
+  skip: true
 release:
-  # Repo in which the release will be created.
-  # Default is extracted from the origin remote URL.
   github:
     owner: percona
     name: mongodb_exporter
-
-  # If set to true, will not auto-publish the release.
-  # Default is false.
   draft: true
-
-  # If set to auto, will mark the release as not ready for production
-  # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
-  # If set to true, will mark the release as not ready for production.
-  # Default is false.
   prerelease: auto
