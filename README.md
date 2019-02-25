@@ -2,6 +2,7 @@
 
 [![Release](https://img.shields.io/github/release/percona/mongodb_exporter.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
 [![Build Status](https://travis-ci.org/percona/mongodb_exporter.svg?branch=master)](https://travis-ci.org/percona/mongodb_exporter)
+[![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/dwyl/hapi-auth-jwt2?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
 [![CLA assistant](https://cla-assistant.io/readme/badge/percona/mongodb_exporter)](https://cla-assistant.io/percona/mongodb_exporter)
 
