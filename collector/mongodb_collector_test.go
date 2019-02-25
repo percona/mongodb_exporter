@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -55,7 +56,7 @@ func TestCollector(t *testing.T) {
 		close(metricCh)
 	}()
 
-	var descriptors = make(map[string]struct{})
+	descriptors := make(map[string]struct{})
 	var descriptorsCount int
 	for d := range descCh {
 		descriptors[d.String()] = struct{}{}
@@ -78,8 +79,13 @@ func TestCollector(t *testing.T) {
 		metricsCount++
 	}
 
-	assert.Emptyf(t, descriptors, "Number of descriptors collected and described should be the same. "+
-		"Got '%d' Descriptors from collector.Describe()"+
-		" and '%d' from collector.Collect().", descriptorsCount, metricsCount)
+	var missingDescMsg string
+	for k := range descriptors {
+		missingDescMsg += fmt.Sprintf("- %s\n", k)
+	}
+
+	assert.True(t, len(descriptors) == 0, "Number of descriptors collected and described should be the same. "+
+		"Got '%d' Descriptors from collector.Describe() and '%d' from collector.Collect().\n"+
+		"Missing descriptors: \n%s", descriptorsCount, metricsCount, missingDescMsg)
 	assert.True(t, versionInfoFound, "version info metric not found")
 }
