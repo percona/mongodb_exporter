@@ -16,28 +16,22 @@ package mongod
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"strconv"
 )
 
 var (
-	opLatenciesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Name:      "op_latencies_latency_total",
-		Help:      "op latencies statistics in microseconds of mongod",
-	}, []string{"type"})
-
-	opLatenciesCountTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Name:      "op_latencies_ops_total",
-		Help:      "op latencies ops total statistics of mongod",
-	}, []string{"type"})
-
-	opLatenciesHistogram = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Name:      "op_latencies_histogram",
-		Help:      "op latencies histogram statistics of mongod",
-	}, []string{"type", "micros"})
+	opLatenciesHistogram    *prometheus.HistogramVec = nil
+	prevLatencyStatReads    *LatencyStat             = nil
+	prevLatencyStatWrites   *LatencyStat             = nil
+	prevLatencyStatCommands *LatencyStat             = nil
 )
+
+func InitOpLatenciesMetrics(start, width float64, count int) {
+	opLatenciesHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "op_latency_microseconds",
+		Help:    "Operation (read/write/command) latencies histogram from mongod",
+		Buckets: prometheus.LinearBuckets(start, width, count),
+	}, []string{"type"})
+}
 
 // HistBucket describes a item of op latencies histogram
 type HistBucket struct {
@@ -52,15 +46,53 @@ type LatencyStat struct {
 	Ops       float64      `bson:"ops"`
 }
 
-// Update update each metric
-func (ls *LatencyStat) Update(op string) {
+// Update each metric
+func (ls *LatencyStat) Update(op string, prevLs *LatencyStat) {
 	if ls.Histogram != nil {
 		for _, bucket := range ls.Histogram {
-			opLatenciesHistogram.WithLabelValues(op, strconv.FormatInt(bucket.Micros, 10)).Set(bucket.Count)
+			loopUpperBound := clipObservationCount(prevLs, bucket.Micros, int64(bucket.Count))
+			observationMicros := histMicrosEdgeToMidpoint(bucket.Micros)
+			for i := int64(0); i < loopUpperBound; i++ {
+				opLatenciesHistogram.WithLabelValues(op).Observe(observationMicros)
+			}
 		}
 	}
-	opLatenciesTotal.WithLabelValues(op).Set(ls.Latency)
-	opLatenciesCountTotal.WithLabelValues(op).Set(ls.Ops)
+}
+
+/**
+Documentation of histogram bins
+https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/#latencystats-document
+"An array of embedded documents, each representing a latency range. Each
+document covers twice the previous document’s range. For upper values between
+2048 microseconds and roughly 1 second, the histogram includes half-steps."
+
+My interpretation is the histogram bin edges are: 1, 2, 4, 8 ... 2048, (2048+2048/2), 4096, (4096+4096/2), ...
+Or another way									: 1, 2, 4, 8 ... 2048, (4096-4096/4), 4096, (8192-8192/4), ...
+*/
+func histMicrosEdgeToMidpoint(microsEdge int64) float64 {
+	if microsEdge == 1 {
+		return 0.5
+	} else if microsEdge < 2048 {
+		// midpoint between x/2 and x is (x / 2 + x) / 2 = 3x/4
+		return 3.0 * float64(microsEdge) / 4.0
+	} else {
+		// midpoint between (x-x/4) and x is ((x-x/4) + x) / 2 = x - x / 8
+		return float64(microsEdge) - float64(microsEdge)/8.0
+	}
+}
+
+// This function assumes monotonically increasing HistBucket.Micros
+func clipObservationCount(ls *LatencyStat, targetLatMicros int64, count int64) int64 {
+	// No previous observation recorded, observe all
+	if ls == nil || len(ls.Histogram) == 0 {
+		return count
+	}
+	for _, bucket := range ls.Histogram {
+		if targetLatMicros == bucket.Micros {
+			return count - int64(bucket.Count)
+		}
+	}
+	return count
 }
 
 // OpLatenciesStat includes reads, writes and commands latency statistic
@@ -73,23 +105,21 @@ type OpLatenciesStat struct {
 // Export exports metrics to Prometheus
 func (stat *OpLatenciesStat) Export(ch chan<- prometheus.Metric) {
 	if stat.Reads != nil {
-		stat.Reads.Update("read")
+		stat.Reads.Update("read", prevLatencyStatReads)
+		prevLatencyStatReads = stat.Reads
 	}
 	if stat.Writes != nil {
-		stat.Writes.Update("write")
+		stat.Writes.Update("write", prevLatencyStatWrites)
+		prevLatencyStatWrites = stat.Writes
 	}
 	if stat.Commands != nil {
-		stat.Commands.Update("command")
+		stat.Commands.Update("command", prevLatencyStatCommands)
+		prevLatencyStatCommands = stat.Commands
 	}
-
-	opLatenciesTotal.Collect(ch)
-	opLatenciesCountTotal.Collect(ch)
 	opLatenciesHistogram.Collect(ch)
 }
 
 // Describe describes the metrics for prometheus
 func (stat *OpLatenciesStat) Describe(ch chan<- *prometheus.Desc) {
-	opLatenciesTotal.Describe(ch)
-	opLatenciesCountTotal.Describe(ch)
 	opLatenciesHistogram.Describe(ch)
 }

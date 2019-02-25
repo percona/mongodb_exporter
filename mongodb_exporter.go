@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/percona/mongodb_exporter/collector/mongod"
+
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -41,6 +43,10 @@ var (
 	collectCollectionF = kingpin.Flag("collect.collection", "Enable collection of Collection metrics").Bool()
 	collectTopF        = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
 	collectIndexUsageF = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
+
+	latencyHistogramMinF   = kingpin.Flag("latency.histogram-min", "Minimum value (in microseconds) for latency histogram").Default("65536").Float64()
+	latencyHistogramStepF  = kingpin.Flag("latency.histogram-step", "Step size between bins (in microseconds) for latency histogram").Default("262144").Float64()
+	latencyHistogramCountF = kingpin.Flag("latency.histogram-count", "Number of bins (Prometheus recommends keeping number of bins reasonably small)").Default("10").Int()
 
 	uriF = kingpin.Flag("mongodb.uri", "MongoDB URI, format").
 		PlaceHolder("[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]").
@@ -76,6 +82,8 @@ func main() {
 	kingpin.CommandLine.Help = fmt.Sprintf("%s %s exports various MongoDB metrics in Prometheus format.\n", os.Args[0], version.Version)
 	kingpin.Version(version.Print(program))
 	kingpin.Parse()
+
+	mongod.InitOpLatenciesMetrics(*latencyHistogramMinF, *latencyHistogramStepF, *latencyHistogramCountF)
 
 	if *testF {
 		buildInfo, err := shared.TestConnection(
