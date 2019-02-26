@@ -55,12 +55,12 @@ func TestBin(t *testing.T) {
 		}
 	}()
 
-	importpath := "github.com/percona/mongodb_exporter/vendor/github.com/prometheus/common"
+	importpath := "github.com/percona/mongodb_exporter/vendor/github.com/percona/pmm"
 	path := binDir + "/" + binName
 	xVariables := map[string]string{
-		importpath + "/version.Version":  "gotest-version",
-		importpath + "/version.Branch":   "gotest-branch",
-		importpath + "/version.Revision": "gotest-revision",
+		importpath + "/version.Version":    "gotest-version",
+		importpath + "/version.Branch":     "gotest-branch",
+		importpath + "/version.FullCommit": "gotest-revision",
 	}
 	var ldflags []string
 	for x, value := range xVariables {
