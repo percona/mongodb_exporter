@@ -2,6 +2,7 @@
 # Make sure to check the documentation at http://goreleaser.com
 # You can run it locally or with your CI, but you should use `make release` or `make snapshot` commands
 # because some init steps should be done before it runs.
+dist: bin
 builds:
   - binary: mongodb_exporter
     env:

@@ -18,7 +18,7 @@ pkgs		= ./...
 BIN_NAME	:= mongodb_exporter
 
 PREFIX              ?= $(shell pwd)
-BIN_DIR             ?= $(PREFIX)/dist
+BIN_DIR             ?= $(PREFIX)/bin
 DOCKER_IMAGE_NAME   ?= mongodb-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
@@ -100,7 +100,7 @@ check-vendor-synced: init
 clean:
 	@echo ">> removing build artifacts"
 	@rm -f $(PREFIX)/coverage.txt
-	@rm -Rf $(PREFIX)/dist
+	@rm -Rf $(PREFIX)/bin
 
 mongo-db-in-docker:
 	# Start docker containers.

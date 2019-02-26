@@ -9,4 +9,4 @@ coverage_temp.txt
 /.idea
 
 # ignore builded binaries
-/dist
+/bin

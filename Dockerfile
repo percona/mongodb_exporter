@@ -12,7 +12,7 @@ FROM quay.io/prometheus/busybox:latest
 
 LABEL maintainer="Alexey Palazhchenko <alexey.palazhchenko@percona.com>"
 
-COPY --from=0 /go/src/github.com/percona/mongodb_exporter/dist/mongodb_exporter /bin/mongodb_exporter
+COPY --from=0 /go/src/github.com/percona/mongodb_exporter/bin/mongodb_exporter /bin/mongodb_exporter
 
 EXPOSE 9216
 
