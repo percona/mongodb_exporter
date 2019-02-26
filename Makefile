@@ -61,7 +61,7 @@ build: init
 		-tags 'netgo' \
 		-ldflags '\
 		-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Version=$(APP_VERSION) \
-    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Revision=$(GIT_REVISION) \
+    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Revision=$(APP_REVISION) \
     	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Branch=$(TRAVIS_BRANCH) \
     	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.BuildUser=$(USER)@$(TRAVIS_APP_HOST) \
     	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.BuildDate=$(BUILD_TIME) \
