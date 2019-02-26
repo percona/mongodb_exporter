@@ -26,12 +26,18 @@ DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
 
 export TRAVIS_APP_HOST ?= $(shell hostname)
-export TRAVIS_BRANCH   ?= $(shell git rev-parse --abbrev-ref HEAD)
+export TRAVIS_BRANCH   ?= $(shell git describe --all --contains --dirty HEAD)
 export TRAVIS_TAG 	   ?= $(shell git describe --tags --abbrev=0)
 export GO_PACKAGE 	   := github.com/percona/mongodb_exporter
 export APP_VERSION	   := $(shell echo $(TRAVIS_TAG) | sed -e 's/v//g')
-export APP_REVISION    := $(shell git show --format='%H' HEAD -q)
+export APP_REVISION    := $(shell git rev-parse HEAD)
 export BUILD_TIME	   := $(shell date '+%Y%m%d-%H:%M:%S')
+
+# We sets default pmm version to empty as we want to build community release by default
+PMM_RELEASE_VERSION    ?= ""
+PMM_RELEASE_TIMESTAMP  = $(shell date '+%s')
+PMM_RELEASE_FULLCOMMIT = $(APP_REVISION)
+PMM_RELEASE_BRANCH     = $(TRAVIS_BRANCH)
 
 all: clean format build test
 
@@ -55,24 +61,30 @@ vet:
 	@echo ">> vetting code"
 	@$(GO) vet $(pkgs)
 
-build: init
-	@echo ">> building binaries"
-	@CGO_ENABLED=0 $(GO) build -v -a \
-		-tags 'netgo' \
-		-ldflags '\
-		-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Version=$(APP_VERSION) \
-    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Revision=$(APP_REVISION) \
-    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.Branch=$(TRAVIS_BRANCH) \
-    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.BuildUser=$(USER)@$(TRAVIS_APP_HOST) \
-    	-X $(GO_PACKAGE)/vendor/github.com/prometheus/common/version.BuildDate=$(BUILD_TIME) \
-		'\
-	 	-o $(BIN_DIR)/$(BIN_NAME) .
+# It's just alias to build binary
+build: release
 
 snapshot: $(GOPATH)/bin/goreleaser
 	@echo ">> building snapshot"
 	goreleaser --snapshot --skip-sign --skip-validate --skip-publish --rm-dist
 
-release: $(GOPATH)/bin/goreleaser
+# We use this target name to build binary across all PMM components
+release:
+	@echo ">> building binary"
+	@CGO_ENABLED=0 $(GO) build -v -a \
+		-tags 'netgo' \
+		-ldflags '\
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.ProjectName=$(BIN_NAME)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.Version=$(APP_VERSION)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.PMMVersion=$(PMM_RELEASE_VERSION)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.Timestamp=$(PMM_RELEASE_TIMESTAMP)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.FullCommit=$(PMM_RELEASE_FULLCOMMIT)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.Branch=$(PMM_RELEASE_BRANCH)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/prometheus/common/version.BuildUser=$(USER)@$(TRAVIS_APP_HOST)' \
+		'\
+		-o $(BIN_DIR)/$(BIN_NAME) .
+
+community-release: $(GOPATH)/bin/goreleaser
 	@echo ">> building release"
 	goreleaser release --rm-dist --skip-validate
 
@@ -114,4 +126,4 @@ mongo-db-in-docker:
 	docker-compose --version
 	docker-compose exec mongo mongo --version
 
-.PHONY: init all style format build test vet release docker clean check-vendor-synced mongo-db-in-docker
+.PHONY: init all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker

@@ -43,7 +43,7 @@ jobs:
       script: skip
       deploy:
         provider: script
-        script: make release
+        script: make community-release
         on:
           tags: true
 

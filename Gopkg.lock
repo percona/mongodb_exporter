@@ -72,6 +72,14 @@
   revision = "7d9e9cc0256a3fbb559aa2f3fb9d8d37e3bd1bf5"
 
 [[projects]]
+  branch = "PMM-2.0"
+  digest = "1:68c6e8ae633d18ae4dc73be2bc6e6a1074e60d5e22f7b855de29d72adc6dbce4"
+  name = "github.com/percona/pmm"
+  packages = ["version"]
+  pruneopts = "NUT"
+  revision = "027c4ede0edd2899d5fde13e321ecaffb416b55e"
+
+[[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
@@ -210,6 +218,7 @@
     "github.com/andreyvit/diff",
     "github.com/percona/exporter_shared",
     "github.com/percona/exporter_shared/helpers",
+    "github.com/percona/pmm/version",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/common/log",

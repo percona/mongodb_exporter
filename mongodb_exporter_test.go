@@ -88,6 +88,7 @@ func TestBin(t *testing.T) {
 		testFlagVersion,
 		testLandingPage,
 		testDefaultGatherer,
+		testBuildVersionGatherer,
 	}
 
 	portStart := 56000
@@ -253,6 +254,41 @@ func testDefaultGatherer(t *testing.T, data bin) {
 		"go_gc_duration_seconds",
 		"go_goroutines",
 		"go_memstats",
+	}
+
+	for _, prefix := range metricsPrefixes {
+		if !strings.Contains(got, prefix) {
+			t.Fatalf("no metric starting with %s", prefix)
+		}
+	}
+}
+
+func testBuildVersionGatherer(t *testing.T, data bin) {
+	metricPath := "/metrics"
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(
+		ctx,
+		data.path,
+		"--web.telemetry-path", metricPath,
+		"--web.listen-address", fmt.Sprintf(":%d", data.port),
+	)
+
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer cmd.Wait()
+	defer cmd.Process.Kill()
+
+	body, err := waitForBody(fmt.Sprintf("http://127.0.0.1:%d%s", data.port, metricPath))
+	if err != nil {
+		t.Fatalf("unable to get metrics: %s", err)
+	}
+	got := string(body)
+
+	metricsPrefixes := []string{
+		"mongodb_exporter_build_info",
 	}
 
 	for _, prefix := range metricsPrefixes {
