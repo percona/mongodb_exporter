@@ -34,7 +34,7 @@ export APP_REVISION    := $(shell git rev-parse HEAD)
 export BUILD_TIME	   := $(shell date '+%Y%m%d-%H:%M:%S')
 
 # We sets default pmm version to empty as we want to build community release by default
-export PMM_RELEASE_VERSION    ?= ""
+export PMM_RELEASE_VERSION    ?=
 export PMM_RELEASE_TIMESTAMP  = $(shell date '+%s')
 export PMM_RELEASE_FULLCOMMIT = $(APP_REVISION)
 export PMM_RELEASE_BRANCH     = $(TRAVIS_BRANCH)
