@@ -15,7 +15,6 @@
 GO          := go
 GOPATH      := $(shell $(GO) env GOPATH)
 pkgs		= ./...
-export BIN_NAME	:= mongodb_exporter
 
 PREFIX              ?= $(shell pwd)
 BIN_DIR             ?= $(PREFIX)/bin
@@ -25,13 +24,14 @@ DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 # Race detector is only supported on amd64.
 RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
 
+export BIN_NAME        := mongodb_exporter
 export TRAVIS_APP_HOST ?= $(shell hostname)
 export TRAVIS_BRANCH   ?= $(shell git describe --all --contains --dirty HEAD)
-export TRAVIS_TAG 	   ?= $(shell git describe --tags --abbrev=0)
-export GO_PACKAGE 	   := github.com/percona/mongodb_exporter
-export APP_VERSION	   := $(shell echo $(TRAVIS_TAG) | sed -e 's/v//g')
+export TRAVIS_TAG      ?= $(shell git describe --tags --abbrev=0)
+export GO_PACKAGE      := github.com/percona/mongodb_exporter
+export APP_VERSION     := $(shell echo $(TRAVIS_TAG) | sed -e 's/v//g')
 export APP_REVISION    := $(shell git rev-parse HEAD)
-export BUILD_TIME	   := $(shell date '+%Y%m%d-%H:%M:%S')
+export BUILD_TIME      := $(shell date '+%Y%m%d-%H:%M:%S')
 
 # We sets default pmm version to empty as we want to build community release by default
 export PMM_RELEASE_VERSION    ?=
