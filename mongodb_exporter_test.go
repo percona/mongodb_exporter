@@ -17,12 +17,15 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/andreyvit/diff"
+	pmmVersion "github.com/percona/pmm/version"
+	"github.com/prometheus/common/version"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2"
 )
@@ -399,4 +402,36 @@ func getBody(urlToGet string) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+func TestVersionInfo(t *testing.T) {
+
+	t.Run("Check version parameters", func(t *testing.T) {
+		var currentTime = time.Now()
+		pmmVersion.Version = "1.2.3"
+		pmmVersion.PMMVersion = "4.5.6"
+		pmmVersion.FullCommit = "test-commit-sha"
+		pmmVersion.Branch = "test-branch"
+		pmmVersion.Timestamp = strconv.FormatInt(currentTime.Unix(), 10)
+
+		initVersionInfo()
+
+		assert.Equal(t, pmmVersion.Version+"-pmm-"+pmmVersion.PMMVersion, version.Version)
+		assert.Equal(t, pmmVersion.FullCommit, version.Revision)
+		assert.Equal(t, pmmVersion.Branch, version.Branch)
+		assert.Equal(t, currentTime.Format(versionDataFormat), version.BuildDate)
+	})
+
+	t.Run("Check Empty Timestamp", func(t *testing.T) {
+		pmmVersion.Timestamp = ""
+		initVersionInfo()
+		assert.Equal(t, time.Unix(0, 0).Format(versionDataFormat), version.BuildDate)
+	})
+
+	t.Run("Check PMMVersion Empty", func(t *testing.T) {
+		pmmVersion.Version = "1.2.3"
+		pmmVersion.PMMVersion = ""
+		initVersionInfo()
+		assert.Equal(t, pmmVersion.Version, version.Version)
+	})
 }

@@ -33,7 +33,8 @@ import (
 )
 
 const (
-	program = "mongodb_exporter"
+	program           = "mongodb_exporter"
+	versionDataFormat = "20060102-15:04:05"
 )
 
 var (
@@ -126,15 +127,14 @@ func main() {
 // `--version` will be displayed in PMM format. Also `PMM Version` will be connected
 // to application version and will be printed in all logs.
 func initVersionInfo() {
-	const VersionDataFormat = "20060102-15:04:05"
 	version.Version = pmmVersion.Version
 	version.Revision = pmmVersion.FullCommit
 	version.Branch = pmmVersion.Branch
 
 	if buildDate, err := strconv.ParseInt(pmmVersion.Timestamp, 10, 64); err != nil {
-		version.BuildDate = time.Unix(0, 0).Format(VersionDataFormat)
+		version.BuildDate = time.Unix(0, 0).Format(versionDataFormat)
 	} else {
-		version.BuildDate = time.Unix(buildDate, 0).Format(VersionDataFormat)
+		version.BuildDate = time.Unix(buildDate, 0).Format(versionDataFormat)
 	}
 
 	if pmmVersion.PMMVersion != "" {
