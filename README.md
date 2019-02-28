@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/percona/mongodb_exporter.svg?branch=master)](https://travis-ci.org/percona/mongodb_exporter)
 [![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
-[![CLA assistant](https://cla-assistant.io/readme/badge/percona/mongodb_exporter)](https://cla-assistant.io/percona/mongodb_exporter)
+[![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
 
 Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado (@dcu), but forked for full sharded support and structure changes.
 
