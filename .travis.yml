@@ -9,6 +9,7 @@ stages:
 
 go:
   - 1.11.x
+  - 1.12.x
 
 matrix:
   allow_failures:
