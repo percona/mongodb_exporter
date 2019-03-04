@@ -27,8 +27,6 @@ builds:
         goarch: arm64
     flags:
       - -v
-      - -a
-      - -tags=netgo
     # We don't use internal `GoReleaser` variables because of consistency with `Makefile` and
     # because we can't change it behaviour.
     ldflags: |

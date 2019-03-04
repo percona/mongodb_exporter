@@ -71,8 +71,7 @@ snapshot: $(GOPATH)/bin/goreleaser
 # We use this target name to build binary across all PMM components
 release:
 	@echo ">> building binary"
-	@CGO_ENABLED=0 $(GO) build -v -a \
-		-tags 'netgo' \
+	@CGO_ENABLED=0 $(GO) build -v \
 		-ldflags '\
 		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.ProjectName=$(BIN_NAME)' \
 		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.Version=$(APP_VERSION)' \
