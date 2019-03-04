@@ -405,7 +405,6 @@ func getBody(urlToGet string) ([]byte, error) {
 }
 
 func TestVersionInfo(t *testing.T) {
-
 	t.Run("Check version parameters", func(t *testing.T) {
 		var currentTime = time.Now()
 		pmmVersion.Version = "1.2.3"
