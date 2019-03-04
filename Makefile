@@ -47,11 +47,11 @@ style:
 
 test: init mongo-db-in-docker
 	@echo ">> running tests"
-	gocoverutil -coverprofile=coverage.txt test -short -v $(RACE) $(pkgs)
+	go test -coverprofile=coverage.txt -short -v $(RACE) $(pkgs)
 
 test-all: init mongo-db-in-docker
 	@echo ">> running all tests"
-	gocoverutil -coverprofile=coverage.txt test -v $(RACE) $(pkgs)
+	go test -coverprofile=coverage.txt -v $(RACE) $(pkgs)
 
 format:
 	@echo ">> formatting code"
@@ -94,13 +94,10 @@ docker:
 $(GOPATH)/bin/dep:
 	curl -s https://raw.githubusercontent.com/golang/dep/v0.5.0/install.sh | sh
 
-$(GOPATH)/bin/gocoverutil:
-	$(GO) get -u github.com/AlekSi/gocoverutil
-
 $(GOPATH)/bin/goreleaser:
 	curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | BINDIR=$(GOPATH)/bin sh
 
-init: $(GOPATH)/bin/dep $(GOPATH)/bin/gocoverutil $(GOPATH)/bin/goreleaser
+init: $(GOPATH)/bin/dep $(GOPATH)/bin/goreleaser
 
 # Ensure that vendor/ is in sync with code and Gopkg.*
 check-vendor-synced: init
