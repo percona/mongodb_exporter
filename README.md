@@ -23,7 +23,7 @@ Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cu
 
 ### Building
 
-Just run. It will install all needed tools, format code with `go fmt`, build a binary for your OS inside `./dist` directory and runs tests.
+Just run `make`. It will install all needed tools, format code with `go fmt`, build a binary for your OS inside `./dist` directory and runs tests.
 
 *Note: You need to have `docker` installed to run tests as it uses mongodb. Also port `27017` must been freed as `docker-compos` maps this port into your host OS while testing.*
 
