@@ -1,0 +1,40 @@
+# This is an goreleaser.yaml file which builds mongodb_exporter releases.
+# Make sure to check the documentation at http://goreleaser.com
+# You can run it locally or with your CI, but you should use `make community-release` or `make snapshot`
+# instead of using `goreleaser` directly as some init steps should be done before it runs.
+dist: bin
+builds:
+  - binary: mongodb_exporter
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+    flags:
+      - -v
+    # We don't use internal `GoReleaser` variables because of consistency with `Makefile` and
+    # because we can't change it behaviour.
+    ldflags: |
+        -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.ProjectName={{.Env.BIN_NAME}}
+        -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.Version={{.Env.APP_VERSION}}
+        -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.PMMVersion={{.Env.PMM_RELEASE_VERSION}}
+        -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.Timestamp={{.Env.PMM_RELEASE_TIMESTAMP}}
+        -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.FullCommit={{.Env.PMM_RELEASE_FULLCOMMIT}}
+        -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.Branch={{.Env.PMM_RELEASE_BRANCH}}
+        -X {{.Env.GO_PACKAGE}}/vendor/github.com/prometheus/common/version.BuildUser={{.Env.USER}}@{{.Env.TRAVIS_APP_HOST}}
+archive:
+  name_template: "{{ .ProjectName }}-{{ .Env.APP_VERSION }}.{{ .Os }}-{{ .Arch }}"
+checksum:
+  name_template: '{{ .ProjectName }}-{{ .Env.APP_VERSION }}-checksums.txt'
+snapshot:
+  name_template: "{{ .ShortCommit }}"
+changelog:
+  skip: true
+release:
+  github:
+    owner: percona
+    name: mongodb_exporter
+  draft: true
+  prerelease: auto

@@ -1,6 +1,5 @@
 usage: mongodb_exporter [<flags>]
 
-mongodb_exporter gotest-version
 exports various MongoDB metrics in Prometheus format.
 
 Flags:

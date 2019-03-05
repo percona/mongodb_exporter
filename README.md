@@ -6,7 +6,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
 [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
 
-Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado (@dcu), but forked for full sharded support and structure changes.
+Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado ([@dcu](https://github.com/dcu)), but forked for full sharded support and structure changes.
 
 ## Features
 
@@ -23,8 +23,18 @@ Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cu
 
 ### Building
 
+Just run `make`. It will install all needed tools, format code with `go fmt`, build a binary for your OS inside `./dist` directory and runs tests.
+
+*Note: You need to have `docker` installed to run tests as it uses mongodb. Also port `27017` must been freed as `docker-compos` maps this port into your host OS while testing.*
+
 ```bash
 make
+```
+
+If you want just build a binary for your OS without codestyle checks and tests you can run command below:
+
+```bash
+make build
 ```
 
 If you don't have or don't want to install the whole GO stuff, use this docker build that creates a container with a freshly built `mongodb_exporter` binary:
@@ -35,7 +45,7 @@ make docker
 
 ### Running
 
-To define your own MongoDB URL, use environment variable `MONGODB_URI`. If set this variable takes precedence over `-mongodb.uri` flag.
+To define your own MongoDB URL, use environment variable `MONGODB_URI`. If set this variable takes precedence over `--mongodb.uri` flag.
 
 To enable HTTP basic authentication, set environment variable `HTTP_AUTH` to user:password pair. Alternatively, you can
 use YAML file with `server_user` and `server_password` fields.
@@ -43,7 +53,7 @@ use YAML file with `server_user` and `server_password` fields.
 ```bash
 export MONGODB_URI='mongodb://localhost:27017'
 export HTTP_AUTH='user:password'
-./mongodb_exporter <flags>
+./bin/mongodb_exporter [<flags>]
 ```
 
 ### Flags

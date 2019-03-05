@@ -15,6 +15,7 @@ This is a **BREAKING CHANGE**. The labels of these metrics are now prefixed with
 ### Added
 - Fine grained error handling for index usage and collection stats (#128), thx [@akira-kurogane](https://github.com/akira-kurogane)
 - Introduce a docker go build that creates a mongodb_exporter binary within a container (#112), thx [@mminks](https://github.com/mminks)
+- Ability to make releases and snapshots with [GoReleaser](https://goreleaser.com/)
 
 ## [0.6.3] - 2019-02-13
 ### Added
