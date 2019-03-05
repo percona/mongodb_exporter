@@ -12,32 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GO           := go
-FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
-PROMU        := $(FIRST_GOPATH)/bin/promu -v
-pkgs          = ./...
+GO          := go
+GOPATH      := $(shell $(GO) env GOPATH)
+pkgs		= ./...
 
 PREFIX              ?= $(shell pwd)
-BIN_DIR             ?= $(shell pwd)
+BIN_DIR             ?= $(PREFIX)/bin
 DOCKER_IMAGE_NAME   ?= mongodb-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
 # Race detector is only supported on amd64.
 RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
 
-all: format build test
+export BIN_NAME        := mongodb_exporter
+export TRAVIS_APP_HOST ?= $(shell hostname)
+export TRAVIS_BRANCH   ?= $(shell git describe --all --contains --dirty HEAD)
+export TRAVIS_TAG      ?= $(shell git describe --tags --abbrev=0)
+export GO_PACKAGE      := github.com/percona/mongodb_exporter
+export APP_VERSION     := $(shell echo $(TRAVIS_TAG) | sed -e 's/v//g')
+export APP_REVISION    := $(shell git rev-parse HEAD)
+export BUILD_TIME      := $(shell date '+%Y%m%d-%H:%M:%S')
+
+# We sets default pmm version to empty as we want to build community release by default
+export PMM_RELEASE_VERSION    ?=
+export PMM_RELEASE_TIMESTAMP  = $(shell date '+%s')
+export PMM_RELEASE_FULLCOMMIT = $(APP_REVISION)
+export PMM_RELEASE_BRANCH     = $(TRAVIS_BRANCH)
+
+all: clean format build test
 
 style:
 	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
+	@! gofmt -s -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
-test:
+test: init mongo-db-in-docker
 	@echo ">> running tests"
-	gocoverutil -coverprofile=coverage.txt test -short -v $(RACE) $(pkgs)
+	go test -coverprofile=coverage.txt -short -v $(RACE) $(pkgs)
 
-testall:
+test-all: init mongo-db-in-docker
 	@echo ">> running all tests"
-	gocoverutil -coverprofile=coverage.txt test -v $(RACE) $(pkgs)
+	go test -coverprofile=coverage.txt -v $(RACE) $(pkgs)
 
 format:
 	@echo ">> formatting code"
@@ -47,23 +61,65 @@ vet:
 	@echo ">> vetting code"
 	@$(GO) vet $(pkgs)
 
-build: init
-	@echo ">> building binaries"
-	@$(PROMU) build --prefix $(PREFIX)
+# It's just alias to build binary
+build: release
 
-tarball: init
-	@echo ">> building release tarball"
-	@$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
+snapshot: $(GOPATH)/bin/goreleaser
+	@echo ">> building snapshot"
+	goreleaser --snapshot --skip-sign --skip-validate --skip-publish --rm-dist
+
+# We use this target name to build binary across all PMM components
+release:
+	@echo ">> building binary"
+	@CGO_ENABLED=0 $(GO) build -v \
+		-ldflags '\
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.ProjectName=$(BIN_NAME)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.Version=$(APP_VERSION)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.PMMVersion=$(PMM_RELEASE_VERSION)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.Timestamp=$(PMM_RELEASE_TIMESTAMP)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.FullCommit=$(PMM_RELEASE_FULLCOMMIT)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/percona/pmm/version.Branch=$(PMM_RELEASE_BRANCH)' \
+		-X '$(GO_PACKAGE)/vendor/github.com/prometheus/common/version.BuildUser=$(USER)@$(TRAVIS_APP_HOST)' \
+		'\
+		-o $(BIN_DIR)/$(BIN_NAME) .
+
+community-release: $(GOPATH)/bin/goreleaser
+	@echo ">> building release"
+	goreleaser release --rm-dist --skip-validate
 
 docker:
 	@echo ">> building docker image"
 	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
 
-init:
-	$(GO) get -u github.com/AlekSi/gocoverutil
-	GOOS=$(shell uname -s | tr A-Z a-z) \
-		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(subst aarch64,arm64,$(shell uname -m)))) \
-		$(GO) get -u github.com/prometheus/promu
+$(GOPATH)/bin/dep:
+	curl -s https://raw.githubusercontent.com/golang/dep/v0.5.0/install.sh | sh
 
+$(GOPATH)/bin/goreleaser:
+	curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | BINDIR=$(GOPATH)/bin sh
 
-.PHONY: all style format build test vet tarball docker init
+init: $(GOPATH)/bin/dep $(GOPATH)/bin/goreleaser
+
+# Ensure that vendor/ is in sync with code and Gopkg.*
+check-vendor-synced: init
+	rm -fr vendor/
+	dep ensure -v
+	git diff --exit-code
+
+clean:
+	@echo ">> removing build artifacts"
+	@rm -f $(PREFIX)/coverage.txt
+	@rm -Rf $(PREFIX)/bin
+
+mongo-db-in-docker:
+	# Start docker containers.
+	docker-compose up -d
+	# Wait for MongoDB to become available.
+	./scripts/wait-for-mongo.sh
+	# Display logs for debug purposes.
+	docker-compose logs
+	# Display versions.
+	docker --version
+	docker-compose --version
+	docker-compose exec mongo mongo --version
+
+.PHONY: init all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker

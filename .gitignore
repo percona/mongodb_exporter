@@ -7,3 +7,6 @@ coverage.txt
 coverage_temp.txt
 /.history
 /.idea
+
+# ignore built binaries
+/bin
