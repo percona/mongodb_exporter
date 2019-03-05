@@ -10,21 +10,8 @@ builds:
     goos:
       - linux
       - darwin
-      - netbsd
     goarch:
-      - 386
       - amd64
-      - arm
-      - arm64
-    ignore:
-      - goos: darwin
-        goarch: arm
-      - goos: netbsd
-        goarch: arm
-      - goos: darwin
-        goarch: arm64
-      - goos: netbsd
-        goarch: arm64
     flags:
       - -v
     # We don't use internal `GoReleaser` variables because of consistency with `Makefile` and
