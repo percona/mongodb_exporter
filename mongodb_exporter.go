@@ -124,12 +124,12 @@ func main() {
 	exporter_shared.RunServer("MongoDB", *listenAddressF, *metricsPathF, promhttp.ContinueOnError)
 }
 
-// TODO: Refactor after moving version.Info() and version.BuildContext() to https://github.com/percona/exporter_shared
-// See: https://jira.percona.com/browse/PMM-3250 and https://github.com/percona/mongodb_exporter/pull/132#discussion_r262227248
 // initVersionInfo sets version info
 // If binary was build for PMM with environment variable PMM_RELEASE_VERSION
 // `--version` will be displayed in PMM format. Also `PMM Version` will be connected
 // to application version and will be printed in all logs.
+// TODO: Refactor after moving version.Info() and version.BuildContext() to https://github.com/percona/exporter_shared
+// See: https://jira.percona.com/browse/PMM-3250 and https://github.com/percona/mongodb_exporter/pull/132#discussion_r262227248
 func initVersionInfo() {
 	version.Version = pmmVersion.Version
 	version.Revision = pmmVersion.FullCommit
