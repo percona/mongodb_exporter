@@ -1,0 +1,161 @@
+{
+	"reads" : {
+		"histogram" : [
+			{
+				"micros" : 64,
+				"count" : 4
+			},
+			{
+				"micros" : 128,
+				"count" : 4
+			},
+			{
+				"micros" : 196608,
+				"count" : 1723
+			},
+			{
+				"micros" : 262144,
+				"count" : 9427
+			},
+			{
+				"micros" : 393216,
+				"count" : 3465
+			},
+			{
+				"micros" : 524288,
+				"count" : 300
+			},
+			{
+				"micros" : 786432,
+				"count" : 2
+			}
+		],
+		"latency" : "5193584861",
+		"ops" : 14925
+	},
+	"writes" : {
+		"histogram" : [
+			{
+				"micros" : 16,
+				"count" : 586
+			},
+			{
+				"micros" : 32,
+				"count" : 319685
+			},
+			{
+				"micros" : 64,
+				"count" : 264797
+			},
+			{
+				"micros" : 128,
+				"count" : 119185
+			},
+			{
+				"micros" : 256,
+				"count" : 19835
+			},
+			{
+				"micros" : 512,
+				"count" : 10845
+			},
+			{
+				"micros" : 1024,
+				"count" : 4567
+			},
+			{
+				"micros" : 2048,
+				"count" : 720
+			},
+			{
+				"micros" : 3072,
+				"count" : 217
+			},
+			{
+				"micros" : 4096,
+				"count" : 490
+			},
+			{
+				"micros" : 6144,
+				"count" : 95
+			},
+			{
+				"micros" : 8192,
+				"count" : 82
+			},
+			{
+				"micros" : 12288,
+				"count" : 46
+			},
+			{
+				"micros" : 16384,
+				"count" : 12
+			},
+			{
+				"micros" : 24576,
+				"count" : 14
+			},
+			{
+				"micros" : 32768,
+				"count" : 1
+			},
+			{
+				"micros" : 49152,
+				"count" : 12
+			}
+		],
+		"latency" : 90913218,
+		"ops" : 741189
+	},
+	"commands" : {
+		"histogram" : [
+			{
+				"micros" : 4,
+				"count" : 113
+			},
+			{
+				"micros" : 8,
+				"count" : 676
+			},
+			{
+				"micros" : 16,
+				"count" : 376
+			},
+			{
+				"micros" : 32,
+				"count" : 69
+			},
+			{
+				"micros" : 64,
+				"count" : 51
+			},
+			{
+				"micros" : 128,
+				"count" : 16
+			},
+			{
+				"micros" : 256,
+				"count" : 6
+			},
+			{
+				"micros" : 512,
+				"count" : 13
+			},
+			{
+				"micros" : 1024,
+				"count" : 3
+			},
+			{
+				"micros" : 6144,
+				"count" : 1
+			}
+		],
+		"latency" : 49104,
+		"ops" : 1324
+	},
+	"transactions" : {
+		"histogram" : [ ],
+		"latency" : 0,
+		"ops" : 0
+	}
+}

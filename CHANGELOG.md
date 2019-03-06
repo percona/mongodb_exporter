@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- [PMM-3535](https://jira.percona.com/browse/PMM-3535): convert mongodb_mongod_op_latencies_histogram from gauge to histogram
+This change removes metrics: op_latencies_ops_total, op_latencies_histogram and op_latencies_latency_total
+This change replaces above with prometheus histogram metric op_latency_microseconds_* where * is either bucket, count, sum.
 - [PMM-3512](https://jira.percona.com/browse/PMM-3512): Switched to [kingpin](https://github.com/alecthomas/kingpin) library.
 This is a **BREAKING CHANGE** because kingpin uses `--` instead of `-` for long flags, so be careful when updating.
 - [PMM-2261](https://jira.percona.com/browse/PMM-2261) Unify common mongod and mongos server metrics, thx [@bz2](https://github.com/bz2)
@@ -69,12 +72,12 @@ This is a **BREAKING CHANGE**. The labels of these metrics are now prefixed with
 ### Added
 - New flags `-collect.database` and `-collect.collection` can be used to enable collection of database and collection
   metrics. They are disabled by default.
-- MongoDB connections are now kept between the scrapes. New flag `-mongodb.max-connections` (with the default value `1`) 
+- MongoDB connections are now kept between the scrapes. New flag `-mongodb.max-connections` (with the default value `1`)
 controls the maximum number of established connections.
 - Add standard metrics:
   - `mongodb_scrape_errors_total`
   - `mongodb_up`
-- Some queries now contain [cursor comments](https://www.percona.com/blog/2017/06/21/tracing-mongodb-queries-to-code-with-cursor-comments/) 
+- Some queries now contain [cursor comments](https://www.percona.com/blog/2017/06/21/tracing-mongodb-queries-to-code-with-cursor-comments/)
 with source code locations.
 
 ### Changed

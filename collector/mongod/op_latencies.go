@@ -51,6 +51,9 @@ func (ls *LatencyStat) Update(op string, prevLs *LatencyStat) {
 	if ls.Histogram != nil {
 		for _, bucket := range ls.Histogram {
 			loopUpperBound := clipObservationCount(prevLs, bucket.Micros, int64(bucket.Count))
+			// Prometheus histogram typically will have much fewer binds and on
+			// boundaries different from mongodb. For best approximation compute midpoint
+			// of histogram bin from mongodb
 			observationMicros := histMicrosEdgeToMidpoint(bucket.Micros)
 			for i := int64(0); i < loopUpperBound; i++ {
 				opLatenciesHistogram.WithLabelValues(op).Observe(observationMicros)
@@ -59,25 +62,41 @@ func (ls *LatencyStat) Update(op string, prevLs *LatencyStat) {
 	}
 }
 
-/**
-Documentation of histogram bins
-https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/#latencystats-document
-"An array of embedded documents, each representing a latency range. Each
-document covers twice the previous document’s range. For upper values between
-2048 microseconds and roughly 1 second, the histogram includes half-steps."
+func isPow2(arg uint64) bool {
+	return (arg > 0) && ((arg & (arg - 1)) == 0)
+}
 
-My interpretation is the histogram bin edges are: 1, 2, 4, 8 ... 2048, (2048+2048/2), 4096, (4096+4096/2), ...
-Or another way									: 1, 2, 4, 8 ... 2048, (4096-4096/4), 4096, (8192-8192/4), ...
-*/
-func histMicrosEdgeToMidpoint(microsEdge int64) float64 {
-	if microsEdge == 1 {
+//  Documentation of histogram bins
+//  https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/#latencystats-document
+//  "An array of embedded documents, each representing a latency range. Each
+//  document covers twice the previous document’s range. For upper values between
+//  2048 microseconds and roughly 1 second, the histogram includes half-steps."
+//
+//  My interpretation is the histogram bin edges are predefined: 1, 2, 4, 8 ... 2048, (2048+2048/2), 4096, (4096+4096/2), ...
+//  Or another way									           : 1, 2, 4, 8 ... 2048, (4096-4096/4), 4096, (8192-8192/4), ...
+//
+//  Input that is not exactly one of the documented histogram boundaries is not expected and will lead to incorrect midpoint
+func histMicrosEdgeToMidpoint(x int64) float64 {
+	if x <= 1 {
 		return 0.5
-	} else if microsEdge < 2048 {
-		// midpoint between x/2 and x is (x / 2 + x) / 2 = 3x/4
-		return 3.0 * float64(microsEdge) / 4.0
+	} else if x <= 2048 {
+		// midpoint between (x/2, x]
+		// e.g. midpoint between (1024, 2048] where input x := 2048
+		// taking the average: (x/2 + x)/2 = 3x/4
+		return 3.0 * float64(x) / 4.0
 	} else {
-		// midpoint between (x-x/4) and x is ((x-x/4) + x) / 2 = x - x / 8
-		return float64(microsEdge) - float64(microsEdge)/8.0
+		if isPow2(uint64(x)) {
+			// midpoint between (x-x/4 ,x] where x is a power of 2 and not "half step" as described in mongodb docs
+			// e.g. midpoint between (3072, 4096] where input x := 4096
+			// taking the average: ((x - x/4) + x)/2 = x*7/8
+			return float64(x) * 7.0 / 8.0
+		} else {
+			// midpoint between (y, y+y/2] where x is a "half step" as described in mongodb docs, and x = y+y/2, for some y which is a power of 2
+			// e.g. midpoint between (2048, 3072] where input x := 3072, and y := 2048
+			// Expressing (y, y+y/2] in terms of x, (2/3*x, x]
+			// taking the average: (2/3*x + x)/2 = x*5/6
+			return float64(x) * 5.0 / 6.0
+		}
 	}
 }
 
