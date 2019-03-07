@@ -67,5 +67,8 @@ func ReadMetric(m prometheus.Metric) *Metric {
 	if pb.Untyped != nil {
 		return &Metric{name, help, labels, dto.MetricType_UNTYPED, pb.GetUntyped().GetValue()}
 	}
+	if pb.Histogram != nil {
+		return &Metric{name, help, labels, dto.MetricType_HISTOGRAM, pb.GetHistogram().GetSampleSum()}
+	}
 	panic("Unsupported metric type")
 }
