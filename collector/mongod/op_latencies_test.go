@@ -7,7 +7,7 @@ import (
 )
 
 func Test_isPow2(t *testing.T) {
-	//edge cases
+	//edge case
 	if isPow2(0) != false {
 		t.Error("isPow2() failed for input 0")
 	}
@@ -77,20 +77,16 @@ func Test_clipObservationCount(t *testing.T) {
 		t.Error("clipObservationCount failed")
 	}
 
-	// Hisogram at 128 contains 4 counts, expected result is 0
+	// Data contains 4 counts, expected result is 0
 	if clipObservationCount(opLatencies.Reads, 128, 4) != int64(0) {
 		t.Error("clipObservationCount failed")
 	}
 
-	// Histogram at 262144 contains 9427 counts
+	// Data contains 9427 counts
 	if clipObservationCount(opLatencies.Reads, 262144, 10000) != int64(10000-9427) {
 		t.Error("clipObservationCount failed")
 	}
 
-	// Non existent point
-	if clipObservationCount(opLatencies.Reads, 3, 10000) != int64(10000) {
-		t.Error("clipObservationCount failed")
-	}
 }
 
 func loadOpLatenciesFromBson(data []byte, stat *OpLatenciesStat) {

@@ -20,8 +20,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/percona/mongodb_exporter/collector/mongod"
-
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -85,8 +83,6 @@ func main() {
 	initVersionInfo()
 	kingpin.Parse()
 
-	mongod.InitOpLatenciesMetrics(*latencyHistogramMinF, *latencyHistogramStepF, *latencyHistogramCountF)
-
 	if *testF {
 		buildInfo, err := shared.TestConnection(
 			shared.MongoSessionOpts{
@@ -126,6 +122,9 @@ func main() {
 		CollectIndexUsageStats:   *collectIndexUsageF,
 		SocketTimeout:            *socketTimeoutF,
 		SyncTimeout:              *syncTimeoutF,
+		LatencyHistogramMin:      *latencyHistogramMinF,
+		LatencyHistogramStep:     *latencyHistogramStepF,
+		LatencyHistogramCount:    *latencyHistogramCountF,
 	})
 	prometheus.MustRegister(programCollector, mongodbCollector)
 

@@ -62,6 +62,7 @@ func (ls *LatencyStat) Update(op string, prevLs *LatencyStat) {
 	}
 }
 
+//  Returns true if input is a power of 2
 func isPow2(arg uint64) bool {
 	return (arg > 0) && ((arg & (arg - 1)) == 0)
 }
@@ -91,9 +92,9 @@ func histMicrosEdgeToMidpoint(x int64) float64 {
 			// taking the average: ((x - x/4) + x)/2 = x*7/8
 			return float64(x) * 7.0 / 8.0
 		} else {
-			// midpoint between (y, y+y/2] where x is a "half step" as described in mongodb docs, and x = y+y/2, for some y which is a power of 2
+			// midpoint between (y, y+y/2] where x is a "half step" endpoint as described in mongodb docs, and x = y+y/2, for some y which is a power of 2
 			// e.g. midpoint between (2048, 3072] where input x := 3072, and y := 2048
-			// Expressing (y, y+y/2] in terms of x, (2/3*x, x]
+			// Expressing interval (y, y+y/2] in terms of x, (2/3*x, x]
 			// taking the average: (2/3*x + x)/2 = x*5/6
 			return float64(x) * 5.0 / 6.0
 		}
