@@ -122,7 +122,7 @@ var (
 	logSuppressCS = make(map[string]bool)
 )
 
-// GetDatabaseStatus returns stats for a given database
+// GetCollectionStatList returns stats for a given database
 func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	database_names, err := session.DatabaseNames()

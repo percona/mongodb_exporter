@@ -426,7 +426,7 @@ func ParseStr(str string) float64 {
 	return float64(-1)
 }
 
-// splits strings with multi-whitespace delimeters into a slice:
+// SplitByWs splits strings with multi-whitespace delimeters into a slice:
 func SplitByWs(str string) []string {
 	var fields []string
 	for _, field := range strings.Split(str, " ") {
