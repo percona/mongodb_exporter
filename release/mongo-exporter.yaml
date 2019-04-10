@@ -1,0 +1,32 @@
+_config:
+  _metadata:
+    name: mongodb-exporter
+    template:
+      type: template.caicloud.io/application
+      version: 1.0.0
+    version: "v0.0.1"
+  controllers:
+    - containers:
+        - args:
+            - "--mongodb.uri=[[ platform_mongo_host ]]"
+          image: "[[ registry_release ]]/mongodb-exporter:v0.0.1"
+          imagePullPolicy: IfNotPresent
+      controller:
+        replica: 1
+        strategy:
+          surge: 1
+          unavailable: 0
+      pod:
+        annotations:
+          - key: prometheus.io/port
+            value: "9216"
+          - key: prometheus.io/scrape
+            value: "true"
+      services:
+        - name: mongodb-exporter
+          ports:
+            - port: 9216
+              protocol: TCP
+              targetPort: 9216
+          type: ClusterIP
+      type: Deployment
