@@ -45,6 +45,7 @@ type MongodbCollectorOpts struct {
 	CollectIndexUsageStats   bool
 	SocketTimeout            time.Duration
 	SyncTimeout              time.Duration
+	AuthentificationDB       string
 }
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
@@ -58,6 +59,7 @@ func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
 		PoolLimit:             in.DBPoolLimit,
 		SocketTimeout:         in.SocketTimeout,
 		SyncTimeout:           in.SyncTimeout,
+		AuthentificationDB:    in.AuthentificationDB,
 	}
 }
 
