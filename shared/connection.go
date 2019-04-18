@@ -54,6 +54,7 @@ type MongoSessionOpts struct {
 	PoolLimit             int
 	SocketTimeout         time.Duration
 	SyncTimeout           time.Duration
+	AuthentificationDB    string
 }
 
 // MongoSession connects to MongoDB and returns ready to use MongoDB session.
@@ -72,6 +73,7 @@ func MongoSession(opts *MongoSessionOpts) *mgo.Session {
 	dialInfo.Direct = true
 	dialInfo.Timeout = opts.SocketTimeout
 	dialInfo.FailFast = true
+	dialInfo.Source = opts.AuthentificationDB
 
 	err = opts.configureDialInfoIfRequired(dialInfo)
 	if err != nil {

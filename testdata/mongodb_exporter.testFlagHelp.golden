@@ -16,6 +16,9 @@ Flags:
       --collect.indexusage       Enable collection of per index usage stats
       --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
                                  MongoDB URI, format
+      --mongodb.authentification-database=""  
+                                 Specifies the database in which the user is
+                                 created
       --mongodb.tls              Enable tls connection with mongo server
       --mongodb.tls-cert=""      Path to PEM file that contains the certificate
                                  (and optionally also the decrypted private key
