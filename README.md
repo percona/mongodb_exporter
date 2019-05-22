@@ -56,6 +56,10 @@ export HTTP_AUTH='user:password'
 ./bin/mongodb_exporter [<flags>]
 ```
 
+#### Kubernetes
+
+You can use the chart [prometheus-mongodb-exporter](https://github.com/helm/charts/tree/master/stable/prometheus-mongodb-exporter) from helm stable repository.
+
 ### Flags
 
 See the help page with `-h`.
