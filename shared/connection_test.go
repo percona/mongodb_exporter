@@ -31,7 +31,9 @@ func TestRedactMongoUri(t *testing.T) {
 }
 
 func TestMongoSession(t *testing.T) {
-	mso := &MongoSessionOpts{}
+	mso := &MongoSessionOpts{
+		URI: "mongodb://localhost:27017",
+	}
 	session := MongoSession(mso)
 	require.NotNil(t, session)
 	if session == nil {
@@ -47,7 +49,9 @@ func TestMongoSession(t *testing.T) {
 }
 
 func TestTestConnection(t *testing.T) {
-	mso := MongoSessionOpts{}
+	mso := MongoSessionOpts{
+		URI: "mongodb://localhost:27017",
+	}
 	_, err := TestConnection(mso)
 	require.NoError(t, err)
 }
