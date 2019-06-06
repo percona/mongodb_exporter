@@ -122,4 +122,7 @@ mongo-db-in-docker:
 	docker-compose --version
 	docker-compose exec mongo mongo --version
 
-.PHONY: init all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker
+gen-ssl-certs:
+	./scripts/ssl.sh
+
+.PHONY: init all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker gen-ssl-certs

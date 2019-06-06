@@ -2,6 +2,8 @@
 
 set -x
 
+cd $PWD/testdata
+
 # CA
 openssl genrsa -out ca.key 2048
 openssl req -x509 -new -key ca.key -days 3650 -out ca.crt -subj "/CN=Certificate Authority"
@@ -27,3 +29,5 @@ rm client.key
 rm server.crt
 rm server.csr
 rm server.key
+
+cd $PWD
