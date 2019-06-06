@@ -15,12 +15,13 @@
 package mongod
 
 import (
+	"context"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
@@ -297,9 +298,9 @@ func (replStatus *ReplSetStatus) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // GetReplSetStatus returns the replica status info
-func GetReplSetStatus(session *mgo.Session) *ReplSetStatus {
+func GetReplSetStatus(client *mongo.Client) *ReplSetStatus {
 	result := &ReplSetStatus{}
-	err := session.DB("admin").Run(bson.D{{"replSetGetStatus", 1}}, result)
+	err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetGetStatus", 1}}).Decode(result)
 	if err != nil {
 		log.Errorf("Failed to get replSet status: %s", err)
 		return nil

@@ -5,9 +5,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"gopkg.in/mgo.v2/bson"
 )
 
 var (
@@ -133,25 +133,25 @@ func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *Coll
 
 			delete(logSuppressCS, dbName)
 			for c.Next(context.TODO()) {
-				itm := &collListItem{}
-				err := c.Decode(&itm)
+				coll := &collListItem{}
+				err := c.Decode(&coll)
 				if err != nil {
 					log.Error(err)
 					continue
 				}
 				collStatus := CollectionStatus{}
-				res := client.Database(dbName).RunCommand(ctx, bson.D{{"collStats", itm.Name}, {"scale", 1}})
+				res := client.Database(dbName).RunCommand(ctx, bson.D{{"collStats", coll.Name}, {"scale", 1}})
 				err = res.Decode(&collStatus)
 				if err != nil {
-					_, logSFound := logSuppressCS[dbName+"."+itm.Name]
+					_, logSFound := logSuppressCS[dbName+"."+coll.Name]
 					if !logSFound {
 						log.Errorf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
-						logSuppressCS[dbName+"."+itm.Name] = true
+						logSuppressCS[dbName+"."+coll.Name] = true
 					}
 				} else {
-					delete(logSuppressCS, dbName+"."+itm.Name)
+					delete(logSuppressCS, dbName+"."+coll.Name)
 					collStatus.Database = dbName
-					collStatus.Name = itm.Name
+					collStatus.Name = coll.Name
 					collectionStatList.Members = append(collectionStatList.Members, collStatus)
 				}
 			}

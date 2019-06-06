@@ -1,30 +1,41 @@
 package mongod
 
 import (
+	"context"
 	"testing"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func Test_ParserTopStatus(t *testing.T) {
-	data := LoadFixture("top_status.bson")
+	topStatus := &TopStatus{}
+
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Disconnect(context.TODO())
+	// TODO: Not working as of "note" field in mongodb result...
+	err = client.Database("admin").RunCommand(context.TODO(), bson.D{{"top", 1}}).Decode(&topStatus)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	collections := []string{
 		"admin.system.roles",
 		"admin.system.version",
-		"dummy.collection",
-		"dummy.users",
-		"local.oplog.rs",
+		"admin.system.users",
+		"admin.system.sessions",
 		"local.startup_log",
 		"local.system.replset",
 	}
 
-	topStatus := &TopStatus{}
-	loadTopStatusFromBson(data, topStatus)
-
 	topStats := topStatus.TopStats["dummy.users"]
 
 	if len(topStatus.TopStats) != len(collections) {
-		t.Error("All database collections were not loaded")
+		t.Errorf("All database collections were not loaded, expected: %v, got: %v", len(collections), len(topStatus.TopStats))
 	}
 
 	for cid := range collections {
@@ -94,12 +105,5 @@ func Test_ParserTopStatus(t *testing.T) {
 	}
 	if topStats.Commands.Count != 0 {
 		t.Error("Wrong commands operation count value for dummy user collection")
-	}
-}
-
-func loadTopStatusFromBson(data []byte, status *TopStatus) {
-	err := bson.Unmarshal(data, status)
-	if err != nil {
-		panic(err)
 	}
 }

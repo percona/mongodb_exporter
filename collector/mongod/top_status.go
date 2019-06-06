@@ -1,10 +1,12 @@
 package mongod
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // TopStatus represents top metrics
@@ -13,9 +15,9 @@ type TopStatus struct {
 }
 
 // GetTopStats fetches top stats
-func GetTopStats(session *mgo.Session) (*TopStatus, error) {
-	results := &TopStatus{}
-	err := session.DB("admin").Run(bson.D{{Name: "top", Value: 1}}, &results)
+func GetTopStats(client *mongo.Client) (*TopStatus, error) {
+	results := &TopStatus{} // TODO: Not working as of "note" field in mongodb result...
+	err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"top", 1}}).Decode(&results)
 	return results, err
 }
 
@@ -25,8 +27,8 @@ func (status *TopStatus) Export(ch chan<- prometheus.Metric) {
 }
 
 // GetTopStatus fetches top stats
-func GetTopStatus(session *mgo.Session) *TopStatus {
-	topStatus, err := GetTopStats(session)
+func GetTopStatus(client *mongo.Client) *TopStatus {
+	topStatus, err := GetTopStats(client)
 	if err != nil {
 		log.Debug("Failed to get top status.")
 		return nil

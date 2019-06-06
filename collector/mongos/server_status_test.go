@@ -18,7 +18,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestParserServerStatus(t *testing.T) {

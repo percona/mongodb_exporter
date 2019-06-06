@@ -17,8 +17,8 @@ package mongos
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/percona/mongodb_exporter/collector/common"
 )

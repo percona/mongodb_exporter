@@ -25,7 +25,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"gopkg.in/mgo.v2"
 
 	"github.com/percona/mongodb_exporter/collector/mongod"
 	"github.com/percona/mongodb_exporter/collector/mongos"
@@ -207,7 +206,6 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 		exporter.mongoUp.Set(0)
 		return
 	}
-	defer mongoSess.Disconnect(context.TODO())
 
 	var serverVersion string
 	serverVersion, err = shared.MongoSessionServerVersion(mongoSess)
