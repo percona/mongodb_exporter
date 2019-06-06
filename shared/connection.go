@@ -235,6 +235,7 @@ func TestConnection(opts MongoSessionOpts) ([]byte, error) {
 	return b, nil
 }
 
+// BuildInfo represents mongodb build info.
 type BuildInfo struct {
 	Version        string
 	VersionArray   []int  `bson:"versionArray"` // On MongoDB 2.0+; assembled from Version otherwise
