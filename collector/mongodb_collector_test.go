@@ -33,9 +33,9 @@ func testMongoDBURL() string {
 }
 
 func TestCollector(t *testing.T) {
-	//if testing.Short() {
-	//	t.Skip("-short is passed, skipping functional test")
-	//}
+	if testing.Short() {
+		t.Skip("-short is passed, skipping functional test")
+	}
 
 	collector := NewMongodbCollector(&MongodbCollectorOpts{
 		URI:                      testMongoDBURL(),
