@@ -128,7 +128,7 @@ var (
 // GetCollectionStatList returns stats for a given database
 func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
-	database_names, err := client.ListDatabaseNames(context.TODO(), bson.M{})
+	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
 		_, logSFound := logSuppressCS[""]
 		if !logSFound {
@@ -138,14 +138,14 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 		return nil
 	}
 	delete(logSuppressCS, "")
-	for _, dbName := range database_names {
-		c, err := client.Database(dbName).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
+	for _, db := range dbNames {
+		c, err := client.Database(db).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
 		defer c.Close(context.TODO())
 		if err != nil {
-			_, logSFound := logSuppressCS[dbName]
+			_, logSFound := logSuppressCS[db]
 			if !logSFound {
 				log.Errorf("%s. Collection stats will not be collected for this db. This log message will be suppressed from now.", err)
-				logSuppressCS[dbName] = true
+				logSuppressCS[db] = true
 			}
 		} else {
 
@@ -154,7 +154,7 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 				Type string `bson:"type,omitempty"`
 			}
 
-			delete(logSuppressCS, dbName)
+			delete(logSuppressCS, db)
 			for c.Next(context.TODO()) {
 				coll := &collListItem{}
 				err := c.Decode(&coll)
@@ -163,16 +163,16 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 					continue
 				}
 				collStatus := CollectionStatus{}
-				err = client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", coll.Name}, {"scale", 1}}).Decode(&collStatus)
+				err = client.Database(db).RunCommand(context.TODO(), bson.D{{"collStats", coll.Name}, {"scale", 1}}).Decode(&collStatus)
 				if err != nil {
-					_, logSFound := logSuppressCS[dbName+"."+coll.Name]
+					_, logSFound := logSuppressCS[db+"."+coll.Name]
 					if !logSFound {
 						log.Errorf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
-						logSuppressCS[dbName+"."+coll.Name] = true
+						logSuppressCS[db+"."+coll.Name] = true
 					}
 				} else {
-					delete(logSuppressCS, dbName+"."+coll.Name)
-					collStatus.Database = dbName
+					delete(logSuppressCS, db+"."+coll.Name)
+					collStatus.Database = db
 					collStatus.Name = coll.Name
 					collectionStatList.Members = append(collectionStatList.Members, collStatus)
 				}

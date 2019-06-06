@@ -92,6 +92,7 @@ type ShardingStats struct {
 	Mongos          *[]MongosInfo
 }
 
+// GetMongosInfo gets mongos info.
 func GetMongosInfo(ctx mongo.SessionContext, client *mongo.Client) *[]MongosInfo {
 	mongosInfo := []MongosInfo{}
 	opts := options.Find().SetComment(shared.GetCallerLocation())
@@ -117,6 +118,7 @@ func GetMongosInfo(ctx mongo.SessionContext, client *mongo.Client) *[]MongosInfo
 	return &mongosInfo
 }
 
+// GetMongosBalancerLock gets mongos balncer lock.
 func GetMongosBalancerLock(ctx mongo.SessionContext, client *mongo.Client) *MongosBalancerLock {
 	var balancerLock *MongosBalancerLock
 	opts := options.FindOne().SetComment(shared.GetCallerLocation())
@@ -127,6 +129,7 @@ func GetMongosBalancerLock(ctx mongo.SessionContext, client *mongo.Client) *Mong
 	return balancerLock
 }
 
+// IsBalancerEnabled check is balancer enabled.
 func IsBalancerEnabled(ctx mongo.SessionContext, client *mongo.Client) float64 {
 	balancerConfig := struct {
 		Stopped bool `bson:"stopped"`
@@ -142,6 +145,7 @@ func IsBalancerEnabled(ctx mongo.SessionContext, client *mongo.Client) float64 {
 	return 1
 }
 
+// IsClusterBalanced check is cluster balanced.
 func IsClusterBalanced(ctx mongo.SessionContext, client *mongo.Client) float64 {
 	// Different thresholds based on size
 	// http://docs.mongodb.org/manual/core/sharding-internals/#sharding-migration-thresholds
@@ -220,6 +224,7 @@ func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
 	mongosBalancerLockTimestamp.Describe(ch)
 }
 
+// GetShardingStatus gets sharding status.
 func GetShardingStatus(ctx mongo.SessionContext, client *mongo.Client) *ShardingStats {
 	results := &ShardingStats{}
 

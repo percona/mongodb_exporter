@@ -33,6 +33,7 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
+// RedactMongoUri removes login and password from mongoUri.
 func RedactMongoUri(uri string) string {
 	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
 		if strings.Contains(uri, "ssl=true") {
@@ -133,6 +134,7 @@ type tlsDialer struct {
 	config *tls.Config
 }
 
+// DialContext custom dialer with ability to skip hostname validation.
 func (d *tlsDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	conn, err := tls.Dial(network, address, d.config)
 	if err != nil {
@@ -179,6 +181,7 @@ func enrichWithOwnChecks(conn *tls.Conn, tlsConfig *tls.Config) error {
 	return nil
 }
 
+// MongoSessionServerVersion returns mongo server version.
 func MongoSessionServerVersion(client *mongo.Client) (string, error) {
 	buildInfo, err := GetBuildInfo(client)
 	if err != nil {
@@ -188,6 +191,7 @@ func MongoSessionServerVersion(client *mongo.Client) (string, error) {
 	return buildInfo.Version, nil
 }
 
+// MongoSessionNodeType returns mongo node type.
 func MongoSessionNodeType(client *mongo.Client) (string, error) {
 	masterDoc := struct {
 		SetName interface{} `bson:"setName"`
@@ -243,6 +247,7 @@ type BuildInfo struct {
 	MaxObjectSize  int `bson:"maxBsonObjectSize"`
 }
 
+// GetBuildInfo gets mongo build info.
 func GetBuildInfo(client *mongo.Client) (info BuildInfo, err error) {
 	res := client.Database("admin").RunCommand(context.TODO(), bson.D{{Key: "buildInfo", Value: "1"}})
 	err = res.Decode(&info)

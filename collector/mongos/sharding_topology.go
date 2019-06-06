@@ -89,6 +89,7 @@ type ShardingTopoStats struct {
 	ShardChunks      *[]ShardingTopoChunkInfo
 }
 
+// GetShards gets shards.
 func GetShards(ctx mongo.SessionContext, client *mongo.Client) *[]ShardingTopoShardInfo {
 	var shards []ShardingTopoShardInfo
 	opts := options.Find().SetComment(shared.GetCallerLocation())
@@ -114,6 +115,7 @@ func GetShards(ctx mongo.SessionContext, client *mongo.Client) *[]ShardingTopoSh
 	return &shards
 }
 
+// GetTotalChunks gets total chunks.
 func GetTotalChunks(ctx mongo.SessionContext, client *mongo.Client) float64 {
 	chunkCount, err := client.Database("config").Collection("chunks").CountDocuments(ctx, bson.M{})
 	if err != nil {
@@ -122,6 +124,7 @@ func GetTotalChunks(ctx mongo.SessionContext, client *mongo.Client) float64 {
 	return float64(chunkCount)
 }
 
+// GetTotalChunksByShard gets total chunks by shard.
 func GetTotalChunksByShard(ctx mongo.SessionContext, client *mongo.Client) *[]ShardingTopoChunkInfo {
 	var results []ShardingTopoChunkInfo
 	c, err := client.Database("config").Collection("chunks").Aggregate(ctx, []bson.M{{"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}})
@@ -146,6 +149,7 @@ func GetTotalChunksByShard(ctx mongo.SessionContext, client *mongo.Client) *[]Sh
 	return &results
 }
 
+// GetTotalDatabases gets total databases.
 func GetTotalDatabases(ctx mongo.SessionContext, client *mongo.Client) *[]ShardingTopoStatsTotalDatabases {
 	results := []ShardingTopoStatsTotalDatabases{}
 	query := []bson.M{{"$match": bson.M{"_id": bson.M{"$ne": "admin"}}}, {"$group": bson.M{"_id": "$partitioned", "total": bson.M{"$sum": 1}}}}
@@ -171,6 +175,7 @@ func GetTotalDatabases(ctx mongo.SessionContext, client *mongo.Client) *[]Shardi
 	return &results
 }
 
+// GetTotalShardedCollections gets total sharded collections.
 func GetTotalShardedCollections(ctx mongo.SessionContext, client *mongo.Client) float64 {
 	collCount, err := client.Database("config").Collection("collections").CountDocuments(ctx, bson.M{"dropped": false})
 	if err != nil {
@@ -233,6 +238,7 @@ func (status *ShardingTopoStats) Describe(ch chan<- *prometheus.Desc) {
 	shardingTopoInfoTotalCollections.Describe(ch)
 }
 
+// GetShardingTopoStatus gets sharding topo status.
 func GetShardingTopoStatus(ctx mongo.SessionContext, client *mongo.Client) *ShardingTopoStats {
 	results := &ShardingTopoStats{}
 

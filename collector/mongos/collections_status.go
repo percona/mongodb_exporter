@@ -105,7 +105,7 @@ var (
 // GetCollectionStatList returns stats for a given database
 func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
-	database_names, err := client.ListDatabaseNames(ctx, bson.M{})
+	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
 		_, logSFound := logSuppressCS[""]
 		if !logSFound {
@@ -115,7 +115,7 @@ func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *Coll
 		return nil
 	}
 	delete(logSuppressCS, "")
-	for _, dbName := range database_names {
+	for _, dbName := range dbNames {
 		c, err := client.Database(dbName).ListCollections(ctx, bson.M{}, options.ListCollections().SetNameOnly(true))
 		defer c.Close(context.TODO())
 		if err != nil {

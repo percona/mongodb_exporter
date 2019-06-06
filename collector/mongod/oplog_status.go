@@ -92,6 +92,7 @@ func getOplogTailOrHeadTimestamp(client *mongo.Client, returnHead bool) (float64
 	return BsonMongoTimestampToUnix(result.Timestamp), err
 }
 
+// GetOplogTimestamps gets oplog timestamps.
 func GetOplogTimestamps(client *mongo.Client) (*OplogTimestamps, error) {
 	headTs, err := getOplogTailOrHeadTimestamp(client, true)
 	if err != nil {
@@ -108,6 +109,7 @@ func GetOplogTimestamps(client *mongo.Client) (*OplogTimestamps, error) {
 	return oplogTimestamps, err
 }
 
+// GetOplogCollectionStats gets oplog connection stats.
 func GetOplogCollectionStats(client *mongo.Client) (*OplogCollectionStats, error) {
 	results := &OplogCollectionStats{}
 	err := client.Database("local").RunCommand(context.TODO(), bson.M{"collStats": "oplog.rs"}).Decode(&results)
@@ -140,6 +142,7 @@ func (status *OplogStatus) Describe(ch chan<- *prometheus.Desc) {
 	oplogStatusSizeBytes.Describe(ch)
 }
 
+// GetOplogStatus gets oplog status.
 func GetOplogStatus(client *mongo.Client) *OplogStatus {
 	collectionStats, err := GetOplogCollectionStats(client)
 	oplogTimestamps, err := GetOplogTimestamps(client)

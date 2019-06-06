@@ -91,6 +91,7 @@ func (status *ShardingChangelogStats) Describe(ch chan<- *prometheus.Desc) {
 	shardingChangelogInfo.Describe(ch)
 }
 
+// GetShardingChangelogStatus gets sharding changelog status.
 func GetShardingChangelogStatus(ctx mongo.SessionContext, client *mongo.Client) *ShardingChangelogStats {
 	var qresults []ShardingChangelogSummary
 	coll := client.Database("config").Collection("changelog")

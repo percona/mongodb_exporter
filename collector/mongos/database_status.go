@@ -106,12 +106,12 @@ func (dbStatList *DatabaseStatList) Describe(ch chan<- *prometheus.Desc) {
 // GetDatabaseStatList returns stats for all databases
 func GetDatabaseStatList(ctx mongo.SessionContext, client *mongo.Client) *DatabaseStatList {
 	dbStatList := &DatabaseStatList{}
-	database_names, err := client.ListDatabaseNames(ctx, bson.M{})
+	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
 		log.Error("Failed to get database names")
 		return nil
 	}
-	for _, db := range database_names {
+	for _, db := range dbNames {
 		dbStatus := DatabaseStatus{}
 		r := client.Database(db).RunCommand(ctx, bson.D{{"dbStats", 1}, {"scale", 1}})
 		err := r.Decode(&dbStatus)
