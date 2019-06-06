@@ -30,7 +30,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/x/network/connstring"
 )
 
 // RedactMongoUri removes login and password from mongoUri.
@@ -39,13 +39,17 @@ func RedactMongoUri(uri string) string {
 		if strings.Contains(uri, "ssl=true") {
 			uri = strings.Replace(uri, "ssl=true", "", 1)
 		}
-		dialInfo, err := mgo.ParseURL(uri)
+
+		cStr, err := connstring.Parse(uri)
 		if err != nil {
 			log.Errorf("Cannot parse mongodb server url: %s", err)
 			return "unknown/error"
 		}
-		if dialInfo.Username != "" && dialInfo.Password != "" {
-			return "mongodb://****:****@" + strings.Join(dialInfo.Addrs, ",")
+
+		if cStr.Username != "" && cStr.Password != "" {
+			uri = strings.Replace(uri, cStr.Username, "****", 1)
+			uri = strings.Replace(uri, cStr.Password, "****", 1)
+			return uri
 		}
 	}
 	return uri
