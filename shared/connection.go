@@ -124,8 +124,7 @@ func (opts *MongoSessionOpts) configureDialInfoIfRequired(cOpts *options.ClientO
 			}
 			config.RootCAs = ca
 		}
-
-		cOpts.SetTLSConfig(config).SetDialer(&tlsDialer{config: config})
+		cOpts.SetDialer(&tlsDialer{config: config})
 	}
 	return nil
 }
