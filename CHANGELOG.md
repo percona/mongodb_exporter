@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+
+### Added
+- Added Authentification Database option when connect to mongo #139, thx [@etiennecoutaud](https://github.com/etiennecoutaud).
+- Added helm chart to readme #140, thx [@pgdagenais](https://github.com/pgdagenais).
+
+### Fixed
+- Fixed some function comments based on best practices from Effective Go #137, thx [@CodeLingoBot](https://github.com/CodeLingoBot).
 
 ## [0.7.0]
 ### Changed
