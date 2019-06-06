@@ -15,11 +15,12 @@
 package mongos
 
 import (
+	"context"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -90,15 +91,30 @@ func (status *ShardingChangelogStats) Describe(ch chan<- *prometheus.Desc) {
 	shardingChangelogInfo.Describe(ch)
 }
 
-func GetShardingChangelogStatus(session *mgo.Session) *ShardingChangelogStats {
+func GetShardingChangelogStatus(ctx mongo.SessionContext, client *mongo.Client) *ShardingChangelogStats {
 	var qresults []ShardingChangelogSummary
-	coll := session.DB("config").C("changelog")
+	coll := client.Database("config").Collection("changelog")
 	match := bson.M{"time": bson.M{"$gt": time.Now().Add(-10 * time.Minute)}}
 	group := bson.M{"_id": bson.M{"event": "$what", "note": "$details.note"}, "count": bson.M{"$sum": 1}}
 
-	err := coll.Pipe([]bson.M{{"$match": match}, {"$group": group}}).All(&qresults)
+	c, err := coll.Aggregate(ctx, []bson.M{{"$match": match}, {"$group": group}})
 	if err != nil {
 		log.Error("Failed to execute find query on 'config.changelog'!")
+	}
+
+	defer c.Close(context.TODO())
+
+	for c.Next(context.TODO()) {
+		s := &ShardingChangelogSummary{}
+		if err := c.Decode(s); err != nil {
+			log.Error(err)
+			continue
+		}
+		qresults = append(qresults, *s)
+	}
+
+	if err := c.Err(); err != nil {
+		log.Error(err)
 	}
 
 	results := &ShardingChangelogStats{}

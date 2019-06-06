@@ -63,8 +63,8 @@ type MongoSessionOpts struct {
 	AuthentificationDB    string
 }
 
-// MongoSession connects to MongoDB and returns ready to use MongoDB session.
-func MongoSession(opts *MongoSessionOpts) *mongo.Client {
+// MongoClient connects to MongoDB and returns ready to use MongoDB client.
+func MongoClient(opts *MongoSessionOpts) *mongo.Client {
 	if strings.Contains(opts.URI, "ssl=true") {
 		opts.URI = strings.Replace(opts.URI, "ssl=true", "", 1)
 		opts.TLSConnection = true
@@ -195,7 +195,7 @@ func MongoSessionNodeType(client *mongo.Client) (string, error) {
 		Msg     string      `bson:"msg"`
 	}{}
 
-	res := client.Database("admin").RunCommand(context.Background(), bson.D{{Key: "isMaster", Value: 1}})
+	res := client.Database("admin").RunCommand(context.TODO(), bson.D{{Key: "isMaster", Value: 1}})
 
 	err := res.Decode(&masterDoc)
 	if err != nil {
@@ -215,7 +215,7 @@ func MongoSessionNodeType(client *mongo.Client) (string, error) {
 
 // TestConnection connects to MongoDB and returns BuildInfo.
 func TestConnection(opts MongoSessionOpts) ([]byte, error) {
-	client := MongoSession(&opts)
+	client := MongoClient(&opts)
 	if client == nil {
 		return nil, fmt.Errorf("Cannot connect using uri: %s", opts.URI)
 	}
@@ -244,7 +244,7 @@ type BuildInfo struct {
 }
 
 func GetBuildInfo(client *mongo.Client) (info BuildInfo, err error) {
-	res := client.Database("admin").RunCommand(context.Background(), bson.D{{Key: "buildInfo", Value: "1"}})
+	res := client.Database("admin").RunCommand(context.TODO(), bson.D{{Key: "buildInfo", Value: "1"}})
 	err = res.Decode(&info)
 
 	if len(info.VersionArray) == 0 {

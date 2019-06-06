@@ -34,7 +34,7 @@ func TestMongoSession(t *testing.T) {
 	mso := &MongoSessionOpts{
 		URI: "mongodb://localhost:27017",
 	}
-	session := MongoSession(mso)
+	session := MongoClient(mso)
 	require.NotNil(t, session)
 	if session == nil {
 		t.Error("session is nil")

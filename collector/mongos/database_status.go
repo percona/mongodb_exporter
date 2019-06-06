@@ -5,7 +5,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -104,16 +104,17 @@ func (dbStatList *DatabaseStatList) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // GetDatabaseStatList returns stats for all databases
-func GetDatabaseStatList(session *mgo.Session) *DatabaseStatList {
+func GetDatabaseStatList(ctx mongo.SessionContext, client *mongo.Client) *DatabaseStatList {
 	dbStatList := &DatabaseStatList{}
-	database_names, err := session.DatabaseNames()
+	database_names, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
 		log.Error("Failed to get database names")
 		return nil
 	}
 	for _, db := range database_names {
 		dbStatus := DatabaseStatus{}
-		err := session.DB(db).Run(bson.D{{"dbStats", 1}, {"scale", 1}}, &dbStatus)
+		r := client.Database(db).RunCommand(ctx, bson.D{{"dbStats", 1}, {"scale", 1}})
+		err := r.Decode(&dbStatus)
 		if err != nil {
 			log.Error("Failed to get database status.")
 			return nil

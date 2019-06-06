@@ -15,12 +15,14 @@
 package mongos
 
 import (
+	"context"
 	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/percona/mongodb_exporter/shared"
@@ -90,30 +92,48 @@ type ShardingStats struct {
 	Mongos          *[]MongosInfo
 }
 
-func GetMongosInfo(session *mgo.Session) *[]MongosInfo {
+func GetMongosInfo(ctx mongo.SessionContext, client *mongo.Client) *[]MongosInfo {
 	mongosInfo := []MongosInfo{}
-	q := session.DB("config").C("mongos").Find(bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}})
-	if err := shared.AddCodeCommentToQuery(q).All(&mongosInfo); err != nil {
+	opts := options.Find().SetComment(shared.GetCallerLocation())
+	c, err := client.Database("config").Collection("mongos").Find(ctx, bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}}, opts)
+	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.mongos': %s.", err)
 	}
+	defer c.Close(context.TODO())
+
+	for c.Next(context.TODO()) {
+		i := &MongosInfo{}
+		if err := c.Decode(i); err != nil {
+			log.Error(err)
+			continue
+		}
+		mongosInfo = append(mongosInfo, *i)
+	}
+
+	if err := c.Err(); err != nil {
+		log.Error(err)
+	}
+
 	return &mongosInfo
 }
 
-func GetMongosBalancerLock(session *mgo.Session) *MongosBalancerLock {
+func GetMongosBalancerLock(ctx mongo.SessionContext, client *mongo.Client) *MongosBalancerLock {
 	var balancerLock *MongosBalancerLock
-	q := session.DB("config").C("locks").Find(bson.M{"_id": "balancer"})
-	if err := shared.AddCodeCommentToQuery(q).One(&balancerLock); err != nil {
+	opts := options.FindOne().SetComment(shared.GetCallerLocation())
+	r := client.Database("config").Collection("locks").FindOne(ctx, bson.M{"_id": "balancer"}, opts)
+	if err := r.Decode(&balancerLock); err != nil {
 		log.Errorf("Failed to execute find query on 'config.locks': %s.", err)
 	}
 	return balancerLock
 }
 
-func IsBalancerEnabled(session *mgo.Session) float64 {
+func IsBalancerEnabled(ctx mongo.SessionContext, client *mongo.Client) float64 {
 	balancerConfig := struct {
 		Stopped bool `bson:"stopped"`
 	}{}
-	q := session.DB("config").C("settings").Find(bson.M{"_id": "balancer"})
-	if err := shared.AddCodeCommentToQuery(q).One(&balancerConfig); err != nil {
+	opts := options.FindOne().SetComment(shared.GetCallerLocation())
+	r := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}, opts)
+	if err := r.Decode(&balancerConfig); err != nil {
 		return 1
 	}
 	if balancerConfig.Stopped {
@@ -122,11 +142,11 @@ func IsBalancerEnabled(session *mgo.Session) float64 {
 	return 1
 }
 
-func IsClusterBalanced(session *mgo.Session) float64 {
+func IsClusterBalanced(ctx mongo.SessionContext, client *mongo.Client) float64 {
 	// Different thresholds based on size
 	// http://docs.mongodb.org/manual/core/sharding-internals/#sharding-migration-thresholds
 	var threshold float64 = 8
-	totalChunkCount := GetTotalChunks(session)
+	totalChunkCount := GetTotalChunks(ctx, client)
 	if totalChunkCount < 20 {
 		threshold = 2
 	} else if totalChunkCount < 80 && totalChunkCount > 21 {
@@ -135,7 +155,7 @@ func IsClusterBalanced(session *mgo.Session) float64 {
 
 	var minChunkCount float64 = -1
 	var maxChunkCount float64 = 0
-	shardChunkInfoAll := GetTotalChunksByShard(session)
+	shardChunkInfoAll := GetTotalChunksByShard(ctx, client)
 	for _, shard := range *shardChunkInfoAll {
 		if shard.Chunks > maxChunkCount {
 			maxChunkCount = shard.Chunks
@@ -200,15 +220,15 @@ func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
 	mongosBalancerLockTimestamp.Describe(ch)
 }
 
-func GetShardingStatus(session *mgo.Session) *ShardingStats {
+func GetShardingStatus(ctx mongo.SessionContext, client *mongo.Client) *ShardingStats {
 	results := &ShardingStats{}
 
-	results.IsBalanced = IsClusterBalanced(session)
-	results.BalancerEnabled = IsBalancerEnabled(session)
-	results.Changelog = GetShardingChangelogStatus(session)
-	results.Topology = GetShardingTopoStatus(session)
-	results.Mongos = GetMongosInfo(session)
-	results.BalancerLock = GetMongosBalancerLock(session)
+	results.IsBalanced = IsClusterBalanced(ctx, client)
+	results.BalancerEnabled = IsBalancerEnabled(ctx, client)
+	results.Changelog = GetShardingChangelogStatus(ctx, client)
+	results.Topology = GetShardingTopoStatus(ctx, client)
+	results.Mongos = GetMongosInfo(ctx, client)
+	results.BalancerLock = GetMongosBalancerLock(ctx, client)
 
 	return results
 }

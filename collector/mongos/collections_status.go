@@ -1,9 +1,12 @@
 package mongos
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -100,9 +103,9 @@ var (
 )
 
 // GetCollectionStatList returns stats for a given database
-func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
+func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
-	database_names, err := session.DatabaseNames()
+	database_names, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
 		_, logSFound := logSuppressCS[""]
 		if !logSFound {
@@ -113,7 +116,8 @@ func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
 	}
 	delete(logSuppressCS, "")
 	for _, dbName := range database_names {
-		collNames, err := session.DB(dbName).CollectionNames()
+		c, err := client.Database(dbName).ListCollections(ctx, bson.M{}, options.ListCollections().SetNameOnly(true))
+		defer c.Close(context.TODO())
 		if err != nil {
 			_, logSFound := logSuppressCS[dbName]
 			if !logSFound {
@@ -121,22 +125,39 @@ func GetCollectionStatList(session *mgo.Session) *CollectionStatList {
 				logSuppressCS[dbName] = true
 			}
 		} else {
+
+			type collListItem struct {
+				Name string `bson:"name,omitempty"`
+				Type string `bson:"type,omitempty"`
+			}
+
 			delete(logSuppressCS, dbName)
-			for _, collName := range collNames {
-				collStatus := CollectionStatus{}
-				err := session.DB(dbName).Run(bson.D{{"collStats", collName}, {"scale", 1}}, &collStatus)
+			for c.Next(context.TODO()) {
+				itm := &collListItem{}
+				err := c.Decode(&itm)
 				if err != nil {
-					_, logSFound := logSuppressCS[dbName+"."+collName]
+					log.Error(err)
+					continue
+				}
+				collStatus := CollectionStatus{}
+				res := client.Database(dbName).RunCommand(ctx, bson.D{{"collStats", itm.Name}, {"scale", 1}})
+				err = res.Decode(&collStatus)
+				if err != nil {
+					_, logSFound := logSuppressCS[dbName+"."+itm.Name]
 					if !logSFound {
 						log.Errorf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
-						logSuppressCS[dbName+"."+collName] = true
+						logSuppressCS[dbName+"."+itm.Name] = true
 					}
 				} else {
-					delete(logSuppressCS, dbName+"."+collName)
+					delete(logSuppressCS, dbName+"."+itm.Name)
 					collStatus.Database = dbName
-					collStatus.Name = collName
+					collStatus.Name = itm.Name
 					collectionStatList.Members = append(collectionStatList.Members, collStatus)
 				}
+			}
+
+			if err := c.Err(); err != nil {
+				log.Error(err)
 			}
 		}
 	}
