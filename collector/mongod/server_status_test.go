@@ -41,8 +41,8 @@ func TestParserServerStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if serverStatus.Version != "3.6.7" {
-		t.Errorf("Server version incorrect: %s", serverStatus.Version)
+	if serverStatus.Version != "" {
+		t.Errorf("Server version incorrect")
 	}
 
 	if serverStatus.Asserts == nil {
