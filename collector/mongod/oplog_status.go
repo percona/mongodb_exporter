@@ -145,9 +145,13 @@ func (status *OplogStatus) Describe(ch chan<- *prometheus.Desc) {
 // GetOplogStatus gets oplog status.
 func GetOplogStatus(client *mongo.Client) *OplogStatus {
 	collectionStats, err := GetOplogCollectionStats(client)
+	if err != nil {
+		log.Errorf("Failed to get oplog collection status: %s", err)
+	}
+
 	oplogTimestamps, err := GetOplogTimestamps(client)
 	if err != nil {
-		log.Errorf("Failed to get oplog status: %s", err)
+		log.Errorf("Failed to get oplog timestamps status: %s", err)
 		return nil
 	}
 
