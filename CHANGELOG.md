@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added Authentification Database option when connect to mongo #139, thx [@etiennecoutaud](https://github.com/etiennecoutaud).
 - Added helm chart to readme #140, thx [@pgdagenais](https://github.com/pgdagenais).
+- [PMM-4154](https://jira.percona.com/browse/PMM-4154): Added standard logging flags.
 
 ### Fixed
 - Fixed some function comments based on best practices from Effective Go #137, thx [@CodeLingoBot](https://github.com/CodeLingoBot).
