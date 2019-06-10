@@ -407,10 +407,18 @@ type ReplStats struct {
 
 // Export exposes the replication stats.
 func (replStats *ReplStats) Export(ch chan<- prometheus.Metric) {
-	replStats.Apply.Export(ch)
-	replStats.Buffer.Export(ch)
-	replStats.Network.Export(ch)
-	replStats.PreloadStats.Export(ch)
+	if replStats.Apply != nil {
+		replStats.Apply.Export(ch)
+	}
+	if replStats.Buffer != nil {
+		replStats.Buffer.Export(ch)
+	}
+	if replStats.Network != nil {
+		replStats.Network.Export(ch)
+	}
+	if replStats.PreloadStats != nil {
+		replStats.PreloadStats.Export(ch)
+	}
 	// 3.0+ only
 	if replStats.Executor != nil {
 		replStats.Executor.Export(ch)
@@ -425,11 +433,15 @@ type PreloadStats struct {
 
 // Export exposes the preload stats.
 func (preloadStats *PreloadStats) Export(ch chan<- prometheus.Metric) {
-	metricsReplPreloadDocsNumTotal.Set(preloadStats.Docs.Num)
-	metricsReplPreloadDocsTotalMilliseconds.Set(preloadStats.Docs.TotalMillis)
+	if preloadStats.Docs != nil {
+		metricsReplPreloadDocsNumTotal.Set(preloadStats.Docs.Num)
+		metricsReplPreloadDocsTotalMilliseconds.Set(preloadStats.Docs.TotalMillis)
+	}
 
-	metricsReplPreloadIndexesNumTotal.Set(preloadStats.Indexes.Num)
-	metricsReplPreloadIndexesTotalMilliseconds.Set(preloadStats.Indexes.TotalMillis)
+	if preloadStats.Indexes != nil {
+		metricsReplPreloadIndexesNumTotal.Set(preloadStats.Indexes.Num)
+		metricsReplPreloadIndexesTotalMilliseconds.Set(preloadStats.Indexes.TotalMillis)
+	}
 }
 
 // StorageStats are the stats associated with the storage.

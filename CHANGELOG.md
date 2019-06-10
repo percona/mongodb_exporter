@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed some function comments based on best practices from Effective Go #137, thx [@CodeLingoBot](https://github.com/CodeLingoBot).
+- [PMM-3473](https://jira.percona.com/browse/PMM-3473): Fixed panic and runtime error.
 
 ## [0.7.0]
 ### Changed
