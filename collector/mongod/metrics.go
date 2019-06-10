@@ -407,8 +407,8 @@ type ReplStats struct {
 
 // Export exposes the replication stats.
 func (replStats *ReplStats) Export(ch chan<- prometheus.Metric) {
-	if replStats.Buffer != nil {
-		replStats.Buffer.Export(ch)
+	if replStats.Apply != nil {
+		replStats.Apply.Export(ch)
 	}
 	if replStats.Buffer != nil {
 		replStats.Buffer.Export(ch)
