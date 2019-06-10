@@ -413,7 +413,7 @@ func TestVersionInfo(t *testing.T) {
 		pmmVersion.Branch = "test-branch"
 		pmmVersion.Timestamp = strconv.FormatInt(currentTime.Unix(), 10)
 
-		initVersionInfo(app)
+		initVersionInfo()
 
 		assert.Equal(t, pmmVersion.Version+"-pmm-"+pmmVersion.PMMVersion, version.Version)
 		assert.Equal(t, pmmVersion.FullCommit, version.Revision)
@@ -423,14 +423,14 @@ func TestVersionInfo(t *testing.T) {
 
 	t.Run("Check Empty Timestamp", func(t *testing.T) {
 		pmmVersion.Timestamp = ""
-		initVersionInfo(app)
+		initVersionInfo()
 		assert.Equal(t, time.Unix(0, 0).Format(versionDataFormat), version.BuildDate)
 	})
 
 	t.Run("Check PMMVersion Empty", func(t *testing.T) {
 		pmmVersion.Version = "1.2.3"
 		pmmVersion.PMMVersion = ""
-		initVersionInfo(app)
+		initVersionInfo()
 		assert.Equal(t, pmmVersion.Version, version.Version)
 	})
 }

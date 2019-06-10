@@ -134,7 +134,7 @@ func main() {
 // to application version and will be printed in all logs.
 // TODO: Refactor after moving version.Info() and version.BuildContext() to https://github.com/percona/exporter_shared
 // See: https://jira.percona.com/browse/PMM-3250 and https://github.com/percona/mongodb_exporter/pull/132#discussion_r262227248
-func initVersionInfo(app *kingpin.Application) {
+func initVersionInfo() {
 
 	version.Version = pmmVersion.Version
 	version.Revision = pmmVersion.FullCommit
@@ -148,11 +148,11 @@ func initVersionInfo(app *kingpin.Application) {
 
 	if pmmVersion.PMMVersion != "" {
 		version.Version += "-pmm-" + pmmVersion.PMMVersion
-		app.Version(pmmVersion.FullInfo())
+		kingpin.Version(pmmVersion.FullInfo())
 	} else {
-		app.Version(version.Print(program))
+		kingpin.Version(version.Print(program))
 	}
 
-	app.HelpFlag.Short('h')
-	app.Help = fmt.Sprintf("%s exports various MongoDB metrics in Prometheus format.\n", pmmVersion.ShortInfo())
+	kingpin.HelpFlag.Short('h')
+	kingpin.CommandLine.Help = fmt.Sprintf("%s exports various MongoDB metrics in Prometheus format.\n", pmmVersion.ShortInfo())
 }
