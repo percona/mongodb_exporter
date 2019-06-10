@@ -135,7 +135,6 @@ func main() {
 // TODO: Refactor after moving version.Info() and version.BuildContext() to https://github.com/percona/exporter_shared
 // See: https://jira.percona.com/browse/PMM-3250 and https://github.com/percona/mongodb_exporter/pull/132#discussion_r262227248
 func initVersionInfo() {
-
 	version.Version = pmmVersion.Version
 	version.Revision = pmmVersion.FullCommit
 	version.Branch = pmmVersion.Branch
