@@ -74,7 +74,6 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 	delete(logSuppressIS, "")
 	for _, dbName := range databaseNames {
 		c, err := client.Database(dbName).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
-		defer c.Close(context.TODO())
 		if err != nil {
 			_, logSFound := logSuppressIS[dbName]
 			if !logSFound {
@@ -99,7 +98,6 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 
 				collIndexUsageStats := IndexStatsList{}
 				c, err := client.Database(dbName).Collection(coll.Name).Aggregate(context.TODO(), []bson.M{{"$indexStats": bson.M{}}})
-				defer c.Close(context.TODO())
 				if err != nil {
 					_, logSFound := logSuppressIS[dbName+"."+coll.Name]
 					if !logSFound {
@@ -121,6 +119,10 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 						log.Error(err)
 					}
 
+					if err := c.Close(context.TODO()); err != nil {
+						log.Errorf("Could not close Aggregate() cursor, reason: %v", err)
+					}
+
 					delete(logSuppressIS, dbName+"."+coll.Name)
 					// Label index stats with corresponding db.collection
 					for i := 0; i < len(collIndexUsageStats.Items); i++ {
@@ -129,6 +131,9 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 					}
 					indexUsageStatsList.Items = append(indexUsageStatsList.Items, collIndexUsageStats.Items...)
 				}
+			}
+			if err := c.Close(context.TODO()); err != nil {
+				log.Errorf("Could not close ListCollections() cursor, reason: %v", err)
 			}
 		}
 	}

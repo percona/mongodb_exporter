@@ -140,7 +140,6 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	delete(logSuppressCS, "")
 	for _, db := range dbNames {
 		c, err := client.Database(db).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
-		defer c.Close(context.TODO())
 		if err != nil {
 			_, logSFound := logSuppressCS[db]
 			if !logSFound {
@@ -176,6 +175,9 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 					collStatus.Name = coll.Name
 					collectionStatList.Members = append(collectionStatList.Members, collStatus)
 				}
+			}
+			if err := c.Close(context.TODO()); err != nil {
+				log.Errorf("Could not close ListCollections() cursor, reason: %v", err)
 			}
 		}
 	}

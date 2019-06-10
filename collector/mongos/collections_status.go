@@ -117,7 +117,6 @@ func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *Coll
 	delete(logSuppressCS, "")
 	for _, dbName := range dbNames {
 		c, err := client.Database(dbName).ListCollections(ctx, bson.M{}, options.ListCollections().SetNameOnly(true))
-		defer c.Close(context.TODO())
 		if err != nil {
 			_, logSFound := logSuppressCS[dbName]
 			if !logSFound {
@@ -158,6 +157,10 @@ func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *Coll
 
 			if err := c.Err(); err != nil {
 				log.Error(err)
+			}
+
+			if err := c.Close(context.TODO()); err != nil {
+				log.Errorf("Could not close ListCollections() cursor, reason: %v", err)
 			}
 		}
 	}
