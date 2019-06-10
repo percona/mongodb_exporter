@@ -78,6 +78,7 @@ var (
 
 func main() {
 	initVersionInfo()
+	log.AddFlags(kingpin.CommandLine)
 	kingpin.Parse()
 
 	if *testF {
