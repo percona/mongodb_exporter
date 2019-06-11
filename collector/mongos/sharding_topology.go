@@ -90,10 +90,10 @@ type ShardingTopoStats struct {
 }
 
 // GetShards gets shards.
-func GetShards(ctx mongo.SessionContext, client *mongo.Client) *[]ShardingTopoShardInfo {
+func GetShards(client *mongo.Client) *[]ShardingTopoShardInfo {
 	var shards []ShardingTopoShardInfo
 	opts := options.Find().SetComment(shared.GetCallerLocation())
-	c, err := client.Database("config").Collection("shards").Find(ctx, bson.M{}, opts)
+	c, err := client.Database("config").Collection("shards").Find(context.TODO(), bson.M{}, opts)
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.shards': %s.", err)
 	}
@@ -116,8 +116,8 @@ func GetShards(ctx mongo.SessionContext, client *mongo.Client) *[]ShardingTopoSh
 }
 
 // GetTotalChunks gets total chunks.
-func GetTotalChunks(ctx mongo.SessionContext, client *mongo.Client) float64 {
-	chunkCount, err := client.Database("config").Collection("chunks").CountDocuments(ctx, bson.M{})
+func GetTotalChunks(client *mongo.Client) float64 {
+	chunkCount, err := client.Database("config").Collection("chunks").CountDocuments(context.TODO(), bson.M{})
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.chunks': %s.", err)
 	}
@@ -125,9 +125,9 @@ func GetTotalChunks(ctx mongo.SessionContext, client *mongo.Client) float64 {
 }
 
 // GetTotalChunksByShard gets total chunks by shard.
-func GetTotalChunksByShard(ctx mongo.SessionContext, client *mongo.Client) *[]ShardingTopoChunkInfo {
+func GetTotalChunksByShard(client *mongo.Client) *[]ShardingTopoChunkInfo {
 	var results []ShardingTopoChunkInfo
-	c, err := client.Database("config").Collection("chunks").Aggregate(ctx, []bson.M{{"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}})
+	c, err := client.Database("config").Collection("chunks").Aggregate(context.TODO(), []bson.M{{"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}})
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.chunks': %s.", err)
 	}
@@ -150,10 +150,10 @@ func GetTotalChunksByShard(ctx mongo.SessionContext, client *mongo.Client) *[]Sh
 }
 
 // GetTotalDatabases gets total databases.
-func GetTotalDatabases(ctx mongo.SessionContext, client *mongo.Client) *[]ShardingTopoStatsTotalDatabases {
+func GetTotalDatabases(client *mongo.Client) *[]ShardingTopoStatsTotalDatabases {
 	results := []ShardingTopoStatsTotalDatabases{}
 	query := []bson.M{{"$match": bson.M{"_id": bson.M{"$ne": "admin"}}}, {"$group": bson.M{"_id": "$partitioned", "total": bson.M{"$sum": 1}}}}
-	c, err := client.Database("config").Collection("databases").Aggregate(ctx, query)
+	c, err := client.Database("config").Collection("databases").Aggregate(context.TODO(), query)
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.databases': %s.", err)
 	}
@@ -176,8 +176,8 @@ func GetTotalDatabases(ctx mongo.SessionContext, client *mongo.Client) *[]Shardi
 }
 
 // GetTotalShardedCollections gets total sharded collections.
-func GetTotalShardedCollections(ctx mongo.SessionContext, client *mongo.Client) float64 {
-	collCount, err := client.Database("config").Collection("collections").CountDocuments(ctx, bson.M{"dropped": false})
+func GetTotalShardedCollections(client *mongo.Client) float64 {
+	collCount, err := client.Database("config").Collection("collections").CountDocuments(context.TODO(), bson.M{"dropped": false})
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.collections': %s.", err)
 	}
@@ -239,14 +239,14 @@ func (status *ShardingTopoStats) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // GetShardingTopoStatus gets sharding topo status.
-func GetShardingTopoStatus(ctx mongo.SessionContext, client *mongo.Client) *ShardingTopoStats {
+func GetShardingTopoStatus(client *mongo.Client) *ShardingTopoStats {
 	results := &ShardingTopoStats{}
 
-	results.Shards = GetShards(ctx, client)
-	results.TotalChunks = GetTotalChunks(ctx, client)
-	results.ShardChunks = GetTotalChunksByShard(ctx, client)
-	results.TotalDatabases = GetTotalDatabases(ctx, client)
-	results.TotalCollections = GetTotalShardedCollections(ctx, client)
+	results.Shards = GetShards(client)
+	results.TotalChunks = GetTotalChunks(client)
+	results.ShardChunks = GetTotalChunksByShard(client)
+	results.TotalDatabases = GetTotalDatabases(client)
+	results.TotalCollections = GetTotalShardedCollections(client)
 
 	return results
 }

@@ -93,10 +93,10 @@ type ShardingStats struct {
 }
 
 // GetMongosInfo gets mongos info.
-func GetMongosInfo(ctx mongo.SessionContext, client *mongo.Client) *[]MongosInfo {
+func GetMongosInfo(client *mongo.Client) *[]MongosInfo {
 	mongosInfo := []MongosInfo{}
 	opts := options.Find().SetComment(shared.GetCallerLocation())
-	c, err := client.Database("config").Collection("mongos").Find(ctx, bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}}, opts)
+	c, err := client.Database("config").Collection("mongos").Find(context.TODO(), bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}}, opts)
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.mongos': %s.", err)
 	}
@@ -119,10 +119,10 @@ func GetMongosInfo(ctx mongo.SessionContext, client *mongo.Client) *[]MongosInfo
 }
 
 // GetMongosBalancerLock gets mongos balncer lock.
-func GetMongosBalancerLock(ctx mongo.SessionContext, client *mongo.Client) *MongosBalancerLock {
+func GetMongosBalancerLock(client *mongo.Client) *MongosBalancerLock {
 	var balancerLock *MongosBalancerLock
 	opts := options.FindOne().SetComment(shared.GetCallerLocation())
-	r := client.Database("config").Collection("locks").FindOne(ctx, bson.M{"_id": "balancer"}, opts)
+	r := client.Database("config").Collection("locks").FindOne(context.TODO(), bson.M{"_id": "balancer"}, opts)
 	if err := r.Decode(&balancerLock); err != nil {
 		log.Errorf("Failed to execute find query on 'config.locks': %s.", err)
 	}
@@ -130,12 +130,12 @@ func GetMongosBalancerLock(ctx mongo.SessionContext, client *mongo.Client) *Mong
 }
 
 // IsBalancerEnabled check is balancer enabled.
-func IsBalancerEnabled(ctx mongo.SessionContext, client *mongo.Client) float64 {
+func IsBalancerEnabled(client *mongo.Client) float64 {
 	balancerConfig := struct {
 		Stopped bool `bson:"stopped"`
 	}{}
 	opts := options.FindOne().SetComment(shared.GetCallerLocation())
-	r := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}, opts)
+	r := client.Database("config").Collection("settings").FindOne(context.TODO(), bson.M{"_id": "balancer"}, opts)
 	if err := r.Decode(&balancerConfig); err != nil {
 		return 1
 	}
@@ -146,11 +146,11 @@ func IsBalancerEnabled(ctx mongo.SessionContext, client *mongo.Client) float64 {
 }
 
 // IsClusterBalanced check is cluster balanced.
-func IsClusterBalanced(ctx mongo.SessionContext, client *mongo.Client) float64 {
+func IsClusterBalanced(client *mongo.Client) float64 {
 	// Different thresholds based on size
 	// http://docs.mongodb.org/manual/core/sharding-internals/#sharding-migration-thresholds
 	var threshold float64 = 8
-	totalChunkCount := GetTotalChunks(ctx, client)
+	totalChunkCount := GetTotalChunks(client)
 	if totalChunkCount < 20 {
 		threshold = 2
 	} else if totalChunkCount < 80 && totalChunkCount > 21 {
@@ -159,7 +159,7 @@ func IsClusterBalanced(ctx mongo.SessionContext, client *mongo.Client) float64 {
 
 	var minChunkCount float64 = -1
 	var maxChunkCount float64 = 0
-	shardChunkInfoAll := GetTotalChunksByShard(ctx, client)
+	shardChunkInfoAll := GetTotalChunksByShard(client)
 	for _, shard := range *shardChunkInfoAll {
 		if shard.Chunks > maxChunkCount {
 			maxChunkCount = shard.Chunks
@@ -225,15 +225,15 @@ func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // GetShardingStatus gets sharding status.
-func GetShardingStatus(ctx mongo.SessionContext, client *mongo.Client) *ShardingStats {
+func GetShardingStatus(client *mongo.Client) *ShardingStats {
 	results := &ShardingStats{}
 
-	results.IsBalanced = IsClusterBalanced(ctx, client)
-	results.BalancerEnabled = IsBalancerEnabled(ctx, client)
-	results.Changelog = GetShardingChangelogStatus(ctx, client)
-	results.Topology = GetShardingTopoStatus(ctx, client)
-	results.Mongos = GetMongosInfo(ctx, client)
-	results.BalancerLock = GetMongosBalancerLock(ctx, client)
+	results.IsBalanced = IsClusterBalanced(client)
+	results.BalancerEnabled = IsBalancerEnabled(client)
+	results.Changelog = GetShardingChangelogStatus(client)
+	results.Topology = GetShardingTopoStatus(client)
+	results.Mongos = GetMongosInfo(client)
+	results.BalancerLock = GetMongosBalancerLock(client)
 
 	return results
 }

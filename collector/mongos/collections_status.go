@@ -103,9 +103,9 @@ var (
 )
 
 // GetCollectionStatList returns stats for a given database
-func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *CollectionStatList {
+func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
-	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
+	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
 		_, logSFound := logSuppressCS[""]
 		if !logSFound {
@@ -116,7 +116,7 @@ func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *Coll
 	}
 	delete(logSuppressCS, "")
 	for _, dbName := range dbNames {
-		c, err := client.Database(dbName).ListCollections(ctx, bson.M{}, options.ListCollections().SetNameOnly(true))
+		c, err := client.Database(dbName).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
 		if err != nil {
 			_, logSFound := logSuppressCS[dbName]
 			if !logSFound {
@@ -139,7 +139,7 @@ func GetCollectionStatList(ctx mongo.SessionContext, client *mongo.Client) *Coll
 					continue
 				}
 				collStatus := CollectionStatus{}
-				res := client.Database(dbName).RunCommand(ctx, bson.D{{"collStats", coll.Name}, {"scale", 1}})
+				res := client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", coll.Name}, {"scale", 1}})
 				err = res.Decode(&collStatus)
 				if err != nil {
 					_, logSFound := logSuppressCS[dbName+"."+coll.Name]

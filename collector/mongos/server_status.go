@@ -15,6 +15,8 @@
 package mongos
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/bson"
@@ -47,10 +49,10 @@ func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // GetServerStatus returns the server status info.
-func GetServerStatus(ctx mongo.SessionContext, client *mongo.Client) *ServerStatus {
+func GetServerStatus(client *mongo.Client) *ServerStatus {
 	result := &ServerStatus{}
 
-	res := client.Database("admin").RunCommand(ctx, bson.D{{"serverStatus", 1}, {"recordStats", 0}})
+	res := client.Database("admin").RunCommand(context.TODO(), bson.D{{"serverStatus", 1}, {"recordStats", 0}})
 	err := res.Decode(result)
 	if err != nil {
 		log.Errorf("Failed to get server status: %s", err)

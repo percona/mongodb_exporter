@@ -23,8 +23,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 
 	"github.com/percona/mongodb_exporter/collector/mongod"
 	"github.com/percona/mongodb_exporter/collector/mongos"
@@ -238,42 +236,33 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 }
 
 func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- prometheus.Metric) {
-	// read from primaries only when using mongos to avoid v
-	opts := options.Session().SetDefaultReadPreference(readpref.Primary())
-	err := client.UseSessionWithOptions(context.TODO(), opts, func(sCtx mongo.SessionContext) error {
-		log.Debug("Collecting Server Status")
+	log.Debug("Collecting Server Status")
 
-		serverStatus := mongos.GetServerStatus(sCtx, client)
-		if serverStatus != nil {
-			serverStatus.Export(ch)
+	serverStatus := mongos.GetServerStatus(client)
+	if serverStatus != nil {
+		serverStatus.Export(ch)
+	}
+
+	log.Debug("Collecting Sharding Status")
+	shardingStatus := mongos.GetShardingStatus(client)
+	if shardingStatus != nil {
+		shardingStatus.Export(ch)
+	}
+
+	if exporter.Opts.CollectDatabaseMetrics {
+		log.Debug("Collecting Database Status From Mongos")
+		dbStatList := mongos.GetDatabaseStatList(client)
+		if dbStatList != nil {
+			dbStatList.Export(ch)
 		}
+	}
 
-		log.Debug("Collecting Sharding Status")
-		shardingStatus := mongos.GetShardingStatus(sCtx, client)
-		if shardingStatus != nil {
-			shardingStatus.Export(ch)
+	if exporter.Opts.CollectCollectionMetrics {
+		log.Debug("Collecting Collection Status From Mongos")
+		collStatList := mongos.GetCollectionStatList(client)
+		if collStatList != nil {
+			collStatList.Export(ch)
 		}
-
-		if exporter.Opts.CollectDatabaseMetrics {
-			log.Debug("Collecting Database Status From Mongos")
-			dbStatList := mongos.GetDatabaseStatList(sCtx, client)
-			if dbStatList != nil {
-				dbStatList.Export(ch)
-			}
-		}
-
-		if exporter.Opts.CollectCollectionMetrics {
-			log.Debug("Collecting Collection Status From Mongos")
-			collStatList := mongos.GetCollectionStatList(sCtx, client)
-			if collStatList != nil {
-				collStatList.Export(ch)
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		log.Errorf("Failed to collect mongos metrics: %s", err)
 	}
 }
 

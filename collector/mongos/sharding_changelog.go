@@ -92,13 +92,13 @@ func (status *ShardingChangelogStats) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // GetShardingChangelogStatus gets sharding changelog status.
-func GetShardingChangelogStatus(ctx mongo.SessionContext, client *mongo.Client) *ShardingChangelogStats {
+func GetShardingChangelogStatus(client *mongo.Client) *ShardingChangelogStats {
 	var qresults []ShardingChangelogSummary
 	coll := client.Database("config").Collection("changelog")
 	match := bson.M{"time": bson.M{"$gt": time.Now().Add(-10 * time.Minute)}}
 	group := bson.M{"_id": bson.M{"event": "$what", "note": "$details.note"}, "count": bson.M{"$sum": 1}}
 
-	c, err := coll.Aggregate(ctx, []bson.M{{"$match": match}, {"$group": group}})
+	c, err := coll.Aggregate(context.TODO(), []bson.M{{"$match": match}, {"$group": group}})
 	if err != nil {
 		log.Error("Failed to execute find query on 'config.changelog'!")
 	}
