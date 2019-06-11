@@ -10,8 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PMM-3511](https://jira.percona.com/browse/PMM-3511): Switched to [mongo-go-driver](https://github.com/mongodb/mongo-go-driver).
 
 ### Added
+
+### Fixed
+
+## [0.7.1]
+### Added
 - Added Authentification Database option when connect to mongo #139, thx [@etiennecoutaud](https://github.com/etiennecoutaud).
 - Added helm chart to readme #140, thx [@pgdagenais](https://github.com/pgdagenais).
+- [PMM-4154](https://jira.percona.com/browse/PMM-4154): Added standard logging flags.
 
 ### Fixed
 - Fixed some function comments based on best practices from Effective Go #137, thx [@CodeLingoBot](https://github.com/CodeLingoBot).
@@ -119,7 +125,8 @@ with source code locations.
 ### Added
 - First tagged version.
 
-[Unreleased]: https://github.com/percona/mongodb_exporter/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/percona/mongodb_exporter/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/percona/mongodb_exporter/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/percona/mongodb_exporter/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/percona/mongodb_exporter/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/percona/mongodb_exporter/compare/v0.6.1...v0.6.2

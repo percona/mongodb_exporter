@@ -56,4 +56,11 @@ Flags:
                                    Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.
       --groups.enabled=""        Currently ignored
       --version                  Show application version.
+      --log.level="info"         Only log messages with the given severity or
+                                 above. Valid levels: [debug, info, warn, error,
+                                 fatal]
+      --log.format="logger:stderr"  
+                                 Set the log target and format. Example:
+                                 "logger:syslog?appname=bob&local=7" or
+                                 "logger:stdout?json=true"
 
