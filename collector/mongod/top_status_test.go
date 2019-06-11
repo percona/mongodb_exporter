@@ -27,14 +27,15 @@ func Test_ParserTopStatus(t *testing.T) {
 	collections := []string{
 		"admin.system.roles",
 		"admin.system.version",
-		"config.system.sessions",
 		"local.startup_log",
 		"local.system.replset",
 	}
 
-	assert.Len(t, topStatus.TopStats, len(collections))
-	for col, stats := range topStatus.TopStats {
-		assert.Contains(t, collections, col)
+	assert.True(t, len(collections) <= len(topStatus.TopStats),
+		"expected more than %d collections, got %d", len(collections), len(topStatus.TopStats))
+	for _, col := range collections {
+		assert.Contains(t, topStatus.TopStats, col)
+		stats := topStatus.TopStats[col]
 		assert.NotZero(t, stats.Total.Time, "%s: %+v", col, stats)
 		assert.NotZero(t, stats.Total.Count, "%s: %+v", col, stats)
 	}
