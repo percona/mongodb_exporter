@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -26,17 +27,15 @@ func Test_ParserTopStatus(t *testing.T) {
 	collections := []string{
 		"admin.system.roles",
 		"admin.system.version",
+		"config.system.sessions",
 		"local.startup_log",
 		"local.system.replset",
 	}
 
-	if len(topStatus.TopStats) < len(collections) {
-		t.Errorf("All database collections were not loaded, expected: %v, got: %v", len(collections), len(topStatus.TopStats))
-	}
-
-	for cid := range collections {
-		if _, ok := topStatus.TopStats[collections[cid]]; !ok {
-			t.Errorf("Database collection is missing, %v", collections[cid])
-		}
+	assert.Len(t, topStatus.TopStats, len(collections))
+	for col, stats := range topStatus.TopStats {
+		assert.Contains(t, collections, col)
+		assert.NotZero(t, stats.Total.Time, "%s: %+v", col, stats)
+		assert.NotZero(t, stats.Total.Count, "%s: %+v", col, stats)
 	}
 }
