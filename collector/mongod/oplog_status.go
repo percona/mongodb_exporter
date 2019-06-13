@@ -72,14 +72,9 @@ type OplogStatus struct {
 	CollectionStats *OplogCollectionStats
 }
 
-// there's gotta be a better way to do this, but it works for now :/
-func BsonMongoTimestampToUnix(timestamp primitive.Timestamp) float64 {
-	return float64(timestamp.T >> 32)
-}
-
 func getOplogTailOrHeadTimestamp(client *mongo.Client, returnHead bool) (float64, error) {
 	var result struct {
-		Timestamp primitive.Timestamp `bson:"ts"`
+		Timestamp primitive.Timestamp `bson:"ts"` // See: https://docs.mongodb.com/manual/reference/bson-types/#timestamps
 	}
 
 	var sortCond = bson.M{"$natural": 1}
@@ -89,7 +84,7 @@ func getOplogTailOrHeadTimestamp(client *mongo.Client, returnHead bool) (float64
 
 	opts := options.FindOne().SetComment(shared.GetCallerLocation()).SetSort(sortCond)
 	err := client.Database(oplogDb).Collection(oplogCollection).FindOne(context.TODO(), bson.M{}, opts).Decode(&result)
-	return BsonMongoTimestampToUnix(result.Timestamp), err
+	return float64(result.Timestamp.T), err
 }
 
 // GetOplogTimestamps gets oplog timestamps.
