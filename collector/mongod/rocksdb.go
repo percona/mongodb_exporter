@@ -33,85 +33,85 @@ var (
 	billion  float64 = million * 1000
 	trillion float64 = billion * 1000
 
-	rocksDbStalledSecs = prometheus.NewCounter(prometheus.CounterOpts{
+	rocksDbStalledSecs = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "stalled_seconds_total",
 		Help:      "The total number of seconds RocksDB has spent stalled",
 	})
-	rocksDbStalls = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbStalls = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "stalls_total",
 		Help:      "The total number of stalls in RocksDB",
 	}, []string{"type"})
-	rocksDbCompactionBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbCompactionBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "compaction_bytes_total",
 		Help:      "Total bytes processed during compaction between levels N and N+1 in RocksDB",
 	}, []string{"level", "type"})
-	rocksDbCompactionSecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbCompactionSecondsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "compaction_seconds_total",
 		Help:      "The time spent doing compactions between levels N and N+1 in RocksDB",
 	}, []string{"level"})
-	rocksDbCompactionsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbCompactionsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "compactions_total",
 		Help:      "The total number of compactions between levels N and N+1 in RocksDB",
 	}, []string{"level"})
-	rocksDbBlockCacheHits = prometheus.NewCounter(prometheus.CounterOpts{
+	rocksDbBlockCacheHits = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "block_cache_hits_total",
 		Help:      "The total number of hits to the RocksDB Block Cache",
 	})
-	rocksDbBlockCacheMisses = prometheus.NewCounter(prometheus.CounterOpts{
+	rocksDbBlockCacheMisses = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "block_cache_misses_total",
 		Help:      "The total number of misses to the RocksDB Block Cache",
 	})
-	rocksDbKeys = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbKeys = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "keys_total",
 		Help:      "The total number of RocksDB key operations",
 	}, []string{"type"})
-	rocksDbSeeks = prometheus.NewCounter(prometheus.CounterOpts{
+	rocksDbSeeks = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "seeks_total",
 		Help:      "The total number of seeks performed by RocksDB",
 	})
-	rocksDbIterations = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbIterations = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "iterations_total",
 		Help:      "The total number of iterations performed by RocksDB",
 	}, []string{"type"})
-	rocksDbBloomFilterUseful = prometheus.NewCounter(prometheus.CounterOpts{
+	rocksDbBloomFilterUseful = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "bloom_filter_useful_total",
 		Help:      "The total number of times the RocksDB Bloom Filter was useful",
 	})
-	rocksDbBytesWritten = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbBytesWritten = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "bytes_written_total",
 		Help:      "The total number of bytes written by RocksDB",
 	}, []string{"type"})
-	rocksDbBytesRead = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbBytesRead = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "bytes_read_total",
 		Help:      "The total number of bytes read by RocksDB",
 	}, []string{"type"})
-	rocksDbReadOps = prometheus.NewCounterVec(prometheus.CounterOpts{
+	rocksDbReadOps = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "rocksdb",
 		Name:      "reads_total",

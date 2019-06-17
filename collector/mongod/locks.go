@@ -19,21 +19,21 @@ import (
 )
 
 var (
-	locksTimeLockedGlobalMicrosecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	locksTimeLockedGlobalMicrosecondsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "locks_time_locked_global_microseconds_total",
 		Help:      "amount of time in microseconds that any database has held the global lock",
 	}, []string{"type", "database"})
 )
 var (
-	locksTimeLockedLocalMicrosecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	locksTimeLockedLocalMicrosecondsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "locks_time_locked_local_microseconds_total",
 		Help:      "amount of time in microseconds that any database has held the local lock",
 	}, []string{"type", "database"})
 )
 var (
-	locksTimeAcquiringGlobalMicrosecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	locksTimeAcquiringGlobalMicrosecondsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "locks_time_acquiring_global_microseconds_total",
 		Help:      "amount of time in microseconds that any database has spent waiting for the global lock",

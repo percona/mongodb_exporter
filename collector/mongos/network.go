@@ -19,14 +19,14 @@ import (
 )
 
 var (
-	networkBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	networkBytesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "network_bytes_total",
 		Help:      "The network data structure contains data regarding MongoDB’s network use",
 	}, []string{"state"})
 )
 var (
-	networkMetricsNumRequestsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	networkMetricsNumRequestsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "network_metrics",
 		Name:      "num_requests_total",

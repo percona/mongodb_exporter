@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	metricsCursorTimedOutTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsCursorTimedOutTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_cursor",
 		Name:      "timed_out_total",
@@ -34,7 +34,7 @@ var (
 	}, []string{"state"})
 )
 var (
-	metricsDocumentTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	metricsDocumentTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "metrics_document_total",
 		Help:      "The document holds a document of that reflect document access and modification patterns and data use. Compare these values to the data in the opcounters document, which track total number of operations",
@@ -47,7 +47,7 @@ var (
 		Name:      "num_total",
 		Help:      "num reports the total number of getLastError operations with a specified write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
 	})
-	metricsGetLastErrorWtimeTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsGetLastErrorWtimeTotalMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_get_last_error_wtime",
 		Name:      "total_milliseconds",
@@ -55,7 +55,7 @@ var (
 	})
 )
 var (
-	metricsGetLastErrorWtimeoutsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsGetLastErrorWtimeoutsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_get_last_error",
 		Name:      "wtimeouts_total",
@@ -63,21 +63,21 @@ var (
 	})
 )
 var (
-	metricsOperationTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	metricsOperationTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "metrics_operation_total",
 		Help:      "operation is a sub-document that holds counters for several types of update and query operations that MongoDB handles using special operation types",
 	}, []string{"type"})
 )
 var (
-	metricsQueryExecutorTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	metricsQueryExecutorTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "metrics_query_executor_total",
 		Help:      "queryExecutor is a document that reports data from the query execution system",
 	}, []string{"state"})
 )
 var (
-	metricsRecordMovesTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsRecordMovesTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_record",
 		Name:      "moves_total",
@@ -85,13 +85,13 @@ var (
 	})
 )
 var (
-	metricsReplApplyBatchesNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplApplyBatchesNumTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_apply_batches",
 		Name:      "num_total",
 		Help:      "num reports the total number of batches applied across all databases",
 	})
-	metricsReplApplyBatchesTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplApplyBatchesTotalMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_apply_batches",
 		Name:      "total_milliseconds",
@@ -99,7 +99,7 @@ var (
 	})
 )
 var (
-	metricsReplApplyOpsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplApplyOpsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_apply",
 		Name:      "ops_total",
@@ -113,7 +113,7 @@ var (
 		Name:      "count",
 		Help:      "count reports the current number of operations in the oplog buffer",
 	})
-	metricsReplBufferMaxSizeBytes = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplBufferMaxSizeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_buffer",
 		Name:      "max_size_bytes",
@@ -127,7 +127,7 @@ var (
 	})
 )
 var (
-	metricsReplExecutorTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	metricsReplExecutorTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_executor",
 		Name:      "total",
@@ -153,13 +153,13 @@ var (
 	})
 )
 var (
-	metricsReplNetworkGetmoresNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplNetworkGetmoresNumTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_network_getmores",
 		Name:      "num_total",
 		Help:      "num reports the total number of getmore operations, which are operations that request an additional set of operations from the replication sync source.",
 	})
-	metricsReplNetworkGetmoresTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplNetworkGetmoresTotalMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_network_getmores",
 		Name:      "total_milliseconds",
@@ -167,19 +167,19 @@ var (
 	})
 )
 var (
-	metricsReplNetworkBytesTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplNetworkBytesTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_network",
 		Name:      "bytes_total",
 		Help:      "bytes reports the total amount of data read from the replication sync source",
 	})
-	metricsReplNetworkOpsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplNetworkOpsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_network",
 		Name:      "ops_total",
 		Help:      "ops reports the total number of operations read from the replication source.",
 	})
-	metricsReplNetworkReadersCreatedTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplNetworkReadersCreatedTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_network",
 		Name:      "readers_created_total",
@@ -209,13 +209,13 @@ var (
 	})
 )
 var (
-	metricsReplPreloadDocsNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplPreloadDocsNumTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_preload_docs",
 		Name:      "num_total",
 		Help:      "num reports the total number of documents loaded during the pre-fetch stage of replication",
 	})
-	metricsReplPreloadDocsTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplPreloadDocsTotalMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_preload_docs",
 		Name:      "total_milliseconds",
@@ -223,13 +223,13 @@ var (
 	})
 )
 var (
-	metricsReplPreloadIndexesNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplPreloadIndexesNumTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_preload_indexes",
 		Name:      "num_total",
 		Help:      "num reports the total number of index entries loaded by members before updating documents as part of the pre-fetch stage of replication",
 	})
-	metricsReplPreloadIndexesTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsReplPreloadIndexesTotalMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_preload_indexes",
 		Name:      "total_milliseconds",
@@ -237,20 +237,20 @@ var (
 	})
 )
 var (
-	metricsStorageFreelistSearchTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	metricsStorageFreelistSearchTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "metrics_storage_freelist_search_total",
 		Help:      "metrics about searching records in the database.",
 	}, []string{"type"})
 )
 var (
-	metricsTTLDeletedDocumentsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsTTLDeletedDocumentsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_ttl",
 		Name:      "deleted_documents_total",
 		Help:      "deletedDocuments reports the total number of documents deleted from collections with a ttl index.",
 	})
-	metricsTTLPassesTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsTTLPassesTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_ttl",
 		Name:      "passes_total",

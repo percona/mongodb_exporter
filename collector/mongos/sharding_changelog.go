@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	shardingChangelogInfo = prometheus.NewCounterVec(prometheus.CounterOpts{
+	shardingChangelogInfo = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "changelog_10min_total",

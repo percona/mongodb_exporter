@@ -19,13 +19,13 @@ import (
 )
 
 var (
-	wtBlockManagerBlocksTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtBlockManagerBlocksTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_blockmanager",
 		Name:      "blocks_total",
 		Help:      "The total number of blocks read by the WiredTiger BlockManager",
 	}, []string{"type"})
-	wtBlockManagerBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtBlockManagerBytesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_blockmanager",
 		Name:      "bytes_total",
@@ -40,7 +40,7 @@ var (
 		Name:      "pages",
 		Help:      "The current number of pages in the WiredTiger Cache",
 	}, []string{"type"})
-	wtCachePagesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtCachePagesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_cache",
 		Name:      "pages_total",
@@ -58,13 +58,13 @@ var (
 		Name:      "max_bytes",
 		Help:      "The maximum size of data in the WiredTiger Cache in bytes",
 	})
-	wtCacheBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtCacheBytesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_cache",
 		Name:      "bytes_total",
 		Help:      "The total number of bytes read into/from the WiredTiger Cache",
 	}, []string{"type"})
-	wtCacheEvictedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtCacheEvictedTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_cache",
 		Name:      "evicted_total",
@@ -79,13 +79,13 @@ var (
 )
 
 var (
-	wtTransactionsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtTransactionsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_transactions",
 		Name:      "total",
 		Help:      "The total number of transactions WiredTiger has handled",
 	}, []string{"type"})
-	wtTransactionsTotalCheckpointMs = prometheus.NewCounter(prometheus.CounterOpts{
+	wtTransactionsTotalCheckpointMs = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_transactions",
 		Name:      "checkpoint_milliseconds_total",
@@ -106,25 +106,25 @@ var (
 )
 
 var (
-	wtLogRecordsScannedTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	wtLogRecordsScannedTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_log",
 		Name:      "records_scanned_total",
 		Help:      "The total number of records scanned by log scan in the WiredTiger log",
 	})
-	wtLogRecordsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtLogRecordsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_log",
 		Name:      "records_total",
 		Help:      "The total number of compressed/uncompressed records written to the WiredTiger log",
 	}, []string{"type"})
-	wtLogBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtLogBytesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_log",
 		Name:      "bytes_total",
 		Help:      "The total number of bytes written to the WiredTiger log",
 	}, []string{"type"})
-	wtLogOperationsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	wtLogOperationsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_log",
 		Name:      "operations_total",

@@ -26,7 +26,7 @@ var (
 	}, []string{"state"})
 )
 var (
-	connectionsMetricsCreatedTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	connectionsMetricsCreatedTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "connections_metrics",
 		Name:      "created_total",
