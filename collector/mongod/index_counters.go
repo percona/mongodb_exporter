@@ -28,7 +28,7 @@ var (
 )
 
 var (
-	indexCountersTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	indexCountersTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "index_counters_total",
 		Help:      "Total indexes by type",

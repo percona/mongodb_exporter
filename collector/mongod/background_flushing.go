@@ -21,13 +21,13 @@ import (
 )
 
 var (
-	backgroundFlushingflushesTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	backgroundFlushingflushesTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
 		Name:      "flushes_total",
 		Help:      "flushes is a counter that collects the number of times the database has flushed all writes to disk. This value will grow as database runs for longer periods of time",
 	})
-	backgroundFlushingtotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
+	backgroundFlushingtotalMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
 		Name:      "total_milliseconds",

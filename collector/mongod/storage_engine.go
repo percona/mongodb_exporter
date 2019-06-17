@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	storageEngine = prometheus.NewCounterVec(prometheus.CounterOpts{
+	storageEngine = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "storage_engine",
 		Help:      "The storage engine used by the MongoDB instance",

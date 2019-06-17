@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	metricsCursorTimedOutTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsCursorTimedOutTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_cursor",
 		Name:      "timed_out_total",
@@ -40,7 +40,7 @@ var (
 		Name:      "num_total",
 		Help:      "num reports the total number of getLastError operations with a specified write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
 	})
-	metricsGetLastErrorWtimeTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsGetLastErrorWtimeTotalMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_get_last_error_wtime",
 		Name:      "total_milliseconds",
@@ -48,7 +48,7 @@ var (
 	})
 )
 var (
-	metricsGetLastErrorWtimeoutsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+	metricsGetLastErrorWtimeoutsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_get_last_error",
 		Name:      "wtimeouts_total",

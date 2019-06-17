@@ -19,14 +19,14 @@ import (
 )
 
 var (
-	opCountersTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	opCountersTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "op_counters_total",
 		Help:      "The opcounters data structure provides an overview of database operations by type and makes it possible to analyze the load on the database in more granular manner. These numbers will grow over time and in response to database use. Analyze these values over time to track database utilization",
 	}, []string{"type"})
 )
 var (
-	opCountersReplTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	opCountersReplTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "op_counters_repl_total",
 		Help:      "The opcountersRepl data structure, similar to the opcounters data structure, provides an overview of database replication operations by type and makes it possible to analyze the load on the replica in more granular manner. These values only appear when the current host has replication enabled",

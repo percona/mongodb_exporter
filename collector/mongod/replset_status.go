@@ -74,7 +74,7 @@ var (
 		Name:      "member_state",
 		Help:      "The value of state is an integer between 0 and 10 that represents the replica state of the member.",
 	}, []string{"set", "name", "state"})
-	memberUptime = prometheus.NewCounterVec(prometheus.CounterOpts{
+	memberUptime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_uptime",

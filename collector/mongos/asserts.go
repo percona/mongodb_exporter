@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	assertsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	assertsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "asserts_total",
 		Help:      "The asserts document reports the number of asserts on the database. While assert errors are typically uncommon, if there are non-zero values for the asserts, you should check the log file for the mongod process for more information. In many cases these errors are trivial, but are worth investigating.",

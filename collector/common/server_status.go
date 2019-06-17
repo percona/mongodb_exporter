@@ -27,19 +27,19 @@ var (
 		Name:      "info",
 		Help:      "Software version information for mongodb process.",
 	}, []string{"mongodb"})
-	instanceUptimeSeconds = prometheus.NewCounter(prometheus.CounterOpts{
+	instanceUptimeSeconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "instance",
 		Name:      "uptime_seconds",
 		Help:      "The value of the uptime field corresponds to the number of seconds that the mongos or mongod process has been active.",
 	})
-	instanceUptimeEstimateSeconds = prometheus.NewCounter(prometheus.CounterOpts{
+	instanceUptimeEstimateSeconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "instance",
 		Name:      "uptime_estimate_seconds",
 		Help:      "uptimeEstimate provides the uptime as calculated from MongoDB's internal course-grained time keeping system.",
 	})
-	instanceLocalTime = prometheus.NewCounter(prometheus.CounterOpts{
+	instanceLocalTime = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "instance",
 		Name:      "local_time",
