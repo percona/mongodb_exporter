@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- [PMM-4168](https://jira.percona.com/browse/PMM-4168): Updated all dependencies including `github.com/prometheus/golang_client`. 
+As a result a lot of metrics was changed from Counter to Gauge. For more information look at commit [af19190](https://github.com/percona/mongodb_exporter/commit/af1919030e6b9cf3a3cc6da069435f09d49f5099). 
 
 ### Added
 
