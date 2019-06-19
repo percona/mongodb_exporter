@@ -126,8 +126,7 @@ func main() {
 	})
 	prometheus.MustRegister(programCollector, mongodbCollector)
 
-	promHandler := promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}))
-	exporter_shared.RunServer("MongoDB", *listenAddressF, *metricsPathF, promHandler)
+	exporter_shared.RunServer("MongoDB", *listenAddressF, *metricsPathF, promhttp.ContinueOnError)
 }
 
 // initVersionInfo sets version info
