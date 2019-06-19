@@ -295,6 +295,7 @@ func NewCallbackCDecl(fn interface{}) uintptr {
 //sys	stringFromGUID2(rguid *GUID, lpsz *uint16, cchMax int32) (chars int32) = ole32.StringFromGUID2
 //sys	coCreateGuid(pguid *GUID) (ret error) = ole32.CoCreateGuid
 //sys	coTaskMemFree(address unsafe.Pointer) = ole32.CoTaskMemFree
+//sys	rtlGetVersion(info *OsVersionInfoEx) (ret error) = ntdll.RtlGetVersion
 
 // syscall interface implementation for other packages
 
@@ -1303,4 +1304,17 @@ func (t Token) KnownFolderPath(folderID *KNOWNFOLDERID, flags uint32) (string, e
 	}
 	defer coTaskMemFree(unsafe.Pointer(p))
 	return UTF16ToString((*[(1 << 30) - 1]uint16)(unsafe.Pointer(p))[:]), nil
+}
+
+// RtlGetVersion returns the true version of the underlying operating system, ignoring
+// any manifesting or compatibility layers on top of the win32 layer.
+func RtlGetVersion() *OsVersionInfoEx {
+	info := &OsVersionInfoEx{}
+	info.osVersionInfoSize = uint32(unsafe.Sizeof(*info))
+	// According to documentation, this function always succeeds.
+	// The function doesn't even check the validity of the
+	// osVersionInfoSize member. Disassembling ntdll.dll indicates
+	// that the documentation is indeed correct about that.
+	_ = rtlGetVersion(info)
+	return info
 }

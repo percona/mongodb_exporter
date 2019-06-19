@@ -85,15 +85,15 @@
   version = "v1.0.1"
 
 [[projects]]
-  digest = "1:2c1122a135602df038f5094e8ca276d31422592ce8ae077c6fd01da9a1121f00"
+  digest = "1:92b6bfd428d2e785a5244dec3ff30e7635e62911d906d29151d0462f79dc94d3"
   name = "github.com/percona/exporter_shared"
   packages = [
     ".",
     "helpers",
   ]
   pruneopts = "NUT"
-  revision = "16b0da83255720371d18b2304257e073491ed63c"
-  version = "v0.1.0"
+  revision = "8986abb41c843706a15d64a3088c1aa39195c295"
+  version = "v0.2.2"
 
 [[projects]]
   branch = "PMM-2.0"
@@ -112,7 +112,7 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:097cc61836050f45cbb712ae3bb45d66fba464c16b8fac09907fa3c1f753eff6"
+  digest = "1:3d7ad9c93ee2e43dc7dd48b76f96804c365be7fe30e75f7405028c4e633d189a"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
@@ -120,8 +120,8 @@
     "prometheus/promhttp",
   ]
   pruneopts = "NUT"
-  revision = "4ab88e80c249ed361d3299e2930427d9ac43ef8d"
-  version = "v1.0.0"
+  revision = "2641b987480bca71fb39738eb8c8b0d577cb1d76"
+  version = "v0.9.4"
 
 [[projects]]
   branch = "master"
@@ -132,7 +132,7 @@
   revision = "fd36f4220a901265f90734c3183c5f0c91daa0b8"
 
 [[projects]]
-  digest = "1:e8a0bc9da663fc125f774c5ec3f127cc5e18c90983a521d7c375a0e5e44fbbc8"
+  digest = "1:9a3a4edd086ae7bf9fc11b252d69a5c198cb3b7a52d5f69e81affcebba9894e0"
   name = "github.com/prometheus/common"
   packages = [
     "expfmt",
@@ -142,8 +142,8 @@
     "version",
   ]
   pruneopts = "NUT"
-  revision = "17f5ca1748182ddf24fc33a5a7caaaf790a52fcc"
-  version = "v0.4.1"
+  revision = "a82f4c12f983cc2649298185f296632953e50d3e"
+  version = "v0.3.0"
 
 [[projects]]
   digest = "1:afe5de112e0ca26a37730f01bc4bac9aabe9843cbfd66034f0c16e5a1fbd045b"
@@ -244,7 +244,7 @@
   name = "golang.org/x/crypto"
   packages = ["pbkdf2"]
   pruneopts = "NUT"
-  revision = "5c40567a22f818bd14a1ea7245dad9f8ef0691aa"
+  revision = "ea8f1a30c4438cc8b13f05538385ad8dc6049b43"
 
 [[projects]]
   branch = "master"
@@ -256,7 +256,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4b30ecfeb51e6109cf6d39143624625bbd43a7167b4dd1f18baa3f1e8090f49c"
+  digest = "1:670bb9513c8b17effbdb1c7027eb7b241c5e9d29895405313f8648a311078cbb"
   name = "golang.org/x/sys"
   packages = [
     "unix",
@@ -265,7 +265,7 @@
     "windows/svc/eventlog",
   ]
   pruneopts = "NUT"
-  revision = "15dcb6c0061f497a3f66e3ea034b629c6dd4d99e"
+  revision = "516e3c20635fbe39539f7ed361a15c51fec29cd8"
 
 [[projects]]
   digest = "1:1093f2eb4b344996604f7d8b29a16c5b22ab9e1b25652140d3fede39f640d5cd"
