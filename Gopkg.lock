@@ -132,7 +132,7 @@
   revision = "fd36f4220a901265f90734c3183c5f0c91daa0b8"
 
 [[projects]]
-  digest = "1:9a3a4edd086ae7bf9fc11b252d69a5c198cb3b7a52d5f69e81affcebba9894e0"
+  digest = "1:e8a0bc9da663fc125f774c5ec3f127cc5e18c90983a521d7c375a0e5e44fbbc8"
   name = "github.com/prometheus/common"
   packages = [
     "expfmt",
@@ -142,8 +142,8 @@
     "version",
   ]
   pruneopts = "NUT"
-  revision = "a82f4c12f983cc2649298185f296632953e50d3e"
-  version = "v0.3.0"
+  revision = "31bed53e4047fd6c510e43a941f90cb31be0972a"
+  version = "v0.6.0"
 
 [[projects]]
   digest = "1:afe5de112e0ca26a37730f01bc4bac9aabe9843cbfd66034f0c16e5a1fbd045b"
@@ -256,7 +256,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:670bb9513c8b17effbdb1c7027eb7b241c5e9d29895405313f8648a311078cbb"
+  digest = "1:8b230a0c38a48a154f34f4ce881ba7706065add5ec4954559683c6e11c615582"
   name = "golang.org/x/sys"
   packages = [
     "unix",
@@ -265,7 +265,7 @@
     "windows/svc/eventlog",
   ]
   pruneopts = "NUT"
-  revision = "516e3c20635fbe39539f7ed361a15c51fec29cd8"
+  revision = "6f217b454f458f9c81d48c1fff9e6f5ea6b0bbf2"
 
 [[projects]]
   digest = "1:1093f2eb4b344996604f7d8b29a16c5b22ab9e1b25652140d3fede39f640d5cd"
