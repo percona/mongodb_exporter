@@ -92,8 +92,8 @@
     "helpers",
   ]
   pruneopts = "NUT"
-  revision = "8986abb41c843706a15d64a3088c1aa39195c295"
-  version = "v0.2.2"
+  revision = "ffa14cdb344417f2b7c14f05b4e2fce818100be9"
+  version = "v0.4.0"
 
 [[projects]]
   branch = "PMM-2.0"
@@ -112,7 +112,7 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:3d7ad9c93ee2e43dc7dd48b76f96804c365be7fe30e75f7405028c4e633d189a"
+  digest = "1:097cc61836050f45cbb712ae3bb45d66fba464c16b8fac09907fa3c1f753eff6"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
@@ -120,8 +120,8 @@
     "prometheus/promhttp",
   ]
   pruneopts = "NUT"
-  revision = "2641b987480bca71fb39738eb8c8b0d577cb1d76"
-  version = "v0.9.4"
+  revision = "4ab88e80c249ed361d3299e2930427d9ac43ef8d"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
