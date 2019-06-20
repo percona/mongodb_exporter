@@ -60,6 +60,9 @@ type ServerStatus struct {
 	ExtraInfo   *ExtraInfo       `bson:"extra_info"`
 	Mem         *MemStats        `bson:"mem"`
 	Network     *NetworkStats    `bson:"network"`
+
+	Opcounters     *OpcountersStats     `bson:"opcounters"`
+	OpcountersRepl *OpcountersReplStats `bson:"opcountersRepl"`
 }
 
 // Export exports the server status to be consumed by prometheus.
@@ -90,6 +93,12 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	}
 	if status.Network != nil {
 		status.Network.Export(ch)
+	}
+	if status.Opcounters != nil {
+		status.Opcounters.Export(ch)
+	}
+	if status.OpcountersRepl != nil {
+		status.OpcountersRepl.Export(ch)
 	}
 }
 
