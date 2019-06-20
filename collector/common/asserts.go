@@ -27,7 +27,6 @@ var (
 )
 
 // AssertsStats has the assets metrics
-
 type AssertsStats struct {
 	Regular   float64 `bson:"regular"`
 	Warning   float64 `bson:"warning"`
