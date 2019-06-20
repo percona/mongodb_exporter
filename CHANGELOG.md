@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- Moved `opcounters`, `opcountersRepl` to `common_collector` (#146), thx [@nikita-b](https://github.com/nikita-b). 
 
 ### Added
 
