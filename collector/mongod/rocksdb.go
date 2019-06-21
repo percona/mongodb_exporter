@@ -519,6 +519,7 @@ func (stats *RocksDbStats) GetStatsLineField(section_prefix string, line_prefix 
 	return field
 }
 
+// ProcessLevelStats counts process level stats metrics.
 func (stats *RocksDbStats) ProcessLevelStats(ch chan<- prometheus.Metric) {
 	var levels []*RocksDbLevelStats
 	var is_section bool
@@ -564,6 +565,7 @@ func (stats *RocksDbStats) ProcessLevelStats(ch chan<- prometheus.Metric) {
 	}
 }
 
+// ProcessStalls counts process stalls metrics.
 func (stats *RocksDbStats) ProcessStalls(ch chan<- prometheus.Metric) {
 	for _, stall_line := range stats.GetStatsLine("** Compaction Stats [default] **", "Stalls(count): ") {
 		stall_split := strings.Split(stall_line, " ")
@@ -575,6 +577,7 @@ func (stats *RocksDbStats) ProcessStalls(ch chan<- prometheus.Metric) {
 	}
 }
 
+// ProcessReadLatencyStats counts process read latency stats metrics.
 func (stats *RocksDbStats) ProcessReadLatencyStats(ch chan<- prometheus.Metric) {
 	for _, level_num := range []string{"0", "1", "2", "3", "4", "5", "6"} {
 		level := "L" + level_num
