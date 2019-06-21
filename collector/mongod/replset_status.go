@@ -74,12 +74,12 @@ var (
 		Name:      "member_state",
 		Help:      "The value of state is an integer between 0 and 10 that represents the replica state of the member.",
 	}, []string{"set", "name", "state"})
-	memberUptime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: subsystem,
-		Name:      "member_uptime",
-		Help:      "The uptime field holds a value that reflects the number of seconds that this member has been online.",
-	}, []string{"set", "name", "state"})
+	memberUptimeDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, subsystem, "member_uptime"),
+		"The uptime field holds a value that reflects the number of seconds that this member has been online.",
+		[]string{"set", "name", "state"},
+		nil,
+	)
 	memberOptimeDate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
@@ -171,7 +171,6 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	heartbeatIntervalMillis.Reset()
 	memberState.Reset()
 	memberHealth.Reset()
-	memberUptime.Reset()
 	memberOptimeDate.Reset()
 	memberRepLag.Reset()
 	memberOperationalLag.Reset()
@@ -231,7 +230,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 			memberHealth.With(ls).Set(float64(*member.Health))
 		}
 
-		memberUptime.With(ls).Set(member.Uptime)
+		ch <- prometheus.MustNewConstMetric(memberUptimeDesc, prometheus.CounterValue, member.Uptime, replStatus.Set, member.Name, member.StateStr)
 
 		memberOptimeDate.With(ls).Set(float64(member.OptimeDate.Unix()))
 
@@ -266,7 +265,6 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	heartbeatIntervalMillis.Collect(ch)
 	memberState.Collect(ch)
 	memberHealth.Collect(ch)
-	memberUptime.Collect(ch)
 	memberOptimeDate.Collect(ch)
 	memberRepLag.Collect(ch)
 	memberOperationalLag.Collect(ch)
@@ -287,7 +285,6 @@ func (replStatus *ReplSetStatus) Describe(ch chan<- *prometheus.Desc) {
 	heartbeatIntervalMillis.Describe(ch)
 	memberState.Describe(ch)
 	memberHealth.Describe(ch)
-	memberUptime.Describe(ch)
 	memberOptimeDate.Describe(ch)
 	memberRepLag.Describe(ch)
 	memberOperationalLag.Describe(ch)
@@ -295,6 +292,8 @@ func (replStatus *ReplSetStatus) Describe(ch chan<- *prometheus.Desc) {
 	memberLastHeartbeatRecv.Describe(ch)
 	memberPingMs.Describe(ch)
 	memberConfigVersion.Describe(ch)
+
+	ch <- memberUptimeDesc
 }
 
 // GetReplSetStatus returns the replica status info
