@@ -22,7 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/percona/mongodb_exporter/collector/common"
+	collector_common "github.com/percona/mongodb_exporter/collector/common"
 )
 
 // ServerStatus keeps the data returned by the serverStatus() method.
@@ -39,10 +39,8 @@ type ServerStatus struct {
 
 	Locks LockStatsMap `bson:"locks,omitempty"`
 
-	OpLatencies    *OpLatenciesStat     `bson:"opLatencies"`
-	Opcounters     *OpcountersStats     `bson:"opcounters"`
-	OpcountersRepl *OpcountersReplStats `bson:"opcountersRepl"`
-	Metrics        *MetricsStats        `bson:"metrics"`
+	OpLatencies *OpLatenciesStat `bson:"opLatencies"`
+	Metrics     *MetricsStats    `bson:"metrics"`
 
 	StorageEngine *StorageEngineStats `bson:"storageEngine"`
 	InMemory      *WiredTigerStats    `bson:"inMemory"`
@@ -68,12 +66,6 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	if status.OpLatencies != nil {
 		status.OpLatencies.Export(ch)
 	}
-	if status.Opcounters != nil {
-		status.Opcounters.Export(ch)
-	}
-	if status.OpcountersRepl != nil {
-		status.OpcountersRepl.Export(ch)
-	}
 	if status.Locks != nil {
 		status.Locks.Export(ch)
 	}
@@ -89,7 +81,6 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	if status.WiredTiger != nil {
 		status.WiredTiger.Export(ch)
 	}
-
 	// If db.serverStatus().storageEngine does not exist (3.0+ only) and status.BackgroundFlushing does (MMAPv1 only), default to mmapv1
 	// https://docs.mongodb.com/v3.0/reference/command/serverStatus/#storageengine
 	if status.StorageEngine == nil && status.BackgroundFlushing != nil {
