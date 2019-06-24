@@ -303,7 +303,7 @@ func GetReplSetStatus(client *mongo.Client) *ReplSetStatus {
 	result := &ReplSetStatus{}
 	err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetGetStatus", 1}}).Decode(result)
 	if err != nil {
-		log.Errorf("Failed to get replSet status: %s", err) // TODO: FIX: "Failed to get replSet status: cannot decode timestamp into a time.Time" in pmm-agent logs for MongoDB replicaset.
+		log.Errorf("Failed to get replSet status: %s", err)
 		return nil
 	}
 	return result
