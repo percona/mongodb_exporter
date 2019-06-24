@@ -39,21 +39,21 @@ export PMM_RELEASE_TIMESTAMP  = $(shell date '+%s')
 export PMM_RELEASE_FULLCOMMIT = $(APP_REVISION)
 export PMM_RELEASE_BRANCH     = $(TRAVIS_BRANCH)
 
-all: clean format build test
+all: clean format style build test-all
 
 style:
 	@echo ">> checking code style"
 	@! gofmt -s -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
-test: init mongo-db-in-docker
+test: mongo-db-in-docker
 	@echo ">> running tests"
 	go test -short -v $(RACE) $(pkgs)
 
-test-all: init mongo-db-in-docker
+test-all: mongo-db-in-docker
 	@echo ">> running all tests"
 	go test -v $(RACE) $(pkgs)
 
-test-coverage: init mongo-db-in-docker
+test-coverage: mongo-db-in-docker
 	@echo ">> running test coverage"
 	go test -coverprofile=coverage.txt -v $(pkgs)
 
@@ -101,10 +101,8 @@ $(GOPATH)/bin/dep:
 $(GOPATH)/bin/goreleaser:
 	curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | BINDIR=$(GOPATH)/bin sh
 
-init: $(GOPATH)/bin/dep $(GOPATH)/bin/goreleaser
-
 # Ensure that vendor/ is in sync with code and Gopkg.*
-check-vendor-synced: init
+check-vendor-synced: $(GOPATH)/bin/dep
 	rm -fr vendor/
 	dep ensure -v
 	git diff --exit-code
@@ -126,4 +124,4 @@ mongo-db-in-docker:
 	docker-compose --version
 	docker-compose exec mongo mongo --version
 
-.PHONY: init all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker
+.PHONY: all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker
