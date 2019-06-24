@@ -5,7 +5,6 @@ language: go
 stages:
   - build
   - test
-  - test-coverage
   - deploy
 
 go:
@@ -41,11 +40,6 @@ jobs:
       script:
         - make check-vendor-synced style build
 
-    - stage: test-coverage
-      script:
-        - make test-coverage
-      after_success: bash <(curl -s https://codecov.io/bash) -X fix
-
     - stage: deploy
       script: skip
       deploy:
@@ -53,6 +47,11 @@ jobs:
         script: make community-release
         on:
           tags: true
+
+after_success:
+  - curl https://codecov.io/bash > codecov
+  - chmod +x codecov
+  - timeout 10 ./codecov -X fix
 
 notifications:
   slack:
