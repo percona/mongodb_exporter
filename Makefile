@@ -47,11 +47,15 @@ style:
 
 test: init mongo-db-in-docker
 	@echo ">> running tests"
-	go test -coverprofile=coverage.txt -short -v $(RACE) $(pkgs)
+	go test -short -v $(RACE) $(pkgs)
 
 test-all: init mongo-db-in-docker
 	@echo ">> running all tests"
-	go test -coverprofile=coverage.txt -v $(RACE) $(pkgs)
+	go test -v $(RACE) $(pkgs)
+
+test-coverage: init mongo-db-in-docker
+	@echo ">> running test coverage"
+	go test -coverprofile=coverage.txt -v $(pkgs)
 
 format:
 	@echo ">> formatting code"
