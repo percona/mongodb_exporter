@@ -21,6 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -144,22 +145,22 @@ type ReplSetStatus struct {
 
 // Member represents an array element of ReplSetStatus.Members
 type Member struct {
-	Name                 string      `bson:"name"`
-	Self                 *bool       `bson:"self,omitempty"`
-	Health               *int32      `bson:"health,omitempty"`
-	State                int32       `bson:"state"`
-	StateStr             string      `bson:"stateStr"`
-	Uptime               float64     `bson:"uptime"`
-	Optime               interface{} `bson:"optime"`
-	OptimeDate           time.Time   `bson:"optimeDate"`
-	ElectionTime         *time.Time  `bson:"electionTime,omitempty"`
-	ElectionDate         *time.Time  `bson:"electionDate,omitempty"`
-	LastHeartbeat        *time.Time  `bson:"lastHeartbeat,omitempty"`
-	LastHeartbeatRecv    *time.Time  `bson:"lastHeartbeatRecv,omitempty"`
-	LastHeartbeatMessage *string     `bson:"lastHeartbeatMessage,omitempty"`
-	PingMs               *float64    `bson:"pingMs,omitempty"`
-	SyncingTo            *string     `bson:"syncingTo,omitempty"`
-	ConfigVersion        *int32      `bson:"configVersion,omitempty"`
+	Name                 string              `bson:"name"`
+	Self                 *bool               `bson:"self,omitempty"`
+	Health               *int32              `bson:"health,omitempty"`
+	State                int32               `bson:"state"`
+	StateStr             string              `bson:"stateStr"`
+	Uptime               float64             `bson:"uptime"`
+	Optime               interface{}         `bson:"optime"`
+	OptimeDate           time.Time           `bson:"optimeDate"`
+	ElectionTime         primitive.Timestamp `bson:"electionTime,omitempty"`
+	ElectionDate         *time.Time          `bson:"electionDate,omitempty"`
+	LastHeartbeat        *time.Time          `bson:"lastHeartbeat,omitempty"`
+	LastHeartbeatRecv    *time.Time          `bson:"lastHeartbeatRecv,omitempty"`
+	LastHeartbeatMessage *string             `bson:"lastHeartbeatMessage,omitempty"`
+	PingMs               *float64            `bson:"pingMs,omitempty"`
+	SyncingTo            *string             `bson:"syncingTo,omitempty"`
+	ConfigVersion        *int32              `bson:"configVersion,omitempty"`
 }
 
 // Export exports the replSetGetStatus stati to be consumed by prometheus

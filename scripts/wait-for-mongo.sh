@@ -1,7 +1,16 @@
 #!/usr/bin/env sh
 
-until docker-compose exec mongo mongo --quiet --eval 'db.runCommand("ping").ok' > /dev/null; do
->&2 echo "MongoDB is unavailable - sleeping"
-    sleep 1
+waitForMongo(){
+    service=$1
+    until docker-compose exec $service mongo --quiet --eval 'db.runCommand("ping").ok' > /dev/null; do
+    >&2 echo "MongoDB($service) is unavailable - sleeping"
+        sleep 1
+    done
+    >&2 echo "MongoDB($service) is up"
+}
+
+for service in mongo mongo-replset
+do
+    waitForMongo $service
 done
->&2 echo "MongoDB is up"
+
