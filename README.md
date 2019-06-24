@@ -28,7 +28,7 @@ Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cu
 
 ### Building
 
-1. Get the code from the Precona repository:
+1. Get the code from the Percona repository:
  
     ```bash
     go get github.com/percona/mongodb_exporter
