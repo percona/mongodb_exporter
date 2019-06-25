@@ -1,19 +1,21 @@
-dist: trusty
-sudo: required
+dist: xenial
 language: go
+
+services:
+  - docker
+
+go:
+  - 1.12.x
+  # - TODO master
+
+matrix:
+  allow_failures:
+    - go: master
 
 stages:
   - build
   - test
   - deploy
-
-go:
-  - 1.11.x
-  - 1.12.x
-
-matrix:
-  allow_failures:
-    - go: master
 
 env:
   global:
@@ -28,9 +30,6 @@ env:
     - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
     - MONGODB_IMAGE=percona/percona-server-mongodb:3.6
     - MONGODB_IMAGE=percona/percona-server-mongodb:4.0
-
-services:
-  - docker
 
 script: make test-all
 
@@ -48,7 +47,10 @@ jobs:
         on:
           tags: true
 
-after_success: bash <(curl -s https://codecov.io/bash) -X fix
+after_success:
+  - curl https://codecov.io/bash > codecov
+  - chmod +x codecov
+  - timeout --signal=KILL 10s ./codecov -X fix
 
 notifications:
   slack:
