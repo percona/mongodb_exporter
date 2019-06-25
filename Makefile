@@ -39,17 +39,17 @@ export PMM_RELEASE_TIMESTAMP  = $(shell date '+%s')
 export PMM_RELEASE_FULLCOMMIT = $(APP_REVISION)
 export PMM_RELEASE_BRANCH     = $(TRAVIS_BRANCH)
 
-all: clean format build test
+all: init clean format style build test-all
 
 style:
 	@echo ">> checking code style"
 	@! gofmt -s -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
-test: init mongo-db-in-docker
+test: mongo-db-in-docker
 	@echo ">> running tests"
 	go test -coverprofile=coverage.txt -short -v $(RACE) $(pkgs)
 
-test-all: init mongo-db-in-docker
+test-all: mongo-db-in-docker
 	@echo ">> running all tests"
 	go test -coverprofile=coverage.txt -v $(RACE) $(pkgs)
 
