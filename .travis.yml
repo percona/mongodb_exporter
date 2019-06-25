@@ -50,8 +50,7 @@ jobs:
 after_success:
   - curl https://codecov.io/bash > codecov
   - chmod +x codecov
-  - timeout --help
-  - timeout --kill-after=3s 10s ./codecov -X fix
+  - timeout --signal=KILL 10s ./codecov -X fix
 
 notifications:
   slack:
