@@ -6,7 +6,3 @@
 [[constraint]]
   name = "github.com/percona/pmm"
   branch = "PMM-2.0"
-
-[[constraint]]
-  name = "go.mongodb.org/mongo-driver"
-  version = "1.0.2"

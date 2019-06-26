@@ -18,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// TODO convert to counter
 var (
 	opCountersTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
@@ -25,6 +26,8 @@ var (
 		Help:      "The opcounters data structure provides an overview of database operations by type and makes it possible to analyze the load on the database in more granular manner. These numbers will grow over time and in response to database use. Analyze these values over time to track database utilization",
 	}, []string{"type"})
 )
+
+// TODO convert to counter
 var (
 	opCountersReplTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
