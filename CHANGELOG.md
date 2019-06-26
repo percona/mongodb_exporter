@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- Moved `opcounters`, `opcountersRepl` to `common_collector` (#146), thx [@nikita-b](https://github.com/nikita-b). 
+- [PMM-3511](https://jira.percona.com/browse/PMM-3511): Switched to [mongo-go-driver](https://github.com/mongodb/mongo-go-driver).
+- [PMM-4168](https://jira.percona.com/browse/PMM-4168): Updated all dependencies including `github.com/prometheus/golang_client`.
+- Moved `opcounters`, `opcountersRepl` to `common_collector` (#146), thx [@nikita-b](https://github.com/nikita-b).
 
 ### Added
 
@@ -87,12 +89,12 @@ This is a **BREAKING CHANGE**. The labels of these metrics are now prefixed with
 ### Added
 - New flags `-collect.database` and `-collect.collection` can be used to enable collection of database and collection
   metrics. They are disabled by default.
-- MongoDB connections are now kept between the scrapes. New flag `-mongodb.max-connections` (with the default value `1`) 
+- MongoDB connections are now kept between the scrapes. New flag `-mongodb.max-connections` (with the default value `1`)
 controls the maximum number of established connections.
 - Add standard metrics:
   - `mongodb_scrape_errors_total`
   - `mongodb_up`
-- Some queries now contain [cursor comments](https://www.percona.com/blog/2017/06/21/tracing-mongodb-queries-to-code-with-cursor-comments/) 
+- Some queries now contain [cursor comments](https://www.percona.com/blog/2017/06/21/tracing-mongodb-queries-to-code-with-cursor-comments/)
 with source code locations.
 
 ### Changed

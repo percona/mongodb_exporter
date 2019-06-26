@@ -19,19 +19,20 @@ import (
 )
 
 var (
-	networkBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "network_bytes_total",
-		Help:      "The network data structure contains data regarding MongoDB’s network use",
-	}, []string{"state"})
+	networkBytesTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "network_bytes_total"),
+		"The network data structure contains data regarding MongoDB’s network use",
+		[]string{"state"},
+		nil,
+	)
 )
 var (
-	networkMetricsNumRequestsTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "network_metrics",
-		Name:      "num_requests_total",
-		Help:      "The numRequests field is a counter of the total number of distinct requests that the server has received. Use this value to provide context for the bytesIn and bytesOut values to ensure that MongoDB’s network utilization is consistent with expectations and application use",
-	})
+	networkMetricsNumRequestsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "network_metrics", "num_requests_total"),
+		"The numRequests field is a counter of the total number of distinct requests that the server has received. Use this value to provide context for the bytesIn and bytesOut values to ensure that MongoDB’s network utilization is consistent with expectations and application use",
+		nil,
+		nil,
+	)
 )
 
 //NetworkStats network stats
@@ -43,17 +44,13 @@ type NetworkStats struct {
 
 // Export exports the data to prometheus
 func (networkStats *NetworkStats) Export(ch chan<- prometheus.Metric) {
-	networkBytesTotal.WithLabelValues("in_bytes").Set(networkStats.BytesIn)
-	networkBytesTotal.WithLabelValues("out_bytes").Set(networkStats.BytesOut)
-
-	networkMetricsNumRequestsTotal.Set(networkStats.NumRequests)
-
-	networkMetricsNumRequestsTotal.Collect(ch)
-	networkBytesTotal.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(networkBytesTotalDesc, prometheus.CounterValue, networkStats.BytesIn, "in_bytes")
+	ch <- prometheus.MustNewConstMetric(networkBytesTotalDesc, prometheus.CounterValue, networkStats.BytesOut, "out_bytes")
+	ch <- prometheus.MustNewConstMetric(networkMetricsNumRequestsTotalDesc, prometheus.CounterValue, networkStats.NumRequests)
 }
 
 // Describe describes the metrics for prometheus
 func (networkStats *NetworkStats) Describe(ch chan<- *prometheus.Desc) {
-	networkMetricsNumRequestsTotal.Describe(ch)
-	networkBytesTotal.Describe(ch)
+	ch <- networkMetricsNumRequestsTotalDesc
+	ch <- networkBytesTotalDesc
 }

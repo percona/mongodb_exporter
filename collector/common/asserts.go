@@ -19,11 +19,12 @@ import (
 )
 
 var (
-	assertsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "asserts_total",
-		Help:      "The asserts document reports the number of asserts on the database. While assert errors are typically uncommon, if there are non-zero values for the asserts, you should check the log file for the mongod process for more information. In many cases these errors are trivial, but are worth investigating.",
-	}, []string{"type"})
+	assertsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "asserts_total"),
+		"The asserts document reports the number of asserts on the database. While assert errors are typically uncommon, if there are non-zero values for the asserts, you should check the log file for the mongod process for more information. In many cases these errors are trivial, but are worth investigating.",
+		[]string{"type"},
+		nil,
+	)
 )
 
 // AssertsStats has the assets metrics
@@ -37,15 +38,14 @@ type AssertsStats struct {
 
 // Export exports the metrics to prometheus.
 func (asserts *AssertsStats) Export(ch chan<- prometheus.Metric) {
-	assertsTotal.WithLabelValues("regular").Set(asserts.Regular)
-	assertsTotal.WithLabelValues("warning").Set(asserts.Warning)
-	assertsTotal.WithLabelValues("msg").Set(asserts.Msg)
-	assertsTotal.WithLabelValues("user").Set(asserts.User)
-	assertsTotal.WithLabelValues("rollovers").Set(asserts.Rollovers)
-	assertsTotal.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(assertsTotalDesc, prometheus.CounterValue, asserts.Regular, "regular")
+	ch <- prometheus.MustNewConstMetric(assertsTotalDesc, prometheus.CounterValue, asserts.Warning, "warning")
+	ch <- prometheus.MustNewConstMetric(assertsTotalDesc, prometheus.CounterValue, asserts.Msg, "msg")
+	ch <- prometheus.MustNewConstMetric(assertsTotalDesc, prometheus.CounterValue, asserts.User, "user")
+	ch <- prometheus.MustNewConstMetric(assertsTotalDesc, prometheus.CounterValue, asserts.Rollovers, "rollovers")
 }
 
 // Describe describes the metrics for prometheus
 func (asserts *AssertsStats) Describe(ch chan<- *prometheus.Desc) {
-	assertsTotal.Describe(ch)
+	ch <- assertsTotalDesc
 }

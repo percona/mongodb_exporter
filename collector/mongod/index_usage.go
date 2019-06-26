@@ -1,10 +1,13 @@
 package mongod
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
@@ -57,9 +60,9 @@ var (
 )
 
 // GetIndexUsageStatList returns stats for a given collection in a database
-func GetIndexUsageStatList(session *mgo.Session) *IndexStatsList {
+func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
-	databaseNames, err := session.DatabaseNames()
+	databaseNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
 		_, logSFound := logSuppressIS[""]
 		if !logSFound {
@@ -70,7 +73,7 @@ func GetIndexUsageStatList(session *mgo.Session) *IndexStatsList {
 	}
 	delete(logSuppressIS, "")
 	for _, dbName := range databaseNames {
-		collNames, err := session.DB(dbName).CollectionNames()
+		c, err := client.Database(dbName).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
 		if err != nil {
 			_, logSFound := logSuppressIS[dbName]
 			if !logSFound {
@@ -78,26 +81,59 @@ func GetIndexUsageStatList(session *mgo.Session) *IndexStatsList {
 				logSuppressIS[dbName] = true
 			}
 		} else {
+
+			type collListItem struct {
+				Name string `bson:"name,omitempty"`
+				Type string `bson:"type,omitempty"`
+			}
+
 			delete(logSuppressIS, dbName)
-			for _, collName := range collNames {
+			for c.Next(context.TODO()) {
+				coll := &collListItem{}
+				err := c.Decode(&coll)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
 
 				collIndexUsageStats := IndexStatsList{}
-				err := session.DB(dbName).C(collName).Pipe([]bson.M{{"$indexStats": bson.M{}}}).All(&collIndexUsageStats.Items)
+				c, err := client.Database(dbName).Collection(coll.Name).Aggregate(context.TODO(), []bson.M{{"$indexStats": bson.M{}}})
 				if err != nil {
-					_, logSFound := logSuppressIS[dbName+"."+collName]
+					_, logSFound := logSuppressIS[dbName+"."+coll.Name]
 					if !logSFound {
 						log.Errorf("%s. Index usage stats will not be collected for this collection. This log message will be suppressed from now.", err)
-						logSuppressIS[dbName+"."+collName] = true
+						logSuppressIS[dbName+"."+coll.Name] = true
 					}
 				} else {
-					delete(logSuppressIS, dbName+"."+collName)
+
+					for c.Next(context.TODO()) {
+						s := &IndexUsageStats{}
+						if err := c.Decode(s); err != nil {
+							log.Error(err)
+							continue
+						}
+						collIndexUsageStats.Items = append(collIndexUsageStats.Items, *s)
+					}
+
+					if err := c.Err(); err != nil {
+						log.Error(err)
+					}
+
+					if err := c.Close(context.TODO()); err != nil {
+						log.Errorf("Could not close Aggregate() cursor, reason: %v", err)
+					}
+
+					delete(logSuppressIS, dbName+"."+coll.Name)
 					// Label index stats with corresponding db.collection
 					for i := 0; i < len(collIndexUsageStats.Items); i++ {
 						collIndexUsageStats.Items[i].Database = dbName
-						collIndexUsageStats.Items[i].Collection = collName
+						collIndexUsageStats.Items[i].Collection = coll.Name
 					}
 					indexUsageStatsList.Items = append(indexUsageStatsList.Items, collIndexUsageStats.Items...)
 				}
+			}
+			if err := c.Close(context.TODO()); err != nil {
+				log.Errorf("Could not close ListCollections() cursor, reason: %v", err)
 			}
 		}
 	}

@@ -27,7 +27,8 @@ import (
 	pmmVersion "github.com/percona/pmm/version"
 	"github.com/prometheus/common/version"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/mgo.v2"
+
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 var Update = flag.Bool("update", false, "update .golden files")
@@ -316,13 +317,13 @@ func testFlagTest(t *testing.T, data bin) {
 		t.Log(string(b))
 		t.Fatal(err)
 	}
-	buildInfo := mgo.BuildInfo{}
+	buildInfo := shared.BuildInfo{}
 	err = json.Unmarshal(b, &buildInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if reflect.DeepEqual(buildInfo, mgo.BuildInfo{}) {
+	if reflect.DeepEqual(buildInfo, shared.BuildInfo{}) {
 		t.Fatalf("buildInfo is empty")
 	}
 }
@@ -345,13 +346,13 @@ func testFlagTestWithTLS(t *testing.T, data bin) {
 		t.Log(string(b))
 		t.Fatal(err)
 	}
-	buildInfo := mgo.BuildInfo{}
+	buildInfo := shared.BuildInfo{}
 	err = json.Unmarshal(b, &buildInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if reflect.DeepEqual(buildInfo, mgo.BuildInfo{}) {
+	if reflect.DeepEqual(buildInfo, shared.BuildInfo{}) {
 		t.Fatalf("buildInfo is empty")
 	}
 }

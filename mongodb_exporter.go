@@ -27,9 +27,10 @@ import (
 	"github.com/prometheus/common/version"
 	"gopkg.in/alecthomas/kingpin.v2"
 
+	pmmVersion "github.com/percona/pmm/version"
+
 	"github.com/percona/mongodb_exporter/collector"
 	"github.com/percona/mongodb_exporter/shared"
-	pmmVersion "github.com/percona/pmm/version"
 )
 
 const (
@@ -125,7 +126,8 @@ func main() {
 	})
 	prometheus.MustRegister(programCollector, mongodbCollector)
 
-	exporter_shared.RunServer("MongoDB", *listenAddressF, *metricsPathF, promhttp.ContinueOnError)
+	promHandler := promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}))
+	exporter_shared.RunServer("MongoDB", *listenAddressF, *metricsPathF, promHandler)
 }
 
 // initVersionInfo sets version info

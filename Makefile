@@ -109,6 +109,7 @@ clean:
 	@echo ">> removing build artifacts"
 	@rm -f $(PREFIX)/coverage.txt
 	@rm -Rf $(PREFIX)/bin
+	docker-compose down
 
 mongo-db-in-docker:
 	# Start docker containers.
@@ -121,5 +122,11 @@ mongo-db-in-docker:
 	docker --version
 	docker-compose --version
 	docker-compose exec mongo mongo --version
+	docker-compose exec mongo-replset mongo --version
+	# Initialize replSet
+	docker-compose exec mongo-replset mongo --eval "rs.initiate()"
 
-.PHONY: init all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker
+gen-ssl-certs:
+	./scripts/ssl.sh
+
+.PHONY: init all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker gen-ssl-certs

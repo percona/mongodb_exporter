@@ -12,12 +12,12 @@ var (
 	// {{ .ProjectName }} for GoReleaser.
 	ProjectName string
 
-	// Component version, e.g. "2.1.2" for pmm-managed or "0.6.3" for mongodb_exporter.
+	// Component version, e.g. "2.1.2-beta1" for pmm-managed or "0.6.3" for mongodb_exporter.
 	// {{ .Version }} for GoReleaser.
 	Version string
 
 	// PMM version. Empty for non-PMM builds.
-	// For example, "2.1.2" for mongodb_exporter when built with PMM Client, empty otherwise.
+	// For example, "2.1.2-beta1" for mongodb_exporter when built with PMM Client, empty otherwise.
 	PMMVersion string
 
 	// Build UNIX timestamp, e.g. "1545226908".
@@ -32,6 +32,7 @@ var (
 	Branch string
 )
 
+// ShortInfo returns project name and short version as one line.
 func ShortInfo() string {
 	if ProjectName == "" {
 		return ""
@@ -44,6 +45,7 @@ func ShortInfo() string {
 	return res
 }
 
+// FullInfo returns multi-line version information.
 func FullInfo() string {
 	timestamp := Timestamp
 	sec, err := strconv.ParseInt(timestamp, 10, 64)
@@ -57,7 +59,10 @@ func FullInfo() string {
 		"PMMVersion: " + PMMVersion,
 		"Timestamp: " + timestamp,
 		"FullCommit: " + FullCommit,
-		"Branch: " + Branch,
 	}
+	if Branch != "" {
+		res = append(res, "Branch: "+Branch)
+	}
+
 	return strings.Join(res, "\n")
 }

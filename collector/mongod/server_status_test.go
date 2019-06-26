@@ -15,35 +15,38 @@
 package mongod
 
 import (
-	"io/ioutil"
+	"context"
 	"testing"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func TestParserServerStatus(t *testing.T) {
-	data, err := ioutil.ReadFile("../fixtures/server_status.bson")
+
+	serverStatus := &ServerStatus{}
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Disconnect(context.TODO())
+
+	err = client.Database("admin").RunCommand(context.TODO(), bson.D{
+		{Key: "serverStatus", Value: 1},
+		{Key: "recordStats", Value: 0},
+		{Key: "opLatencies", Value: bson.M{"histograms": true}},
+	}).Decode(serverStatus)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	serverStatus := &ServerStatus{}
-	loadServerStatusFromBson(data, serverStatus)
-
-	if serverStatus.Version != "2.6.7" {
-		t.Errorf("Server version incorrect: %s", serverStatus.Version)
+	if serverStatus.Version == "" {
+		t.Errorf("Server version incorrect")
 	}
 
 	if serverStatus.Asserts == nil {
 		t.Error("Asserts group was not loaded")
-	}
-
-	if serverStatus.Dur == nil {
-		t.Error("Dur group was not loaded")
-	}
-
-	if serverStatus.BackgroundFlushing == nil {
-		t.Error("BackgroundFlushing group was not loaded")
 	}
 
 	if serverStatus.Connections == nil {
@@ -82,14 +85,7 @@ func TestParserServerStatus(t *testing.T) {
 		t.Error("Locks group was not loaded")
 	}
 
-	if serverStatus.Metrics.Document.Deleted != 45726 {
+	if serverStatus.Metrics.Document == nil {
 		t.Error("Metrics group was not loaded correctly")
-	}
-}
-
-func loadServerStatusFromBson(data []byte, status *ServerStatus) {
-	err := bson.Unmarshal(data, status)
-	if err != nil {
-		panic(err)
 	}
 }
