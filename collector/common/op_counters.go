@@ -18,22 +18,22 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// TODO convert to counter
 var (
-	opCountersTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Name:      "op_counters_total",
-		Help:      "The opcounters data structure provides an overview of database operations by type and makes it possible to analyze the load on the database in more granular manner. These numbers will grow over time and in response to database use. Analyze these values over time to track database utilization",
-	}, []string{"type"})
+	opCountersTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "op_counters_total"),
+		"The opcounters data structure provides an overview of database operations by type and makes it possible to analyze the load on the database in more granular manner. These numbers will grow over time and in response to database use. Analyze these values over time to track database utilization",
+		[]string{"type"},
+		nil,
+	)
 )
 
-// TODO convert to counter
 var (
-	opCountersReplTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Name:      "op_counters_repl_total",
-		Help:      "The opcountersRepl data structure, similar to the opcounters data structure, provides an overview of database replication operations by type and makes it possible to analyze the load on the replica in more granular manner. These values only appear when the current host has replication enabled",
-	}, []string{"type"})
+	opCountersReplTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "op_counters_repl_total"),
+		"The opcountersRepl data structure, similar to the opcounters data structure, provides an overview of database replication operations by type and makes it possible to analyze the load on the replica in more granular manner. These values only appear when the current host has replication enabled",
+		[]string{"type"},
+		nil,
+	)
 )
 
 // OpcountersStats opcounters stats
@@ -48,19 +48,17 @@ type OpcountersStats struct {
 
 // Export exports the data to prometheus.
 func (opCounters *OpcountersStats) Export(ch chan<- prometheus.Metric) {
-	opCountersTotal.WithLabelValues("insert").Set(opCounters.Insert)
-	opCountersTotal.WithLabelValues("query").Set(opCounters.Query)
-	opCountersTotal.WithLabelValues("update").Set(opCounters.Update)
-	opCountersTotal.WithLabelValues("delete").Set(opCounters.Delete)
-	opCountersTotal.WithLabelValues("getmore").Set(opCounters.GetMore)
-	opCountersTotal.WithLabelValues("command").Set(opCounters.Command)
-
-	opCountersTotal.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(opCountersTotalDesc, prometheus.CounterValue, opCounters.Insert, "insert")
+	ch <- prometheus.MustNewConstMetric(opCountersTotalDesc, prometheus.CounterValue, opCounters.Query, "query")
+	ch <- prometheus.MustNewConstMetric(opCountersTotalDesc, prometheus.CounterValue, opCounters.Update, "update")
+	ch <- prometheus.MustNewConstMetric(opCountersTotalDesc, prometheus.CounterValue, opCounters.Delete, "delete")
+	ch <- prometheus.MustNewConstMetric(opCountersTotalDesc, prometheus.CounterValue, opCounters.GetMore, "getmore")
+	ch <- prometheus.MustNewConstMetric(opCountersTotalDesc, prometheus.CounterValue, opCounters.Command, "command")
 }
 
 // Describe describes the metrics for prometheus
 func (opCounters *OpcountersStats) Describe(ch chan<- *prometheus.Desc) {
-	opCountersTotal.Describe(ch)
+	ch <- opCountersTotalDesc
 }
 
 // OpcountersReplStats opcounters stats
@@ -75,17 +73,15 @@ type OpcountersReplStats struct {
 
 // Export exports the data to prometheus.
 func (opCounters *OpcountersReplStats) Export(ch chan<- prometheus.Metric) {
-	opCountersReplTotal.WithLabelValues("insert").Set(opCounters.Insert)
-	opCountersReplTotal.WithLabelValues("query").Set(opCounters.Query)
-	opCountersReplTotal.WithLabelValues("update").Set(opCounters.Update)
-	opCountersReplTotal.WithLabelValues("delete").Set(opCounters.Delete)
-	opCountersReplTotal.WithLabelValues("getmore").Set(opCounters.GetMore)
-	opCountersReplTotal.WithLabelValues("command").Set(opCounters.Command)
-
-	opCountersReplTotal.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(opCountersReplTotalDesc, prometheus.CounterValue, opCounters.Insert, "insert")
+	ch <- prometheus.MustNewConstMetric(opCountersReplTotalDesc, prometheus.CounterValue, opCounters.Query, "query")
+	ch <- prometheus.MustNewConstMetric(opCountersReplTotalDesc, prometheus.CounterValue, opCounters.Update, "update")
+	ch <- prometheus.MustNewConstMetric(opCountersReplTotalDesc, prometheus.CounterValue, opCounters.Delete, "delete")
+	ch <- prometheus.MustNewConstMetric(opCountersReplTotalDesc, prometheus.CounterValue, opCounters.GetMore, "getmore")
+	ch <- prometheus.MustNewConstMetric(opCountersReplTotalDesc, prometheus.CounterValue, opCounters.Command, "command")
 }
 
 // Describe describes the metrics for prometheus
 func (opCounters *OpcountersReplStats) Describe(ch chan<- *prometheus.Desc) {
-	opCountersReplTotal.Describe(ch)
+	ch <- opCountersReplTotalDesc
 }
