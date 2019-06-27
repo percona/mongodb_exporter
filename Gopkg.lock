@@ -85,12 +85,9 @@
   version = "v1.0.1"
 
 [[projects]]
-  digest = "1:92b6bfd428d2e785a5244dec3ff30e7635e62911d906d29151d0462f79dc94d3"
+  digest = "1:c381b975202fc8a501e9140ba917b784057645628db40279e2b159d1ea73b2b7"
   name = "github.com/percona/exporter_shared"
-  packages = [
-    ".",
-    "helpers",
-  ]
+  packages = ["."]
   pruneopts = "NUT"
   revision = "ffa14cdb344417f2b7c14f05b4e2fce818100be9"
   version = "v0.4.0"
@@ -304,7 +301,6 @@
   input-imports = [
     "github.com/andreyvit/diff",
     "github.com/percona/exporter_shared",
-    "github.com/percona/exporter_shared/helpers",
     "github.com/percona/pmm/version",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
