@@ -1,6 +1,7 @@
 package mongod
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -67,7 +68,7 @@ func Test_histMicrosEdgeToMidpoint(t *testing.T) {
 }
 
 func Test_clipObservationCount(t *testing.T) {
-	data := LoadFixture("op_latencies.bson")
+	data := loadFixture("op_latencies.bson")
 
 	var opLatencies OpLatenciesStat
 	loadOpLatenciesFromBson(data, &opLatencies)
@@ -94,4 +95,13 @@ func loadOpLatenciesFromBson(data []byte, stat *OpLatenciesStat) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func loadFixture(name string) []byte {
+	data, err := ioutil.ReadFile("../fixtures/" + name)
+	if err != nil {
+		panic(err)
+	}
+
+	return data
 }

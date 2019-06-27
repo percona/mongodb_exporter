@@ -17,9 +17,9 @@ package collector
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
-	"github.com/percona/exporter_shared/helpers"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -74,8 +74,7 @@ func TestCollector(t *testing.T) {
 			delete(descriptors, m.Desc().String())
 		}
 
-		m := helpers.ReadMetric(m)
-		switch m.Name {
+		switch getMetricName(m.Desc()) {
 		case "mongodb_version_info":
 			versionInfoFound = true
 		}
@@ -91,4 +90,12 @@ func TestCollector(t *testing.T) {
 		"Got '%d' Descriptors from collector.Describe() and '%d' from collector.Collect().\n"+
 		"Missing descriptors: \n%s", descriptorsCount, metricsCount, missingDescMsg)
 	assert.True(t, versionInfoFound, "version info metric not found")
+}
+
+func getMetricName(d *prometheus.Desc) string {
+	m := regexp.MustCompile(`fqName: "(\w+)", help`).FindStringSubmatch(d.String())
+	if len(m) != 2 {
+		panic(fmt.Sprintf("failed to get metric name from %#q: %#v", d.String(), m))
+	}
+	return m[1]
 }
