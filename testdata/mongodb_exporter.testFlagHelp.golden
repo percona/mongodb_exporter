@@ -23,6 +23,15 @@ Flags:
       --collect.collection       Enable collection of Collection metrics
       --collect.topmetrics       Enable collection of table top metrics
       --collect.indexusage       Enable collection of per index usage stats
+      --latency.histogram-min=65536  
+                                 Minimum value (in microseconds) for latency
+                                 histogram
+      --latency.histogram-step=262144  
+                                 Step size between bins (in microseconds) for
+                                 latency histogram
+      --latency.histogram-count=10  
+                                 Number of bins (Prometheus recommends keeping
+                                 number of bins reasonably small)
       --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
                                  MongoDB URI, format
       --mongodb.authentification-database=""  

@@ -47,6 +47,9 @@ type MongodbCollectorOpts struct {
 	SocketTimeout            time.Duration
 	SyncTimeout              time.Duration
 	AuthentificationDB       string
+	LatencyHistogramMin      float64
+	LatencyHistogramStep     float64
+	LatencyHistogramCount    int
 }
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
@@ -80,6 +83,8 @@ type MongodbCollector struct {
 
 // NewMongodbCollector returns a new instance of a MongodbCollector.
 func NewMongodbCollector(opts *MongodbCollectorOpts) *MongodbCollector {
+	mongod.InitOpLatenciesMetrics(opts.LatencyHistogramMin, opts.LatencyHistogramStep, opts.LatencyHistogramCount)
+
 	exporter := &MongodbCollector{
 		Opts: opts,
 

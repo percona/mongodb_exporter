@@ -43,6 +43,9 @@ func TestCollector(t *testing.T) {
 		CollectCollectionMetrics: true,
 		CollectTopMetrics:        true,
 		CollectIndexUsageStats:   true,
+		LatencyHistogramMin:      65536.0,
+		LatencyHistogramStep:     262144.0,
+		LatencyHistogramCount:    10,
 	})
 
 	descCh := make(chan *prometheus.Desc)

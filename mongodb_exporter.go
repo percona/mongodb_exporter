@@ -47,6 +47,10 @@ var (
 	collectTopF        = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
 	collectIndexUsageF = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
 
+	latencyHistogramMinF   = kingpin.Flag("latency.histogram-min", "Minimum value (in microseconds) for latency histogram").Default("65536").Float64()
+	latencyHistogramStepF  = kingpin.Flag("latency.histogram-step", "Step size between bins (in microseconds) for latency histogram").Default("262144").Float64()
+	latencyHistogramCountF = kingpin.Flag("latency.histogram-count", "Number of bins (Prometheus recommends keeping number of bins reasonably small)").Default("10").Int()
+
 	uriF = kingpin.Flag("mongodb.uri", "MongoDB URI, format").
 		PlaceHolder("[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]").
 		Default("mongodb://localhost:27017").
@@ -123,6 +127,9 @@ func main() {
 		SocketTimeout:            *socketTimeoutF,
 		SyncTimeout:              *syncTimeoutF,
 		AuthentificationDB:       *authDB,
+		LatencyHistogramMin:      *latencyHistogramMinF,
+		LatencyHistogramStep:     *latencyHistogramStepF,
+		LatencyHistogramCount:    *latencyHistogramCountF,
 	})
 	prometheus.MustRegister(programCollector, mongodbCollector)
 
