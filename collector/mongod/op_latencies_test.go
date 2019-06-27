@@ -3,7 +3,7 @@ package mongod
 import (
 	"testing"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func Test_isPow2(t *testing.T) {

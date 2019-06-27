@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	opLatenciesHistogram    *prometheus.HistogramVec = nil
-	prevLatencyStatReads    *LatencyStat             = nil
-	prevLatencyStatWrites   *LatencyStat             = nil
-	prevLatencyStatCommands *LatencyStat             = nil
+	opLatenciesHistogram    *prometheus.HistogramVec
+	prevLatencyStatReads    *LatencyStat
+	prevLatencyStatWrites   *LatencyStat
+	prevLatencyStatCommands *LatencyStat
 )
 
 func InitOpLatenciesMetrics(start, width float64, count int) {
