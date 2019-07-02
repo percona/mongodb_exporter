@@ -22,12 +22,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	collector_common "github.com/percona/mongodb_exporter/collector/common"
+	commoncollector "github.com/percona/mongodb_exporter/collector/common"
 )
 
 // ServerStatus keeps the data returned by the serverStatus() method.
 type ServerStatus struct {
-	collector_common.ServerStatus `bson:",inline"`
+	commoncollector.ServerStatus `bson:",inline"`
 
 	Dur *DurStats `bson:"dur"`
 

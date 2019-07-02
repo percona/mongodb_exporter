@@ -43,24 +43,21 @@ var (
 	}, []string{"id", "host"})
 )
 
-// Although the docs say that it returns a map with id etc. it *actually* returns
-// that wrapped in a map
+// OuterReplSetConf Although the docs say that it returns a map with id etc. it *actually* returns that wrapped in a map.
 type OuterReplSetConf struct {
 	Config ReplSetConf `bson:"config"`
 }
 
 // ReplSetConf keeps the data returned by the GetReplSetConf method
 type ReplSetConf struct {
-	Id      string       `bson:"_id"`
+	ID      string       `bson:"_id"`
 	Version int          `bson:"version"`
 	Members []MemberConf `bson:"members"`
 }
 
-type ReplSetConfSettings struct{}
-
-// Member represents an array element of ReplSetConf.Members
+// MemberConf represents an array element of ReplSetConf.Members
 type MemberConf struct {
-	Id           int32  `bson:"_id"`
+	ID           int32  `bson:"_id"`
 	Host         string `bson:"host"`
 	ArbiterOnly  bool   `bson:"arbiterOnly"`
 	BuildIndexes bool   `bson:"buildIndexes"`
@@ -76,7 +73,7 @@ type MemberConf struct {
 func (replConf *ReplSetConf) Export(ch chan<- prometheus.Metric) {
 	for _, member := range replConf.Members {
 		ls := prometheus.Labels{
-			"id":   replConf.Id,
+			"id":   replConf.ID,
 			"host": member.Host,
 		}
 		if member.Hidden {

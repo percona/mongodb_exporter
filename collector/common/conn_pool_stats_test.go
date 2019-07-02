@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package collector_common
+package common
 
 import (
 	"context"
@@ -32,7 +32,7 @@ func TestGetConnPoolStatsDecodesFine(t *testing.T) {
 
 	t.Run("mongod", func(t *testing.T) {
 		// setup
-		defaultClient := testutils.MustGetConnectedMongodClient(t, ctx)
+		defaultClient := testutils.MustGetConnectedMongodClient(ctx, t)
 		defer defaultClient.Disconnect(ctx)
 		// run
 		statusDefault := GetConnPoolStats(defaultClient)
@@ -42,7 +42,7 @@ func TestGetConnPoolStatsDecodesFine(t *testing.T) {
 
 	t.Run("replset", func(t *testing.T) {
 		// setup
-		replSetClient := testutils.MustGetConnectedReplSetClient(t, ctx)
+		replSetClient := testutils.MustGetConnectedReplSetClient(ctx, t)
 		defer replSetClient.Disconnect(ctx)
 		// run
 		statusReplSet := GetConnPoolStats(replSetClient)

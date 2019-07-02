@@ -1,4 +1,4 @@
-package collector_common
+package common
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
@@ -52,11 +52,13 @@ type TCMallocStats struct {
 	Details DetailedTCMallocStats `bson:"tcmalloc"`
 }
 
+// GenericTCMAllocStats tracks the mem stats generic metrics.
 type GenericTCMAllocStats struct {
 	CurrentAllocatedBytes float64 `bson:"current_allocated_bytes"`
 	HeapSize              float64 `bson:"heap_size"`
 }
 
+// DetailedTCMallocStats tracks the mem stats detailed metrics.
 type DetailedTCMallocStats struct {
 	PageheapFreeBytes          float64 `bson:"pageheap_free_bytes"`
 	PageheapUnmappedBytes      float64 `bson:"pageheap_unmapped_bytes"`

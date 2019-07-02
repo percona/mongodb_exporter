@@ -28,7 +28,7 @@ func TestGetReplSetStatusDecodesFine(t *testing.T) {
 	// setup
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	client := testutils.MustGetConnectedReplSetClient(t, ctx)
+	client := testutils.MustGetConnectedReplSetClient(ctx, t)
 	defer client.Disconnect(ctx)
 
 	// run

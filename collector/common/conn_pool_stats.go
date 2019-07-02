@@ -1,4 +1,4 @@
-package collector_common
+package common
 
 import (
 	"context"
@@ -47,7 +47,7 @@ var (
 	)
 )
 
-// ServerStatus keeps the data returned by the serverStatus() method.
+// ConnPoolStats keeps the data returned by the connPoolStats command.
 type ConnPoolStats struct {
 	SyncClientConnections float64 `bson:"numClientConnections"`
 	ASScopedConnections   float64 `bson:"numAScopedConnections"`
@@ -82,7 +82,7 @@ func (stats *ConnPoolStats) Describe(ch chan<- *prometheus.Desc) {
 	ch <- totalCreatedDesc
 }
 
-// GetServerStatus returns the server status info.
+// GetConnPoolStats returns the server connPoolStats info.
 func GetConnPoolStats(client *mongo.Client) *ConnPoolStats {
 	result := &ConnPoolStats{}
 	err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"connPoolStats", 1}, {"recordStats", 0}}).Decode(result)

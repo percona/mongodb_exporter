@@ -24,7 +24,7 @@ import (
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	collector_common "github.com/percona/mongodb_exporter/collector/common"
+	commoncollector "github.com/percona/mongodb_exporter/collector/common"
 	"github.com/percona/mongodb_exporter/collector/mongod"
 	"github.com/percona/mongodb_exporter/collector/mongos"
 	"github.com/percona/mongodb_exporter/shared"
@@ -268,7 +268,7 @@ func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- 
 
 	if exporter.Opts.CollectConnPoolStats {
 		log.Debug("Collecting ConnPoolStats Metrics")
-		connPoolStats := collector_common.GetConnPoolStats(client)
+		connPoolStats := commoncollector.GetConnPoolStats(client)
 		if connPoolStats != nil {
 			connPoolStats.Export(ch)
 		}
@@ -316,7 +316,7 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 
 	if exporter.Opts.CollectConnPoolStats {
 		log.Debug("Collecting ConnPoolStats Metrics")
-		connPoolStats := collector_common.GetConnPoolStats(client)
+		connPoolStats := commoncollector.GetConnPoolStats(client)
 		if connPoolStats != nil {
 			connPoolStats.Export(ch)
 		}

@@ -98,7 +98,7 @@ func TestGetServerStatusDecodesFine(t *testing.T) {
 	// setup
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	defaultClient := testutils.MustGetConnectedMongodClient(t, ctx)
+	defaultClient := testutils.MustGetConnectedMongodClient(ctx, t)
 	defer defaultClient.Disconnect(ctx)
 
 	// run
