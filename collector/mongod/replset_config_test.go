@@ -24,7 +24,7 @@ import (
 	"github.com/percona/mongodb_exporter/testutils"
 )
 
-func TestGetReplSetStatusDecodesFine(t *testing.T) {
+func TestGetReplSetConfDecodesFine(t *testing.T) {
 	// setup
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -32,7 +32,7 @@ func TestGetReplSetStatusDecodesFine(t *testing.T) {
 	defer client.Disconnect(ctx)
 
 	// run
-	status := GetReplSetStatus(client)
+	status := GetReplSetConf(client)
 
 	// test
 	assert.NotNil(t, status)

@@ -309,6 +309,12 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 func (exporter *MongodbCollector) collectMongodReplSet(client *mongo.Client, ch chan<- prometheus.Metric) {
 	exporter.collectMongod(client, ch)
 
+	log.Debug("Collecting ReplSetConf Metrics")
+	replSetConf := mongod.GetReplSetConf(client)
+	if replSetConf != nil {
+		replSetConf.Export(ch)
+	}
+
 	log.Debug("Collecting Replset Status")
 	replSetStatus := mongod.GetReplSetStatus(client)
 	if replSetStatus != nil {
