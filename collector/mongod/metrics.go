@@ -19,12 +19,12 @@ import (
 )
 
 var (
-	metricsCursorTimedOutTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_cursor",
-		Name:      "timed_out_total",
-		Help:      "timedOut provides the total number of cursors that have timed out since the server process started. If this number is large or growing at a regular rate, this may indicate an application error",
-	})
+	metricsCursorTimedOutTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_cursor", "timed_out_total"),
+		"timedOut provides the total number of cursors that have timed out since the server process started. If this number is large or growing at a regular rate, this may indicate an application error",
+		nil,
+		nil,
+	)
 )
 var (
 	metricsCursorOpen = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -34,11 +34,12 @@ var (
 	}, []string{"state"})
 )
 var (
-	metricsDocumentTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "metrics_document_total",
-		Help:      "The document holds a document of that reflect document access and modification patterns and data use. Compare these values to the data in the opcounters document, which track total number of operations",
-	}, []string{"state"})
+	metricsDocumentTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "metrics_document_total"),
+		"The document holds a document of that reflect document access and modification patterns and data use. Compare these values to the data in the opcounters document, which track total number of operations",
+		[]string{"state"},
+		nil,
+	)
 )
 var (
 	metricsGetLastErrorWtimeNumTotal = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -47,64 +48,66 @@ var (
 		Name:      "num_total",
 		Help:      "num reports the total number of getLastError operations with a specified write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
 	})
-	metricsGetLastErrorWtimeTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_get_last_error_wtime",
-		Name:      "total_milliseconds",
-		Help:      "total_millis reports the total amount of time in milliseconds that the mongod has spent performing getLastError operations with write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
-	})
+	metricsGetLastErrorWtimeTotalMillisecondsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_get_last_error_wtime", "total_milliseconds"),
+		"total_millis reports the total amount of time in milliseconds that the mongod has spent performing getLastError operations with write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
+		nil,
+		nil,
+	)
 )
 var (
-	metricsGetLastErrorWtimeoutsTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_get_last_error",
-		Name:      "wtimeouts_total",
-		Help:      "wtimeouts reports the number of times that write concern operations have timed out as a result of the wtimeout threshold to getLastError.",
-	})
+	metricsGetLastErrorWtimeoutsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_get_last_error", "wtimeouts_total"),
+		"wtimeouts reports the number of times that write concern operations have timed out as a result of the wtimeout threshold to getLastError.",
+		nil,
+		nil,
+	)
 )
 var (
-	metricsOperationTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "metrics_operation_total",
-		Help:      "operation is a sub-document that holds counters for several types of update and query operations that MongoDB handles using special operation types",
-	}, []string{"type"})
+	metricsOperationTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "metrics_operation_total"),
+		"operation is a sub-document that holds counters for several types of update and query operations that MongoDB handles using special operation types",
+		[]string{"type"},
+		nil,
+	)
 )
 var (
-	metricsQueryExecutorTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "metrics_query_executor_total",
-		Help:      "queryExecutor is a document that reports data from the query execution system",
-	}, []string{"state"})
+	metricsQueryExecutorTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "metrics_query_executor_total"),
+		"queryExecutor is a document that reports data from the query execution system",
+		[]string{"state"},
+		nil,
+	)
 )
 var (
-	metricsRecordMovesTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_record",
-		Name:      "moves_total",
-		Help:      "moves reports the total number of times documents move within the on-disk representation of the MongoDB data set. Documents move as a result of operations that increase the size of the document beyond their allocated record size",
-	})
+	metricsRecordMovesTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_record", "moves_total"),
+		"moves reports the total number of times documents move within the on-disk representation of the MongoDB data set. Documents move as a result of operations that increase the size of the document beyond their allocated record size",
+		nil,
+		nil,
+	)
 )
 var (
-	metricsReplApplyBatchesNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_apply_batches",
-		Name:      "num_total",
-		Help:      "num reports the total number of batches applied across all databases",
-	})
-	metricsReplApplyBatchesTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_apply_batches",
-		Name:      "total_milliseconds",
-		Help:      "total_millis reports the total amount of time the mongod has spent applying operations from the oplog",
-	})
+	metricsReplApplyBatchesNumTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_apply_batches", "num_total"),
+		"num reports the total number of batches applied across all databases",
+		nil,
+		nil,
+	)
+	metricsReplApplyBatchesTotalMillisecondsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_apply_batches", "total_milliseconds"),
+		"total_millis reports the total amount of time the mongod has spent applying operations from the oplog",
+		nil,
+		nil,
+	)
 )
 var (
-	metricsReplApplyOpsTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_apply",
-		Name:      "ops_total",
-		Help:      "ops reports the total number of oplog operations applied",
-	})
+	metricsReplApplyOpsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_apply", "ops_total"),
+		"ops reports the total number of oplog operations applied",
+		nil,
+		nil,
+	)
 )
 var (
 	metricsReplBufferCount = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -113,12 +116,12 @@ var (
 		Name:      "count",
 		Help:      "count reports the current number of operations in the oplog buffer",
 	})
-	metricsReplBufferMaxSizeBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_buffer",
-		Name:      "max_size_bytes",
-		Help:      "maxSizeBytes reports the maximum size of the buffer. This value is a constant setting in the mongod, and is not configurable",
-	})
+	metricsReplBufferMaxSizeBytesDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_buffer", "max_size_bytes"),
+		"maxSizeBytes reports the maximum size of the buffer. This value is a constant setting in the mongod, and is not configurable",
+		nil,
+		nil,
+	)
 	metricsReplBufferSizeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_buffer",
@@ -127,12 +130,12 @@ var (
 	})
 )
 var (
-	metricsReplExecutorTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_executor",
-		Name:      "total",
-		Help:      "total number of operations in the replication executor",
-	}, []string{"type"})
+	metricsReplExecutorTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_executor", "total"),
+		"total number of operations in the replication executor",
+		[]string{"type"},
+		nil,
+	)
 	metricsReplExecutorQueue = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_executor",
@@ -153,38 +156,38 @@ var (
 	})
 )
 var (
-	metricsReplNetworkGetmoresNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_network_getmores",
-		Name:      "num_total",
-		Help:      "num reports the total number of getmore operations, which are operations that request an additional set of operations from the replication sync source.",
-	})
-	metricsReplNetworkGetmoresTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_network_getmores",
-		Name:      "total_milliseconds",
-		Help:      "total_millis reports the total amount of time required to collect data from getmore operations",
-	})
+	metricsReplNetworkGetmoresNumTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_network_getmores", "num_total"),
+		"num reports the total number of getmore operations, which are operations that request an additional set of operations from the replication sync source.",
+		nil,
+		nil,
+	)
+	metricsReplNetworkGetmoresTotalMillisecondsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_network_getmores", "total_milliseconds"),
+		"total_millis reports the total amount of time required to collect data from getmore operations",
+		nil,
+		nil,
+	)
 )
 var (
-	metricsReplNetworkBytesTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_network",
-		Name:      "bytes_total",
-		Help:      "bytes reports the total amount of data read from the replication sync source",
-	})
-	metricsReplNetworkOpsTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_network",
-		Name:      "ops_total",
-		Help:      "ops reports the total number of operations read from the replication source.",
-	})
-	metricsReplNetworkReadersCreatedTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_network",
-		Name:      "readers_created_total",
-		Help:      "readersCreated reports the total number of oplog query processes created. MongoDB will create a new oplog query any time an error occurs in the connection, including a timeout, or a network operation. Furthermore, readersCreated will increment every time MongoDB selects a new source fore replication.",
-	})
+	metricsReplNetworkBytesTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_network", "bytes_total"),
+		"bytes reports the total amount of data read from the replication sync source",
+		nil,
+		nil,
+	)
+	metricsReplNetworkOpsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_network", "ops_total"),
+		"ops reports the total number of operations read from the replication source.",
+		nil,
+		nil,
+	)
+	metricsReplNetworkReadersCreatedTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_network", "readers_created_total"),
+		"readersCreated reports the total number of oplog query processes created. MongoDB will create a new oplog query any time an error occurs in the connection, including a timeout, or a network operation. Furthermore, readersCreated will increment every time MongoDB selects a new source fore replication.",
+		nil,
+		nil,
+	)
 )
 var (
 	metricsReplOplogInsertNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
@@ -209,53 +212,54 @@ var (
 	})
 )
 var (
-	metricsReplPreloadDocsNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_preload_docs",
-		Name:      "num_total",
-		Help:      "num reports the total number of documents loaded during the pre-fetch stage of replication",
-	})
-	metricsReplPreloadDocsTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_preload_docs",
-		Name:      "total_milliseconds",
-		Help:      "total_millis reports the total amount of time spent loading documents as part of the pre-fetch stage of replication",
-	})
+	metricsReplPreloadDocsNumTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_preload_docs", "num_total"),
+		"num reports the total number of documents loaded during the pre-fetch stage of replication",
+		nil,
+		nil,
+	)
+	metricsReplPreloadDocsTotalMillisecondsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_preload_docs", "total_milliseconds"),
+		"total_millis reports the total amount of time spent loading documents as part of the pre-fetch stage of replication",
+		nil,
+		nil,
+	)
 )
 var (
-	metricsReplPreloadIndexesNumTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_preload_indexes",
-		Name:      "num_total",
-		Help:      "num reports the total number of index entries loaded by members before updating documents as part of the pre-fetch stage of replication",
-	})
-	metricsReplPreloadIndexesTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_repl_preload_indexes",
-		Name:      "total_milliseconds",
-		Help:      "total_millis reports the total amount of time spent loading index entries as part of the pre-fetch stage of replication",
-	})
+	metricsReplPreloadIndexesNumTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_preload_indexes", "num_total"),
+		"num reports the total number of index entries loaded by members before updating documents as part of the pre-fetch stage of replication",
+		nil,
+		nil,
+	)
+	metricsReplPreloadIndexesTotalMillisecondsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_repl_preload_indexes", "total_milliseconds"),
+		"total_millis reports the total amount of time spent loading index entries as part of the pre-fetch stage of replication",
+		nil,
+		nil,
+	)
 )
 var (
-	metricsStorageFreelistSearchTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "metrics_storage_freelist_search_total",
-		Help:      "metrics about searching records in the database.",
-	}, []string{"type"})
+	metricsStorageFreelistSearchTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "metrics_storage_freelist_search_total"),
+		"metrics about searching records in the database.",
+		[]string{"type"},
+		nil,
+	)
 )
 var (
-	metricsTTLDeletedDocumentsTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_ttl",
-		Name:      "deleted_documents_total",
-		Help:      "deletedDocuments reports the total number of documents deleted from collections with a ttl index.",
-	})
-	metricsTTLPassesTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_ttl",
-		Name:      "passes_total",
-		Help:      "passes reports the number of times the background process removes documents from collections with a ttl index",
-	})
+	metricsTTLDeletedDocumentsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_ttl", "deleted_documents_total"),
+		"deletedDocuments reports the total number of documents deleted from collections with a ttl index.",
+		nil,
+		nil,
+	)
+	metricsTTLPassesTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_ttl", "passes_total"),
+		"passes reports the number of times the background process removes documents from collections with a ttl index",
+		nil,
+		nil,
+	)
 )
 
 // DocumentStats are the stats associated to a document.
@@ -268,10 +272,10 @@ type DocumentStats struct {
 
 // Export exposes the document stats to be consumed by the prometheus server.
 func (documentStats *DocumentStats) Export(ch chan<- prometheus.Metric) {
-	metricsDocumentTotal.WithLabelValues("deleted").Set(documentStats.Deleted)
-	metricsDocumentTotal.WithLabelValues("inserted").Set(documentStats.Inserted)
-	metricsDocumentTotal.WithLabelValues("returned").Set(documentStats.Returned)
-	metricsDocumentTotal.WithLabelValues("updated").Set(documentStats.Updated)
+	ch <- prometheus.MustNewConstMetric(metricsDocumentTotalDesc, prometheus.CounterValue, documentStats.Deleted, "deleted")
+	ch <- prometheus.MustNewConstMetric(metricsDocumentTotalDesc, prometheus.CounterValue, documentStats.Inserted, "inserted")
+	ch <- prometheus.MustNewConstMetric(metricsDocumentTotalDesc, prometheus.CounterValue, documentStats.Returned, "returned")
+	ch <- prometheus.MustNewConstMetric(metricsDocumentTotalDesc, prometheus.CounterValue, documentStats.Updated, "updated")
 }
 
 // BenchmarkStats is bechmark info about an operation.
@@ -289,9 +293,9 @@ type GetLastErrorStats struct {
 // Export exposes the get last error stats.
 func (getLastErrorStats *GetLastErrorStats) Export(ch chan<- prometheus.Metric) {
 	metricsGetLastErrorWtimeNumTotal.Set(getLastErrorStats.Wtime.Num)
-	metricsGetLastErrorWtimeTotalMilliseconds.Set(getLastErrorStats.Wtime.TotalMillis)
 
-	metricsGetLastErrorWtimeoutsTotal.Set(getLastErrorStats.Wtimeouts)
+	ch <- prometheus.MustNewConstMetric(metricsGetLastErrorWtimeTotalMillisecondsDesc, prometheus.CounterValue, getLastErrorStats.Wtime.TotalMillis)
+	ch <- prometheus.MustNewConstMetric(metricsGetLastErrorWtimeoutsTotalDesc, prometheus.CounterValue, getLastErrorStats.Wtimeouts)
 }
 
 // OperationStats are the stats for some kind of operations.
@@ -303,9 +307,9 @@ type OperationStats struct {
 
 // Export exports the operation stats.
 func (operationStats *OperationStats) Export(ch chan<- prometheus.Metric) {
-	metricsOperationTotal.WithLabelValues("fastmod").Set(operationStats.Fastmod)
-	metricsOperationTotal.WithLabelValues("idhack").Set(operationStats.Idhack)
-	metricsOperationTotal.WithLabelValues("scan_and_order").Set(operationStats.ScanAndOrder)
+	ch <- prometheus.MustNewConstMetric(metricsOperationTotalDesc, prometheus.CounterValue, operationStats.Fastmod, "fastmod")
+	ch <- prometheus.MustNewConstMetric(metricsOperationTotalDesc, prometheus.CounterValue, operationStats.Idhack, "idhack")
+	ch <- prometheus.MustNewConstMetric(metricsOperationTotalDesc, prometheus.CounterValue, operationStats.ScanAndOrder, "scan_and_order")
 }
 
 // QueryExecutorStats are the stats associated with a query execution.
@@ -316,8 +320,8 @@ type QueryExecutorStats struct {
 
 // Export exports the query executor stats.
 func (queryExecutorStats *QueryExecutorStats) Export(ch chan<- prometheus.Metric) {
-	metricsQueryExecutorTotal.WithLabelValues("scanned").Set(queryExecutorStats.Scanned)
-	metricsQueryExecutorTotal.WithLabelValues("scanned_objects").Set(queryExecutorStats.ScannedObjects)
+	ch <- prometheus.MustNewConstMetric(metricsQueryExecutorTotalDesc, prometheus.CounterValue, queryExecutorStats.Scanned, "scanned")
+	ch <- prometheus.MustNewConstMetric(metricsQueryExecutorTotalDesc, prometheus.CounterValue, queryExecutorStats.ScannedObjects, "scanned_objects")
 }
 
 // RecordStats are stats associated with a record.
@@ -327,7 +331,7 @@ type RecordStats struct {
 
 // Export exposes the record stats.
 func (recordStats *RecordStats) Export(ch chan<- prometheus.Metric) {
-	metricsRecordMovesTotal.Set(recordStats.Moves)
+	ch <- prometheus.MustNewConstMetric(metricsRecordMovesTotalDesc, prometheus.CounterValue, recordStats.Moves)
 }
 
 // ApplyStats are the stats associated with the apply operation.
@@ -338,10 +342,9 @@ type ApplyStats struct {
 
 // Export exports the apply stats
 func (applyStats *ApplyStats) Export(ch chan<- prometheus.Metric) {
-	metricsReplApplyOpsTotal.Set(applyStats.Ops)
-
-	metricsReplApplyBatchesNumTotal.Set(applyStats.Batches.Num)
-	metricsReplApplyBatchesTotalMilliseconds.Set(applyStats.Batches.TotalMillis)
+	ch <- prometheus.MustNewConstMetric(metricsReplApplyOpsTotalDesc, prometheus.CounterValue, applyStats.Ops)
+	ch <- prometheus.MustNewConstMetric(metricsReplApplyBatchesNumTotalDesc, prometheus.CounterValue, applyStats.Batches.Num)
+	ch <- prometheus.MustNewConstMetric(metricsReplApplyBatchesTotalMillisecondsDesc, prometheus.CounterValue, applyStats.Batches.TotalMillis)
 }
 
 // BufferStats are the stats associated with the buffer
@@ -354,7 +357,7 @@ type BufferStats struct {
 // Export exports the buffer stats.
 func (bufferStats *BufferStats) Export(ch chan<- prometheus.Metric) {
 	metricsReplBufferCount.Set(bufferStats.Count)
-	metricsReplBufferMaxSizeBytes.Set(bufferStats.MaxSizeBytes)
+	ch <- prometheus.MustNewConstMetric(metricsReplBufferMaxSizeBytesDesc, prometheus.CounterValue, bufferStats.MaxSizeBytes)
 	metricsReplBufferSizeBytes.Set(bufferStats.SizeBytes)
 }
 
@@ -369,7 +372,7 @@ type ReplExecutorStats struct {
 // Export replication executor stats
 func (replExecutorStats *ReplExecutorStats) Export(ch chan<- prometheus.Metric) {
 	for key, val := range replExecutorStats.Counters {
-		metricsReplExecutorTotal.WithLabelValues(key).Set(val)
+		ch <- prometheus.MustNewConstMetric(metricsReplExecutorTotalDesc, prometheus.CounterValue, val, key)
 	}
 	for key, val := range replExecutorStats.Queues {
 		metricsReplExecutorQueue.WithLabelValues(key).Set(val)
@@ -388,12 +391,12 @@ type MetricsNetworkStats struct {
 
 // Export exposes the network stats.
 func (metricsNetworkStats *MetricsNetworkStats) Export(ch chan<- prometheus.Metric) {
-	metricsReplNetworkBytesTotal.Set(metricsNetworkStats.Bytes)
-	metricsReplNetworkOpsTotal.Set(metricsNetworkStats.Ops)
-	metricsReplNetworkReadersCreatedTotal.Set(metricsNetworkStats.ReadersCreated)
+	ch <- prometheus.MustNewConstMetric(metricsReplNetworkBytesTotalDesc, prometheus.CounterValue, metricsNetworkStats.Bytes)
+	ch <- prometheus.MustNewConstMetric(metricsReplNetworkOpsTotalDesc, prometheus.CounterValue, metricsNetworkStats.Ops)
+	ch <- prometheus.MustNewConstMetric(metricsReplNetworkReadersCreatedTotalDesc, prometheus.CounterValue, metricsNetworkStats.ReadersCreated)
 
-	metricsReplNetworkGetmoresNumTotal.Set(metricsNetworkStats.GetMores.Num)
-	metricsReplNetworkGetmoresTotalMilliseconds.Set(metricsNetworkStats.GetMores.TotalMillis)
+	ch <- prometheus.MustNewConstMetric(metricsReplNetworkGetmoresNumTotalDesc, prometheus.CounterValue, metricsNetworkStats.GetMores.Num)
+	ch <- prometheus.MustNewConstMetric(metricsReplNetworkGetmoresTotalMillisecondsDesc, prometheus.CounterValue, metricsNetworkStats.GetMores.TotalMillis)
 }
 
 // ReplStats are the stats associated with the replication process.
@@ -434,13 +437,13 @@ type PreloadStats struct {
 // Export exposes the preload stats.
 func (preloadStats *PreloadStats) Export(ch chan<- prometheus.Metric) {
 	if preloadStats.Docs != nil {
-		metricsReplPreloadDocsNumTotal.Set(preloadStats.Docs.Num)
-		metricsReplPreloadDocsTotalMilliseconds.Set(preloadStats.Docs.TotalMillis)
+		ch <- prometheus.MustNewConstMetric(metricsReplPreloadDocsNumTotalDesc, prometheus.CounterValue, preloadStats.Docs.Num)
+		ch <- prometheus.MustNewConstMetric(metricsReplPreloadDocsTotalMillisecondsDesc, prometheus.CounterValue, preloadStats.Docs.TotalMillis)
 	}
 
 	if preloadStats.Indexes != nil {
-		metricsReplPreloadIndexesNumTotal.Set(preloadStats.Indexes.Num)
-		metricsReplPreloadIndexesTotalMilliseconds.Set(preloadStats.Indexes.TotalMillis)
+		ch <- prometheus.MustNewConstMetric(metricsReplPreloadIndexesNumTotalDesc, prometheus.CounterValue, preloadStats.Indexes.Num)
+		ch <- prometheus.MustNewConstMetric(metricsReplPreloadIndexesTotalMillisecondsDesc, prometheus.CounterValue, preloadStats.Indexes.TotalMillis)
 	}
 }
 
@@ -453,9 +456,9 @@ type StorageStats struct {
 
 // Export exports the storage stats.
 func (storageStats *StorageStats) Export(ch chan<- prometheus.Metric) {
-	metricsStorageFreelistSearchTotal.WithLabelValues("bucket_exhausted").Set(storageStats.BucketExhausted)
-	metricsStorageFreelistSearchTotal.WithLabelValues("requests").Set(storageStats.Requests)
-	metricsStorageFreelistSearchTotal.WithLabelValues("scanned").Set(storageStats.Scanned)
+	ch <- prometheus.MustNewConstMetric(metricsStorageFreelistSearchTotalDesc, prometheus.CounterValue, storageStats.BucketExhausted, "bucket_exhausted")
+	ch <- prometheus.MustNewConstMetric(metricsStorageFreelistSearchTotalDesc, prometheus.CounterValue, storageStats.Requests, "requests")
+	ch <- prometheus.MustNewConstMetric(metricsStorageFreelistSearchTotalDesc, prometheus.CounterValue, storageStats.Scanned, "scanned")
 }
 
 // CursorStatsOpen are the stats for open cursors
@@ -473,7 +476,8 @@ type CursorStats struct {
 
 // Export exports the cursor stats.
 func (cursorStats *CursorStats) Export(ch chan<- prometheus.Metric) {
-	metricsCursorTimedOutTotal.Set(cursorStats.TimedOut)
+	ch <- prometheus.MustNewConstMetric(metricsCursorTimedOutTotalDesc, prometheus.CounterValue, cursorStats.TimedOut)
+
 	metricsCursorOpen.WithLabelValues("noTimeout").Set(cursorStats.Open.NoTimeout)
 	metricsCursorOpen.WithLabelValues("pinned").Set(cursorStats.Open.Pinned)
 	metricsCursorOpen.WithLabelValues("total").Set(cursorStats.Open.Total)
@@ -487,8 +491,8 @@ type TTLStats struct {
 
 // Export exports the cursor stats.
 func (ttlStats *TTLStats) Export(ch chan<- prometheus.Metric) {
-	metricsTTLDeletedDocumentsTotal.Set(ttlStats.DeletedDocuments)
-	metricsTTLPassesTotal.Set(ttlStats.Passes)
+	ch <- prometheus.MustNewConstMetric(metricsTTLDeletedDocumentsTotalDesc, prometheus.CounterValue, ttlStats.DeletedDocuments)
+	ch <- prometheus.MustNewConstMetric(metricsTTLPassesTotalDesc, prometheus.CounterValue, ttlStats.Passes)
 }
 
 // MetricsStats are all stats associated with metrics of the system
@@ -534,76 +538,53 @@ func (metricsStats *MetricsStats) Export(ch chan<- prometheus.Metric) {
 		metricsStats.TTL.Export(ch)
 	}
 
-	metricsCursorTimedOutTotal.Collect(ch)
 	metricsCursorOpen.Collect(ch)
-	metricsDocumentTotal.Collect(ch)
 	metricsGetLastErrorWtimeNumTotal.Collect(ch)
-	metricsGetLastErrorWtimeTotalMilliseconds.Collect(ch)
-	metricsGetLastErrorWtimeoutsTotal.Collect(ch)
-	metricsOperationTotal.Collect(ch)
-	metricsQueryExecutorTotal.Collect(ch)
-	metricsRecordMovesTotal.Collect(ch)
-	metricsReplApplyBatchesNumTotal.Collect(ch)
-	metricsReplApplyBatchesTotalMilliseconds.Collect(ch)
-	metricsReplApplyOpsTotal.Collect(ch)
 	metricsReplBufferCount.Collect(ch)
-	metricsReplBufferMaxSizeBytes.Collect(ch)
 	metricsReplBufferSizeBytes.Collect(ch)
-	metricsReplExecutorTotal.Collect(ch)
 	metricsReplExecutorQueue.Collect(ch)
 	metricsReplExecutorEventWaiters.Collect(ch)
 	metricsReplExecutorUnsignaledEvents.Collect(ch)
-	metricsReplNetworkGetmoresNumTotal.Collect(ch)
-	metricsReplNetworkGetmoresTotalMilliseconds.Collect(ch)
-	metricsReplNetworkBytesTotal.Collect(ch)
-	metricsReplNetworkOpsTotal.Collect(ch)
-	metricsReplNetworkReadersCreatedTotal.Collect(ch)
 	metricsReplOplogInsertNumTotal.Collect(ch)
 	metricsReplOplogInsertTotalMilliseconds.Collect(ch)
 	metricsReplOplogInsertBytesTotal.Collect(ch)
-	metricsReplPreloadDocsNumTotal.Collect(ch)
-	metricsReplPreloadDocsTotalMilliseconds.Collect(ch)
-	metricsReplPreloadIndexesNumTotal.Collect(ch)
-	metricsReplPreloadIndexesTotalMilliseconds.Collect(ch)
-	metricsStorageFreelistSearchTotal.Collect(ch)
-	metricsTTLDeletedDocumentsTotal.Collect(ch)
-	metricsTTLPassesTotal.Collect(ch)
 }
 
 // Describe describes the metrics for prometheus
 func (metricsStats *MetricsStats) Describe(ch chan<- *prometheus.Desc) {
-	metricsCursorTimedOutTotal.Describe(ch)
 	metricsCursorOpen.Describe(ch)
-	metricsDocumentTotal.Describe(ch)
 	metricsGetLastErrorWtimeNumTotal.Describe(ch)
-	metricsGetLastErrorWtimeTotalMilliseconds.Describe(ch)
-	metricsGetLastErrorWtimeoutsTotal.Describe(ch)
-	metricsOperationTotal.Describe(ch)
-	metricsQueryExecutorTotal.Describe(ch)
-	metricsRecordMovesTotal.Describe(ch)
-	metricsReplApplyBatchesNumTotal.Describe(ch)
-	metricsReplApplyBatchesTotalMilliseconds.Describe(ch)
-	metricsReplApplyOpsTotal.Describe(ch)
 	metricsReplBufferCount.Describe(ch)
-	metricsReplBufferMaxSizeBytes.Describe(ch)
 	metricsReplBufferSizeBytes.Describe(ch)
-	metricsReplExecutorTotal.Describe(ch)
 	metricsReplExecutorQueue.Describe(ch)
 	metricsReplExecutorEventWaiters.Describe(ch)
 	metricsReplExecutorUnsignaledEvents.Describe(ch)
-	metricsReplNetworkGetmoresNumTotal.Describe(ch)
-	metricsReplNetworkGetmoresTotalMilliseconds.Describe(ch)
-	metricsReplNetworkBytesTotal.Describe(ch)
-	metricsReplNetworkOpsTotal.Describe(ch)
-	metricsReplNetworkReadersCreatedTotal.Describe(ch)
 	metricsReplOplogInsertNumTotal.Describe(ch)
 	metricsReplOplogInsertTotalMilliseconds.Describe(ch)
 	metricsReplOplogInsertBytesTotal.Describe(ch)
-	metricsReplPreloadDocsNumTotal.Describe(ch)
-	metricsReplPreloadDocsTotalMilliseconds.Describe(ch)
-	metricsReplPreloadIndexesNumTotal.Describe(ch)
-	metricsReplPreloadIndexesTotalMilliseconds.Describe(ch)
-	metricsStorageFreelistSearchTotal.Describe(ch)
-	metricsTTLDeletedDocumentsTotal.Describe(ch)
-	metricsTTLPassesTotal.Describe(ch)
+
+	ch <- metricsCursorTimedOutTotalDesc
+	ch <- metricsDocumentTotalDesc
+	ch <- metricsGetLastErrorWtimeTotalMillisecondsDesc
+	ch <- metricsGetLastErrorWtimeoutsTotalDesc
+	ch <- metricsOperationTotalDesc
+	ch <- metricsQueryExecutorTotalDesc
+	ch <- metricsRecordMovesTotalDesc
+	ch <- metricsReplApplyBatchesNumTotalDesc
+	ch <- metricsReplApplyBatchesTotalMillisecondsDesc
+	ch <- metricsReplApplyOpsTotalDesc
+	ch <- metricsReplBufferMaxSizeBytesDesc
+	ch <- metricsReplExecutorTotalDesc
+	ch <- metricsReplNetworkGetmoresNumTotalDesc
+	ch <- metricsReplNetworkGetmoresTotalMillisecondsDesc
+	ch <- metricsReplNetworkBytesTotalDesc
+	ch <- metricsReplNetworkOpsTotalDesc
+	ch <- metricsReplNetworkReadersCreatedTotalDesc
+	ch <- metricsReplPreloadDocsNumTotalDesc
+	ch <- metricsReplPreloadDocsTotalMillisecondsDesc
+	ch <- metricsReplPreloadIndexesNumTotalDesc
+	ch <- metricsReplPreloadIndexesTotalMillisecondsDesc
+	ch <- metricsStorageFreelistSearchTotalDesc
+	ch <- metricsTTLDeletedDocumentsTotalDesc
+	ch <- metricsTTLPassesTotalDesc
 }

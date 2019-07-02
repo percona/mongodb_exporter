@@ -19,12 +19,12 @@ import (
 )
 
 var (
-	metricsCursorTimedOutTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_cursor",
-		Name:      "timed_out_total",
-		Help:      "timedOut provides the total number of cursors that have timed out since the server process started. If this number is large or growing at a regular rate, this may indicate an application error",
-	})
+	metricsCursorTimedOutTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_cursor", "timed_out_total"),
+		"timedOut provides the total number of cursors that have timed out since the server process started. If this number is large or growing at a regular rate, this may indicate an application error",
+		nil,
+		nil,
+	)
 )
 var (
 	metricsCursorOpen = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -40,20 +40,20 @@ var (
 		Name:      "num_total",
 		Help:      "num reports the total number of getLastError operations with a specified write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
 	})
-	metricsGetLastErrorWtimeTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_get_last_error_wtime",
-		Name:      "total_milliseconds",
-		Help:      "total_millis reports the total amount of time in milliseconds that the mongod has spent performing getLastError operations with write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
-	})
+	metricsGetLastErrorWtimeTotalMillisecondsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_get_last_error_wtime", "total_milliseconds"),
+		"total_millis reports the total amount of time in milliseconds that the mongod has spent performing getLastError operations with write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
+		nil,
+		nil,
+	)
 )
 var (
-	metricsGetLastErrorWtimeoutsTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: "metrics_get_last_error",
-		Name:      "wtimeouts_total",
-		Help:      "wtimeouts reports the number of times that write concern operations have timed out as a result of the wtimeout threshold to getLastError.",
-	})
+	metricsGetLastErrorWtimeoutsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "metrics_get_last_error", "wtimeouts_total"),
+		"wtimeouts reports the number of times that write concern operations have timed out as a result of the wtimeout threshold to getLastError.",
+		nil,
+		nil,
+	)
 )
 
 // BenchmarkStats is bechmark info about an operation.
@@ -71,9 +71,8 @@ type GetLastErrorStats struct {
 // Export exposes the get last error stats.
 func (getLastErrorStats *GetLastErrorStats) Export(ch chan<- prometheus.Metric) {
 	metricsGetLastErrorWtimeNumTotal.Set(getLastErrorStats.Wtime.Num)
-	metricsGetLastErrorWtimeTotalMilliseconds.Set(getLastErrorStats.Wtime.TotalMillis)
-
-	metricsGetLastErrorWtimeoutsTotal.Set(getLastErrorStats.Wtimeouts)
+	ch <- prometheus.MustNewConstMetric(metricsGetLastErrorWtimeTotalMillisecondsDesc, prometheus.CounterValue, getLastErrorStats.Wtime.TotalMillis)
+	ch <- prometheus.MustNewConstMetric(metricsGetLastErrorWtimeoutsTotalDesc, prometheus.CounterValue, getLastErrorStats.Wtimeouts)
 }
 
 // CursorStatsOpen are the stats for open cursors
@@ -91,7 +90,7 @@ type CursorStats struct {
 
 // Export exports the cursor stats.
 func (cursorStats *CursorStats) Export(ch chan<- prometheus.Metric) {
-	metricsCursorTimedOutTotal.Set(cursorStats.TimedOut)
+	ch <- prometheus.MustNewConstMetric(metricsCursorTimedOutTotalDesc, prometheus.CounterValue, cursorStats.TimedOut)
 	metricsCursorOpen.WithLabelValues("noTimeout").Set(cursorStats.Open.NoTimeout)
 	metricsCursorOpen.WithLabelValues("pinned").Set(cursorStats.Open.Pinned)
 	metricsCursorOpen.WithLabelValues("total").Set(cursorStats.Open.Total)
@@ -112,18 +111,15 @@ func (metricsStats *MetricsStats) Export(ch chan<- prometheus.Metric) {
 		metricsStats.Cursor.Export(ch)
 	}
 
-	metricsCursorTimedOutTotal.Collect(ch)
 	metricsCursorOpen.Collect(ch)
 	metricsGetLastErrorWtimeNumTotal.Collect(ch)
-	metricsGetLastErrorWtimeTotalMilliseconds.Collect(ch)
-	metricsGetLastErrorWtimeoutsTotal.Collect(ch)
 }
 
 // Describe describes the metrics for prometheus
 func (metricsStats *MetricsStats) Describe(ch chan<- *prometheus.Desc) {
-	metricsCursorTimedOutTotal.Describe(ch)
+	ch <- metricsCursorTimedOutTotalDesc
 	metricsCursorOpen.Describe(ch)
 	metricsGetLastErrorWtimeNumTotal.Describe(ch)
-	metricsGetLastErrorWtimeTotalMilliseconds.Describe(ch)
-	metricsGetLastErrorWtimeoutsTotal.Describe(ch)
+	ch <- metricsGetLastErrorWtimeTotalMillisecondsDesc
+	ch <- metricsGetLastErrorWtimeoutsTotalDesc
 }

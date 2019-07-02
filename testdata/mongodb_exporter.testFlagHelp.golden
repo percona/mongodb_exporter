@@ -5,6 +5,15 @@ exports various MongoDB metrics in Prometheus format.
 Flags:
   -h, --help                     Show context-sensitive help (also try
                                  --help-long and --help-man).
+      --web.auth-file=WEB.AUTH-FILE  
+                                 Path to YAML file with server_user,
+                                 server_password keys for HTTP Basic
+                                 authentication (overrides HTTP_AUTH environment
+                                 variable).
+      --web.ssl-cert-file=WEB.SSL-CERT-FILE  
+                                 Path to SSL certificate file.
+      --web.ssl-key-file=WEB.SSL-KEY-FILE  
+                                 Path to SSL key file.
       --web.listen-address=":9216"  
                                  Address to listen on for web interface and
                                  telemetry.
