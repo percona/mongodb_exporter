@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Added
-- [PMM-4131](https://jira.percona.com/browse/PMM-4131): Added some features from [dcu/mongodb_exporter](https://github.com/dcu/mongodb_exporter). See list below.
+- [PMM-4131](https://jira.percona.com/browse/PMM-4131): Added missing features from [dcu/mongodb_exporter](https://github.com/dcu/mongodb_exporter). See list below.
 - New metrics:
   - `mongodb_mongod_replset_member_*`
   - `mongodb_connpoolstats_*`
-
+  - `mongodb_tcmalloc_*`
 
 ### Fixed
 

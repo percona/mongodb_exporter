@@ -63,6 +63,8 @@ type ServerStatus struct {
 
 	Opcounters     *OpcountersStats     `bson:"opcounters"`
 	OpcountersRepl *OpcountersReplStats `bson:"opcountersRepl"`
+
+	TCMallocStats *TCMallocStats `bson:"tcmalloc"`
 }
 
 // Export exports the server status to be consumed by prometheus.
@@ -97,6 +99,9 @@ func (status *ServerStatus) Export(ch chan<- prometheus.Metric) {
 	if status.OpcountersRepl != nil {
 		status.OpcountersRepl.Export(ch)
 	}
+	if status.TCMallocStats != nil {
+		status.TCMallocStats.Export(ch)
+	}
 }
 
 // Describe describes the server status for prometheus.
@@ -122,5 +127,8 @@ func (status *ServerStatus) Describe(ch chan<- *prometheus.Desc) {
 	}
 	if status.Network != nil {
 		status.Network.Describe(ch)
+	}
+	if status.TCMallocStats != nil {
+		status.TCMallocStats.Describe(ch)
 	}
 }
