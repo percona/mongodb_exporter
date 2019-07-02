@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -18,7 +17,7 @@ func MustGetConnectedReplSetClient(t *testing.T, ctx context.Context) *mongo.Cli
 		SetDirect(true).SetServerSelectionTimeout(time.Second)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
-		t.Fatal(errors.Wrap(err, "Couldn't connect to MongoDB instance"))
+		t.Fatalf("Couldn't connect to MongoDB instance, reason: %v", err)
 	}
 
 	return client
@@ -31,7 +30,7 @@ func MustGetConnectedMongodClient(t *testing.T, ctx context.Context) *mongo.Clie
 		SetDirect(true).SetServerSelectionTimeout(time.Second)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
-		t.Fatal(errors.Wrap(err, "Couldn't connect to MongoDB instance"))
+		t.Fatalf("Couldn't connect to MongoDB instance, reason: %v", err)
 	}
 
 	return client
