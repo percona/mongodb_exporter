@@ -23,3 +23,16 @@ func MustGetConnectedReplSetClient(t *testing.T, ctx context.Context) *mongo.Cli
 
 	return client
 }
+
+// MustGetConnectedMongodClient return mongo.Client instance connected to server started in single mode.
+func MustGetConnectedMongodClient(t *testing.T, ctx context.Context) *mongo.Client {
+	opts := options.Client().
+		ApplyURI("mongodb://127.0.0.1:27017/admin").
+		SetDirect(true).SetServerSelectionTimeout(time.Second)
+	client, err := mongo.Connect(ctx, opts)
+	if err != nil {
+		t.Fatal(errors.Wrap(err, "Couldn't connect to MongoDB instance"))
+	}
+
+	return client
+}

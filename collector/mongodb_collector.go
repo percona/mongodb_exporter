@@ -24,6 +24,7 @@ import (
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/mongo"
 
+	collector_common "github.com/percona/mongodb_exporter/collector/common"
 	"github.com/percona/mongodb_exporter/collector/mongod"
 	"github.com/percona/mongodb_exporter/collector/mongos"
 	"github.com/percona/mongodb_exporter/shared"
@@ -44,6 +45,7 @@ type MongodbCollectorOpts struct {
 	CollectCollectionMetrics bool
 	CollectTopMetrics        bool
 	CollectIndexUsageStats   bool
+	CollectConnPoolStats     bool
 	SocketTimeout            time.Duration
 	SyncTimeout              time.Duration
 	AuthentificationDB       string
@@ -237,7 +239,6 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 
 func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- prometheus.Metric) {
 	log.Debug("Collecting Server Status")
-
 	serverStatus := mongos.GetServerStatus(client)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
@@ -262,6 +263,14 @@ func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- 
 		collStatList := mongos.GetCollectionStatList(client)
 		if collStatList != nil {
 			collStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectConnPoolStats {
+		log.Debug("Collecting ConnPoolStats Metrics")
+		connPoolStats := collector_common.GetConnPoolStats(client)
+		if connPoolStats != nil {
+			connPoolStats.Export(ch)
 		}
 	}
 }
@@ -302,6 +311,14 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 		indexStatList := mongod.GetIndexUsageStatList(client)
 		if indexStatList != nil {
 			indexStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectConnPoolStats {
+		log.Debug("Collecting ConnPoolStats Metrics")
+		connPoolStats := collector_common.GetConnPoolStats(client)
+		if connPoolStats != nil {
+			connPoolStats.Export(ch)
 		}
 	}
 }
