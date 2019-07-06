@@ -144,7 +144,7 @@ func (d *tlsDialer) DialContext(ctx context.Context, network, address string) (n
 		log.Errorf("Could not connect to %v. Got: %v", address, err)
 		return nil, err
 	}
-	if d.config.InsecureSkipVerify {
+	if !d.config.InsecureSkipVerify {
 		err = enrichWithOwnChecks(conn, d.config)
 		if err != nil {
 			log.Errorf("Could not disable hostname validation. Got: %v", err)
