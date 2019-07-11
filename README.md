@@ -18,6 +18,9 @@ Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cu
 - MongoDB WiredTiger storage-engine metrics (*cache, blockmanger, tickets, etc*)
 - MongoDB Top Metrics per collection (writeLock, readLock, query, etc*)
 
+### Important Note
+
+Metrics `mongodb_mongod_replset_oplog_*` doesn't work in [Master/Slave](https://docs.mongodb.com/v3.4/core/master-slave/) replication mode, because it was *DEPRECATED* in MongoDB `3.2` and removed in `4.0`.
 
 ## Building and running
 
