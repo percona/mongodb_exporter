@@ -26,12 +26,12 @@ import (
 
 func TestGetConnPoolStatsDecodesFine(t *testing.T) {
 	// setup
-	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	t.Run("mongod", func(t *testing.T) {
 		// setup
+		t.Parallel()
 		defaultClient := testutils.MustGetConnectedMongodClient(ctx, t)
 		defer defaultClient.Disconnect(ctx)
 		// run
@@ -42,6 +42,7 @@ func TestGetConnPoolStatsDecodesFine(t *testing.T) {
 
 	t.Run("replset", func(t *testing.T) {
 		// setup
+		t.Parallel()
 		replSetClient := testutils.MustGetConnectedReplSetClient(ctx, t)
 		defer replSetClient.Disconnect(ctx)
 		// run

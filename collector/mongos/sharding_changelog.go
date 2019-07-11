@@ -104,7 +104,7 @@ func GetShardingChangelogStatus(client *mongo.Client) *ShardingChangelogStats {
 
 	c, err := coll.Aggregate(context.TODO(), []bson.M{{"$match": match}, {"$group": group}})
 	if err != nil {
-		log.Error("Failed to execute find query on 'config.changelog'!")
+		log.Error(err)
 	}
 
 	defer c.Close(context.TODO())

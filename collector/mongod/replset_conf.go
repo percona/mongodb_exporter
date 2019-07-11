@@ -3,11 +3,10 @@ package mongod
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
@@ -119,7 +118,7 @@ func GetReplSetConf(client *mongo.Client) *ReplSetConf {
 	result := &OuterReplSetConf{}
 	err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetGetConfig", 1}}).Decode(result)
 	if err != nil {
-		log.Error("Failed to get replSet config.")
+		log.Error(err)
 		return nil
 	}
 	return &result.Config

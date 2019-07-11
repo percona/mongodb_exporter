@@ -112,7 +112,6 @@ func (m *TCMallocStats) Export(ch chan<- prometheus.Metric) {
 
 	ch <- prometheus.MustNewConstMetric(tcmallocAggressiveDecommitDesc, prometheus.CounterValue, m.Details.AggressiveMemoryDecommit)
 	ch <- prometheus.MustNewConstMetric(tcmallocFreeBytesDesc, prometheus.CounterValue, m.Details.TotalFreeBytes)
-
 }
 
 // Describe describes the metrics for prometheus
