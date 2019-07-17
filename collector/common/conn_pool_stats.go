@@ -54,6 +54,8 @@ type ConnPoolStats struct {
 	TotalInUse            float64 `bson:"totalInUse"`
 	TotalAvailable        float64 `bson:"totalAvailable"`
 	TotalCreated          float64 `bson:"totalCreated"`
+
+	Ok float64 `bson:"ok"`
 }
 
 // Export exports the server status to be consumed by prometheus.

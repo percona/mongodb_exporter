@@ -34,10 +34,13 @@ func TestGetConnPoolStatsDecodesFine(t *testing.T) {
 		t.Parallel()
 		defaultClient := testutils.MustGetConnectedMongodClient(ctx, t)
 		defer defaultClient.Disconnect(ctx)
+
 		// run
 		statusDefault := GetConnPoolStats(defaultClient)
+
 		// test
 		assert.NotNil(t, statusDefault)
+		assert.Equal(t, 1.0, statusDefault.Ok)
 	})
 
 	t.Run("replset", func(t *testing.T) {
@@ -45,9 +48,12 @@ func TestGetConnPoolStatsDecodesFine(t *testing.T) {
 		t.Parallel()
 		replSetClient := testutils.MustGetConnectedReplSetClient(ctx, t)
 		defer replSetClient.Disconnect(ctx)
+
 		// run
 		statusReplSet := GetConnPoolStats(replSetClient)
+
 		// test
 		assert.NotNil(t, statusReplSet)
+		assert.Equal(t, 1.0, statusReplSet.Ok)
 	})
 }

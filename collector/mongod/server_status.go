@@ -46,6 +46,8 @@ type ServerStatus struct {
 	InMemory      *WiredTigerStats    `bson:"inMemory"`
 	RocksDb       *RocksDbStats       `bson:"rocksdb"`
 	WiredTiger    *WiredTigerStats    `bson:"wiredTiger"`
+
+	Ok float64 `bson:"ok"`
 }
 
 // Export exports the server status to be consumed by prometheus.

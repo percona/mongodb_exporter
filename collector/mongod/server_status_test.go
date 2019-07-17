@@ -106,4 +106,5 @@ func TestGetServerStatusDecodesFine(t *testing.T) {
 
 	// test
 	assert.NotNil(t, statusDefault)
+	assert.Equal(t, 1.0, statusDefault.Ok)
 }

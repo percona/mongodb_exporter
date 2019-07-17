@@ -36,4 +36,5 @@ func TestGetReplSetStatusDecodesFine(t *testing.T) {
 
 	// test
 	assert.NotNil(t, status)
+	assert.Equal(t, 1.0, status.Ok)
 }
