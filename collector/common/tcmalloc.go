@@ -5,31 +5,33 @@ import (
 )
 
 var (
-	tcmallocGeneral = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: "tcmalloc",
-		Name:      "generic_heap",
-		Help:      "High-level summary metricsInternal metrics from tcmalloc",
-	}, []string{"type"})
-	tcmallocPageheapBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: "tcmalloc",
-		Name:      "pageheap_bytes",
-		Help:      "Sizes for tcpmalloc pageheaps",
-	}, []string{"type"})
-	tcmallocPageheapCounts = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: "tcmalloc",
-		Name:      "pageheap_count",
-		Help:      "Sizes for tcpmalloc pageheaps",
-	}, []string{"type"})
+	tcmallocGeneralDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "tcmalloc", "generic_heap"),
+		"High-level summary metricsInternal metrics from tcmalloc",
+		[]string{"type"},
+		nil,
+	)
 
-	tcmallocCacheBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: "tcmalloc",
-		Name:      "cache_bytes",
-		Help:      "Sizes for tcpmalloc caches in bytes",
-	}, []string{"cache", "type"})
+	tcmallocPageheapBytesDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "tcmalloc", "pageheap_bytes"),
+		"Sizes for tcpmalloc pageheaps",
+		[]string{"type"},
+		nil,
+	)
+
+	tcmallocPageheapCountsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "tcmalloc", "pageheap_count"),
+		"Sizes for tcpmalloc pageheaps",
+		[]string{"type"},
+		nil,
+	)
+
+	tcmallocCacheBytesDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "tcmalloc", "cache_bytes"),
+		"Sizes for tcpmalloc caches in bytes",
+		[]string{"cache", "type"},
+		nil,
+	)
 
 	tcmallocAggressiveDecommitDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "tcmalloc", "aggressive_memory_decommit"),
@@ -84,31 +86,27 @@ type DetailedTCMallocStats struct {
 // Export exports the data to prometheus.
 func (m *TCMallocStats) Export(ch chan<- prometheus.Metric) {
 	// Generic metrics
-	tcmallocGeneral.WithLabelValues("allocated").Set(m.Generic.CurrentAllocatedBytes)
-	tcmallocGeneral.WithLabelValues("total").Set(m.Generic.HeapSize)
-	tcmallocGeneral.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(tcmallocGeneralDesc, prometheus.GaugeValue, m.Generic.CurrentAllocatedBytes, "allocated")
+	ch <- prometheus.MustNewConstMetric(tcmallocGeneralDesc, prometheus.GaugeValue, m.Generic.HeapSize, "total")
 
 	// Pageheap
-	tcmallocPageheapBytes.WithLabelValues("free").Set(m.Details.PageheapFreeBytes)
-	tcmallocPageheapBytes.WithLabelValues("unmapped").Set(m.Details.PageheapUnmappedBytes)
-	tcmallocPageheapBytes.WithLabelValues("comitted").Set(m.Details.PageheapComittedBytes)
-	tcmallocPageheapBytes.WithLabelValues("total_commit").Set(m.Details.PageheapTotalCommitBytes)
-	tcmallocPageheapBytes.WithLabelValues("total_decommit").Set(m.Details.PageheapTotalDecommitBytes)
-	tcmallocPageheapBytes.WithLabelValues("total_reserve").Set(m.Details.PageheapTotalReserveBytes)
-	tcmallocPageheapBytes.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapBytesDesc, prometheus.GaugeValue, m.Details.PageheapFreeBytes, "free")
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapBytesDesc, prometheus.GaugeValue, m.Details.PageheapUnmappedBytes, "unmapped")
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapBytesDesc, prometheus.GaugeValue, m.Details.PageheapComittedBytes, "comitted")
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapBytesDesc, prometheus.GaugeValue, m.Details.PageheapTotalCommitBytes, "total_commit")
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapBytesDesc, prometheus.GaugeValue, m.Details.PageheapTotalDecommitBytes, "total_decommit")
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapBytesDesc, prometheus.GaugeValue, m.Details.PageheapTotalReserveBytes, "total_reserve")
 
-	tcmallocPageheapCounts.WithLabelValues("scavenge").Set(m.Details.PageheapScavengeCount)
-	tcmallocPageheapCounts.WithLabelValues("commit").Set(m.Details.PageheapCommitCount)
-	tcmallocPageheapCounts.WithLabelValues("decommit").Set(m.Details.PageheapDecommitCount)
-	tcmallocPageheapCounts.WithLabelValues("reserve").Set(m.Details.PageheapReserveCount)
-	tcmallocPageheapCounts.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapCountsDesc, prometheus.GaugeValue, m.Details.PageheapScavengeCount, "scavenge")
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapCountsDesc, prometheus.GaugeValue, m.Details.PageheapCommitCount, "commit")
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapCountsDesc, prometheus.GaugeValue, m.Details.PageheapDecommitCount, "decommit")
+	ch <- prometheus.MustNewConstMetric(tcmallocPageheapCountsDesc, prometheus.GaugeValue, m.Details.PageheapReserveCount, "reserve")
 
-	tcmallocCacheBytes.WithLabelValues("thread_cache", "max_total").Set(m.Details.MaxTotalThreadCacheBytes)
-	tcmallocCacheBytes.WithLabelValues("thread_cache", "current_total").Set(m.Details.CurrentTotalThreadCacheBytes)
-	tcmallocCacheBytes.WithLabelValues("central_cache", "free").Set(m.Details.CentralCacheFreeBytes)
-	tcmallocCacheBytes.WithLabelValues("transfer_cache", "free").Set(m.Details.TransferCacheFreeBytes)
-	tcmallocCacheBytes.WithLabelValues("thread_cache", "free").Set(m.Details.ThreadCacheFreeBytes)
-	tcmallocCacheBytes.Collect(ch)
+	ch <- prometheus.MustNewConstMetric(tcmallocCacheBytesDesc, prometheus.GaugeValue, m.Details.MaxTotalThreadCacheBytes, "thread_cache", "max_total")
+	ch <- prometheus.MustNewConstMetric(tcmallocCacheBytesDesc, prometheus.GaugeValue, m.Details.CurrentTotalThreadCacheBytes, "thread_cache", "current_total")
+	ch <- prometheus.MustNewConstMetric(tcmallocCacheBytesDesc, prometheus.GaugeValue, m.Details.CentralCacheFreeBytes, "central_cache", "free")
+	ch <- prometheus.MustNewConstMetric(tcmallocCacheBytesDesc, prometheus.GaugeValue, m.Details.TransferCacheFreeBytes, "transfer_cache", "free")
+	ch <- prometheus.MustNewConstMetric(tcmallocCacheBytesDesc, prometheus.GaugeValue, m.Details.ThreadCacheFreeBytes, "thread_cache", "free")
 
 	ch <- prometheus.MustNewConstMetric(tcmallocAggressiveDecommitDesc, prometheus.CounterValue, m.Details.AggressiveMemoryDecommit)
 	ch <- prometheus.MustNewConstMetric(tcmallocFreeBytesDesc, prometheus.CounterValue, m.Details.TotalFreeBytes)
@@ -116,11 +114,10 @@ func (m *TCMallocStats) Export(ch chan<- prometheus.Metric) {
 
 // Describe describes the metrics for prometheus
 func (m *TCMallocStats) Describe(ch chan<- *prometheus.Desc) {
-	tcmallocGeneral.Describe(ch)
-	tcmallocPageheapBytes.Describe(ch)
-	tcmallocPageheapCounts.Describe(ch)
-	tcmallocCacheBytes.Describe(ch)
-
+	ch <- tcmallocGeneralDesc
+	ch <- tcmallocPageheapBytesDesc
+	ch <- tcmallocPageheapCountsDesc
+	ch <- tcmallocCacheBytesDesc
 	ch <- tcmallocAggressiveDecommitDesc
 	ch <- tcmallocAggressiveDecommitDesc
 }

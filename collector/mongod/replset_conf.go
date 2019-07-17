@@ -10,36 +10,40 @@ import (
 )
 
 var (
-	memberHidden = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: subsystem,
-		Name:      "member_hidden",
-		Help:      "This field conveys if the member is hidden (1) or not-hidden (0).",
-	}, []string{"id", "host"})
-	memberArbiter = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: subsystem,
-		Name:      "member_arbiter",
-		Help:      "This field conveys if the member is an arbiter (1) or not (0).",
-	}, []string{"id", "host"})
-	memberBuildIndexes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: subsystem,
-		Name:      "member_build_indexes",
-		Help:      "This field conveys if the member is  builds indexes (1) or not (0).",
-	}, []string{"id", "host"})
-	memberPriority = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: subsystem,
-		Name:      "member_priority",
-		Help:      "This field conveys the priority of a given member",
-	}, []string{"id", "host"})
-	memberVotes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: subsystem,
-		Name:      "member_votes",
-		Help:      "This field conveys the number of votes of a given member",
-	}, []string{"id", "host"})
+	memberHiddenDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, subsystem, "member_hidden"),
+		"This field conveys if the member is hidden (1) or not-hidden (0).",
+		[]string{"id", "host"},
+		nil,
+	)
+
+	memberArbiterDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, subsystem, "member_arbiter"),
+		"This field conveys if the member is an arbiter (1) or not (0).",
+		[]string{"id", "host"},
+		nil,
+	)
+
+	memberBuildIndexesDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, subsystem, "member_build_indexes"),
+		"This field conveys if the member is  builds indexes (1) or not (0).",
+		[]string{"id", "host"},
+		nil,
+	)
+
+	memberPriorityDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, subsystem, "member_priority"),
+		"This field conveys the priority of a given member",
+		[]string{"id", "host"},
+		nil,
+	)
+
+	memberVotesDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, subsystem, "member_votes"),
+		"This field conveys the number of votes of a given member",
+		[]string{"id", "host"},
+		nil,
+	)
 )
 
 // OuterReplSetConf Although the docs say that it returns a map with id etc. it *actually* returns that wrapped in a map.
@@ -71,46 +75,36 @@ type MemberConf struct {
 // Export exports the replSetGetStatus stati to be consumed by prometheus
 func (replConf *ReplSetConf) Export(ch chan<- prometheus.Metric) {
 	for _, member := range replConf.Members {
-		ls := prometheus.Labels{
-			"id":   replConf.ID,
-			"host": member.Host,
-		}
 		if member.Hidden {
-			memberHidden.With(ls).Set(1)
+			ch <- prometheus.MustNewConstMetric(memberHiddenDesc, prometheus.GaugeValue, 1, replConf.ID, member.Host)
 		} else {
-			memberHidden.With(ls).Set(0)
+			ch <- prometheus.MustNewConstMetric(memberHiddenDesc, prometheus.GaugeValue, 0, replConf.ID, member.Host)
 		}
 
 		if member.ArbiterOnly {
-			memberArbiter.With(ls).Set(1)
+			ch <- prometheus.MustNewConstMetric(memberArbiterDesc, prometheus.GaugeValue, 1, replConf.ID, member.Host)
 		} else {
-			memberArbiter.With(ls).Set(0)
+			ch <- prometheus.MustNewConstMetric(memberArbiterDesc, prometheus.GaugeValue, 0, replConf.ID, member.Host)
 		}
 
 		if member.BuildIndexes {
-			memberBuildIndexes.With(ls).Set(1)
+			ch <- prometheus.MustNewConstMetric(memberBuildIndexesDesc, prometheus.GaugeValue, 1, replConf.ID, member.Host)
 		} else {
-			memberBuildIndexes.With(ls).Set(0)
+			ch <- prometheus.MustNewConstMetric(memberBuildIndexesDesc, prometheus.GaugeValue, 0, replConf.ID, member.Host)
 		}
 
-		memberPriority.With(ls).Set(float64(member.Priority))
-		memberVotes.With(ls).Set(float64(member.Votes))
+		ch <- prometheus.MustNewConstMetric(memberPriorityDesc, prometheus.GaugeValue, float64(member.Priority), replConf.ID, member.Host)
+		ch <- prometheus.MustNewConstMetric(memberVotesDesc, prometheus.GaugeValue, float64(member.Votes), replConf.ID, member.Host)
 	}
-	// collect metrics
-	memberHidden.Collect(ch)
-	memberArbiter.Collect(ch)
-	memberBuildIndexes.Collect(ch)
-	memberPriority.Collect(ch)
-	memberVotes.Collect(ch)
 }
 
 // Describe describes the replSetGetStatus metrics for prometheus
 func (replConf *ReplSetConf) Describe(ch chan<- *prometheus.Desc) {
-	memberHidden.Describe(ch)
-	memberArbiter.Describe(ch)
-	memberBuildIndexes.Describe(ch)
-	memberPriority.Describe(ch)
-	memberVotes.Describe(ch)
+	ch <- memberHiddenDesc
+	ch <- memberArbiterDesc
+	ch <- memberBuildIndexesDesc
+	ch <- memberPriorityDesc
+	ch <- memberVotesDesc
 }
 
 // GetReplSetConf returns the replica status info
