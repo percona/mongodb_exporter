@@ -14,6 +14,7 @@ This change replaces above with prometheus histogram metric op_latency_microseco
 ### Added
 
 ### Fixed
+- [PMM-4427](https://jira.percona.com/browse/PMM-4427): Panic when read rocksdb status, txh [@lijinglin2019](https://github.com/lijinglin2019).
 
 ## [0.8.0]
 ### Changed
