@@ -60,7 +60,7 @@ var (
 	rocksDbCompactionsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "rocksdb", "compactions_total"),
 		"The total number of compactions between levels N and N+1 in RocksDB",
-		[]string{"level"},
+		[]string{"level", "type"},
 		nil,
 	)
 	rocksDbBlockCacheHitsDesc = prometheus.NewDesc(
