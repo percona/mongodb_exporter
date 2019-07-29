@@ -12,6 +12,7 @@ This change removes metrics: op_latencies_ops_total, op_latencies_histogram and 
 This change replaces above with prometheus histogram metric op_latency_microseconds_* where * is either bucket, count, sum.
 
 ### Added
+- Added application name "mongo_exporter" to mongo logs, [@nikita-b](https://github.com/nikita-b)
 
 ### Fixed
 - [PMM-4427](https://jira.percona.com/browse/PMM-4427): Panic when read rocksdb status, txh [@lijinglin2019](https://github.com/lijinglin2019).
