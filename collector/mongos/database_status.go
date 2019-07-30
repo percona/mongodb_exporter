@@ -117,7 +117,7 @@ func GetDatabaseStatList(client *mongo.Client) *DatabaseStatList {
 		r := client.Database(db).RunCommand(context.TODO(), bson.D{{"dbStats", 1}, {"scale", 1}})
 		err := r.Decode(&dbStatus)
 		if err != nil {
-			log.Error(err)
+			log.Errorf("Failed to get database status: %s.", err)
 			return nil
 		}
 		dbStatList.Members = append(dbStatList.Members, dbStatus)

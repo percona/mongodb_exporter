@@ -112,7 +112,7 @@ func GetReplSetConf(client *mongo.Client) *ReplSetConf {
 	result := &OuterReplSetConf{}
 	err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"replSetGetConfig", 1}}).Decode(result)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Failed to get replSetGetConfig: %s.", err)
 		return nil
 	}
 	return &result.Config

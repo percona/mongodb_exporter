@@ -81,7 +81,7 @@ func GetConnPoolStats(client *mongo.Client) *ConnPoolStats {
 	result := &ConnPoolStats{}
 	err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"connPoolStats", 1}, {"recordStats", 0}}).Decode(result)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Failed to get connPoolStats: %s.", err)
 		return nil
 	}
 	return result
