@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `mongodb_mongod_replset_member_*`
   - `mongodb_connpoolstats_*`
   - `mongodb_tcmalloc_*`
+- Added application name "mongodb_exporter" to mongo logs, [@nikita-b](https://github.com/nikita-b)
 
 ### Fixed
 - [PMM-4427](https://jira.percona.com/browse/PMM-4427): Panic when read rocksdb status, txh [@lijinglin2019](https://github.com/lijinglin2019).
