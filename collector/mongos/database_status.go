@@ -109,7 +109,7 @@ func GetDatabaseStatList(client *mongo.Client) *DatabaseStatList {
 	dbStatList := &DatabaseStatList{}
 	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Failed to get database names: %s.", err)
 		return nil
 	}
 	for _, db := range dbNames {

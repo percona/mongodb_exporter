@@ -104,7 +104,7 @@ func GetShardingChangelogStatus(client *mongo.Client) *ShardingChangelogStats {
 
 	c, err := coll.Aggregate(context.TODO(), []bson.M{{"$match": match}, {"$group": group}})
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Failed to aggregate sharding changelog events: %s.", err)
 	}
 
 	defer c.Close(context.TODO())
