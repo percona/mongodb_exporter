@@ -17,10 +17,14 @@ package mongod
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/percona/mongodb_exporter/testutils"
 )
 
 func TestParserServerStatus(t *testing.T) {
@@ -88,4 +92,19 @@ func TestParserServerStatus(t *testing.T) {
 	if serverStatus.Metrics.Document == nil {
 		t.Error("Metrics group was not loaded correctly")
 	}
+}
+
+func TestGetServerStatusDecodesFine(t *testing.T) {
+	// setup
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	defaultClient := testutils.MustGetConnectedMongodClient(ctx, t)
+	defer defaultClient.Disconnect(ctx)
+
+	// run
+	statusDefault := GetServerStatus(defaultClient)
+
+	// test
+	assert.NotNil(t, statusDefault)
+	assert.Equal(t, 1.0, statusDefault.Ok)
 }

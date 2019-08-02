@@ -17,10 +17,14 @@ package mongos
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/percona/mongodb_exporter/testutils"
 )
 
 func TestParserServerStatus(t *testing.T) {
@@ -76,4 +80,18 @@ func loadServerStatusFromBson(data []byte, status *ServerStatus) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func TestGetServerStatusDecodesFine(t *testing.T) {
+	// setup
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	defaultClient := testutils.MustGetConnectedReplSetClient(ctx, t)
+	defer defaultClient.Disconnect(ctx)
+
+	// run
+	statusDefault := GetServerStatus(defaultClient)
+
+	// test
+	assert.NotNil(t, statusDefault)
 }

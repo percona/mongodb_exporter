@@ -141,6 +141,8 @@ type ReplSetStatus struct {
 	Term                    *int32    `bson:"term,omitempty"`
 	HeartbeatIntervalMillis *float64  `bson:"heartbeatIntervalMillis,omitempty"`
 	Members                 []Member  `bson:"members"`
+
+	Ok float64 `bson:"ok"`
 }
 
 // Member represents an array element of ReplSetStatus.Members

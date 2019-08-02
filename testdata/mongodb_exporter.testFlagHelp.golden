@@ -23,6 +23,7 @@ Flags:
       --collect.collection       Enable collection of Collection metrics
       --collect.topmetrics       Enable collection of table top metrics
       --collect.indexusage       Enable collection of per index usage stats
+      --collect.connpoolstats    Collect MongoDB connpoolstats
       --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
                                  MongoDB URI, format
       --mongodb.authentification-database=""  
