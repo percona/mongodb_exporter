@@ -81,7 +81,8 @@ func MongoClient(opts *MongoSessionOpts) *mongo.Client {
 		SetSocketTimeout(opts.SocketTimeout).
 		SetConnectTimeout(opts.SyncTimeout).
 		SetMaxPoolSize(uint16(opts.PoolLimit)).
-		SetReadPreference(readpref.Nearest())
+		SetReadPreference(readpref.Nearest()).
+		SetAppName("mongodb_exporter")
 
 	if cOpts.Auth != nil {
 		cOpts.Auth.AuthSource = opts.AuthentificationDB

@@ -9,8 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Added
+- [PMM-4131](https://jira.percona.com/browse/PMM-4131): Added missing features from [dcu/mongodb_exporter](https://github.com/dcu/mongodb_exporter). See list below.
+- New metrics:
+  - `mongodb_mongod_replset_member_*`
+  - `mongodb_connpoolstats_*`
+  - `mongodb_tcmalloc_*`
+- Added application name "mongodb_exporter" to mongo logs, [@nikita-b](https://github.com/nikita-b)
 
 ### Fixed
+- [PMM-4427](https://jira.percona.com/browse/PMM-4427): Panic when read rocksdb status, txh [@lijinglin2019](https://github.com/lijinglin2019).
 
 ## [0.8.0]
 ### Changed

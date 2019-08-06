@@ -22,12 +22,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	collector_common "github.com/percona/mongodb_exporter/collector/common"
+	commoncollector "github.com/percona/mongodb_exporter/collector/common"
 )
 
 // ServerStatus keeps the data returned by the serverStatus() method.
 type ServerStatus struct {
-	collector_common.ServerStatus `bson:",inline"`
+	commoncollector.ServerStatus `bson:",inline"`
 
 	Dur *DurStats `bson:"dur"`
 
@@ -46,6 +46,8 @@ type ServerStatus struct {
 	InMemory      *WiredTigerStats    `bson:"inMemory"`
 	RocksDb       *RocksDbStats       `bson:"rocksdb"`
 	WiredTiger    *WiredTigerStats    `bson:"wiredTiger"`
+
+	Ok float64 `bson:"ok"`
 }
 
 // Export exports the server status to be consumed by prometheus.
