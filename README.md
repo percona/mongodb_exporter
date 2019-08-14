@@ -34,7 +34,7 @@ Metrics `mongodb_mongod_replset_oplog_*` doesn't work in [Master/Slave](https://
 1. Get the code from the Percona repository:
  
     ```bash
-    go get github.com/percona/mongodb_exporter
+    go get -u github.com/percona/mongodb_exporter
     ```
  2. Switch to the buld directory and just run ``make`` to install all needed tools, format code with `go fmt`, build a binary for your OS and run tests.:
  
