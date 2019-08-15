@@ -47,6 +47,9 @@ var (
 	collectTopF                  = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
 	collectIndexUsageF           = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
 	mongodbCollectConnPoolStatsF = kingpin.Flag("collect.connpoolstats", "Collect MongoDB connpoolstats").Bool()
+	collectDatabaseProfilerF     = kingpin.Flag("collect.databaseprofiler", "Enable collection of Database system.profiler metrics").Bool()
+	databaseProfilerLookbackF    = kingpin.Flag("databaseprofiler.lookback", "Size of the system.profile scan window, in seconds").Default("60").Int64()
+	databaseProfilerThresholdF   = kingpin.Flag("databaseprofiler.threshold", "Min query duration, in ms, for slow queries to count").Default("1000").Int64()
 
 	uriF = kingpin.Flag("mongodb.uri", "MongoDB URI, format").
 		PlaceHolder("[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]").
@@ -96,16 +99,19 @@ func main() {
 
 	programCollector := version.NewCollector(program)
 	mongodbCollector := collector.NewMongodbCollector(&collector.MongodbCollectorOpts{
-		URI:                      *uriF,
-		DBPoolLimit:              *maxConnectionsF,
-		CollectDatabaseMetrics:   *collectDatabaseF,
-		CollectCollectionMetrics: *collectCollectionF,
-		CollectTopMetrics:        *collectTopF,
-		CollectIndexUsageStats:   *collectIndexUsageF,
-		CollectConnPoolStats:     *mongodbCollectConnPoolStatsF,
-		SocketTimeout:            *socketTimeoutF,
-		SyncTimeout:              *syncTimeoutF,
-		AuthentificationDB:       *authDB,
+		URI:                       *uriF,
+		DBPoolLimit:               *maxConnectionsF,
+		CollectDatabaseMetrics:    *collectDatabaseF,
+		CollectCollectionMetrics:  *collectCollectionF,
+		CollectTopMetrics:         *collectTopF,
+		CollectIndexUsageStats:    *collectIndexUsageF,
+		CollectConnPoolStats:      *mongodbCollectConnPoolStatsF,
+		CollectDatabaseProfiler:   *collectDatabaseProfilerF,
+		SocketTimeout:             *socketTimeoutF,
+		SyncTimeout:               *syncTimeoutF,
+		AuthentificationDB:        *authDB,
+		DatabaseProfilerLookback:  *databaseProfilerLookbackF,
+		DatabaseProfilerThreshold: *databaseProfilerThresholdF,
 	})
 	prometheus.MustRegister(programCollector, mongodbCollector)
 
