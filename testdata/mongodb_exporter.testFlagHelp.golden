@@ -25,8 +25,9 @@ Flags:
       --collect.indexusage       Enable collection of per index usage stats
       --collect.connpoolstats    Collect MongoDB connpoolstats
       --collect.databaseprofiler  
-                                 Enable collection of Database system.profiler
+                                 Enable collection of database system.profiler
                                  metrics
+      --collect.currentop        Enable collection of $currentOp metrics
       --databaseprofiler.lookback=60  
                                  Size of the system.profile scan window, in
                                  seconds

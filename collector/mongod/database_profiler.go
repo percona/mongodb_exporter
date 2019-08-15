@@ -18,6 +18,12 @@ var (
 		Name:      "slow_query",
 		Help:      "Number of slow queries recoded in the system.profile collection",
 	}, []string{"db", "collection"})
+	slowOps = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "profiler",
+		Name:      "slow_ops",
+		Help:      "Number of slow operations reported by $currentOp",
+	}, []string{"db", "collection"})
 
 	// Track collections for wich slow queries have been seen so they can be re-set to
 	// zero in case no slow queries are detected during metrics refresh.
@@ -25,7 +31,7 @@ var (
 	trackedLabelsSet = make(map[string]map[string]bool)
 )
 
-// DatabaseProfilerRecord represents records returned by the agglomerate query.
+// DatabaseProfilerRecord represents records returned by the aggregate query.
 type DatabaseProfilerRecord struct {
 	Namespace   string `bson:"_id,omitempty"`
 	SlowQueries int    `bson:"count,omitempty"`
@@ -58,6 +64,8 @@ func (dbStatsList *DatabaseProfilerStatsList) Export(ch chan<- prometheus.Metric
 		}
 		trackedLabelsSet[member.Database][member.Collection] = true
 	}
+
+	// Set stale slow queries back to 0
 	for db, colls := range trackedLabelsSet {
 		for coll := range colls {
 			if skipValueReset[db][coll] {
@@ -132,6 +140,107 @@ func GetDatabaseProfilerStats(client *mongo.Client, lookback int64, millis int64
 			log.Errorf("Failed to iterate database profiler stats: %s.", err)
 			return nil
 		}
+	}
+	return dbStatsList
+}
+
+// DatabaseCurrentOpStatsList contains stats from all databases
+type DatabaseCurrentOpStatsList struct {
+	Members []DatabaseProfilerStats
+}
+
+// Describe describes $currentOp stats for prometheus
+func (dbStatsList *DatabaseCurrentOpStatsList) Describe(ch chan<- *prometheus.Desc) {
+	slowOps.Describe(ch)
+}
+
+// Export exports database stats to prometheus
+func (dbStatsList *DatabaseCurrentOpStatsList) Export(ch chan<- prometheus.Metric) {
+	skipValueReset := make(map[string]map[string]bool)
+	for _, member := range dbStatsList.Members {
+		ls := prometheus.Labels{"db": member.Database, "collection": member.Collection}
+		slowOps.With(ls).Set(float64(member.SlowQueries))
+
+		// Book-keeping around seen collections for resetting correctly.
+		if _, ok := skipValueReset[member.Database]; !ok {
+			skipValueReset[member.Database] = make(map[string]bool)
+		}
+		skipValueReset[member.Database][member.Collection] = true
+		if _, ok := trackedLabelsSet[member.Database]; !ok {
+			trackedLabelsSet[member.Database] = make(map[string]bool)
+		}
+		trackedLabelsSet[member.Database][member.Collection] = true
+	}
+
+	// Set stale slow ops back to 0
+	for db, colls := range trackedLabelsSet {
+		for coll := range colls {
+			if skipValueReset[db][coll] {
+				continue
+			}
+			ls := prometheus.Labels{"db": db, "collection": coll}
+			slowOps.With(ls).Set(0.0)
+		}
+	}
+	slowOps.Collect(ch)
+}
+
+// GetDatabaseCurrentOpStats returns $currentOp stats for all databases
+func GetDatabaseCurrentOpStats(client *mongo.Client, millis int64) *DatabaseCurrentOpStatsList {
+	dbStatsList := &DatabaseCurrentOpStatsList{}
+	currentOp := bson.M{"$currentOp": bson.M{
+		"allUsers": true,
+	}}
+	match := bson.M{"$match": bson.M{
+		"microsecs_running": bson.M{"$gte": millis * 1000},
+	}}
+	group := bson.M{"$group": bson.M{
+		"_id":   "$ns",
+		"count": bson.M{"$sum": 1},
+	}}
+	pipeline := []bson.M{currentOp, match, group}
+	// Need the command version of aggregate to use $currentOp.
+	//   https://docs.mongodb.com/manual/reference/command/aggregate/#dbcmd.aggregate
+	aggregate := bson.D{
+		{"aggregate", 1},
+		{"pipeline", pipeline},
+		{"cursor", bson.M{}},
+	}
+	cursor, err := client.Database("admin").RunCommandCursor(context.TODO(), aggregate)
+	if err != nil {
+		log.Errorf("Failed to get $currentOp stats: %v", err)
+		return nil
+	}
+	defer cursor.Close(context.TODO())
+	dbsToSkip := map[string]bool{
+		"admin":  true,
+		"config": true,
+		"local":  true,
+		"test":   true,
+	}
+	for cursor.Next(context.TODO()) {
+		record := DatabaseProfilerRecord{}
+		err := cursor.Decode(&record)
+		if err != nil {
+			log.Errorf("Failed to iterate $currentOp stats: %s.", err)
+			return nil
+		}
+		ns := strings.SplitN(record.Namespace, ".", 2)
+		db := ns[0]
+		if dbsToSkip[db] {
+			continue
+		}
+		coll := ns[1]
+		stats := DatabaseProfilerStats{
+			Database:    db,
+			Collection:  coll,
+			SlowQueries: record.SlowQueries,
+		}
+		dbStatsList.Members = append(dbStatsList.Members, stats)
+	}
+	if err := cursor.Err(); err != nil {
+		log.Errorf("Failed to iterate $currentOp stats: %s.", err)
+		return nil
 	}
 	return dbStatsList
 }

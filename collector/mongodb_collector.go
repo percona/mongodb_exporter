@@ -41,6 +41,7 @@ type MongodbCollectorOpts struct {
 	CollectTopMetrics         bool
 	CollectIndexUsageStats    bool
 	CollectConnPoolStats      bool
+	CollectDatabaseCurrentOps bool
 	CollectDatabaseProfiler   bool
 	SocketTimeout             time.Duration
 	SyncTimeout               time.Duration
@@ -322,6 +323,14 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 		dbProfilerStats := mongod.GetDatabaseProfilerStats(client, lookback, threshold)
 		if dbProfilerStats != nil {
 			dbProfilerStats.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectDatabaseCurrentOps {
+		threshold := exporter.Opts.DatabaseProfilerThreshold
+		dbCurrentOpStats := mongod.GetDatabaseCurrentOpStats(client, threshold)
+		if dbCurrentOpStats != nil {
+			dbCurrentOpStats.Export(ch)
 		}
 	}
 }
