@@ -99,6 +99,7 @@ func GetMongosInfo(client *mongo.Client) *[]MongosInfo {
 	c, err := client.Database("config").Collection("mongos").Find(context.TODO(), bson.M{"ping": bson.M{"$gte": time.Now().Add(-10 * time.Minute)}}, opts)
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.mongos': %s.", err)
+		return nil
 	}
 	defer c.Close(context.TODO())
 
