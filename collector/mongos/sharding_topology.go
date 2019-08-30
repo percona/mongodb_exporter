@@ -96,6 +96,7 @@ func GetShards(client *mongo.Client) *[]ShardingTopoShardInfo {
 	c, err := client.Database("config").Collection("shards").Find(context.TODO(), bson.M{}, opts)
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.shards': %s.", err)
+		return nil
 	}
 	defer c.Close(context.TODO())
 
@@ -130,6 +131,7 @@ func GetTotalChunksByShard(client *mongo.Client) *[]ShardingTopoChunkInfo {
 	c, err := client.Database("config").Collection("chunks").Aggregate(context.TODO(), []bson.M{{"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}})
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.chunks': %s.", err)
+		return nil
 	}
 	defer c.Close(context.TODO())
 
@@ -156,6 +158,7 @@ func GetTotalDatabases(client *mongo.Client) *[]ShardingTopoStatsTotalDatabases 
 	c, err := client.Database("config").Collection("databases").Aggregate(context.TODO(), query)
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.databases': %s.", err)
+		return nil
 	}
 	defer c.Close(context.TODO())
 
