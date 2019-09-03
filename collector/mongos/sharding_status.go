@@ -147,11 +147,10 @@ func IsBalancerEnabled(client *mongo.Client) float64 {
 }
 
 // IsClusterBalanced check is cluster balanced.
-func IsClusterBalanced(client *mongo.Client) float64 {
+func IsClusterBalanced(totalChunkCount float64, shardChunkInfoAll *[]ShardingTopoChunkInfo) float64 {
 	// Different thresholds based on size
 	// http://docs.mongodb.org/manual/core/sharding-internals/#sharding-migration-thresholds
 	var threshold float64 = 8
-	totalChunkCount := GetTotalChunks(client)
 	if totalChunkCount < 20 {
 		threshold = 2
 	} else if totalChunkCount < 80 && totalChunkCount > 21 {
@@ -160,7 +159,6 @@ func IsClusterBalanced(client *mongo.Client) float64 {
 
 	var minChunkCount float64 = -1
 	var maxChunkCount float64 = 0
-	shardChunkInfoAll := GetTotalChunksByShard(client)
 	for _, shard := range *shardChunkInfoAll {
 		if shard.Chunks > maxChunkCount {
 			maxChunkCount = shard.Chunks
@@ -229,12 +227,14 @@ func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
 func GetShardingStatus(client *mongo.Client) *ShardingStats {
 	results := &ShardingStats{}
 
-	results.IsBalanced = IsClusterBalanced(client)
 	results.BalancerEnabled = IsBalancerEnabled(client)
 	results.Changelog = GetShardingChangelogStatus(client)
 	results.Topology = GetShardingTopoStatus(client)
 	results.Mongos = GetMongosInfo(client)
 	results.BalancerLock = GetMongosBalancerLock(client)
+	if results.Topology.ShardChunks != nil {
+		results.IsBalanced = IsClusterBalanced(results.Topology.TotalChunks, results.Topology.ShardChunks)
+	}
 
 	return results
 }
