@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.0]
 ### Changed
 - `go.mongodb.org/mongo-driver` was updated to `v1.1.1`.
-- All `--mongodb.tls*` flags was removed. Use [tls-options](https://docs.mongodb.com/manual/reference/connection-string/#tls-options) instead.
+- All `--mongodb.tls*` flags were removed. Use [tls-options](https://docs.mongodb.com/manual/reference/connection-string/#tls-options) instead.
 
 ### Added
 
