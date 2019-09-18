@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.10.0]
+### Changed
+- `go.mongodb.org/mongo-driver` was updated to `v1.1.1`.
+- All `--mongodb.tls*` flags were removed. Use [tls-options](https://docs.mongodb.com/manual/reference/connection-string/#tls-options) instead.
+
+### Added
+
+### Fixed
+
 ## [0.9.0]
 ### Changed
 
@@ -149,7 +158,8 @@ with source code locations.
 ### Added
 - First tagged version.
 
-[Unreleased]: https://github.com/percona/mongodb_exporter/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/percona/mongodb_exporter/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/percona/mongodb_exporter/compare/v0.10.0...v0.9.0
 [0.9.0]: https://github.com/percona/mongodb_exporter/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/percona/mongodb_exporter/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/percona/mongodb_exporter/compare/v0.7.0...v0.7.1
