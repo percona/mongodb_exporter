@@ -54,18 +54,9 @@ var (
 		Envar("MONGODB_URI").
 		String()
 
-	authDB   = kingpin.Flag("mongodb.authentification-database", "Specifies the database in which the user is created").Default("").String()
-	tlsF     = kingpin.Flag("mongodb.tls", "Enable tls connection with mongo server").Bool()
-	tlsCertF = kingpin.Flag("mongodb.tls-cert", "Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).\n"+
-		"    \tThis should include the whole certificate chain.\n"+
-		"    \tIf provided: The connection will be opened via TLS to the MongoDB server.").Default("").String()
-	tlsPrivateKeyF = kingpin.Flag("mongodb.tls-private-key", "Path to PEM file that contains the decrypted private key (if not contained in mongodb.tls-cert file).").Default("").String()
-	tlsCAF         = kingpin.Flag("mongodb.tls-ca", "Path to PEM file that contains the CAs that are trusted for server connections.\n"+
-		"    \tIf provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.\n"+
-		"    \tIf not provided: System default CAs are used.").Default("").String()
-	tlsDisableHostnameValidationF = kingpin.Flag("mongodb.tls-disable-hostname-validation", "Disable hostname validation for server connection.").Bool()
-	maxConnectionsF               = kingpin.Flag("mongodb.max-connections", "Max number of pooled connections to the database.").Default("1").Int()
-	testF                         = kingpin.Flag("test", "Check MongoDB connection, print buildInfo() information and exit.").Bool()
+	authDB          = kingpin.Flag("mongodb.authentification-database", "Specifies the database in which the user is created").Default("").String()
+	maxConnectionsF = kingpin.Flag("mongodb.max-connections", "Max number of pooled connections to the database.").Default("1").Int()
+	testF           = kingpin.Flag("test", "Check MongoDB connection, print buildInfo() information and exit.").Bool()
 
 	socketTimeoutF = kingpin.Flag("mongodb.socket-timeout", "Amount of time to wait for a non-responding socket to the database before it is forcefully closed.\n"+
 		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.").Default("3s").Duration()
@@ -86,13 +77,8 @@ func main() {
 	if *testF {
 		buildInfo, err := shared.TestConnection(
 			shared.MongoSessionOpts{
-				URI:                   *uriF,
-				TLSConnection:         *tlsF,
-				TLSCertificateFile:    *tlsCertF,
-				TLSPrivateKeyFile:     *tlsPrivateKeyF,
-				TLSCaFile:             *tlsCAF,
-				TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
-				AuthentificationDB:    *authDB,
+				URI:                *uriF,
+				AuthentificationDB: *authDB,
 			},
 		)
 		if err != nil {
@@ -111,11 +97,6 @@ func main() {
 	programCollector := version.NewCollector(program)
 	mongodbCollector := collector.NewMongodbCollector(&collector.MongodbCollectorOpts{
 		URI:                      *uriF,
-		TLSConnection:            *tlsF,
-		TLSCertificateFile:       *tlsCertF,
-		TLSPrivateKeyFile:        *tlsPrivateKeyF,
-		TLSCaFile:                *tlsCAF,
-		TLSHostnameValidation:    !(*tlsDisableHostnameValidationF),
 		DBPoolLimit:              *maxConnectionsF,
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
