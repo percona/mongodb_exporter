@@ -2,6 +2,7 @@ package mongod
 
 import (
 	"context"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -60,7 +61,7 @@ var (
 )
 
 // GetIndexUsageStatList returns stats for a given collection in a database
-func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
+func GetIndexUsageStatList(client *mongo.Client, excludeSystemCollections bool) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	databaseNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
@@ -93,6 +94,10 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 				err := c.Decode(&coll)
 				if err != nil {
 					log.Error(err)
+					continue
+				}
+
+				if excludeSystemCollections && strings.HasPrefix(coll.Name, "system.") {
 					continue
 				}
 

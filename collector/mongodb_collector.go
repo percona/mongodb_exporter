@@ -37,6 +37,7 @@ type MongodbCollectorOpts struct {
 	URI                      string
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
+	ExcludeSystemCollections bool
 	CollectTopMetrics        bool
 	CollectIndexUsageStats   bool
 	CollectConnPoolStats     bool
@@ -242,7 +243,7 @@ func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- 
 
 	if exporter.Opts.CollectCollectionMetrics {
 		log.Debug("Collecting Collection Status From Mongos")
-		collStatList := mongos.GetCollectionStatList(client)
+		collStatList := mongos.GetCollectionStatList(client, exporter.Opts.ExcludeSystemCollections)
 		if collStatList != nil {
 			collStatList.Export(ch)
 		}
@@ -274,7 +275,7 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 
 	if exporter.Opts.CollectCollectionMetrics {
 		log.Debug("Collecting Collection Status From Mongod")
-		collStatList := mongod.GetCollectionStatList(client)
+		collStatList := mongod.GetCollectionStatList(client, exporter.Opts.ExcludeSystemCollections)
 		if collStatList != nil {
 			collStatList.Export(ch)
 		}
@@ -290,7 +291,7 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 
 	if exporter.Opts.CollectIndexUsageStats {
 		log.Debug("Collecting Index Statistics")
-		indexStatList := mongod.GetIndexUsageStatList(client)
+		indexStatList := mongod.GetIndexUsageStatList(client, exporter.Opts.ExcludeSystemCollections)
 		if indexStatList != nil {
 			indexStatList.Export(ch)
 		}

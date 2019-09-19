@@ -2,6 +2,7 @@ package mongos
 
 import (
 	"context"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -103,7 +104,7 @@ var (
 )
 
 // GetCollectionStatList returns stats for a given database
-func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
+func GetCollectionStatList(client *mongo.Client, excludeSystemCollections bool) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
@@ -138,6 +139,11 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 					log.Error(err)
 					continue
 				}
+
+				if excludeSystemCollections && strings.HasPrefix(coll.Name, "system.") {
+					continue
+				}
+
 				collStatus := CollectionStatus{}
 				res := client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", coll.Name}, {"scale", 1}})
 				err = res.Decode(&collStatus)

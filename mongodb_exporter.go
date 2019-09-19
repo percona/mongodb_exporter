@@ -44,6 +44,7 @@ var (
 
 	collectDatabaseF             = kingpin.Flag("collect.database", "Enable collection of Database metrics").Bool()
 	collectCollectionF           = kingpin.Flag("collect.collection", "Enable collection of Collection metrics").Bool()
+	excludeSystemCollectionsF    = kingpin.Flag("collect.exclude-system", "Exclude collection of system.* Collection metrics").Bool()
 	collectTopF                  = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
 	collectIndexUsageF           = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
 	mongodbCollectConnPoolStatsF = kingpin.Flag("collect.connpoolstats", "Collect MongoDB connpoolstats").Bool()
@@ -85,6 +86,7 @@ func main() {
 		URI:                      *uriF,
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
+		ExcludeSystemCollections: *excludeSystemCollectionsF,
 		CollectTopMetrics:        *collectTopF,
 		CollectIndexUsageStats:   *collectIndexUsageF,
 		CollectConnPoolStats:     *mongodbCollectConnPoolStatsF,
