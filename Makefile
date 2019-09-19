@@ -13,7 +13,7 @@
 # limitations under the License.
 
 GO          := go
-GOPATH      := $(shell $(GO) env GOPATH)
+GOPATH      := $(shell $(GO) env GOPATH | cut -d: -f1)
 pkgs		= ./...
 
 PREFIX              ?= $(shell pwd)
