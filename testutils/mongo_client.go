@@ -12,8 +12,8 @@ import (
 // MustGetConnectedReplSetClient return mongo.Client instance connected to server started in replicaSet mode.
 func MustGetConnectedReplSetClient(ctx context.Context, t *testing.T) *mongo.Client {
 	opts := options.Client().
-		ApplyURI("mongodb://127.0.0.1:27019/admin").
-		SetReplicaSet("rs0").
+		ApplyURI("mongodb://127.0.0.1:17003/admin").
+		SetReplicaSet("rs3").
 		SetDirect(true).SetServerSelectionTimeout(time.Second)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
@@ -26,7 +26,7 @@ func MustGetConnectedReplSetClient(ctx context.Context, t *testing.T) *mongo.Cli
 // MustGetConnectedMongodClient return mongo.Client instance connected to server started in single mode.
 func MustGetConnectedMongodClient(ctx context.Context, t *testing.T) *mongo.Client {
 	opts := options.Client().
-		ApplyURI("mongodb://127.0.0.1:27017/admin").
+		ApplyURI("mongodb://127.0.0.1:17001/admin").
 		SetDirect(true).SetServerSelectionTimeout(time.Second)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {

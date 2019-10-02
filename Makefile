@@ -39,17 +39,43 @@ export PMM_RELEASE_TIMESTAMP  = $(shell date '+%s')
 export PMM_RELEASE_FULLCOMMIT = $(APP_REVISION)
 export PMM_RELEASE_BRANCH     = $(TRAVIS_BRANCH)
 
+TEST_PSMDB_VERSION?=3.6
+TEST_MONGODB_FLAVOR?=percona/percona-server-mongodb
+TEST_MONGODB_ADMIN_USERNAME?=admin
+TEST_MONGODB_ADMIN_PASSWORD?=admin123456
+TEST_MONGODB_USERNAME?=test
+TEST_MONGODB_PASSWORD?=123456
+
+TEST_MONGODB_CONFIGSVR_RS?=csReplSet
+TEST_MONGODB_S1_RS?=rs1
+TEST_MONGODB_S2_RS?=rs2
+TEST_MONGODB_S3_RS?=rs3
+
+define TEST_ENV
+	GOCACHE=$(GOCACHE) \
+	TEST_MONGODB_ADMIN_USERNAME=$(TEST_MONGODB_ADMIN_USERNAME) \
+	TEST_MONGODB_ADMIN_PASSWORD=$(TEST_MONGODB_ADMIN_PASSWORD) \
+	TEST_MONGODB_USERNAME=$(TEST_MONGODB_USERNAME) \
+	TEST_MONGODB_PASSWORD=$(TEST_MONGODB_PASSWORD) \
+	TEST_MONGODB_S1_RS=$(TEST_MONGODB_S1_RS) \
+	TEST_MONGODB_S2_RS=$(TEST_MONGODB_S2_RS) \
+	TEST_MONGODB_S3_RS=$(TEST_MONGODB_S3_RS) \
+	TEST_MONGODB_CONFIGSVR_RS=$(TEST_MONGODB_CONFIGSVR_RS) \
+	TEST_PSMDB_VERSION=$(TEST_PSMDB_VERSION) \
+	TEST_MONGODB_FLAVOR=$(TEST_MONGODB_FLAVOR)
+endef
+
 all: init clean format style build test-all
 
 style:
 	@echo ">> checking code style"
 	@! gofmt -s -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
-test: mongo-db-in-docker
+test:
 	@echo ">> running tests"
 	go test -coverprofile=coverage.txt -short -v $(RACE) $(pkgs)
 
-test-all: mongo-db-in-docker
+test-all:
 	@echo ">> running all tests"
 	go test -coverprofile=coverage.txt -v $(RACE) $(pkgs)
 
@@ -61,14 +87,10 @@ vet:
 	@echo ">> vetting code"
 	@$(GO) vet $(pkgs)
 
-# It's just alias to build binary
+# We use this target name to build binary across all PMM components
 build: release
 
-snapshot: $(GOPATH)/bin/goreleaser
-	@echo ">> building snapshot"
-	goreleaser --snapshot --skip-sign --skip-validate --skip-publish --rm-dist
-
-# We use this target name to build binary across all PMM components
+# It's just alias to build binary across all PMM components
 release:
 	@echo ">> building binary"
 	@CGO_ENABLED=0 $(GO) build -v \
@@ -87,17 +109,13 @@ community-release: $(GOPATH)/bin/goreleaser
 	@echo ">> building release"
 	goreleaser release --rm-dist --skip-validate
 
+snapshot: $(GOPATH)/bin/goreleaser
+	@echo ">> building snapshot"
+	goreleaser --snapshot --skip-sign --skip-validate --skip-publish --rm-dist
+
 docker:
 	@echo ">> building docker image"
 	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
-
-$(GOPATH)/bin/dep:
-	curl -s https://raw.githubusercontent.com/golang/dep/v0.5.0/install.sh | sh
-
-$(GOPATH)/bin/goreleaser:
-	curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | BINDIR=$(GOPATH)/bin sh
-
-init: $(GOPATH)/bin/dep $(GOPATH)/bin/goreleaser
 
 # Ensure that vendor/ is in sync with code and Gopkg.*
 check-vendor-synced: init
@@ -107,26 +125,34 @@ check-vendor-synced: init
 
 clean:
 	@echo ">> removing build artifacts"
+	$(MAKE) test-cluster-clean
+	@rm -f $(PREFIX)/.env
 	@rm -f $(PREFIX)/coverage.txt
 	@rm -Rf $(PREFIX)/bin
-	docker-compose down
+	@rm -Rf $(PREFIX)/dist
 
-mongo-db-in-docker:
-	# Start docker containers.
-	docker-compose up -d
-	# Wait for MongoDB to become available.
-	./scripts/wait-for-mongo.sh
-	# Display logs for debug purposes.
-	docker-compose logs
-	# Display versions.
-	docker --version
-	docker-compose --version
-	docker-compose exec mongo mongo --version
-	docker-compose exec mongo-replset mongo --version
-	# Initialize replSet
-	docker-compose exec mongo-replset mongo --eval "rs.initiate()"
+test-cluster: env
+	TEST_PSMDB_VERSION=$(TEST_PSMDB_VERSION) \
+	docker-compose up \
+	--detach \
+	--force-recreate \
+	--always-recreate-deps \
+	--renew-anon-volumes \
+	init
+	docker/test/init-cluster-wait.sh
 
-gen-ssl-certs:
-	./scripts/ssl.sh
+test-cluster-clean: env
+	docker-compose down -v
 
-.PHONY: init all style format build release test vet release docker clean check-vendor-synced mongo-db-in-docker gen-ssl-certs
+env:
+	@echo $(TEST_ENV) | tr ' ' '\n' >.env
+
+init: $(GOPATH)/bin/dep $(GOPATH)/bin/goreleaser
+
+$(GOPATH)/bin/dep:
+	curl -s https://raw.githubusercontent.com/golang/dep/v0.5.0/install.sh | sh
+
+$(GOPATH)/bin/goreleaser:
+	curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | BINDIR=$(GOPATH)/bin sh
+
+.PHONY: init env test-cluster-clean test-cluster clean check-vendor-synced docker snapshot community-release release build vet format test-all test style all

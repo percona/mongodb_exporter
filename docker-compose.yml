@@ -1,41 +1,267 @@
-# see CONTRIBUTING.md
 ---
 version: '3'
 services:
-  mongo:
-    image: ${MONGODB_IMAGE:-mongo:3.6}
+  standalone:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --port=27017
+    expose:
+      - 27017
     ports:
-      - 127.0.0.1:27017:27017
-    # Given a signed SSL certificate located at /etc/ssl/server.pem
-    # and the certificate authority file at /etc/ssl/ca.crt,
-    # you can configure mongod for SSL encryption as follows:
-    # ```
-    # mongod \
-    #   --sslMode requireSSL \
-    #   --sslPEMKeyFile /etc/ssl/server.pem \
-    #   --sslCAFile /etc/ssl/ca.crt
-    # ```
-    # https://docs.mongodb.com/manual/tutorial/configure-ssl/#set-up-mongod-and-mongos-with-certificate-validation
-    command:
-      - --sslMode=preferSSL
-      - --sslPEMKeyFile=/etc/ssl/server.pem
-      - --sslCAFile=/etc/ssl/ca.crt
-      - --bind_ip=0.0.0.0
+      - 17001:27017
+    env_file:
+      - .env
     volumes:
-      - ./testdata/ca.crt:/etc/ssl/ca.crt
-      - ./testdata/server.pem:/etc/ssl/server.pem
-      - ./testdata/client.pem:/etc/ssl/client.pem
-  mongo-replset:
-    image: ${MONGODB_IMAGE:-mongo:3.6}
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s1-mongo1:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S1_RS} --shardsvr
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s1-mongo2:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S1_RS} --shardsvr
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s1-mongo3:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S1_RS} --shardsvr
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s2-mongo1:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S2_RS} --shardsvr
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s2-mongo2:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S2_RS} --shardsvr
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s2-mongo3:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S2_RS} --shardsvr
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s3-mongo1:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S3_RS}
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
     ports:
-      - 127.0.0.1:27019:27017
-    command:
-      - --bind_ip=0.0.0.0
-      - --replSet=rs0
-      - --sslMode=preferSSL
-      - --sslPEMKeyFile=/etc/ssl/server.pem
-      - --sslCAFile=/etc/ssl/ca.crt
+      - 17003:27017
+    env_file:
+      - .env
     volumes:
-      - ./testdata/ca.crt:/etc/ssl/ca.crt
-      - ./testdata/server.pem:/etc/ssl/server.pem
-      - ./testdata/client.pem:/etc/ssl/client.pem
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s3-mongo2:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S3_RS}
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s3-mongo3:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S3_RS}
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  configsvr1:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --configsvr
+    env_file:
+      - .env
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    volumes:
+      - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  #  configsvr2:
+  #    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+  #    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --port=${TEST_MONGODB_CONFIGSVR2_PORT} --configsvr
+  #    volumes:
+  #    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+  #    - ./docker/test/mongod.key:/mongod.key:ro
+  #    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+  #    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  #  configsvr3:
+  #    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+  #    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --port=${TEST_MONGODB_CONFIGSVR3_PORT} --configsvr
+  #    volumes:
+  #    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+  #    - ./docker/test/mongod.key:/mongod.key:ro
+  #    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+  #    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  mongos:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --configdb=${TEST_MONGODB_CONFIGSVR_RS}/configsvr1:27019
+    expose:
+      - "27017"
+      - "27018"
+      - "27019"
+    ports:
+      - 17002:27017
+    env_file:
+      - .env
+    volumes:
+      - ./docker/test/entrypoint-mongos.sh:/entrypoint.sh:ro
+      - ./docker/test/entrypoint-mongos.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongos.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/mongodb.pem:/mongos.pem:ro
+    depends_on:
+      - configsvr1
+  #   - configsvr2
+  #   - configsvr3
+  init:
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    volumes:
+      - ./docker/test/init-cluster.sh:/entrypoint.sh:ro
+      - ./docker/test/init-cluster.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/test/mongod.key:/mongod.key:ro
+      - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+      - ./docker/test/ssl/client.pem:/client.pem:ro
+    env_file:
+      - .env
+    depends_on:
+      - mongos
+      - s1-mongo1
+      - s1-mongo2
+      - s1-mongo3
+      - s2-mongo1
+      - s2-mongo2
+      - s2-mongo3
+      - s3-mongo1
+      - s3-mongo2
+      - s3-mongo3
+      - standalone
+  # ----------------------------------------------------------------------------
+#  mongo:
+#    image: ${MONGODB_IMAGE:-mongo:3.6}
+#    ports:
+#      - 127.0.0.1:27017:27017
+#    # Given a signed SSL certificate located at /etc/ssl/server.pem
+#    # and the certificate authority file at /etc/ssl/ca.crt,
+#    # you can configure mongod for SSL encryption as follows:
+#    # ```
+#    # mongod \
+#    #   --sslMode requireSSL \
+#    #   --sslPEMKeyFile /etc/ssl/server.pem \
+#    #   --sslCAFile /etc/ssl/ca.crt
+#    # ```
+#    # https://docs.mongodb.com/manual/tutorial/configure-ssl/#set-up-mongod-and-mongos-with-certificate-validation
+#    command:
+#      - --sslMode=preferSSL
+#      - --sslPEMKeyFile=/etc/ssl/server.pem
+#      - --sslCAFile=/etc/ssl/ca.crt
+#      - --bind_ip=0.0.0.0
+#    volumes:
+#      - ./testdata/ca.crt:/etc/ssl/ca.crt
+#      - ./testdata/server.pem:/etc/ssl/server.pem
+#      - ./testdata/client.pem:/etc/ssl/client.pem
+#  mongo-replset:
+#    image: ${MONGODB_IMAGE:-mongo:3.6}
+#    ports:
+#      - 127.0.0.1:27019:27017
+#    command:
+#      - --bind_ip=0.0.0.0
+#      - --replSet=rs0
+#      - --sslMode=preferSSL
+#      - --sslPEMKeyFile=/etc/ssl/server.pem
+#      - --sslCAFile=/etc/ssl/ca.crt
+#    volumes:
+#      - ./testdata/ca.crt:/etc/ssl/ca.crt
+#      - ./testdata/server.pem:/etc/ssl/server.pem
+#      - ./testdata/client.pem:/etc/ssl/client.pem
