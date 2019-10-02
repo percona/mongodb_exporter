@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+- [PMM-2717](https://jira.percona.com/browse/PMM-2717): Failed to execute find query on 'config.locks': not found. source="sharding_status.go:106". 
+All `mongodb_mongos_sharding_balancer_lock_*` metrics won't be exposed for `MongoDB 3.6+`. See: https://docs.mongodb.com/v3.6/reference/config-database/#config.locks.
 
 ## [0.10.0]
 ### Changed
@@ -159,7 +161,7 @@ with source code locations.
 - First tagged version.
 
 [Unreleased]: https://github.com/percona/mongodb_exporter/compare/v0.10.0...HEAD
-[0.10.0]: https://github.com/percona/mongodb_exporter/compare/v0.10.0...v0.9.0
+[0.10.0]: https://github.com/percona/mongodb_exporter/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/percona/mongodb_exporter/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/percona/mongodb_exporter/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/percona/mongodb_exporter/compare/v0.7.0...v0.7.1

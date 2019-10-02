@@ -90,6 +90,8 @@ type ShardingStats struct {
 	Topology        *ShardingTopoStats
 	BalancerLock    *MongosBalancerLock
 	Mongos          *[]MongosInfo
+
+	Client *mongo.Client
 }
 
 // GetMongosInfo gets mongos info.
@@ -206,8 +208,11 @@ func (status *ShardingStats) Export(ch chan<- prometheus.Metric) {
 	balancerChunksBalanced.Collect(ch)
 	mongosUpSecs.Collect(ch)
 	mongosPing.Collect(ch)
-	mongosBalancerLockState.Collect(ch)
-	mongosBalancerLockTimestamp.Collect(ch)
+
+	if shared.MongoServerVersionLessThan("3.6", status.Client) {
+		mongosBalancerLockState.Collect(ch)
+		mongosBalancerLockTimestamp.Collect(ch)
+	}
 }
 
 func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
@@ -221,20 +226,28 @@ func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
 	balancerChunksBalanced.Describe(ch)
 	mongosUpSecs.Describe(ch)
 	mongosPing.Describe(ch)
-	mongosBalancerLockState.Describe(ch)
-	mongosBalancerLockTimestamp.Describe(ch)
+
+	if shared.MongoServerVersionLessThan("3.6", status.Client) {
+		mongosBalancerLockState.Describe(ch)
+		mongosBalancerLockTimestamp.Describe(ch)
+	}
 }
 
 // GetShardingStatus gets sharding status.
 func GetShardingStatus(client *mongo.Client) *ShardingStats {
-	results := &ShardingStats{}
+	results := &ShardingStats{
+		Client: client,
+	}
 
 	results.IsBalanced = IsClusterBalanced(client)
 	results.BalancerEnabled = IsBalancerEnabled(client)
 	results.Changelog = GetShardingChangelogStatus(client)
 	results.Topology = GetShardingTopoStatus(client)
 	results.Mongos = GetMongosInfo(client)
-	results.BalancerLock = GetMongosBalancerLock(client)
+
+	if shared.MongoServerVersionLessThan("3.6", client) {
+		results.BalancerLock = GetMongosBalancerLock(client)
+	}
 
 	return results
 }
