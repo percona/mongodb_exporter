@@ -21,8 +21,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/testutils"
 )
@@ -31,13 +29,10 @@ func TestParserServerStatus(t *testing.T) {
 
 	serverStatus := &ServerStatus{}
 
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost:27017"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Disconnect(context.TODO())
+	client := testutils.MustGetConnectedMongodClient(context.Background(), t)
+	defer client.Disconnect(context.Background())
 
-	err = client.Database("admin").RunCommand(context.TODO(), bson.D{
+	err := client.Database("admin").RunCommand(context.TODO(), bson.D{
 		{Key: "serverStatus", Value: 1},
 		{Key: "recordStats", Value: 0},
 		{Key: "opLatencies", Value: bson.M{"histograms": true}},

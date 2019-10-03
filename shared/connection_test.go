@@ -19,6 +19,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/percona/mongodb_exporter/testutils"
 )
 
 func TestRedactMongoUri(t *testing.T) {
@@ -32,7 +34,7 @@ func TestRedactMongoUri(t *testing.T) {
 
 func TestMongoSession(t *testing.T) {
 	mso := &MongoSessionOpts{
-		URI: "mongodb://localhost:27017",
+		URI: testutils.DefaultStandaloneMongoDBServerURL,
 	}
 	session := MongoClient(mso)
 	require.NotNil(t, session)
@@ -50,18 +52,18 @@ func TestMongoSession(t *testing.T) {
 
 func TestTestConnection(t *testing.T) {
 	mso := MongoSessionOpts{
-		URI: "mongodb://localhost:27017",
+		URI: testutils.DefaultStandaloneMongoDBServerURL,
 	}
 	_, err := TestConnection(mso)
 	require.NoError(t, err)
 }
 
 func TestTestSSLConnection(t *testing.T) {
-	tlsCertificateKeyFile := "../testdata/client.pem"
-	tlsCAFile := "../testdata/ca.crt"
+	tlsCertificateKeyFile := "../docker/test/ssl/client.pem"
+	tlsCAFile := "../docker/test/ssl/rootCA.crt"
 
 	mso := MongoSessionOpts{
-		URI: "mongodb://127.0.0.1:27017/admin/?ssl=true&tlsCertificateKeyFile=" + tlsCertificateKeyFile + "&tlsCAFile=" + tlsCAFile + "&tlsInsecure=true&serverSelectionTimeoutMS=2000",
+		URI: testutils.DefaultStandaloneMongoDBServerURL + "/admin/?ssl=true&tlsCertificateKeyFile=" + tlsCertificateKeyFile + "&tlsCAFile=" + tlsCAFile + "&tlsInsecure=true&serverSelectionTimeoutMS=2000",
 	}
 	_, err := TestConnection(mso)
 	require.NoError(t, err)

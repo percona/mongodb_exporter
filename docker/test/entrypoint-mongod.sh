@@ -11,13 +11,12 @@ chmod 400 /tmp/mongod.key /tmp/mongod.pem /tmp/mongod-rootCA.pem
 	--oplogSize=50 \
 	--profile=2 \
 	--wiredTigerCacheSizeGB=0.1 \
+  --sslMode=preferSSL \
+  --sslCAFile=/tmp/mongod-rootCA.crt \
+  --sslPEMKeyFile=/tmp/mongod.pem \
+  --sslAllowInvalidHostnames \
+  --sslAllowInvalidCertificates \
 	$*
-#	--keyFile=/tmp/mongod.key \
-#	--sslMode=preferSSL \
-#	--sslCAFile=/tmp/mongod-rootCA.crt \
-#	--sslPEMKeyFile=/tmp/mongod.pem \
-#	--sslAllowInvalidHostnames \
-#	--sslAllowInvalidCertificates \
 
 
 

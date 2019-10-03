@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/shared"
+	"github.com/percona/mongodb_exporter/testutils"
 )
 
 var Update = flag.Bool("update", false, "update .golden files")
@@ -123,7 +124,7 @@ func testFlagHelp(t *testing.T, data bin) {
 	output = regexp.MustCompile(regexp.QuoteMeta(data.path)).ReplaceAll(output, []byte("mongodb_exporter"))
 	actual := string(output)
 
-	filename := path.Join("testdata", path.Base(t.Name())+".golden")
+	filename := path.Join("testutils", "data", path.Base(t.Name())+".golden")
 	if *Update {
 		err := ioutil.WriteFile(filename, output, 0600)
 		assert.NoError(t, err)
@@ -139,7 +140,7 @@ func testFlagHelp(t *testing.T, data bin) {
 
 func testFlagVersion(t *testing.T, data bin) {
 	// TODO: Doesn't work with go 1.13+. Should be refactored.
-	t.Skip()
+	t.Skip("Doesn't work with go 1.13+. Should be refactored.")
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
@@ -147,6 +148,7 @@ func testFlagVersion(t *testing.T, data bin) {
 		ctx,
 		data.path,
 		"--version",
+		"--mongodb.uri", testutils.DefaultStandaloneMongoDBServerURL,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
 	)
 
@@ -204,6 +206,7 @@ func testLandingPage(t *testing.T, data bin) {
 	cmd := exec.CommandContext(
 		ctx,
 		data.path,
+		"--mongodb.uri", testutils.DefaultStandaloneMongoDBServerURL,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
 	)
 	if err := cmd.Start(); err != nil {
@@ -240,6 +243,7 @@ func testDefaultGatherer(t *testing.T, data bin) {
 	cmd := exec.CommandContext(
 		ctx,
 		data.path,
+		"--mongodb.uri", testutils.DefaultStandaloneMongoDBServerURL,
 		"--web.telemetry-path", metricPath,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
 	)
@@ -277,6 +281,7 @@ func testBuildVersionGatherer(t *testing.T, data bin) {
 	cmd := exec.CommandContext(
 		ctx,
 		data.path,
+		"--mongodb.uri", testutils.DefaultStandaloneMongoDBServerURL,
 		"--web.telemetry-path", metricPath,
 		"--web.listen-address", fmt.Sprintf(":%d", data.port),
 	)
@@ -311,6 +316,7 @@ func testFlagTest(t *testing.T, data bin) {
 	cmd := exec.CommandContext(
 		ctx,
 		data.path,
+		"--mongodb.uri", testutils.DefaultStandaloneMongoDBServerURL,
 		"--test",
 	)
 
@@ -334,13 +340,13 @@ func testFlagTestWithTLS(t *testing.T, data bin) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	tlsCertificateKeyFile := "testdata/client.pem"
-	tlsCAFile := "testdata/ca.crt"
+	tlsCertificateKeyFile := "docker/test/ssl/client.pem"
+	tlsCAFile := "docker/test/ssl/rootCA.crt"
 
 	cmd := exec.CommandContext(
 		ctx,
 		data.path,
-		"--mongodb.uri=mongodb://127.0.0.1:27017/admin/?ssl=true&tlsCertificateKeyFile="+tlsCertificateKeyFile+"&tlsCAFile="+tlsCAFile+"&tlsInsecure=true&serverSelectionTimeoutMS=2000",
+		"--mongodb.uri="+testutils.DefaultStandaloneMongoDBServerURL+"/admin/?ssl=true&tlsCertificateKeyFile="+tlsCertificateKeyFile+"&tlsCAFile="+tlsCAFile+"&tlsInsecure=true&serverSelectionTimeoutMS=2000",
 		"--test",
 	)
 

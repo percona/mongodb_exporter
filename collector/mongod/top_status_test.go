@@ -6,18 +6,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/percona/mongodb_exporter/testutils"
 )
 
 func Test_ParserTopStatus(t *testing.T) {
 	raw := &TopStatusRaw{}
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost:27017"))
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	client := testutils.MustGetConnectedMongodClient(context.Background(), t)
 	defer client.Disconnect(context.TODO())
-	err = client.Database("admin").RunCommand(context.TODO(), bson.D{{"top", 1}}).Decode(&raw)
+	err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"top", 1}}).Decode(&raw)
 	if err != nil {
 		t.Fatal(err)
 	}

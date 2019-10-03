@@ -39,8 +39,7 @@ export PMM_RELEASE_TIMESTAMP  = $(shell date '+%s')
 export PMM_RELEASE_FULLCOMMIT = $(APP_REVISION)
 export PMM_RELEASE_BRANCH     = $(TRAVIS_BRANCH)
 
-TEST_PSMDB_VERSION?=3.6
-TEST_MONGODB_FLAVOR?=percona/percona-server-mongodb
+MONGODB_IMAGE?=percona/percona-server-mongodb:3.6
 TEST_MONGODB_ADMIN_USERNAME?=admin
 TEST_MONGODB_ADMIN_PASSWORD?=admin123456
 TEST_MONGODB_USERNAME?=test
@@ -61,8 +60,7 @@ define TEST_ENV
 	TEST_MONGODB_S2_RS=$(TEST_MONGODB_S2_RS) \
 	TEST_MONGODB_S3_RS=$(TEST_MONGODB_S3_RS) \
 	TEST_MONGODB_CONFIGSVR_RS=$(TEST_MONGODB_CONFIGSVR_RS) \
-	TEST_PSMDB_VERSION=$(TEST_PSMDB_VERSION) \
-	TEST_MONGODB_FLAVOR=$(TEST_MONGODB_FLAVOR)
+	MONGODB_IMAGE=$(MONGODB_IMAGE)
 endef
 
 all: init clean format style build test-all
@@ -132,7 +130,7 @@ clean:
 	@rm -Rf $(PREFIX)/dist
 
 test-cluster: env
-	TEST_PSMDB_VERSION=$(TEST_PSMDB_VERSION) \
+	MONGODB_IMAGE=$(MONGODB_IMAGE) \
 	docker-compose up \
 	--detach \
 	--force-recreate \

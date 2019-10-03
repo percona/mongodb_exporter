@@ -9,10 +9,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	DefaultStandaloneMongoDBServerURL = "mongodb://localhost:27027"
+	DefaultShardedMongoDBServerURL    = "mongodb://localhost:27037"
+	DefaultReplSetMongoDBServerURL    = "mongodb://localhost:27047"
+)
+
 // MustGetConnectedReplSetClient return mongo.Client instance connected to server started in replicaSet mode.
 func MustGetConnectedReplSetClient(ctx context.Context, t *testing.T) *mongo.Client {
 	opts := options.Client().
-		ApplyURI("mongodb://127.0.0.1:17003/admin").
+		ApplyURI(DefaultReplSetMongoDBServerURL + "/admin").
 		SetReplicaSet("rs3").
 		SetDirect(true).SetServerSelectionTimeout(time.Second)
 	client, err := mongo.Connect(ctx, opts)
@@ -26,7 +32,7 @@ func MustGetConnectedReplSetClient(ctx context.Context, t *testing.T) *mongo.Cli
 // MustGetConnectedMongodClient return mongo.Client instance connected to server started in single mode.
 func MustGetConnectedMongodClient(ctx context.Context, t *testing.T) *mongo.Client {
 	opts := options.Client().
-		ApplyURI("mongodb://127.0.0.1:17001/admin").
+		ApplyURI(DefaultStandaloneMongoDBServerURL + "/admin").
 		SetDirect(true).SetServerSelectionTimeout(time.Second)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {

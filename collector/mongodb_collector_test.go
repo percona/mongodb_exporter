@@ -23,13 +23,15 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/percona/mongodb_exporter/testutils"
 )
 
 func testMongoDBURL() string {
 	if u := os.Getenv("TEST_MONGODB_URI"); u != "" {
 		return u
 	}
-	return "mongodb://localhost:27017"
+	return testutils.DefaultStandaloneMongoDBServerURL
 }
 
 func TestCollector(t *testing.T) {
