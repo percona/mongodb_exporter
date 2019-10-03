@@ -60,20 +60,17 @@ func MongoServerVersionLessThan(version string, client *mongo.Client) bool {
 		return false
 	}
 
-	v, err := semver.NewVersion(serverVersion)
+	srvVersion, err := semver.NewVersion(serverVersion)
 	if err != nil {
 		log.Errorf("couldn't parse mongo server version '%s', reason: %v", serverVersion, err)
 		return false
 	}
 
-	v3dot6, err := semver.NewVersion(version)
+	v, err := semver.NewVersion(version)
 	if err != nil {
 		log.Errorf("couldn't parse version '%s', reason: %v", version, err)
 		return false
 	}
 
-	if v.LessThan(v3dot6) {
-		return true
-	}
-	return false
+	return srvVersion.LessThan(v)
 }
