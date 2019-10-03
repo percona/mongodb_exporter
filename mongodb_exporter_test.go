@@ -63,9 +63,12 @@ func TestBin(t *testing.T) {
 	importpath := "github.com/percona/mongodb_exporter/vendor/github.com/percona/pmm"
 	path := binDir + "/" + binName
 	xVariables := map[string]string{
-		importpath + "/version.Version":    "gotest-version",
-		importpath + "/version.Branch":     "gotest-branch",
-		importpath + "/version.FullCommit": "gotest-revision",
+		importpath + "/version.Version":             "gotest-version",
+		importpath + "/version.Branch":              "gotest-branch",
+		importpath + "/version.FullCommit":          "gotest-revision",
+		"github.com/percona/pmm/version.Version":    "gotest-version",
+		"github.com/percona/pmm/version.Branch":     "gotest-branch",
+		"github.com/percona/pmm/version.FullCommit": "gotest-revision",
 	}
 	var ldflags []string
 	for x, value := range xVariables {
@@ -139,8 +142,6 @@ func testFlagHelp(t *testing.T, data bin) {
 }
 
 func testFlagVersion(t *testing.T, data bin) {
-	// TODO: Doesn't work with go 1.13+. Should be refactored.
-	t.Skip("Doesn't work with go 1.13+. Should be refactored.")
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 

@@ -16,6 +16,7 @@ builds:
       - -v
     # We don't use internal `GoReleaser` variables because of consistency with `Makefile` and
     # because we can't change it behaviour.
+    # Note: We duplicate "-X" linker parameters for backward compatibility with go1.12
     ldflags: |
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.ProjectName={{.Env.BIN_NAME}}
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.Version={{.Env.APP_VERSION}}
@@ -24,6 +25,13 @@ builds:
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.FullCommit={{.Env.PMM_RELEASE_FULLCOMMIT}}
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.Branch={{.Env.PMM_RELEASE_BRANCH}}
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/prometheus/common/version.BuildUser={{.Env.USER}}@{{.Env.TRAVIS_APP_HOST}}
+        -X github.com/percona/pmm/version.ProjectName={{.Env.BIN_NAME}}
+        -X github.com/percona/pmm/version.Version={{.Env.APP_VERSION}}
+        -X github.com/percona/pmm/version.PMMVersion={{.Env.PMM_RELEASE_VERSION}}
+        -X github.com/percona/pmm/version.Timestamp={{.Env.PMM_RELEASE_TIMESTAMP}}
+        -X github.com/percona/pmm/version.FullCommit={{.Env.PMM_RELEASE_FULLCOMMIT}}
+        -X github.com/percona/pmm/version.Branch={{.Env.PMM_RELEASE_BRANCH}}
+        -X github.com/prometheus/common/version.BuildUser={{.Env.USER}}@{{.Env.TRAVIS_APP_HOST}}
 archive:
   name_template: "{{ .ProjectName }}-{{ .Env.APP_VERSION }}.{{ .Os }}-{{ .Arch }}"
 checksum:
