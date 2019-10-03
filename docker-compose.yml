@@ -4,14 +4,8 @@ services:
   standalone:
     image: ${MONGODB_IMAGE}
     command: --port=27017
-    expose:
-      - 27017
-      - 27018
-      - 27019
     ports:
       - 27027:27017
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -21,12 +15,6 @@ services:
   s1-mongo1:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S1_RS} --shardsvr
-    expose:
-      - 27017
-      - 27018
-      - 27019
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -36,12 +24,6 @@ services:
   s1-mongo2:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S1_RS} --shardsvr
-    expose:
-      - 27017
-      - 27018
-      - 27019
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -51,12 +33,6 @@ services:
   s1-mongo3:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S1_RS} --shardsvr
-    expose:
-      - 27017
-      - 27018
-      - 27019
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -66,12 +42,6 @@ services:
   s2-mongo1:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S2_RS} --shardsvr
-    expose:
-      - 27017
-      - 27018
-      - 27019
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -81,12 +51,6 @@ services:
   s2-mongo2:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S2_RS} --shardsvr
-    expose:
-      - 27017
-      - 27018
-      - 27019
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -96,12 +60,6 @@ services:
   s2-mongo3:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S2_RS} --shardsvr
-    expose:
-      - 27017
-      - 27018
-      - 27019
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -111,14 +69,8 @@ services:
   s3-mongo1:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S3_RS}
-    expose:
-      - 27017
-      - 27018
-      - 27019
     ports:
       - 27047:27017
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -128,12 +80,6 @@ services:
   s3-mongo2:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S3_RS}
-    expose:
-      - 27017
-      - 27018
-      - 27019
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -143,12 +89,6 @@ services:
   s3-mongo3:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_S3_RS}
-    expose:
-      - 27017
-      - 27018
-      - 27019
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -158,12 +98,6 @@ services:
   configsvr1:
     image: ${MONGODB_IMAGE}
     command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --configsvr
-    env_file:
-      - .env
-    expose:
-      - 27017
-      - 27018
-      - 27019
     volumes:
       - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
@@ -173,12 +107,6 @@ services:
   #  configsvr2:
   #    image: ${MONGODB_IMAGE}
   #    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --configsvr
-  #    env_file:
-  #      - .env
-  #    expose:
-  #      - 27017
-  #      - 27018
-  #      - 27019
   #    volumes:
   #    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
   #    - ./docker/test/mongod.key:/mongod.key:ro
@@ -187,12 +115,6 @@ services:
   #  configsvr3:
   #    image: ${MONGODB_IMAGE}
   #    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --configsvr
-  #    env_file:
-  #      - .env
-  #    expose:
-  #      - 27017
-  #      - 27018
-  #      - 27019
   #    volumes:
   #    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
   #    - ./docker/test/mongod.key:/mongod.key:ro
@@ -201,14 +123,8 @@ services:
   mongos:
     image: ${MONGODB_IMAGE}
     command: --configdb=${TEST_MONGODB_CONFIGSVR_RS}/configsvr1:27019
-    expose:
-      - 27017
-      - 27018
-      - 27019
     ports:
       - 27037:27017
-    env_file:
-      - .env
     volumes:
       - ./docker/test/entrypoint-mongos.sh:/entrypoint.sh:ro
       - ./docker/test/entrypoint-mongos.sh:/usr/local/bin/docker-entrypoint.sh:ro

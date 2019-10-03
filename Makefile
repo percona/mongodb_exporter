@@ -63,19 +63,7 @@ define TEST_ENV
 	MONGODB_IMAGE=$(MONGODB_IMAGE)
 endef
 
-all: init clean format style build test-all
-
-style:
-	@echo ">> checking code style"
-	@! gofmt -s -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
-
-test:
-	@echo ">> running tests"
-	go test -coverprofile=coverage.txt -short -v $(RACE) $(pkgs)
-
-test-all:
-	@echo ">> running all tests"
-	go test -coverprofile=coverage.txt -v $(RACE) $(pkgs)
+all: init format style build test-cluster-up test-all docker-image snapshot
 
 format:
 	@echo ">> formatting code"
@@ -85,11 +73,26 @@ vet:
 	@echo ">> vetting code"
 	@$(GO) vet $(pkgs)
 
-# We use this target name to build binary across all PMM components
-build: release
+style:
+	@echo ">> checking code style"
+	@! gofmt -s -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
 
-# It's just alias to build binary across all PMM components
-release:
+# Ensure that vendor/ is in sync with code and Gopkg.*
+check-vendor-synced: init
+	rm -fr vendor/
+	dep ensure -v
+	git diff --exit-code
+
+test:
+	@echo ">> running tests"
+	go test -coverprofile=coverage.txt -short -v $(RACE) $(pkgs)
+
+test-all:
+	@echo ">> running all tests"
+	go test -coverprofile=coverage.txt -v $(RACE) $(pkgs)
+
+# We use this target name to build binary across all PMM components
+build:
 	@echo ">> building binary"
 	@CGO_ENABLED=0 $(GO) build -v \
 		-ldflags '\
@@ -103,6 +106,13 @@ release:
 		'\
 		-o $(BIN_DIR)/$(BIN_NAME) .
 
+docker-image:
+	@echo ">> building docker image"
+	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
+
+# It's just alias to build binary across all PMM components
+release: build
+
 community-release: $(GOPATH)/bin/goreleaser
 	@echo ">> building release"
 	goreleaser release --rm-dist --skip-validate
@@ -111,25 +121,15 @@ snapshot: $(GOPATH)/bin/goreleaser
 	@echo ">> building snapshot"
 	goreleaser --snapshot --skip-sign --skip-validate --skip-publish --rm-dist
 
-docker:
-	@echo ">> building docker image"
-	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
-
-# Ensure that vendor/ is in sync with code and Gopkg.*
-check-vendor-synced: init
-	rm -fr vendor/
-	dep ensure -v
-	git diff --exit-code
-
 clean:
 	@echo ">> removing build artifacts"
-	$(MAKE) test-cluster-clean
+	$(MAKE) test-cluster-down
 	@rm -f $(PREFIX)/.env
 	@rm -f $(PREFIX)/coverage.txt
 	@rm -Rf $(PREFIX)/bin
 	@rm -Rf $(PREFIX)/dist
 
-test-cluster: env
+test-cluster-up: env
 	MONGODB_IMAGE=$(MONGODB_IMAGE) \
 	docker-compose up \
 	--detach \
@@ -139,7 +139,7 @@ test-cluster: env
 	init
 	docker/test/init-cluster-wait.sh
 
-test-cluster-clean: env
+test-cluster-down: env
 	docker-compose down -v
 
 env:
@@ -153,4 +153,4 @@ $(GOPATH)/bin/dep:
 $(GOPATH)/bin/goreleaser:
 	curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | BINDIR=$(GOPATH)/bin sh
 
-.PHONY: init env test-cluster-clean test-cluster clean check-vendor-synced docker snapshot community-release release build vet format test-all test style all
+.PHONY: init env test-cluster-down test-cluster-up clean check-vendor-synced docker-image snapshot community-release release build vet format test-all test style all

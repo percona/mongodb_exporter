@@ -26,6 +26,11 @@ func MustGetConnectedReplSetClient(ctx context.Context, t *testing.T) *mongo.Cli
 		t.Fatalf("Couldn't connect to MongoDB instance, reason: %v", err)
 	}
 
+	err = client.Ping(context.Background(), nil)
+	if err != nil {
+		t.Skipf("Test has been skipped, reason: %v", err)
+	}
+
 	return client
 }
 
@@ -37,6 +42,11 @@ func MustGetConnectedMongodClient(ctx context.Context, t *testing.T) *mongo.Clie
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		t.Fatalf("Couldn't connect to MongoDB instance, reason: %v", err)
+	}
+
+	err = client.Ping(context.Background(), nil)
+	if err != nil {
+		t.Skipf("Test has been skipped, reason: %v", err)
 	}
 
 	return client
