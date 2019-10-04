@@ -16,7 +16,7 @@ builds:
       - -v
     # We don't use internal `GoReleaser` variables because of consistency with `Makefile` and
     # because we can't change it behaviour.
-    # Note: We duplicate "-X" linker parameters for backward compatibility with go1.12
+    # Note: We duplicate "-X" linker parameters to make "-ldflags" work in all types of environments (go1.12, go1.13+ with GO111MODULE=off/on/auto).
     ldflags: |
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.ProjectName={{.Env.BIN_NAME}}
         -X {{.Env.GO_PACKAGE}}/vendor/github.com/percona/pmm/version.Version={{.Env.APP_VERSION}}

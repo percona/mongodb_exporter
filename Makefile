@@ -92,7 +92,7 @@ test-all:
 	go test -coverprofile=coverage.txt -v $(RACE) $(pkgs)
 
 # We use this target name to build binary across all PMM components
-# Note: We duplicate "-X" linker parameters for backward compatibility with go1.12
+# Note: We duplicate "-X" linker parameters to make "-ldflags" work in all types of environments (go1.12, go1.13+ with GO111MODULE=off/on/auto).
 build:
 	@echo ">> building binary"
 	CGO_ENABLED=0 $(GO) build -v \

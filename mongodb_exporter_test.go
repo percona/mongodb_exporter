@@ -60,6 +60,7 @@ func TestBin(t *testing.T) {
 		}
 	}()
 
+	// Note: We duplicate "-X" linker parameters to make "-ldflags" work in all types of environments (go1.12, go1.13+ with GO111MODULE=off/on/auto).
 	importpath := "github.com/percona/mongodb_exporter/vendor/github.com/percona/pmm"
 	path := binDir + "/" + binName
 	xVariables := map[string]string{
