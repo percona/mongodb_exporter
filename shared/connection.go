@@ -16,11 +16,8 @@ package shared
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -30,7 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"go.mongodb.org/mongo-driver/x/network/connstring"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
 // RedactMongoUri removes login and password from mongoUri.
@@ -56,42 +53,26 @@ func RedactMongoUri(uri string) string {
 }
 
 type MongoSessionOpts struct {
-	URI                   string
-	TLSConnection         bool
-	TLSCertificateFile    string
-	TLSPrivateKeyFile     string
-	TLSCaFile             string
-	TLSHostnameValidation bool
-	PoolLimit             int
-	SocketTimeout         time.Duration
-	SyncTimeout           time.Duration
-	AuthentificationDB    string
+	URI                string
+	PoolLimit          int
+	SocketTimeout      time.Duration
+	SyncTimeout        time.Duration
+	AuthentificationDB string
 }
 
 // MongoClient connects to MongoDB and returns ready to use MongoDB client.
 func MongoClient(opts *MongoSessionOpts) *mongo.Client {
-	if strings.Contains(opts.URI, "ssl=true") {
-		opts.URI = strings.Replace(opts.URI, "ssl=true", "", 1)
-		opts.TLSConnection = true
-	}
-
 	cOpts := options.Client().
 		ApplyURI(opts.URI).
 		SetDirect(true).
 		SetSocketTimeout(opts.SocketTimeout).
 		SetConnectTimeout(opts.SyncTimeout).
-		SetMaxPoolSize(uint16(opts.PoolLimit)).
+		SetMaxPoolSize(uint64(opts.PoolLimit)).
 		SetReadPreference(readpref.Nearest()).
 		SetAppName("mongodb_exporter")
 
 	if cOpts.Auth != nil {
 		cOpts.Auth.AuthSource = opts.AuthentificationDB
-	}
-
-	err := opts.configureDialInfoIfRequired(cOpts)
-	if err != nil {
-		log.Errorf("%s", err)
-		return nil
 	}
 
 	client, err := mongo.NewClient(cOpts)
@@ -108,81 +89,6 @@ func MongoClient(opts *MongoSessionOpts) *mongo.Client {
 	}
 
 	return client
-}
-
-func (opts *MongoSessionOpts) configureDialInfoIfRequired(cOpts *options.ClientOptions) error {
-	if opts.TLSConnection {
-		config := &tls.Config{
-			InsecureSkipVerify: !opts.TLSHostnameValidation,
-		}
-		if len(opts.TLSCertificateFile) > 0 {
-			certificates, err := LoadKeyPairFrom(opts.TLSCertificateFile, opts.TLSPrivateKeyFile)
-			if err != nil {
-				return fmt.Errorf("Cannot load key pair from '%s' and '%s' to connect to server '%s'. Got: %v", opts.TLSCertificateFile, opts.TLSPrivateKeyFile, opts.URI, err)
-			}
-			config.Certificates = []tls.Certificate{certificates}
-		}
-		if len(opts.TLSCaFile) > 0 {
-			ca, err := LoadCaFrom(opts.TLSCaFile)
-			if err != nil {
-				return fmt.Errorf("Couldn't load client CAs from %s. Got: %s", opts.TLSCaFile, err)
-			}
-			config.RootCAs = ca
-		}
-		cOpts.SetDialer(&tlsDialer{config: config})
-	}
-	return nil
-}
-
-type tlsDialer struct {
-	config *tls.Config
-}
-
-// DialContext custom dialer with ability to skip hostname validation.
-func (d *tlsDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	conn, err := tls.Dial(network, address, d.config)
-	if err != nil {
-		log.Errorf("Could not connect to %v. Got: %v", address, err)
-		return nil, err
-	}
-	if d.config.InsecureSkipVerify {
-		err = enrichWithOwnChecks(conn, d.config)
-		if err != nil {
-			log.Errorf("Could not disable hostname validation. Got: %v", err)
-		}
-	}
-	return conn, err
-}
-
-func enrichWithOwnChecks(conn *tls.Conn, tlsConfig *tls.Config) error {
-	var err error
-	if err = conn.Handshake(); err != nil {
-		conn.Close()
-		return err
-	}
-
-	opts := x509.VerifyOptions{
-		Roots:         tlsConfig.RootCAs,
-		CurrentTime:   time.Now(),
-		DNSName:       "",
-		Intermediates: x509.NewCertPool(),
-	}
-
-	certs := conn.ConnectionState().PeerCertificates
-	for i, cert := range certs {
-		if i == 0 {
-			continue
-		}
-		opts.Intermediates.AddCert(cert)
-	}
-
-	_, err = certs[0].Verify(opts)
-	if err != nil {
-		conn.Close()
-		return err
-	}
-
-	return nil
 }
 
 // MongoSessionServerVersion returns mongo server version.

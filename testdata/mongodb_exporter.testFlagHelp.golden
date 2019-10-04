@@ -23,39 +23,12 @@ Flags:
       --collect.collection       Enable collection of Collection metrics
       --collect.topmetrics       Enable collection of table top metrics
       --collect.indexusage       Enable collection of per index usage stats
-      --latency.histogram-min=65536  
-                                 Minimum value (in microseconds) for latency
-                                 histogram
-      --latency.histogram-step=262144  
-                                 Step size between bins (in microseconds) for
-                                 latency histogram
-      --latency.histogram-count=10  
-                                 Number of bins (Prometheus recommends keeping
-                                 number of bins reasonably small)
+      --collect.connpoolstats    Collect MongoDB connpoolstats
       --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
                                  MongoDB URI, format
       --mongodb.authentification-database=""  
                                  Specifies the database in which the user is
                                  created
-      --mongodb.tls              Enable tls connection with mongo server
-      --mongodb.tls-cert=""      Path to PEM file that contains the certificate
-                                 (and optionally also the decrypted private key
-                                 in PEM format).
-                                 
-                                   This should include the whole certificate chain.
-                                   If provided: The connection will be opened via TLS to the MongoDB server.
-      --mongodb.tls-private-key=""  
-                                 Path to PEM file that contains the decrypted
-                                 private key (if not contained in
-                                 mongodb.tls-cert file).
-      --mongodb.tls-ca=""        Path to PEM file that contains the CAs that are
-                                 trusted for server connections.
-                                 
-                                   If provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.
-                                   If not provided: System default CAs are used.
-      --mongodb.tls-disable-hostname-validation  
-                                 Disable hostname validation for server
-                                 connection.
       --mongodb.max-connections=1  
                                  Max number of pooled connections to the
                                  database.

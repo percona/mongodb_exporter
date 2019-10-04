@@ -12,10 +12,32 @@ This change removes metrics: op_latencies_ops_total, op_latencies_histogram and 
 This change replaces above with prometheus histogram metric op_latency_microseconds_* where * is either bucket, count, sum.
 
 ### Added
-- Added application name "mongo_exporter" to mongo logs, [@nikita-b](https://github.com/nikita-b)
+
+### Fixed
+
+## [0.10.0]
+### Changed
+- `go.mongodb.org/mongo-driver` was updated to `v1.1.1`.
+- All `--mongodb.tls*` flags were removed. Use [tls-options](https://docs.mongodb.com/manual/reference/connection-string/#tls-options) instead.
+
+### Added
+
+### Fixed
+
+## [0.9.0]
+### Changed
+
+### Added
+- [PMM-4131](https://jira.percona.com/browse/PMM-4131): Added missing features from [dcu/mongodb_exporter](https://github.com/dcu/mongodb_exporter). See list below.
+- New metrics:
+  - `mongodb_mongod_replset_member_*`
+  - `mongodb_connpoolstats_*`
+  - `mongodb_tcmalloc_*`
+- Added application name "mongodb_exporter" to mongo logs, [@nikita-b](https://github.com/nikita-b)
 
 ### Fixed
 - [PMM-4427](https://jira.percona.com/browse/PMM-4427): Panic when read rocksdb status, txh [@lijinglin2019](https://github.com/lijinglin2019).
+- [PMM-4583](https://jira.percona.com/browse/PMM-4583): Fix panic when GetTotalChunksByShard (#158), txh [@lijinglin2019](https://github.com/lijinglin2019).
 
 ## [0.8.0]
 ### Changed
@@ -139,7 +161,9 @@ with source code locations.
 ### Added
 - First tagged version.
 
-[Unreleased]: https://github.com/percona/mongodb_exporter/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/percona/mongodb_exporter/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/percona/mongodb_exporter/compare/v0.10.0...v0.9.0
+[0.9.0]: https://github.com/percona/mongodb_exporter/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/percona/mongodb_exporter/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/percona/mongodb_exporter/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/percona/mongodb_exporter/compare/v0.6.3...v0.7.0

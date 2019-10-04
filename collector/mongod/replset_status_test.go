@@ -20,23 +20,21 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/percona/mongodb_exporter/testutils"
 )
 
 func TestGetReplSetStatusDecodesFine(t *testing.T) {
+	// setup
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	opts := options.Client().
-		ApplyURI("mongodb://127.0.0.1:27019/admin").
-		SetReplicaSet("rs0").
-		SetDirect(true).SetServerSelectionTimeout(time.Second)
-	client, err := mongo.Connect(ctx, opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Disconnect(context.Background())
+	client := testutils.MustGetConnectedReplSetClient(ctx, t)
+	defer client.Disconnect(ctx)
 
+	// run
 	status := GetReplSetStatus(client)
+
+	// test
 	assert.NotNil(t, status)
+	assert.Equal(t, 1.0, status.Ok)
 }

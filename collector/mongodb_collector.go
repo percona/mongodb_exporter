@@ -24,6 +24,7 @@ import (
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/mongo"
 
+	commoncollector "github.com/percona/mongodb_exporter/collector/common"
 	"github.com/percona/mongodb_exporter/collector/mongod"
 	"github.com/percona/mongodb_exporter/collector/mongos"
 	"github.com/percona/mongodb_exporter/shared"
@@ -34,16 +35,12 @@ const namespace = "mongodb"
 // MongodbCollectorOpts is the options of the mongodb collector.
 type MongodbCollectorOpts struct {
 	URI                      string
-	TLSConnection            bool
-	TLSCertificateFile       string
-	TLSPrivateKeyFile        string
-	TLSCaFile                string
-	TLSHostnameValidation    bool
 	DBPoolLimit              int
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
 	CollectTopMetrics        bool
 	CollectIndexUsageStats   bool
+	CollectConnPoolStats     bool
 	SocketTimeout            time.Duration
 	SyncTimeout              time.Duration
 	AuthentificationDB       string
@@ -54,16 +51,11 @@ type MongodbCollectorOpts struct {
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
 	return &shared.MongoSessionOpts{
-		URI:                   in.URI,
-		TLSConnection:         in.TLSConnection,
-		TLSCertificateFile:    in.TLSCertificateFile,
-		TLSPrivateKeyFile:     in.TLSPrivateKeyFile,
-		TLSCaFile:             in.TLSCaFile,
-		TLSHostnameValidation: in.TLSHostnameValidation,
-		PoolLimit:             in.DBPoolLimit,
-		SocketTimeout:         in.SocketTimeout,
-		SyncTimeout:           in.SyncTimeout,
-		AuthentificationDB:    in.AuthentificationDB,
+		URI:                in.URI,
+		PoolLimit:          in.DBPoolLimit,
+		SocketTimeout:      in.SocketTimeout,
+		SyncTimeout:        in.SyncTimeout,
+		AuthentificationDB: in.AuthentificationDB,
 	}
 }
 
@@ -242,7 +234,6 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 
 func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- prometheus.Metric) {
 	log.Debug("Collecting Server Status")
-
 	serverStatus := mongos.GetServerStatus(client)
 	if serverStatus != nil {
 		serverStatus.Export(ch)
@@ -267,6 +258,14 @@ func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- 
 		collStatList := mongos.GetCollectionStatList(client)
 		if collStatList != nil {
 			collStatList.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectConnPoolStats {
+		log.Debug("Collecting ConnPoolStats Metrics")
+		connPoolStats := commoncollector.GetConnPoolStats(client)
+		if connPoolStats != nil {
+			connPoolStats.Export(ch)
 		}
 	}
 }
@@ -309,10 +308,24 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 			indexStatList.Export(ch)
 		}
 	}
+
+	if exporter.Opts.CollectConnPoolStats {
+		log.Debug("Collecting ConnPoolStats Metrics")
+		connPoolStats := commoncollector.GetConnPoolStats(client)
+		if connPoolStats != nil {
+			connPoolStats.Export(ch)
+		}
+	}
 }
 
 func (exporter *MongodbCollector) collectMongodReplSet(client *mongo.Client, ch chan<- prometheus.Metric) {
 	exporter.collectMongod(client, ch)
+
+	log.Debug("Collecting ReplSetConf Metrics")
+	replSetConf := mongod.GetReplSetConf(client)
+	if replSetConf != nil {
+		replSetConf.Export(ch)
+	}
 
 	log.Debug("Collecting Replset Status")
 	replSetStatus := mongod.GetReplSetStatus(client)

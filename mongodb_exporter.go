@@ -42,10 +42,11 @@ var (
 	listenAddressF = kingpin.Flag("web.listen-address", "Address to listen on for web interface and telemetry.").Default(":9216").String()
 	metricsPathF   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
-	collectDatabaseF   = kingpin.Flag("collect.database", "Enable collection of Database metrics").Bool()
-	collectCollectionF = kingpin.Flag("collect.collection", "Enable collection of Collection metrics").Bool()
-	collectTopF        = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
-	collectIndexUsageF = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
+	collectDatabaseF             = kingpin.Flag("collect.database", "Enable collection of Database metrics").Bool()
+	collectCollectionF           = kingpin.Flag("collect.collection", "Enable collection of Collection metrics").Bool()
+	collectTopF                  = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
+	collectIndexUsageF           = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
+	mongodbCollectConnPoolStatsF = kingpin.Flag("collect.connpoolstats", "Collect MongoDB connpoolstats").Bool()
 
 	latencyHistogramMinF   = kingpin.Flag("latency.histogram-min", "Minimum value (in microseconds) for latency histogram").Default("65536").Float64()
 	latencyHistogramStepF  = kingpin.Flag("latency.histogram-step", "Step size between bins (in microseconds) for latency histogram").Default("262144").Float64()
@@ -57,18 +58,9 @@ var (
 		Envar("MONGODB_URI").
 		String()
 
-	authDB   = kingpin.Flag("mongodb.authentification-database", "Specifies the database in which the user is created").Default("").String()
-	tlsF     = kingpin.Flag("mongodb.tls", "Enable tls connection with mongo server").Bool()
-	tlsCertF = kingpin.Flag("mongodb.tls-cert", "Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).\n"+
-		"    \tThis should include the whole certificate chain.\n"+
-		"    \tIf provided: The connection will be opened via TLS to the MongoDB server.").Default("").String()
-	tlsPrivateKeyF = kingpin.Flag("mongodb.tls-private-key", "Path to PEM file that contains the decrypted private key (if not contained in mongodb.tls-cert file).").Default("").String()
-	tlsCAF         = kingpin.Flag("mongodb.tls-ca", "Path to PEM file that contains the CAs that are trusted for server connections.\n"+
-		"    \tIf provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.\n"+
-		"    \tIf not provided: System default CAs are used.").Default("").String()
-	tlsDisableHostnameValidationF = kingpin.Flag("mongodb.tls-disable-hostname-validation", "Disable hostname validation for server connection.").Bool()
-	maxConnectionsF               = kingpin.Flag("mongodb.max-connections", "Max number of pooled connections to the database.").Default("1").Int()
-	testF                         = kingpin.Flag("test", "Check MongoDB connection, print buildInfo() information and exit.").Bool()
+	authDB          = kingpin.Flag("mongodb.authentification-database", "Specifies the database in which the user is created").Default("").String()
+	maxConnectionsF = kingpin.Flag("mongodb.max-connections", "Max number of pooled connections to the database.").Default("1").Int()
+	testF           = kingpin.Flag("test", "Check MongoDB connection, print buildInfo() information and exit.").Bool()
 
 	socketTimeoutF = kingpin.Flag("mongodb.socket-timeout", "Amount of time to wait for a non-responding socket to the database before it is forcefully closed.\n"+
 		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.").Default("3s").Duration()
@@ -89,13 +81,8 @@ func main() {
 	if *testF {
 		buildInfo, err := shared.TestConnection(
 			shared.MongoSessionOpts{
-				URI:                   *uriF,
-				TLSConnection:         *tlsF,
-				TLSCertificateFile:    *tlsCertF,
-				TLSPrivateKeyFile:     *tlsPrivateKeyF,
-				TLSCaFile:             *tlsCAF,
-				TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
-				AuthentificationDB:    *authDB,
+				URI:                *uriF,
+				AuthentificationDB: *authDB,
 			},
 		)
 		if err != nil {
@@ -114,16 +101,12 @@ func main() {
 	programCollector := version.NewCollector(program)
 	mongodbCollector := collector.NewMongodbCollector(&collector.MongodbCollectorOpts{
 		URI:                      *uriF,
-		TLSConnection:            *tlsF,
-		TLSCertificateFile:       *tlsCertF,
-		TLSPrivateKeyFile:        *tlsPrivateKeyF,
-		TLSCaFile:                *tlsCAF,
-		TLSHostnameValidation:    !(*tlsDisableHostnameValidationF),
 		DBPoolLimit:              *maxConnectionsF,
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
 		CollectTopMetrics:        *collectTopF,
 		CollectIndexUsageStats:   *collectIndexUsageF,
+		CollectConnPoolStats:     *mongodbCollectConnPoolStatsF,
 		SocketTimeout:            *socketTimeoutF,
 		SyncTimeout:              *syncTimeoutF,
 		AuthentificationDB:       *authDB,
