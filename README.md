@@ -24,27 +24,37 @@ Metrics `mongodb_mongod_replset_oplog_*` doesn't work in [Master/Slave](https://
 
 ## Building and running
 
+### Prerequisites:
+
+* [Go compiler](https://golang.org/dl/)
+* Docker and [Docker Compose](https://docs.docker.com/compose/)
+
 ### Building
 
-Just run `make`. It will install all needed tools, format code with `go fmt`, build a binary for your OS inside `./dist` directory and runs tests.
+1. Get the code from the Percona repository:
+ 
+    ```bash
+    go get -u github.com/percona/mongodb_exporter
+    ```
+ 2. Switch to the buld directory and just run ``make`` to install all needed tools, format code with `go fmt`, build a binary for your OS and run tests.:
+ 
+    ```bash
+    cd ${GOPATH-$HOME/go}/src/github.com/percona/mongodb_exporter
+    make
+    ```
+    *Note: Running tests requires ``docker`` (as it uses MongoDB) and ``docker-compose``, and you will also need free ``27017`` port, as ``docker-compose`` maps this port into your host OS while testing.*
 
-*Note: You need to have `docker` installed to run tests as it uses mongodb. Also port `27017` must been freed as `docker-compos` maps this port into your host OS while testing.*
+    1. If you want just build a binary for your OS without codestyle checks and tests you can run command below:
 
-```bash
-make
-```
+       ```bash
+          make build
+       ```
 
-If you want just build a binary for your OS without codestyle checks and tests you can run command below:
+    2. If you don't have or don't want to install the whole GO stuff, use this docker build that creates a container with a freshly built `mongodb_exporter` binary:
 
-```bash
-make build
-```
-
-If you don't have or don't want to install the whole GO stuff, use this docker build that creates a container with a freshly built `mongodb_exporter` binary:
-
-```bash
-make docker
-```
+       ```bash
+          make docker
+       ```
 
 ### Running
 
