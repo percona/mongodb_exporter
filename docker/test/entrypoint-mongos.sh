@@ -13,6 +13,3 @@ chmod 400 /tmp/mongos.key /tmp/mongos.pem /tmp/mongod-rootCA.crt
   --sslAllowInvalidHostnames \
   --sslAllowInvalidCertificates \
   $*
-
-
-

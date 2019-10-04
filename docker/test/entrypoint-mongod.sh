@@ -17,6 +17,3 @@ chmod 400 /tmp/mongod.key /tmp/mongod.pem /tmp/mongod-rootCA.crt
   --sslAllowInvalidHostnames \
   --sslAllowInvalidCertificates \
 	$*
-
-
-

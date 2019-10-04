@@ -160,5 +160,3 @@ $(GOPATH)/bin/dep:
 
 $(GOPATH)/bin/goreleaser:
 	curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | BINDIR=$(GOPATH)/bin sh
-
-.PHONY: init env test-cluster-down test-cluster-up clean check-vendor-synced docker-image snapshot community-release release build vet format test-all test style all
