@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/bson"
@@ -53,11 +52,7 @@ func RedactMongoUri(uri string) string {
 }
 
 type MongoSessionOpts struct {
-	URI                string
-	PoolLimit          int
-	SocketTimeout      time.Duration
-	SyncTimeout        time.Duration
-	AuthentificationDB string
+	URI string
 }
 
 // MongoClient connects to MongoDB and returns ready to use MongoDB client.
@@ -65,24 +60,15 @@ func MongoClient(opts *MongoSessionOpts) *mongo.Client {
 	cOpts := options.Client().
 		ApplyURI(opts.URI).
 		SetDirect(true).
-		SetSocketTimeout(opts.SocketTimeout).
-		SetConnectTimeout(opts.SyncTimeout).
-		SetMaxPoolSize(uint64(opts.PoolLimit)).
 		SetReadPreference(readpref.Nearest()).
 		SetAppName("mongodb_exporter")
-
-	if cOpts.Auth != nil {
-		cOpts.Auth.AuthSource = opts.AuthentificationDB
-	}
 
 	client, err := mongo.NewClient(cOpts)
 	if err != nil {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), opts.SyncTimeout)
-	defer cancel()
-	err = client.Connect(ctx)
+	err = client.Connect(context.Background())
 	if err != nil {
 		log.Errorf("Cannot connect to server using url %s: %s", RedactMongoUri(opts.URI), err)
 		return nil
