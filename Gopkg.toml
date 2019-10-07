@@ -9,4 +9,4 @@
 
 [[constraint]]
   name = "github.com/Masterminds/semver"
-  version = "3.0.1"
+  version = "1.5.0"
