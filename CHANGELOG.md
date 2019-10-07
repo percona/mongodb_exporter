@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- [PMM-4719](https://jira.percona.com/browse/PMM-4719): Remove redundant flags from "mongodb_exporter" if possible. 
+Those flags have been removed: `--mongodb.authentification-database, --mongodb.max-connections, --mongodb.socket-timeout, --mongodb.sync-timeout`. You can use [connection-string-options](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-options) instead.
 - [PMM-3535](https://jira.percona.com/browse/PMM-3535): convert mongodb_mongod_op_latencies_histogram from gauge to histogram
 This change removes metrics: op_latencies_ops_total, op_latencies_histogram and op_latencies_latency_total
 This change replaces above with prometheus histogram metric op_latency_microseconds_* where * is either bucket, count, sum.

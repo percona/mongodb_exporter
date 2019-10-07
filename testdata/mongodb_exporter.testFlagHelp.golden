@@ -3,64 +3,37 @@ usage: mongodb_exporter [<flags>]
 exports various MongoDB metrics in Prometheus format.
 
 Flags:
-  -h, --help                     Show context-sensitive help (also try
-                                 --help-long and --help-man).
+  -h, --help                   Show context-sensitive help (also try --help-long
+                               and --help-man).
       --web.auth-file=WEB.AUTH-FILE  
-                                 Path to YAML file with server_user,
-                                 server_password keys for HTTP Basic
-                                 authentication (overrides HTTP_AUTH environment
-                                 variable).
+                               Path to YAML file with server_user,
+                               server_password keys for HTTP Basic
+                               authentication (overrides HTTP_AUTH environment
+                               variable).
       --web.ssl-cert-file=WEB.SSL-CERT-FILE  
-                                 Path to SSL certificate file.
+                               Path to SSL certificate file.
       --web.ssl-key-file=WEB.SSL-KEY-FILE  
-                                 Path to SSL key file.
+                               Path to SSL key file.
       --web.listen-address=":9216"  
-                                 Address to listen on for web interface and
-                                 telemetry.
+                               Address to listen on for web interface and
+                               telemetry.
       --web.telemetry-path="/metrics"  
-                                 Path under which to expose metrics.
-      --collect.database         Enable collection of Database metrics
-      --collect.collection       Enable collection of Collection metrics
-      --collect.topmetrics       Enable collection of table top metrics
-      --collect.indexusage       Enable collection of per index usage stats
-      --collect.connpoolstats    Collect MongoDB connpoolstats
-      --latency.histogram-min=65536  
-                                 Minimum value (in microseconds) for latency
-                                 histogram
-      --latency.histogram-step=262144  
-                                 Step size between bins (in microseconds) for
-                                 latency histogram
-      --latency.histogram-count=10  
-                                 Number of bins (Prometheus recommends keeping
-                                 number of bins reasonably small)
+                               Path under which to expose metrics.
+      --collect.database       Enable collection of Database metrics
+      --collect.collection     Enable collection of Collection metrics
+      --collect.topmetrics     Enable collection of table top metrics
+      --collect.indexusage     Enable collection of per index usage stats
+      --collect.connpoolstats  Collect MongoDB connpoolstats
       --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
-                                 MongoDB URI, format
-      --mongodb.authentification-database=""  
-                                 Specifies the database in which the user is
-                                 created
-      --mongodb.max-connections=1  
-                                 Max number of pooled connections to the
-                                 database.
-      --test                     Check MongoDB connection, print buildInfo()
-                                 information and exit.
-      --mongodb.socket-timeout=3s  
-                                 Amount of time to wait for a non-responding
-                                 socket to the database before it is forcefully
-                                 closed.
-                                 
-                                   Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.
-      --mongodb.sync-timeout=1m  Amount of time an operation with this session
-                                 will wait before returning an error in case
-                                 
-                                   a connection to a usable server can't be established.
-                                   Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.
-      --groups.enabled=""        Currently ignored
-      --version                  Show application version.
-      --log.level="info"         Only log messages with the given severity or
-                                 above. Valid levels: [debug, info, warn, error,
-                                 fatal]
+                               MongoDB URI, format
+      --test                   Check MongoDB connection, print buildInfo()
+                               information and exit.
+      --version                Show application version.
+      --log.level="info"       Only log messages with the given severity or
+                               above. Valid levels: [debug, info, warn, error,
+                               fatal]
       --log.format="logger:stderr"  
-                                 Set the log target and format. Example:
-                                 "logger:syslog?appname=bob&local=7" or
-                                 "logger:stdout?json=true"
+                               Set the log target and format. Example:
+                               "logger:syslog?appname=bob&local=7" or
+                               "logger:stdout?json=true"
 

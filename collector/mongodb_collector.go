@@ -35,15 +35,11 @@ const namespace = "mongodb"
 // MongodbCollectorOpts is the options of the mongodb collector.
 type MongodbCollectorOpts struct {
 	URI                      string
-	DBPoolLimit              int
 	CollectDatabaseMetrics   bool
 	CollectCollectionMetrics bool
 	CollectTopMetrics        bool
 	CollectIndexUsageStats   bool
 	CollectConnPoolStats     bool
-	SocketTimeout            time.Duration
-	SyncTimeout              time.Duration
-	AuthentificationDB       string
 	LatencyHistogramMin      float64
 	LatencyHistogramStep     float64
 	LatencyHistogramCount    int
@@ -51,11 +47,7 @@ type MongodbCollectorOpts struct {
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
 	return &shared.MongoSessionOpts{
-		URI:                in.URI,
-		PoolLimit:          in.DBPoolLimit,
-		SocketTimeout:      in.SocketTimeout,
-		SyncTimeout:        in.SyncTimeout,
-		AuthentificationDB: in.AuthentificationDB,
+		URI: in.URI,
 	}
 }
 

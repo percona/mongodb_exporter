@@ -57,20 +57,7 @@ var (
 		Default("mongodb://localhost:27017").
 		Envar("MONGODB_URI").
 		String()
-
-	authDB          = kingpin.Flag("mongodb.authentification-database", "Specifies the database in which the user is created").Default("").String()
-	maxConnectionsF = kingpin.Flag("mongodb.max-connections", "Max number of pooled connections to the database.").Default("1").Int()
-	testF           = kingpin.Flag("test", "Check MongoDB connection, print buildInfo() information and exit.").Bool()
-
-	socketTimeoutF = kingpin.Flag("mongodb.socket-timeout", "Amount of time to wait for a non-responding socket to the database before it is forcefully closed.\n"+
-		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.").Default("3s").Duration()
-	syncTimeoutF = kingpin.Flag("mongodb.sync-timeout", "Amount of time an operation with this session will wait before returning an error in case\n"+
-		"    \ta connection to a usable server can't be established.\n"+
-		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.").Default("1m").Duration()
-
-	// FIXME currently ignored
-	// enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
-	enabledGroupsFlag = kingpin.Flag("groups.enabled", "Currently ignored").Default("").String()
+	testF = kingpin.Flag("test", "Check MongoDB connection, print buildInfo() information and exit.").Bool()
 )
 
 func main() {
@@ -81,8 +68,7 @@ func main() {
 	if *testF {
 		buildInfo, err := shared.TestConnection(
 			shared.MongoSessionOpts{
-				URI:                *uriF,
-				AuthentificationDB: *authDB,
+				URI: *uriF,
 			},
 		)
 		if err != nil {
@@ -101,15 +87,11 @@ func main() {
 	programCollector := version.NewCollector(program)
 	mongodbCollector := collector.NewMongodbCollector(&collector.MongodbCollectorOpts{
 		URI:                      *uriF,
-		DBPoolLimit:              *maxConnectionsF,
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
 		CollectTopMetrics:        *collectTopF,
 		CollectIndexUsageStats:   *collectIndexUsageF,
 		CollectConnPoolStats:     *mongodbCollectConnPoolStatsF,
-		SocketTimeout:            *socketTimeoutF,
-		SyncTimeout:              *syncTimeoutF,
-		AuthentificationDB:       *authDB,
 		LatencyHistogramMin:      *latencyHistogramMinF,
 		LatencyHistogramStep:     *latencyHistogramStepF,
 		LatencyHistogramCount:    *latencyHistogramCountF,
