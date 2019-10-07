@@ -24,6 +24,16 @@ Flags:
       --collect.topmetrics     Enable collection of table top metrics
       --collect.indexusage     Enable collection of per index usage stats
       --collect.connpoolstats  Collect MongoDB connpoolstats
+      --collect.databaseprofiler  
+                               Enable collection of database system.profiler
+                               metrics
+      --collect.currentop      Enable collection of $currentOp metrics
+      --databaseprofiler.lookback=60  
+                               Size of the system.profile scan window, in
+                               seconds
+      --databaseprofiler.threshold=1000  
+                               Min query duration, in ms, for slow queries to
+                               count
       --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
                                MongoDB URI, format
       --test                   Check MongoDB connection, print buildInfo()
