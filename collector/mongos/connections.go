@@ -22,13 +22,13 @@ var (
 	connections = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "connections",
-		Help:      "The connections sub document data regarding the current status of incoming connections and availability of the database server. Use these values to assess the current load and capacity requirements of the server",
+		Help:      "source = serverStatus connections.[current|available]",
 	}, []string{"state"})
 )
 var (
 	connectionsMetricsCreatedTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "connections_metrics", "created_total"),
-		"totalCreated provides a count of all incoming connections created to the server. This number includes connections that have since closed",
+		"source = serverStatsus connections.totalCreated",
 		nil,
 		nil,
 	)

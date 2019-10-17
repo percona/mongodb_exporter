@@ -21,7 +21,7 @@ import (
 var (
 	metricsCursorTimedOutTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_cursor", "timed_out_total"),
-		"timedOut provides the total number of cursors that have timed out since the server process started. If this number is large or growing at a regular rate, this may indicate an application error",
+		"source = serverStatus metrics.cursor.timedOut",
 		nil,
 		nil,
 	)
@@ -30,7 +30,7 @@ var (
 	metricsCursorOpen = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "metrics_cursor_open",
-		Help:      "The open is an embedded document that contains data regarding open cursors",
+		Help:      "source = serverStatus metrics.cursor.open",
 	}, []string{"state"})
 )
 var (
@@ -38,11 +38,11 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_get_last_error_wtime",
 		Name:      "num_total",
-		Help:      "num reports the total number of getLastError operations with a specified write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
+		Help:      "source = serverStatus metrics.getLastError.wtimeouts",
 	})
 	metricsGetLastErrorWtimeTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_get_last_error_wtime", "total_milliseconds"),
-		"total_millis reports the total amount of time in milliseconds that the mongod has spent performing getLastError operations with write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
+		"source = serverStatus metrics.getLastError.wtime.totalMillis",
 		nil,
 		nil,
 	)
@@ -50,7 +50,7 @@ var (
 var (
 	metricsGetLastErrorWtimeoutsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_get_last_error", "wtimeouts_total"),
-		"wtimeouts reports the number of times that write concern operations have timed out as a result of the wtimeout threshold to getLastError.",
+		"source = serverStatus metrics.getLastError.wtime.num",
 		nil,
 		nil,
 	)

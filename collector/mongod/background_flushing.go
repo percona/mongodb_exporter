@@ -23,13 +23,13 @@ import (
 var (
 	backgroundFlushingflushesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "background_flushing", "flushes_total"),
-		"flushes is a counter that collects the number of times the database has flushed all writes to disk. This value will grow as database runs for longer periods of time",
+		"source = serverStatus backgroundFlushing.flushes",
 		nil,
 		nil,
 	)
 	backgroundFlushingtotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "background_flushing", "total_milliseconds"),
-		"The total_ms value provides the total number of milliseconds (ms) that the mongod processes have spent writing (i.e. flushing) data to disk. Because this is an absolute value, consider the value offlushes and average_ms to provide better context for this datum",
+		"source = serverStatus backgroundFlushing.total_ms",
 		nil,
 		nil,
 	)
@@ -37,19 +37,19 @@ var (
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
 		Name:      "average_milliseconds",
-		Help:      `The average_ms value describes the relationship between the number of flushes and the total amount of time that the database has spent writing data to disk. The larger flushes is, the more likely this value is likely to represent a "normal," time; however, abnormal data can skew this value`,
+		Help:      "source = serverStatus backgroundFlushing.average_ms",
 	})
 	backgroundFlushinglastMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
 		Name:      "last_milliseconds",
-		Help:      "The value of the last_ms field is the amount of time, in milliseconds, that the last flush operation took to complete. Use this value to verify that the current performance of the server and is in line with the historical data provided by average_ms and total_ms",
+		Help:      "source = serverStatus backgroundFlushing.last_ms",
 	})
 	backgroundFlushinglastFinishedTime = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
 		Name:      "last_finished_time",
-		Help:      "The last_finished field provides a timestamp of the last completed flush operation in the ISODateformat. If this value is more than a few minutes old relative to your server’s current time and accounting for differences in time zone, restarting the database may result in some data loss",
+		Help:      "source = serverStatus backgroundFlushing.last_finished",
 	})
 )
 

@@ -33,37 +33,37 @@ var (
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "balancer_enabled",
-		Help:      "Boolean reporting if cluster balancer is enabled (1 = enabled/0 = disabled)",
+		Help:      "source = config.settings ({_id=\"balancer\"})",
 	})
 	balancerChunksBalanced = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "chunks_is_balanced",
-		Help:      "Boolean reporting if cluster chunks are evenly balanced across shards (1 = yes/0 = no)",
+		Help:      "source = config.chunks (custom algorithm simulating BalancerPolicy code)",
 	})
 	mongosUpSecs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "mongos_uptime_seconds",
-		Help:      "The uptime of the Mongos processes in seconds",
+		Help:      "source = conifg.mongos",
 	}, []string{"name"})
 	mongosPing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "mongos_last_ping_timestamp",
-		Help:      "The unix timestamp of the last Mongos ping to the Cluster config servers",
+		Help:      "source = conifg.mongos",
 	}, []string{"name"})
 	mongosBalancerLockTimestamp = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "balancer_lock_timestamp",
-		Help:      "The unix timestamp of the last update to the Cluster balancer lock",
+		Help:      "source = config.locks ({_id=\"balancer\"})",
 	}, []string{"name"})
 	mongosBalancerLockState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "balancer_lock_state",
-		Help:      "The state of the Cluster balancer lock (-1 = none/0 = unlocked/1 = contention/2 = locked)",
+		Help:      "source = config.locks ({_id=\"balancer\"})",
 	}, []string{"name"})
 )
 

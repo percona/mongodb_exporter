@@ -21,7 +21,7 @@ import (
 var (
 	storageEngineDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "storage_engine"),
-		"The storage engine used by the MongoDB instance",
+		"source = serverStatus storageEngine.name",
 		[]string{"engine"},
 		nil,
 	)

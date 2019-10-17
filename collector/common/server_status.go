@@ -25,23 +25,23 @@ var (
 		Namespace: Namespace,
 		Subsystem: "version",
 		Name:      "info",
-		Help:      "Software version information for mongodb process.",
+		Help:      "source = serverStatus version",
 	}, []string{"mongodb"})
 	instanceUptimeSecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "instance", "uptime_seconds"),
-		"The value of the uptime field corresponds to the number of seconds that the mongos or mongod process has been active.",
+		"source = serverStatus uptime",
 		nil,
 		nil,
 	)
 	instanceUptimeEstimateSecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "instance", "uptime_estimate_seconds"),
-		"uptimeEstimate provides the uptime as calculated from MongoDB's internal course-grained time keeping system.",
+		"source = serverStatus uptimeEstimate",
 		nil,
 		nil,
 	)
 	instanceLocalTimeDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "instance", "local_time"),
-		"The localTime value is the current time, according to the server, in UTC specified in an ISODate format.",
+		"source = serverStatus localTime",
 		nil,
 		nil,
 	)

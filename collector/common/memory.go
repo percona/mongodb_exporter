@@ -22,7 +22,7 @@ var (
 	memory = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "memory",
-		Help:      "The mem data structure holds information regarding the target system architecture of mongod and current memory use",
+		Help:      "source = serverStatus mem",
 	}, []string{"type"})
 )
 

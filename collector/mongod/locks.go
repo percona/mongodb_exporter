@@ -21,7 +21,7 @@ import (
 var (
 	locksTimeLockedGlobalMicrosecondsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "locks_time_locked_global_microseconds_total"),
-		"amount of time in microseconds that any database has held the global lock",
+		"source = serverStatus locks.global.timeLockedMicros",
 		[]string{"type", "database"},
 		nil,
 	)
@@ -29,7 +29,7 @@ var (
 var (
 	locksTimeLockedLocalMicrosecondsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "locks_time_locked_local_microseconds_total"),
-		"amount of time in microseconds that any database has held the local lock",
+		"source = serverStatus locks.local.timeLockedMicros",
 		[]string{"type", "database"},
 		nil,
 	)
@@ -37,7 +37,7 @@ var (
 var (
 	locksTimeAcquiringGlobalMicrosecondsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "locks_time_acquiring_global_microseconds_total"),
-		"amount of time in microseconds that any database has spent waiting for the global lock",
+		"source = serverStatus locks.<database>.timeAcquiringMicros",
 		[]string{"type", "database"},
 		nil,
 	)

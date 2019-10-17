@@ -22,7 +22,7 @@ var (
 	durabilityCommits = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "durability_commits",
-		Help:      "Durability commits",
+		Help:      "source = serverStatus dur.commits",
 	}, []string{"state"})
 )
 var (
@@ -30,32 +30,32 @@ var (
 		Namespace: Namespace,
 		Subsystem: "durability",
 		Name:      "journaled_megabytes",
-		Help:      "The journaledMB provides the amount of data in megabytes (MB) written to journal during the last journal group commit interval",
+		Help:      "source = serverStatus dur.journaledMB",
 	})
 	durabilityWriteToDataFilesMegabytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "durability",
 		Name:      "write_to_data_files_megabytes",
-		Help:      "The writeToDataFilesMB provides the amount of data in megabytes (MB) written from journal to the data files during the last journal group commit interval",
+		Help:      "source = serverStatus dur.writeToDataFilesMB",
 	})
 	durabilityCompression = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "durability",
 		Name:      "compression",
-		Help:      "The compression represents the compression ratio of the data written to the journal: ( journaled_size_of_data / uncompressed_size_of_data )",
+		Help:      "source = serverStatus dur.compression",
 	})
 	durabilityEarlyCommits = prometheus.NewSummary(prometheus.SummaryOpts{
 		Namespace: Namespace,
 		Subsystem: "durability",
 		Name:      "early_commits",
-		Help:      "The earlyCommits value reflects the number of times MongoDB requested a commit before the scheduled journal group commit interval. Use this value to ensure that your journal group commit interval is not too long for your deployment",
+		Help:      "source = serverStatus dur.earlyCommits",
 	})
 )
 var (
 	durabilityTimeMilliseconds = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Namespace: Namespace,
 		Name:      "durability_time_milliseconds",
-		Help:      "Summary of times spent during the journaling process.",
+		Help:      "source = serverStatus dur.timeMs",
 	}, []string{"stage"})
 )
 

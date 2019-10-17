@@ -19,15 +19,16 @@ import (
 )
 
 var (
+	//Deprecated: the lockTime sub-field was removed in MongoDB 3.0
 	globalLockRatio = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "global_lock",
 		Name:      "ratio",
-		Help:      "The value of ratio displays the relationship between lockTime and totalTime. Low values indicate that operations have held the globalLock frequently for shorter periods of time. High values indicate that operations have held globalLock infrequently for longer periods of time",
+		Help:      "source = serverStatus globalLock.lockTime / globalLock.totalTime",
 	})
 	globalLockTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "global_lock", "total"),
-		"The value of totalTime represents the time, in microseconds, since the database last started and creation of the globalLock. This is roughly equivalent to total server uptime",
+		"source = serverStatus globalLock.totalTime",
 		nil,
 		nil,
 	)
@@ -36,14 +37,14 @@ var (
 	globalLockCurrentQueue = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "global_lock_current_queue",
-		Help:      "The currentQueue data structure value provides more granular information concerning the number of operations queued because of a lock",
+		Help:      "source = serverStatus globalLock.currentQueue",
 	}, []string{"type"})
 )
 var (
 	globalLockClient = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "global_lock_client",
-		Help:      "The activeClients data structure provides more granular information about the number of connected clients and the operation types (e.g. read or write) performed by these clients",
+		Help:      "source = serverStatus globalLock.activeClients",
 	}, []string{"type"})
 )
 

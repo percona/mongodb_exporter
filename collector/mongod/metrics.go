@@ -21,7 +21,7 @@ import (
 var (
 	metricsCursorTimedOutTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_cursor", "timed_out_total"),
-		"timedOut provides the total number of cursors that have timed out since the server process started. If this number is large or growing at a regular rate, this may indicate an application error",
+		"source = serverStatus metrics.cursor.timedOut",
 		nil,
 		nil,
 	)
@@ -30,13 +30,13 @@ var (
 	metricsCursorOpen = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "metrics_cursor_open",
-		Help:      "The open is an embedded document that contains data regarding open cursors",
+		Help:      "source = serverStatus metrics.cursor.open",
 	}, []string{"state"})
 )
 var (
 	metricsDocumentTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_document_total"),
-		"The document holds a document of that reflect document access and modification patterns and data use. Compare these values to the data in the opcounters document, which track total number of operations",
+		"source = serverStatus metrics.document",
 		[]string{"state"},
 		nil,
 	)
@@ -46,11 +46,11 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_get_last_error_wtime",
 		Name:      "num_total",
-		Help:      "num reports the total number of getLastError operations with a specified write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
+		Help:      "source = serverStatus metrics.getLastError.wtimeouts",
 	})
 	metricsGetLastErrorWtimeTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_get_last_error_wtime", "total_milliseconds"),
-		"total_millis reports the total amount of time in milliseconds that the mongod has spent performing getLastError operations with write concern (i.e. w) that wait for one or more members of a replica set to acknowledge the write operation (i.e. a w value greater than 1.)",
+		"source = serverStatus metrics.getLastError.wtime.totalMillis",
 		nil,
 		nil,
 	)
@@ -58,7 +58,7 @@ var (
 var (
 	metricsGetLastErrorWtimeoutsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_get_last_error", "wtimeouts_total"),
-		"wtimeouts reports the number of times that write concern operations have timed out as a result of the wtimeout threshold to getLastError.",
+		"source = serverStatus metrics.getLastError.wtime.num",
 		nil,
 		nil,
 	)
@@ -66,7 +66,7 @@ var (
 var (
 	metricsOperationTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_operation_total"),
-		"operation is a sub-document that holds counters for several types of update and query operations that MongoDB handles using special operation types",
+		"source = serverStatus metrics.operation.scanAndOrder",
 		[]string{"type"},
 		nil,
 	)
@@ -74,7 +74,7 @@ var (
 var (
 	metricsQueryExecutorTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_query_executor_total"),
-		"queryExecutor is a document that reports data from the query execution system",
+		"source = serverStatus metrics.queryExecutor",
 		[]string{"state"},
 		nil,
 	)
@@ -82,7 +82,7 @@ var (
 var (
 	metricsRecordMovesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_record", "moves_total"),
-		"moves reports the total number of times documents move within the on-disk representation of the MongoDB data set. Documents move as a result of operations that increase the size of the document beyond their allocated record size",
+		"source = serverStatus metrics.record.moves",
 		nil,
 		nil,
 	)
@@ -90,13 +90,13 @@ var (
 var (
 	metricsReplApplyBatchesNumTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_apply_batches", "num_total"),
-		"num reports the total number of batches applied across all databases",
+		"source = serverStatus metrics.repl.apply.batches.num",
 		nil,
 		nil,
 	)
 	metricsReplApplyBatchesTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_apply_batches", "total_milliseconds"),
-		"total_millis reports the total amount of time the mongod has spent applying operations from the oplog",
+		"source = serverStatus metrics.repl.apply.batches.totalMillis",
 		nil,
 		nil,
 	)
@@ -104,7 +104,7 @@ var (
 var (
 	metricsReplApplyOpsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_apply", "ops_total"),
-		"ops reports the total number of oplog operations applied",
+		"source = serverStatus metrics.repl.apply.ops",
 		nil,
 		nil,
 	)
@@ -114,11 +114,11 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_buffer",
 		Name:      "count",
-		Help:      "count reports the current number of operations in the oplog buffer",
+		Help:      "source = serverStatus metrics.repl.buffer.count",
 	})
 	metricsReplBufferMaxSizeBytesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_buffer", "max_size_bytes"),
-		"maxSizeBytes reports the maximum size of the buffer. This value is a constant setting in the mongod, and is not configurable",
+		"source = serverStatus metrics.repl.buffer.maxSizeBytes",
 		nil,
 		nil,
 	)
@@ -126,13 +126,13 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_buffer",
 		Name:      "size_bytes",
-		Help:      "sizeBytes reports the current size of the contents of the oplog buffer",
+		Help:      "source = serverStatus metrics.repl.buffer.sizeBytes",
 	})
 )
 var (
 	metricsReplExecutorTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_executor", "total"),
-		"total number of operations in the replication executor",
+		"source = serverStatus metrics.repl.executor.counters",
 		[]string{"type"},
 		nil,
 	)
@@ -140,31 +140,31 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_executor",
 		Name:      "queue",
-		Help:      "number of queued operations in the replication executor",
+		Help:      "source = serverStatus metrics.repl.executor.queues",
 	}, []string{"type"})
 	metricsReplExecutorEventWaiters = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_executor",
 		Name:      "event_waiters",
-		Help:      "number of event waiters in the replication executor",
+		Help:      "source = serverStatus metrics.repl.executor.eventWaiters",
 	})
 	metricsReplExecutorUnsignaledEvents = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_executor",
 		Name:      "unsignaled_events",
-		Help:      "number of unsignaled events in the replication executor",
+		Help:      "source = serverStatus metrics.repl.executor.unsignaledEvents",
 	})
 )
 var (
 	metricsReplNetworkGetmoresNumTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network_getmores", "num_total"),
-		"num reports the total number of getmore operations, which are operations that request an additional set of operations from the replication sync source.",
+		"source = serverStatus metrics.repl.network.getmores.num",
 		nil,
 		nil,
 	)
 	metricsReplNetworkGetmoresTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network_getmores", "total_milliseconds"),
-		"total_millis reports the total amount of time required to collect data from getmore operations",
+		"source = serverStatus metrics.repl.network.getmores.totalMillis",
 		nil,
 		nil,
 	)
@@ -172,19 +172,19 @@ var (
 var (
 	metricsReplNetworkBytesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network", "bytes_total"),
-		"bytes reports the total amount of data read from the replication sync source",
+		"source = serverStatus metrics.repl.network.bytes",
 		nil,
 		nil,
 	)
 	metricsReplNetworkOpsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network", "ops_total"),
-		"ops reports the total number of operations read from the replication source.",
+		"source = serverStatus metrics.repl.network.ops",
 		nil,
 		nil,
 	)
 	metricsReplNetworkReadersCreatedTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network", "readers_created_total"),
-		"readersCreated reports the total number of oplog query processes created. MongoDB will create a new oplog query any time an error occurs in the connection, including a timeout, or a network operation. Furthermore, readersCreated will increment every time MongoDB selects a new source fore replication.",
+		"source = serverStatus metrics.repl.network.readersCreated",
 		nil,
 		nil,
 	)
@@ -194,13 +194,13 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_oplog_insert",
 		Name:      "num_total",
-		Help:      "num reports the total number of items inserted into the oplog.",
+		Help:      "source = serverStatus metrics.repl.oplog.insert.num",
 	})
 	metricsReplOplogInsertTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_oplog_insert",
 		Name:      "total_milliseconds",
-		Help:      "total_millis reports the total amount of time spent for the mongod to insert data into the oplog.",
+		Help:      "source = serverStatus metrics.repl.oplog.insert.totalMillis",
 	})
 )
 var (
@@ -208,19 +208,19 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_oplog",
 		Name:      "insert_bytes_total",
-		Help:      "insertBytes the total size of documents inserted into the oplog.",
+		Help:      "source = serverStatus metrics.repl.oplog.insertBytes",
 	})
 )
 var (
 	metricsReplPreloadDocsNumTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_preload_docs", "num_total"),
-		"num reports the total number of documents loaded during the pre-fetch stage of replication",
+		"source = serverStatus metrics.repl.preload.num.docs.num",
 		nil,
 		nil,
 	)
 	metricsReplPreloadDocsTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_preload_docs", "total_milliseconds"),
-		"total_millis reports the total amount of time spent loading documents as part of the pre-fetch stage of replication",
+		"source = serverStatus metrics.repl.preload.num.docs.totalMillis",
 		nil,
 		nil,
 	)
@@ -228,13 +228,13 @@ var (
 var (
 	metricsReplPreloadIndexesNumTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_preload_indexes", "num_total"),
-		"num reports the total number of index entries loaded by members before updating documents as part of the pre-fetch stage of replication",
+		"source = serverStatus metrics.repl.preload.num.indexes.num",
 		nil,
 		nil,
 	)
 	metricsReplPreloadIndexesTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_preload_indexes", "total_milliseconds"),
-		"total_millis reports the total amount of time spent loading index entries as part of the pre-fetch stage of replication",
+		"source = serverStatus metrics.repl.preload.num.indexes.totalMillis",
 		nil,
 		nil,
 	)
@@ -242,7 +242,7 @@ var (
 var (
 	metricsStorageFreelistSearchTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_storage_freelist_search_total"),
-		"metrics about searching records in the database.",
+		"source = serverStatus metrics.storage.freelist.search",
 		[]string{"type"},
 		nil,
 	)
@@ -250,13 +250,13 @@ var (
 var (
 	metricsTTLDeletedDocumentsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_ttl", "deleted_documents_total"),
-		"deletedDocuments reports the total number of documents deleted from collections with a ttl index.",
+		"source = serverStatus metrics.ttl.deletedDocuments",
 		nil,
 		nil,
 	)
 	metricsTTLPassesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_ttl", "passes_total"),
-		"passes reports the number of times the background process removes documents from collections with a ttl index",
+		"source = serverStatus metrics.ttl.passes",
 		nil,
 		nil,
 	)

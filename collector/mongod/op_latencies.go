@@ -23,19 +23,19 @@ var (
 	opLatenciesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "op_latencies_latency_total",
-		Help:      "op latencies statistics in microseconds of mongod",
+		Help:      "source = serverStatus opLatencies.*.latency",
 	}, []string{"type"})
 
 	opLatenciesCountTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "op_latencies_ops_total",
-		Help:      "op latencies ops total statistics of mongod",
+		Help:      "source = serverStatus opLatencies.*.ops",
 	}, []string{"type"})
 
 	opLatenciesHistogram = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "op_latencies_histogram",
-		Help:      "op latencies histogram statistics of mongod",
+		Help:      "source = serverStatus opLatencies.*.histogram",
 	}, []string{"type", "micros"})
 )
 

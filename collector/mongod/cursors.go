@@ -19,10 +19,11 @@ import (
 )
 
 var (
+	//N.b. this is not "metrics.cursor.*" this is "cursors.*" which only exists in <= 3.0
 	cursorsGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "cursors",
-		Help:      "The cursors data structure contains data regarding cursor state and use",
+		Help:      "source = serverStatus cursors",
 	}, []string{"state"})
 )
 

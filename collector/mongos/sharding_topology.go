@@ -31,37 +31,37 @@ var (
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "shards_total",
-		Help:      "Total # of Shards in the Cluster",
+		Help:      "source = config.shards",
 	})
 	shardingTopoInfoDrainingShards = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "shards_draining_total",
-		Help:      "Total # of Shards in the Cluster in draining state",
+		Help:      "source = config.shards",
 	})
 	shardingTopoInfoTotalChunks = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "chunks_total",
-		Help:      "Total # of Chunks in the Cluster",
+		Help:      "source = config.chunks",
 	})
 	shardingTopoInfoShardChunks = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "shard_chunks_total",
-		Help:      "Total number of chunks per shard",
+		Help:      "source = config.chunks",
 	}, []string{"shard"})
 	shardingTopoInfoTotalDatabases = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "databases_total",
-		Help:      "Total # of Databases in the Cluster",
+		Help:      "source = config.databases",
 	}, []string{"type"})
 	shardingTopoInfoTotalCollections = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "collections_total",
-		Help:      "Total # of Collections with Sharding enabled",
+		Help:      "source = config.collections",
 	})
 )
 

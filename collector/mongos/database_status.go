@@ -15,31 +15,31 @@ var (
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "index_size_bytes",
-		Help:      "The total size in bytes of all indexes created on this database",
+		Help:      "source = dbStats indexSize",
 	}, []string{"db", "shard"})
 	dataSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "data_size_bytes",
-		Help:      "The total size in bytes of the uncompressed data held in this database",
+		Help:      "source = dbStats dataSize",
 	}, []string{"db", "shard"})
 	collectionsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "collections_total",
-		Help:      "Contains a count of the number of collections in that database",
+		Help:      "source = dbStats collections",
 	}, []string{"db", "shard"})
 	indexesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "indexes_total",
-		Help:      "Contains a count of the total number of indexes across all collections in the database",
+		Help:      "source = dbStats indexes",
 	}, []string{"db", "shard"})
 	objectsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "objects_total",
-		Help:      "Contains a count of the number of objects (i.e. documents) in the database across all collections",
+		Help:      "source = dbStats objects",
 	}, []string{"db", "shard"})
 )
 

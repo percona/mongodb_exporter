@@ -19,18 +19,20 @@ import (
 )
 
 var (
+	//This is only present in MongoDB <= 2.6
 	indexCountersMissRatio = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "index_counters",
 		Name:      "miss_ratio",
-		Help:      "The missRatio value is the ratio of hits to misses. This value is typically 0 or approaching 0",
+		Help:      "source = serverStatus indexCounters.missRatio",
 	})
 )
 
 var (
+	//This is only present in MongoDB <= 2.6
 	indexCountersTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "index_counters_total"),
-		"Total indexes by type",
+		"source = serverStatus indexCounters (excluding missRatio)",
 		[]string{"type"},
 		nil,
 	)
