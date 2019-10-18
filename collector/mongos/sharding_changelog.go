@@ -27,7 +27,7 @@ import (
 var (
 	shardingChangelogInfoDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "sharding", "changelog_10min_total"),
-		"Total # of Cluster Balancer log events over the last 10 minutes",
+		"= config.changelog (where ts within 10 min)",
 		[]string{"event"},
 		nil,
 	)

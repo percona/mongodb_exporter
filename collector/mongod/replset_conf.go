@@ -12,35 +12,35 @@ import (
 var (
 	memberHiddenDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, subsystem, "member_hidden"),
-		"This field conveys if the member is hidden (1) or not-hidden (0).",
+		"= replSetGetConfig members.*.hidden",
 		[]string{"id", "host"},
 		nil,
 	)
 
 	memberArbiterDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, subsystem, "member_arbiter"),
-		"This field conveys if the member is an arbiter (1) or not (0).",
+		"= replSetGetConfig members.*.arbiter",
 		[]string{"id", "host"},
 		nil,
 	)
 
 	memberBuildIndexesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, subsystem, "member_build_indexes"),
-		"This field conveys if the member is  builds indexes (1) or not (0).",
+		"= replSetGetConfig members.*.buildIndexes",
 		[]string{"id", "host"},
 		nil,
 	)
 
 	memberPriorityDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, subsystem, "member_priority"),
-		"This field conveys the priority of a given member",
+		"= replSetGetConfig members.*.priority",
 		[]string{"id", "host"},
 		nil,
 	)
 
 	memberVotesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, subsystem, "member_votes"),
-		"This field conveys the number of votes of a given member",
+		"= replSetGetConfig members.*.votes",
 		[]string{"id", "host"},
 		nil,
 	)

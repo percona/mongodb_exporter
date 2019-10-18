@@ -21,7 +21,7 @@ import (
 var (
 	assertsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "asserts_total"),
-		"The asserts document reports the number of asserts on the database. While assert errors are typically uncommon, if there are non-zero values for the asserts, you should check the log file for the mongod process for more information. In many cases these errors are trivial, but are worth investigating.",
+		"= serverStatus asserts",
 		[]string{"type"},
 		nil,
 	)

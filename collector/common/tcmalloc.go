@@ -7,42 +7,43 @@ import (
 var (
 	tcmallocGeneralDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "tcmalloc", "generic_heap"),
-		"High-level summary metricsInternal metrics from tcmalloc",
+		"= serverStatus tcmalloc.generic.[current_allocated_bytes|heap_size]",
 		[]string{"type"},
 		nil,
 	)
 
 	tcmallocPageheapBytesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "tcmalloc", "pageheap_bytes"),
-		"Sizes for tcpmalloc pageheaps",
+		"= serverStatus tcmalloc.tcmalloc.pageheap_[free|unmapped|committed|total_commit|total_decommit|total_reserve]_bytes",
 		[]string{"type"},
 		nil,
 	)
 
+
 	tcmallocPageheapCountsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "tcmalloc", "pageheap_count"),
-		"Sizes for tcpmalloc pageheaps",
+		"= serverStatus tcmalloc.tcmalloc.pageheap_[scavenge|commit|decommit|reserve]_count",
 		[]string{"type"},
 		nil,
 	)
 
 	tcmallocCacheBytesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "tcmalloc", "cache_bytes"),
-		"Sizes for tcpmalloc caches in bytes",
+		"= serverStatus tcmalloc.tcmalloc.[max_total_thread_cache_bytes|current_total_thread_cache_bytes|central_cache_free_bytes|transfer_cache_free_bytes|thread_cache_free_bytes]",
 		[]string{"cache", "type"},
 		nil,
 	)
 
 	tcmallocAggressiveDecommitDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "tcmalloc", "aggressive_memory_decommit"),
-		"Whether aggressive_memory_decommit is on",
+		"= serverStatus tcmalloc.tcmalloc.aggressive_memory_decommit",
 		nil,
 		nil,
 	)
 
 	tcmallocFreeBytesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "tcmalloc", "free_bytes"),
-		"Total free bytes of tcmalloc",
+		"= serverStatus tcmalloc.tcmalloc.total_free_bytes",
 		nil,
 		nil,
 	)

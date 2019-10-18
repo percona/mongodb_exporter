@@ -10,13 +10,13 @@ import (
 var (
 	topCountTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "top_count_total"),
-		"The top command provides operation count for each database collection",
+		"= top totals.<db_and_coll_name>.*.count",
 		[]string{"type", "database", "collection"}, nil,
 	)
 
 	topTimeSecondsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "top_time_seconds_total"),
-		"The top command provides operation time, in seconds, for each database collection",
+		"= top totals.<db_and_coll_name>.*.time",
 		[]string{"type", "database", "collection"}, nil,
 	)
 )

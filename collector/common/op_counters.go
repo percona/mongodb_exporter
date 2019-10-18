@@ -21,7 +21,7 @@ import (
 var (
 	opCountersTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "op_counters_total"),
-		"The opcounters data structure provides an overview of database operations by type and makes it possible to analyze the load on the database in more granular manner. These numbers will grow over time and in response to database use. Analyze these values over time to track database utilization",
+		"= serverStatus opCounters",
 		[]string{"type"},
 		nil,
 	)
@@ -30,7 +30,7 @@ var (
 var (
 	opCountersReplTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "op_counters_repl_total"),
-		"The opcountersRepl data structure, similar to the opcounters data structure, provides an overview of database replication operations by type and makes it possible to analyze the load on the replica in more granular manner. These values only appear when the current host has replication enabled",
+		"= serverStatus opCountersRepl",
 		[]string{"type"},
 		nil,
 	)

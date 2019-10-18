@@ -21,7 +21,7 @@ import (
 var (
 	networkBytesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "network_bytes_total"),
-		"The network data structure contains data regarding MongoDB’s network use",
+		"= serverStatus network.[bytesIn|bytesOut]",
 		[]string{"state"},
 		nil,
 	)
@@ -29,7 +29,7 @@ var (
 var (
 	networkMetricsNumRequestsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "network_metrics", "num_requests_total"),
-		"The numRequests field is a counter of the total number of distinct requests that the server has received. Use this value to provide context for the bytesIn and bytesOut values to ensure that MongoDB’s network utilization is consistent with expectations and application use",
+		"= serverStatus network.numRequests",
 		nil,
 		nil,
 	)

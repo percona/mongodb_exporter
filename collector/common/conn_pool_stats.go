@@ -13,35 +13,35 @@ import (
 var (
 	syncClientConnectionsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "connpoolstats", "connection_sync"),
-		"Corresponds to the total number of client connections to mongo.",
+		"= connPoolStats numClientConnections",
 		nil,
 		nil,
 	)
 
 	numAScopedConnectionsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "connpoolstats", "connections_scoped_sync"),
-		"Corresponds to the number of active and stored outgoing scoped synchronous connections from the current instance to other members of the sharded cluster or replica set.",
+		"= connPoolStats numAScopedConnections",
 		nil,
 		nil,
 	)
 
 	totalInUseDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "connpoolstats", "connections_in_use"),
-		"Corresponds to the total number of client connections to mongo currently in use.",
+		"= connPoolStats totalInUse",
 		nil,
 		nil,
 	)
 
 	totalAvailableDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "connpoolstats", "connections_available"),
-		"Corresponds to the total number of client connections to mongo that are currently available.",
+		"= connPoolStats totalAvailable",
 		nil,
 		nil,
 	)
 
 	totalCreatedDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "connpoolstats", "connections_created_total"),
-		"Corresponds to the total number of client connections to mongo created since instance start",
+		"= connPoolStats totalCreated",
 		nil,
 		nil,
 	)
