@@ -14,31 +14,31 @@ var (
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "index_size_bytes",
-		Help:      "source = dbStats indexSize",
+		Help:      "= dbStats indexSize",
 	}, []string{"db"})
 	dataSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "data_size_bytes",
-		Help:      "source = dbStats dataSize",
+		Help:      "= dbStats dataSize",
 	}, []string{"db"})
 	collectionsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "collections_total",
-		Help:      "source = dbStats collections",
+		Help:      "= dbStats collections",
 	}, []string{"db"})
 	indexesTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "indexes_total",
-		Help:      "source = dbStats indexes",
+		Help:      "= dbStats indexes",
 	}, []string{"db"})
 	objectsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db",
 		Name:      "objects_total",
-		Help:      "source = dbStats objects",
+		Help:      "= dbStats objects",
 	}, []string{"db"})
 )
 

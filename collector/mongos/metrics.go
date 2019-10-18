@@ -21,7 +21,7 @@ import (
 var (
 	metricsCursorTimedOutTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_cursor", "timed_out_total"),
-		"source = serverStatus metrics.cursor.timedOut",
+		"= serverStatus metrics.cursor.timedOut",
 		nil,
 		nil,
 	)
@@ -30,7 +30,7 @@ var (
 	metricsCursorOpen = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "metrics_cursor_open",
-		Help:      "source = serverStatus metrics.cursor.open",
+		Help:      "= serverStatus metrics.cursor.open",
 	}, []string{"state"})
 )
 var (
@@ -38,11 +38,11 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_get_last_error_wtime",
 		Name:      "num_total",
-		Help:      "source = serverStatus metrics.getLastError.wtimeouts",
+		Help:      "= serverStatus metrics.getLastError.wtimeouts",
 	})
 	metricsGetLastErrorWtimeTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_get_last_error_wtime", "total_milliseconds"),
-		"source = serverStatus metrics.getLastError.wtime.totalMillis",
+		"= serverStatus metrics.getLastError.wtime.totalMillis",
 		nil,
 		nil,
 	)
@@ -50,7 +50,7 @@ var (
 var (
 	metricsGetLastErrorWtimeoutsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_get_last_error", "wtimeouts_total"),
-		"source = serverStatus metrics.getLastError.wtime.num",
+		"= serverStatus metrics.getLastError.wtime.num",
 		nil,
 		nil,
 	)

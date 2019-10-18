@@ -31,53 +31,53 @@ var (
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "my_name",
-		Help:      "source = replSetGetStatus members.*.name (where self=true)",
+		Help:      "= replSetGetStatus members.*.name (where self=true)",
 	}, []string{"set", "name"})
 	myState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "my_state",
-		Help:      "source = replSetGetStatus myState",
+		Help:      "= replSetGetStatus myState",
 	}, []string{"set"})
 	date = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "date",
-		Help:      "source = replSetGetStatus date",
+		Help:      "= replSetGetStatus date",
 	}, []string{"set"})
 	term = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "term",
-		Help:      "source = replSetGetStatus term",
+		Help:      "= replSetGetStatus term",
 	}, []string{"set"})
 	numberOfMembers = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "number_of_members",
-		Help:      "source = replSetGetStatus members",
+		Help:      "= replSetGetStatus members",
 	}, []string{"set"})
 	heartbeatIntervalMillis = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "heatbeat_interval_millis",
-		Help:      "source = replSetGetStatus heartbeatIntervalMillis",
+		Help:      "= replSetGetStatus heartbeatIntervalMillis",
 	}, []string{"set"})
 	memberHealth = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_health",
-		Help:      "source = replSetGetStatus members.*.health",
+		Help:      "= replSetGetStatus members.*.health",
 	}, []string{"set", "name", "state"})
 	memberState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_state",
-		Help:      "source = replSetGetStatus members.*.state",
+		Help:      "= replSetGetStatus members.*.state",
 	}, []string{"set", "name", "state"})
 	memberUptimeDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, subsystem, "member_uptime"),
-		"source = replSetGetStatus members.*.uptime",
+		"= replSetGetStatus members.*.uptime",
 		[]string{"set", "name", "state"},
 		nil,
 	)
@@ -85,49 +85,49 @@ var (
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_optime_date",
-		Help:      "source = replSetGetStatus members.*.optimeDate",
+		Help:      "= replSetGetStatus members.*.optimeDate",
 	}, []string{"set", "name", "state"})
 	memberRepLag = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_replication_lag",
-		Help:      "source = replSetGetStatus members.*.optimeDate (primary's minus current member)",
+		Help:      "= replSetGetStatus members.*.optimeDate (primary's minus current member)",
 	}, []string{"set", "name", "state"})
 	memberOperationalLag = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_operational_lag",
-		Help:      "source = current unix time minus replSetGetStatus members.*.lastHeartbeatRecv (Unix time is of mongodb_exporter's host, which is assumed to be same as monitored mongod)",
+		Help:      "= current unix time minus replSetGetStatus members.*.lastHeartbeatRecv (Unix time is of mongodb_exporter's host, which is assumed to be same as monitored mongod)",
 	}, []string{"set", "name", "state"})
 	memberElectionDate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_election_date",
-		Help:      "source = replSetGetStatus members.*.electionDate",
+		Help:      "= replSetGetStatus members.*.electionDate",
 	}, []string{"set", "name", "state"})
 	memberLastHeartbeat = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_last_heartbeat",
-		Help:      "source = replSetGetStatus members.*.lastHeartbeat",
+		Help:      "= replSetGetStatus members.*.lastHeartbeat",
 	}, []string{"set", "name", "state"})
 	memberLastHeartbeatRecv = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_last_heartbeat_recv",
-		Help:      "source = replSetGetStatus members.*.lastHeartbeatRecv",
+		Help:      "= replSetGetStatus members.*.lastHeartbeatRecv",
 	}, []string{"set", "name", "state"})
 	memberPingMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_ping_ms",
-		Help:      "source = replSetGetStatus members.*.pingMs",
+		Help:      "= replSetGetStatus members.*.pingMs",
 	}, []string{"set", "name", "state"})
 	memberConfigVersion = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
 		Name:      "member_config_version",
-		Help:      "source = replSetGetStatus members.*.configVersion",
+		Help:      "= replSetGetStatus members.*.configVersion",
 	}, []string{"set", "name", "state"})
 	primaryOptimeDate        float64
 	primaryLastHeartbeatRecv float64

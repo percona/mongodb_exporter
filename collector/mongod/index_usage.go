@@ -14,7 +14,7 @@ var (
 	indexUsage = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Name:      "index_usage_count",
-		Help:      "source = $indexStats(aggregation)",
+		Help:      "= $indexStats(aggregation)",
 	}, []string{"collection", "db", "index"})
 )
 

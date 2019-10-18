@@ -15,43 +15,43 @@ var (
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "size",
-		Help:      "source = collStats size",
+		Help:      "= collStats size",
 	}, []string{"db", "coll"})
 	collectionObjectCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "count",
-		Help:      "source = collStats count",
+		Help:      "= collStats count",
 	}, []string{"db", "coll"})
 	collectionAvgObjSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "avgobjsize",
-		Help:      "source = collStats avgObjSize",
+		Help:      "= collStats avgObjSize",
 	}, []string{"db", "coll"})
 	collectionStorageSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "storage_size",
-		Help:      "source = collStats storageSize",
+		Help:      "= collStats storageSize",
 	}, []string{"db", "coll"})
 	collectionIndexes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "indexes",
-		Help:      "source = collStats nindexes",
+		Help:      "= collStats nindexes",
 	}, []string{"db", "coll"})
 	collectionIndexesSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "indexes_size",
-		Help:      "source = collStats totalIndexSize",
+		Help:      "= collStats totalIndexSize",
 	}, []string{"db", "coll"})
 	collectionIndexSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "db_coll",
 		Name:      "index_size",
-		Help:      "source = collStats indexSizes",
+		Help:      "= collStats indexSizes",
 	}, []string{"db", "coll", "index"})
 )
 

@@ -22,13 +22,13 @@ var (
 	connections = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "connections",
-		Help:      "source = serverStatus connections.[current|available]",
+		Help:      "= serverStatus connections.[current|available]",
 	}, []string{"state"})
 )
 var (
 	connectionsMetricsCreatedTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "connections_metrics", "created_total"),
-		"source = serverStatus connections.totalCreated",
+		"= serverStatus connections.totalCreated",
 		nil,
 		nil,
 	)

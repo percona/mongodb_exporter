@@ -23,7 +23,7 @@ var (
 	cursorsGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "cursors",
-		Help:      "source = serverStatus cursors",
+		Help:      "= serverStatus cursors",
 	}, []string{"state"})
 )
 

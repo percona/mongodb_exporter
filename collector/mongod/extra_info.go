@@ -23,13 +23,13 @@ var (
 		Namespace: Namespace,
 		Subsystem: "extra_info",
 		Name:      "page_faults_total",
-		Help:      "source = serverStatus extra_info.page_faults",
+		Help:      "= serverStatus extra_info.page_faults",
 	})
 	extraInfoheapUsageBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "extra_info",
 		Name:      "heap_usage_bytes",
-		Help:      "source = serverStatus extra_info.heap_usage_bytes",
+		Help:      "= serverStatus extra_info.heap_usage_bytes",
 	})
 )
 

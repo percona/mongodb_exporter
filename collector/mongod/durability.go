@@ -22,7 +22,7 @@ var (
 	durabilityCommits = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "durability_commits",
-		Help:      "source = serverStatus dur.commits",
+		Help:      "= serverStatus dur.commits",
 	}, []string{"state"})
 )
 var (
@@ -30,32 +30,32 @@ var (
 		Namespace: Namespace,
 		Subsystem: "durability",
 		Name:      "journaled_megabytes",
-		Help:      "source = serverStatus dur.journaledMB",
+		Help:      "= serverStatus dur.journaledMB",
 	})
 	durabilityWriteToDataFilesMegabytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "durability",
 		Name:      "write_to_data_files_megabytes",
-		Help:      "source = serverStatus dur.writeToDataFilesMB",
+		Help:      "= serverStatus dur.writeToDataFilesMB",
 	})
 	durabilityCompression = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "durability",
 		Name:      "compression",
-		Help:      "source = serverStatus dur.compression",
+		Help:      "= serverStatus dur.compression",
 	})
 	durabilityEarlyCommits = prometheus.NewSummary(prometheus.SummaryOpts{
 		Namespace: Namespace,
 		Subsystem: "durability",
 		Name:      "early_commits",
-		Help:      "source = serverStatus dur.earlyCommits",
+		Help:      "= serverStatus dur.earlyCommits",
 	})
 )
 var (
 	durabilityTimeMilliseconds = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Namespace: Namespace,
 		Name:      "durability_time_milliseconds",
-		Help:      "source = serverStatus dur.timeMs",
+		Help:      "= serverStatus dur.timeMs",
 	}, []string{"stage"})
 )
 

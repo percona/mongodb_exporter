@@ -21,7 +21,7 @@ import (
 var (
 	storageEngineDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "storage_engine"),
-		"source = serverStatus storageEngine.name",
+		"= serverStatus storageEngine.name",
 		[]string{"engine"},
 		nil,
 	)

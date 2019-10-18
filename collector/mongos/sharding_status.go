@@ -33,37 +33,37 @@ var (
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "balancer_enabled",
-		Help:      "source = config.settings ({_id=\"balancer\"})",
+		Help:      "= config.settings ({_id=\"balancer\"})",
 	})
 	balancerChunksBalanced = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "chunks_is_balanced",
-		Help:      "source = config.chunks (custom algorithm simulating BalancerPolicy code)",
+		Help:      "= config.chunks (custom algorithm simulating BalancerPolicy code)",
 	})
 	mongosUpSecs = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "mongos_uptime_seconds",
-		Help:      "source = conifg.mongos",
+		Help:      "= conifg.mongos",
 	}, []string{"name"})
 	mongosPing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "mongos_last_ping_timestamp",
-		Help:      "source = conifg.mongos",
+		Help:      "= conifg.mongos",
 	}, []string{"name"})
 	mongosBalancerLockTimestamp = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "balancer_lock_timestamp",
-		Help:      "source = config.locks ({_id=\"balancer\"})",
+		Help:      "= config.locks ({_id=\"balancer\"})",
 	}, []string{"name"})
 	mongosBalancerLockState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "sharding",
 		Name:      "balancer_lock_state",
-		Help:      "source = config.locks ({_id=\"balancer\"})",
+		Help:      "= config.locks ({_id=\"balancer\"})",
 	}, []string{"name"})
 )
 

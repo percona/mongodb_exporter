@@ -23,13 +23,13 @@ import (
 var (
 	backgroundFlushingflushesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "background_flushing", "flushes_total"),
-		"source = serverStatus backgroundFlushing.flushes",
+		"= serverStatus backgroundFlushing.flushes",
 		nil,
 		nil,
 	)
 	backgroundFlushingtotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "background_flushing", "total_milliseconds"),
-		"source = serverStatus backgroundFlushing.total_ms",
+		"= serverStatus backgroundFlushing.total_ms",
 		nil,
 		nil,
 	)
@@ -37,19 +37,19 @@ var (
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
 		Name:      "average_milliseconds",
-		Help:      "source = serverStatus backgroundFlushing.average_ms",
+		Help:      "= serverStatus backgroundFlushing.average_ms",
 	})
 	backgroundFlushinglastMilliseconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
 		Name:      "last_milliseconds",
-		Help:      "source = serverStatus backgroundFlushing.last_ms",
+		Help:      "= serverStatus backgroundFlushing.last_ms",
 	})
 	backgroundFlushinglastFinishedTime = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "background_flushing",
 		Name:      "last_finished_time",
-		Help:      "source = serverStatus backgroundFlushing.last_finished",
+		Help:      "= serverStatus backgroundFlushing.last_finished",
 	})
 )
 

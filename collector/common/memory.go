@@ -22,7 +22,7 @@ var (
 	memory = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "memory",
-		Help:      "source = serverStatus mem",
+		Help:      "= serverStatus mem",
 	}, []string{"type"})
 )
 

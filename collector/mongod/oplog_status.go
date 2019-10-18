@@ -34,25 +34,25 @@ var (
 		Namespace: Namespace,
 		Subsystem: "replset_oplog",
 		Name:      "items_total",
-		Help:      "source = collStats count",
+		Help:      "= collStats count",
 	})
 	oplogStatusHeadTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "replset_oplog",
 		Name:      "head_timestamp",
-		Help:      "source = local.oplog.rs (findOne oldest)",
+		Help:      "= local.oplog.rs (findOne oldest)",
 	})
 	oplogStatusTailTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "replset_oplog",
 		Name:      "tail_timestamp",
-		Help:      "source = local.oplog.rs (findOne latest)",
+		Help:      "= local.oplog.rs (findOne latest)",
 	})
 	oplogStatusSizeBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "replset_oplog",
 		Name:      "size_bytes",
-		Help:      "source = collStats size, storageSize",
+		Help:      "= collStats size, storageSize",
 	}, []string{"type"})
 )
 

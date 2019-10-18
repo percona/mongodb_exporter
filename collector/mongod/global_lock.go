@@ -24,11 +24,11 @@ var (
 		Namespace: Namespace,
 		Subsystem: "global_lock",
 		Name:      "ratio",
-		Help:      "source = serverStatus globalLock.lockTime / globalLock.totalTime",
+		Help:      "= serverStatus globalLock.lockTime / globalLock.totalTime",
 	})
 	globalLockTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "global_lock", "total"),
-		"source = serverStatus globalLock.totalTime",
+		"= serverStatus globalLock.totalTime",
 		nil,
 		nil,
 	)
@@ -37,14 +37,14 @@ var (
 	globalLockCurrentQueue = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "global_lock_current_queue",
-		Help:      "source = serverStatus globalLock.currentQueue",
+		Help:      "= serverStatus globalLock.currentQueue",
 	}, []string{"type"})
 )
 var (
 	globalLockClient = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "global_lock_client",
-		Help:      "source = serverStatus globalLock.activeClients",
+		Help:      "= serverStatus globalLock.activeClients",
 	}, []string{"type"})
 )
 

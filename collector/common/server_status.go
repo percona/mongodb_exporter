@@ -25,23 +25,23 @@ var (
 		Namespace: Namespace,
 		Subsystem: "version",
 		Name:      "info",
-		Help:      "source = serverStatus version",
+		Help:      "= serverStatus version",
 	}, []string{"mongodb"})
 	instanceUptimeSecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "instance", "uptime_seconds"),
-		"source = serverStatus uptime",
+		"= serverStatus uptime",
 		nil,
 		nil,
 	)
 	instanceUptimeEstimateSecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "instance", "uptime_estimate_seconds"),
-		"source = serverStatus uptimeEstimate",
+		"= serverStatus uptimeEstimate",
 		nil,
 		nil,
 	)
 	instanceLocalTimeDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "instance", "local_time"),
-		"source = serverStatus localTime",
+		"= serverStatus localTime",
 		nil,
 		nil,
 	)

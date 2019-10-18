@@ -21,7 +21,7 @@ import (
 var (
 	metricsCursorTimedOutTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_cursor", "timed_out_total"),
-		"source = serverStatus metrics.cursor.timedOut",
+		"= serverStatus metrics.cursor.timedOut",
 		nil,
 		nil,
 	)
@@ -30,13 +30,13 @@ var (
 	metricsCursorOpen = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Name:      "metrics_cursor_open",
-		Help:      "source = serverStatus metrics.cursor.open",
+		Help:      "= serverStatus metrics.cursor.open",
 	}, []string{"state"})
 )
 var (
 	metricsDocumentTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_document_total"),
-		"source = serverStatus metrics.document",
+		"= serverStatus metrics.document",
 		[]string{"state"},
 		nil,
 	)
@@ -46,11 +46,11 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_get_last_error_wtime",
 		Name:      "num_total",
-		Help:      "source = serverStatus metrics.getLastError.wtimeouts",
+		Help:      "= serverStatus metrics.getLastError.wtimeouts",
 	})
 	metricsGetLastErrorWtimeTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_get_last_error_wtime", "total_milliseconds"),
-		"source = serverStatus metrics.getLastError.wtime.totalMillis",
+		"= serverStatus metrics.getLastError.wtime.totalMillis",
 		nil,
 		nil,
 	)
@@ -58,7 +58,7 @@ var (
 var (
 	metricsGetLastErrorWtimeoutsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_get_last_error", "wtimeouts_total"),
-		"source = serverStatus metrics.getLastError.wtime.num",
+		"= serverStatus metrics.getLastError.wtime.num",
 		nil,
 		nil,
 	)
@@ -66,7 +66,7 @@ var (
 var (
 	metricsOperationTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_operation_total"),
-		"source = serverStatus metrics.operation.scanAndOrder",
+		"= serverStatus metrics.operation.scanAndOrder",
 		[]string{"type"},
 		nil,
 	)
@@ -74,7 +74,7 @@ var (
 var (
 	metricsQueryExecutorTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_query_executor_total"),
-		"source = serverStatus metrics.queryExecutor",
+		"= serverStatus metrics.queryExecutor",
 		[]string{"state"},
 		nil,
 	)
@@ -82,7 +82,7 @@ var (
 var (
 	metricsRecordMovesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_record", "moves_total"),
-		"source = serverStatus metrics.record.moves",
+		"= serverStatus metrics.record.moves",
 		nil,
 		nil,
 	)
@@ -90,13 +90,13 @@ var (
 var (
 	metricsReplApplyBatchesNumTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_apply_batches", "num_total"),
-		"source = serverStatus metrics.repl.apply.batches.num",
+		"= serverStatus metrics.repl.apply.batches.num",
 		nil,
 		nil,
 	)
 	metricsReplApplyBatchesTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_apply_batches", "total_milliseconds"),
-		"source = serverStatus metrics.repl.apply.batches.totalMillis",
+		"= serverStatus metrics.repl.apply.batches.totalMillis",
 		nil,
 		nil,
 	)
@@ -104,7 +104,7 @@ var (
 var (
 	metricsReplApplyOpsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_apply", "ops_total"),
-		"source = serverStatus metrics.repl.apply.ops",
+		"= serverStatus metrics.repl.apply.ops",
 		nil,
 		nil,
 	)
@@ -114,11 +114,11 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_buffer",
 		Name:      "count",
-		Help:      "source = serverStatus metrics.repl.buffer.count",
+		Help:      "= serverStatus metrics.repl.buffer.count",
 	})
 	metricsReplBufferMaxSizeBytesDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_buffer", "max_size_bytes"),
-		"source = serverStatus metrics.repl.buffer.maxSizeBytes",
+		"= serverStatus metrics.repl.buffer.maxSizeBytes",
 		nil,
 		nil,
 	)
@@ -126,13 +126,13 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_buffer",
 		Name:      "size_bytes",
-		Help:      "source = serverStatus metrics.repl.buffer.sizeBytes",
+		Help:      "= serverStatus metrics.repl.buffer.sizeBytes",
 	})
 )
 var (
 	metricsReplExecutorTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_executor", "total"),
-		"source = serverStatus metrics.repl.executor.counters",
+		"= serverStatus metrics.repl.executor.counters",
 		[]string{"type"},
 		nil,
 	)
@@ -140,31 +140,31 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_executor",
 		Name:      "queue",
-		Help:      "source = serverStatus metrics.repl.executor.queues",
+		Help:      "= serverStatus metrics.repl.executor.queues",
 	}, []string{"type"})
 	metricsReplExecutorEventWaiters = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_executor",
 		Name:      "event_waiters",
-		Help:      "source = serverStatus metrics.repl.executor.eventWaiters",
+		Help:      "= serverStatus metrics.repl.executor.eventWaiters",
 	})
 	metricsReplExecutorUnsignaledEvents = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_executor",
 		Name:      "unsignaled_events",
-		Help:      "source = serverStatus metrics.repl.executor.unsignaledEvents",
+		Help:      "= serverStatus metrics.repl.executor.unsignaledEvents",
 	})
 )
 var (
 	metricsReplNetworkGetmoresNumTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network_getmores", "num_total"),
-		"source = serverStatus metrics.repl.network.getmores.num",
+		"= serverStatus metrics.repl.network.getmores.num",
 		nil,
 		nil,
 	)
 	metricsReplNetworkGetmoresTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network_getmores", "total_milliseconds"),
-		"source = serverStatus metrics.repl.network.getmores.totalMillis",
+		"= serverStatus metrics.repl.network.getmores.totalMillis",
 		nil,
 		nil,
 	)
@@ -172,19 +172,19 @@ var (
 var (
 	metricsReplNetworkBytesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network", "bytes_total"),
-		"source = serverStatus metrics.repl.network.bytes",
+		"= serverStatus metrics.repl.network.bytes",
 		nil,
 		nil,
 	)
 	metricsReplNetworkOpsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network", "ops_total"),
-		"source = serverStatus metrics.repl.network.ops",
+		"= serverStatus metrics.repl.network.ops",
 		nil,
 		nil,
 	)
 	metricsReplNetworkReadersCreatedTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_network", "readers_created_total"),
-		"source = serverStatus metrics.repl.network.readersCreated",
+		"= serverStatus metrics.repl.network.readersCreated",
 		nil,
 		nil,
 	)
@@ -194,13 +194,13 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_oplog_insert",
 		Name:      "num_total",
-		Help:      "source = serverStatus metrics.repl.oplog.insert.num",
+		Help:      "= serverStatus metrics.repl.oplog.insert.num",
 	})
 	metricsReplOplogInsertTotalMilliseconds = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_oplog_insert",
 		Name:      "total_milliseconds",
-		Help:      "source = serverStatus metrics.repl.oplog.insert.totalMillis",
+		Help:      "= serverStatus metrics.repl.oplog.insert.totalMillis",
 	})
 )
 var (
@@ -208,19 +208,19 @@ var (
 		Namespace: Namespace,
 		Subsystem: "metrics_repl_oplog",
 		Name:      "insert_bytes_total",
-		Help:      "source = serverStatus metrics.repl.oplog.insertBytes",
+		Help:      "= serverStatus metrics.repl.oplog.insertBytes",
 	})
 )
 var (
 	metricsReplPreloadDocsNumTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_preload_docs", "num_total"),
-		"source = serverStatus metrics.repl.preload.num.docs.num",
+		"= serverStatus metrics.repl.preload.num.docs.num",
 		nil,
 		nil,
 	)
 	metricsReplPreloadDocsTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_preload_docs", "total_milliseconds"),
-		"source = serverStatus metrics.repl.preload.num.docs.totalMillis",
+		"= serverStatus metrics.repl.preload.num.docs.totalMillis",
 		nil,
 		nil,
 	)
@@ -228,13 +228,13 @@ var (
 var (
 	metricsReplPreloadIndexesNumTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_preload_indexes", "num_total"),
-		"source = serverStatus metrics.repl.preload.num.indexes.num",
+		"= serverStatus metrics.repl.preload.num.indexes.num",
 		nil,
 		nil,
 	)
 	metricsReplPreloadIndexesTotalMillisecondsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_repl_preload_indexes", "total_milliseconds"),
-		"source = serverStatus metrics.repl.preload.num.indexes.totalMillis",
+		"= serverStatus metrics.repl.preload.num.indexes.totalMillis",
 		nil,
 		nil,
 	)
@@ -242,7 +242,7 @@ var (
 var (
 	metricsStorageFreelistSearchTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_storage_freelist_search_total"),
-		"source = serverStatus metrics.storage.freelist.search",
+		"= serverStatus metrics.storage.freelist.search",
 		[]string{"type"},
 		nil,
 	)
@@ -250,13 +250,13 @@ var (
 var (
 	metricsTTLDeletedDocumentsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_ttl", "deleted_documents_total"),
-		"source = serverStatus metrics.ttl.deletedDocuments",
+		"= serverStatus metrics.ttl.deletedDocuments",
 		nil,
 		nil,
 	)
 	metricsTTLPassesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "metrics_ttl", "passes_total"),
-		"source = serverStatus metrics.ttl.passes",
+		"= serverStatus metrics.ttl.passes",
 		nil,
 		nil,
 	)

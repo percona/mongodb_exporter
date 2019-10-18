@@ -24,7 +24,7 @@ var (
 		Namespace: Namespace,
 		Subsystem: "index_counters",
 		Name:      "miss_ratio",
-		Help:      "source = serverStatus indexCounters.missRatio",
+		Help:      "= serverStatus indexCounters.missRatio",
 	})
 )
 
@@ -32,7 +32,7 @@ var (
 	//This is only present in MongoDB <= 2.6
 	indexCountersTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "index_counters_total"),
-		"source = serverStatus indexCounters (excluding missRatio)",
+		"= serverStatus indexCounters (excluding missRatio)",
 		[]string{"type"},
 		nil,
 	)

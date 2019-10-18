@@ -21,13 +21,13 @@ import (
 var (
 	wtBlockManagerBlocksTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_blockmanager", "blocks_total"),
-		"source = serverStatus wiredTiger.block-manager.[\"mapped blocks read\"|\"blocks pre-loaded\"|\"blocks read\"|\"blocks written\"]",
+		"= serverStatus wiredTiger.block-manager.[\"mapped blocks read\"|\"blocks pre-loaded\"|\"blocks read\"|\"blocks written\"]",
 		[]string{"type"},
 		nil,
 	)
 	wtBlockManagerBytesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_blockmanager", "bytes_total"),
-		"source = serverStatus wiredTiger.block-manager.[\"mapped bytes read\"|\"bytes read\"|\"bytes written\"]",
+		"= serverStatus wiredTiger.block-manager.[\"mapped bytes read\"|\"bytes read\"|\"bytes written\"]",
 		[]string{"type"},
 		nil,
 	)
@@ -38,11 +38,11 @@ var (
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_cache",
 		Name:      "pages",
-		Help:      "source = serverStatus wiredTiger.cache",
+		Help:      "= serverStatus wiredTiger.cache",
 	}, []string{"type"})
 	wtCachePagesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_cache", "pages_total"),
-		"source = serverStatus wiredTiger.cache.\"pages currently held in the cache\"",
+		"= serverStatus wiredTiger.cache.\"pages currently held in the cache\"",
 		[]string{"type"},
 		nil,
 	)
@@ -50,23 +50,23 @@ var (
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_cache",
 		Name:      "bytes",
-		Help:      "source = serverStatus wiredTiger.cache.\"bytes currently in the cache\"",
+		Help:      "= serverStatus wiredTiger.cache.\"bytes currently in the cache\"",
 	}, []string{"type"})
 	wtCacheMaxBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_cache",
 		Name:      "max_bytes",
-		Help:      "source = serverStatus wiredTiger.cache.\"maximum bytes configured\"",
+		Help:      "= serverStatus wiredTiger.cache.\"maximum bytes configured\"",
 	})
 	wtCacheBytesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_cache", "bytes_total"),
-		"source = serverStatus wiredTiger.cache.[\"bytes read into cache\"|\"bytes written from cache\"]",
+		"= serverStatus wiredTiger.cache.[\"bytes read into cache\"|\"bytes written from cache\"]",
 		[]string{"type"},
 		nil,
 	)
 	wtCacheEvictedTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_cache", "evicted_total"),
-		"source = serverStatus wiredTiger.cache.[\"modified pages evicted\"|\"unmodified pages evicted\"]",
+		"= serverStatus wiredTiger.cache.[\"modified pages evicted\"|\"unmodified pages evicted\"]",
 		[]string{"type"},
 		nil,
 	)
@@ -74,20 +74,20 @@ var (
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_cache",
 		Name:      "overhead_percent",
-		Help:      "source = serverStatus wiredTiger.cache.\"percentage overhead\"",
+		Help:      "= serverStatus wiredTiger.cache.\"percentage overhead\"",
 	})
 )
 
 var (
 	wtTransactionsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_transactions", "total"),
-		"source = serverStatus wiredTiger.transactions",
+		"= serverStatus wiredTiger.transactions",
 		[]string{"type"},
 		nil,
 	)
 	wtTransactionsTotalCheckpointMsDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_transactions", "checkpoint_milliseconds_total"),
-		"source = serverStatus wiredTiger.transactions.\"transaction checkpoint *\"",
+		"= serverStatus wiredTiger.transactions.\"transaction checkpoint *\"",
 		nil,
 		nil,
 	)
@@ -95,38 +95,38 @@ var (
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_transactions",
 		Name:      "checkpoint_milliseconds",
-		Help:      "source = serverStatus wiredTiger.transactions.\"transaction checkpoint [min|max] time (msecs)\"",
+		Help:      "= serverStatus wiredTiger.transactions.\"transaction checkpoint [min|max] time (msecs)\"",
 	}, []string{"type"})
 	wtTransactionsCheckpointsRunning = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_transactions",
 		Name:      "running_checkpoints",
-		Help:      "source = serverStatus wiredTiger.transactions.\"transaction checkpoint currently running\"",
+		Help:      "= serverStatus wiredTiger.transactions.\"transaction checkpoint currently running\"",
 	})
 )
 
 var (
 	wtLogRecordsScannedTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_log", "records_scanned_total"),
-		"source = serverStatus wiredTiger.log.\"records processed by log scan\"",
+		"= serverStatus wiredTiger.log.\"records processed by log scan\"",
 		nil,
 		nil,
 	)
 	wtLogRecordsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_log", "records_total"),
-		"source = serverStatus wiredTiger.log.[\"log records not compressed\"|\"log records compressed\"]",
+		"= serverStatus wiredTiger.log.[\"log records not compressed\"|\"log records compressed\"]",
 		[]string{"type"},
 		nil,
 	)
 	wtLogBytesTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_log", "bytes_total"),
-		"source = serverStatus wiredTiger.log.[\"log bytes of payload data\"|\"log bytes written\"]",
+		"= serverStatus wiredTiger.log.[\"log bytes of payload data\"|\"log bytes written\"]",
 		[]string{"type"},
 		nil,
 	)
 	wtLogOperationsTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "wiredtiger_log", "operations_total"),
-		"source = serverStatus wiredTiger.log.[\"log [flush|read|scan|sync|sync_dir|write] operations\"|\"log scan records requiring two reads\"]",
+		"= serverStatus wiredTiger.log.[\"log [flush|read|scan|sync|sync_dir|write] operations\"|\"log scan records requiring two reads\"]",
 		[]string{"type"},
 		nil,
 	)
@@ -137,13 +137,13 @@ var (
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_session",
 		Name:      "open_cursors_total",
-		Help:      "source = serverStatus wiredTiger.\"open cursor count\"",
+		Help:      "= serverStatus wiredTiger.\"open cursor count\"",
 	})
 	wtOpenSessions = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_session",
 		Name:      "open_sessions_total",
-		Help:      "source = serverStatus wiredTiger.\"open session count\"",
+		Help:      "= serverStatus wiredTiger.\"open session count\"",
 	})
 )
 
@@ -152,19 +152,19 @@ var (
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_concurrent_transactions",
 		Name:      "out_tickets",
-		Help:      "source = serverStatus wiredTiger.concurrentTransactions.*.out",
+		Help:      "= serverStatus wiredTiger.concurrentTransactions.*.out",
 	}, []string{"type"})
 	wtConcurrentTransactionsAvailable = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_concurrent_transactions",
 		Name:      "available_tickets",
-		Help:      "source = serverStatus wiredTiger.concurrentTransactions.*.available",
+		Help:      "= serverStatus wiredTiger.concurrentTransactions.*.available",
 	}, []string{"type"})
 	wtConcurrentTransactionsTotalTickets = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: "wiredtiger_concurrent_transactions",
 		Name:      "total_tickets",
-		Help:      "source = serverStatus wiredTiger.concurrentTransactions.*.totalTickets",
+		Help:      "= serverStatus wiredTiger.concurrentTransactions.*.totalTickets",
 	}, []string{"type"})
 )
 
