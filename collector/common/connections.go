@@ -28,7 +28,7 @@ var (
 var (
 	connectionsMetricsCreatedTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "connections_metrics", "created_total"),
-		"source = serverStatsus connections.totalCreated",
+		"source = serverStatus connections.totalCreated",
 		nil,
 		nil,
 	)
