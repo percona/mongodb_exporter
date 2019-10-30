@@ -66,7 +66,7 @@ var (
 var (
 	metricsOperationTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(Namespace, "", "metrics_operation_total"),
-		"= serverStatus metrics.operation.scanAndOrder",
+		"= serverStatus metrics.operation.[fastmod|idhack|scanAndOrder]",
 		[]string{"type"},
 		nil,
 	)
