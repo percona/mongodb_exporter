@@ -15,20 +15,36 @@
 package mongos
 
 import (
-	"io/ioutil"
+	"context"
 	"testing"
+	"time"
 
-	"gopkg.in/mgo.v2/bson"
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/percona/mongodb_exporter/testutils"
 )
 
 func TestParserServerStatus(t *testing.T) {
-	data, err := ioutil.ReadFile("../fixtures/server_status.bson")
+
+	serverStatus := &ServerStatus{}
+
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Disconnect(context.TODO())
 
-	serverStatus := &ServerStatus{}
-	loadServerStatusFromBson(data, serverStatus)
+	err = client.Database("admin").RunCommand(context.TODO(), bson.D{
+		{Key: "serverStatus", Value: 1},
+		{Key: "recordStats", Value: 0},
+		{Key: "opLatencies", Value: bson.M{"histograms": true}},
+	}).Decode(serverStatus)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if serverStatus.Asserts == nil {
 		t.Error("Asserts group was not loaded")
@@ -46,16 +62,16 @@ func TestParserServerStatus(t *testing.T) {
 		t.Error("Network group was not loaded")
 	}
 
-	if serverStatus.Opcounters == nil {
-		t.Error("Opcounters group was not loaded")
-	}
-
 	if serverStatus.Mem == nil {
 		t.Error("Mem group was not loaded")
 	}
 
 	if serverStatus.Connections == nil {
 		t.Error("Connections group was not loaded")
+	}
+
+	if serverStatus.Metrics == nil {
+		t.Error("Metrics group was not loaded")
 	}
 }
 
@@ -64,4 +80,18 @@ func loadServerStatusFromBson(data []byte, status *ServerStatus) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func TestGetServerStatusDecodesFine(t *testing.T) {
+	// setup
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	defaultClient := testutils.MustGetConnectedReplSetClient(ctx, t)
+	defer defaultClient.Disconnect(ctx)
+
+	// run
+	statusDefault := GetServerStatus(defaultClient)
+
+	// test
+	assert.NotNil(t, statusDefault)
 }

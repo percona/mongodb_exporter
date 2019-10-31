@@ -15,153 +15,71 @@
 package shared
 
 import (
-	"crypto/tls"
-	"crypto/x509"
+	"context"
 	"encoding/json"
 	"fmt"
-	"net"
+	"strconv"
 	"strings"
-	"time"
 
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
+// RedactMongoUri removes login and password from mongoUri.
 func RedactMongoUri(uri string) string {
 	if strings.HasPrefix(uri, "mongodb://") && strings.Contains(uri, "@") {
 		if strings.Contains(uri, "ssl=true") {
 			uri = strings.Replace(uri, "ssl=true", "", 1)
 		}
-		dialInfo, err := mgo.ParseURL(uri)
+
+		cStr, err := connstring.Parse(uri)
 		if err != nil {
 			log.Errorf("Cannot parse mongodb server url: %s", err)
 			return "unknown/error"
 		}
-		if dialInfo.Username != "" && dialInfo.Password != "" {
-			return "mongodb://****:****@" + strings.Join(dialInfo.Addrs, ",")
+
+		if cStr.Username != "" && cStr.Password != "" {
+			uri = strings.Replace(uri, cStr.Username, "****", 1)
+			uri = strings.Replace(uri, cStr.Password, "****", 1)
+			return uri
 		}
 	}
 	return uri
 }
 
 type MongoSessionOpts struct {
-	URI                   string
-	TLSConnection         bool
-	TLSCertificateFile    string
-	TLSPrivateKeyFile     string
-	TLSCaFile             string
-	TLSHostnameValidation bool
-	PoolLimit             int
-	SocketTimeout         time.Duration
-	SyncTimeout           time.Duration
+	URI string
 }
 
-// MongoSession connects to MongoDB and returns ready to use MongoDB session.
-func MongoSession(opts *MongoSessionOpts) *mgo.Session {
-	if strings.Contains(opts.URI, "ssl=true") {
-		opts.URI = strings.Replace(opts.URI, "ssl=true", "", 1)
-		opts.TLSConnection = true
-	}
-	dialInfo, err := mgo.ParseURL(opts.URI)
+// MongoClient connects to MongoDB and returns ready to use MongoDB client.
+func MongoClient(opts *MongoSessionOpts) *mongo.Client {
+	cOpts := options.Client().
+		ApplyURI(opts.URI).
+		SetDirect(true).
+		SetReadPreference(readpref.Nearest()).
+		SetAppName("mongodb_exporter")
+
+	client, err := mongo.NewClient(cOpts)
 	if err != nil {
-		log.Errorf("Cannot parse mongodb server url: %s", err)
 		return nil
 	}
 
-	// connect directly, fail faster, do not retry - for faster responses and accurate metrics, including mongoUp
-	dialInfo.Direct = true
-	dialInfo.Timeout = opts.SocketTimeout
-	dialInfo.FailFast = true
-
-	err = opts.configureDialInfoIfRequired(dialInfo)
-	if err != nil {
-		log.Errorf("%s", err)
-		return nil
-	}
-
-	session, err := mgo.DialWithInfo(dialInfo)
+	err = client.Connect(context.Background())
 	if err != nil {
 		log.Errorf("Cannot connect to server using url %s: %s", RedactMongoUri(opts.URI), err)
 		return nil
 	}
-	session.SetMode(mgo.Eventual, true)
-	session.SetPoolLimit(opts.PoolLimit)
-	session.SetPrefetch(0.00)
-	session.SetSyncTimeout(opts.SyncTimeout)
-	session.SetSocketTimeout(opts.SocketTimeout)
-	return session
+
+	return client
 }
 
-func (opts *MongoSessionOpts) configureDialInfoIfRequired(dialInfo *mgo.DialInfo) error {
-	if opts.TLSConnection {
-		config := &tls.Config{
-			InsecureSkipVerify: !opts.TLSHostnameValidation,
-		}
-		if len(opts.TLSCertificateFile) > 0 {
-			certificates, err := LoadKeyPairFrom(opts.TLSCertificateFile, opts.TLSPrivateKeyFile)
-			if err != nil {
-				return fmt.Errorf("Cannot load key pair from '%s' and '%s' to connect to server '%s'. Got: %v", opts.TLSCertificateFile, opts.TLSPrivateKeyFile, opts.URI, err)
-			}
-			config.Certificates = []tls.Certificate{certificates}
-		}
-		if len(opts.TLSCaFile) > 0 {
-			ca, err := LoadCaFrom(opts.TLSCaFile)
-			if err != nil {
-				return fmt.Errorf("Couldn't load client CAs from %s. Got: %s", opts.TLSCaFile, err)
-			}
-			config.RootCAs = ca
-		}
-		dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-			conn, err := tls.Dial("tcp", addr.String(), config)
-			if err != nil {
-				log.Errorf("Could not connect to %v. Got: %v", addr, err)
-				return nil, err
-			}
-			if config.InsecureSkipVerify {
-				err = enrichWithOwnChecks(conn, config)
-				if err != nil {
-					log.Errorf("Could not disable hostname validation. Got: %v", err)
-				}
-			}
-			return conn, err
-		}
-	}
-	return nil
-}
-
-func enrichWithOwnChecks(conn *tls.Conn, tlsConfig *tls.Config) error {
-	var err error
-	if err = conn.Handshake(); err != nil {
-		conn.Close()
-		return err
-	}
-
-	opts := x509.VerifyOptions{
-		Roots:         tlsConfig.RootCAs,
-		CurrentTime:   time.Now(),
-		DNSName:       "",
-		Intermediates: x509.NewCertPool(),
-	}
-
-	certs := conn.ConnectionState().PeerCertificates
-	for i, cert := range certs {
-		if i == 0 {
-			continue
-		}
-		opts.Intermediates.AddCert(cert)
-	}
-
-	_, err = certs[0].Verify(opts)
-	if err != nil {
-		conn.Close()
-		return err
-	}
-
-	return nil
-}
-
-func MongoSessionServerVersion(session *mgo.Session) (string, error) {
-	buildInfo, err := session.BuildInfo()
+// MongoSessionServerVersion returns mongo server version.
+func MongoSessionServerVersion(client *mongo.Client) (string, error) {
+	buildInfo, err := GetBuildInfo(client)
 	if err != nil {
 		log.Errorf("Could not get MongoDB BuildInfo: %s!", err)
 		return "unknown", err
@@ -169,13 +87,17 @@ func MongoSessionServerVersion(session *mgo.Session) (string, error) {
 	return buildInfo.Version, nil
 }
 
-func MongoSessionNodeType(session *mgo.Session) (string, error) {
+// MongoSessionNodeType returns mongo node type.
+func MongoSessionNodeType(client *mongo.Client) (string, error) {
 	masterDoc := struct {
 		SetName interface{} `bson:"setName"`
 		Hosts   interface{} `bson:"hosts"`
 		Msg     string      `bson:"msg"`
 	}{}
-	err := session.Run("isMaster", &masterDoc)
+
+	res := client.Database("admin").RunCommand(context.TODO(), bson.D{{Key: "isMaster", Value: 1}})
+
+	err := res.Decode(&masterDoc)
 	if err != nil {
 		log.Errorf("Got unknown node type: %s", err)
 		return "unknown", err
@@ -193,11 +115,11 @@ func MongoSessionNodeType(session *mgo.Session) (string, error) {
 
 // TestConnection connects to MongoDB and returns BuildInfo.
 func TestConnection(opts MongoSessionOpts) ([]byte, error) {
-	session := MongoSession(&opts)
-	if session == nil {
+	client := MongoClient(&opts)
+	if client == nil {
 		return nil, fmt.Errorf("Cannot connect using uri: %s", opts.URI)
 	}
-	buildInfo, err := session.BuildInfo()
+	buildInfo, err := GetBuildInfo(client)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot get buildInfo() for MongoDB using uri %s: %s", opts.URI, err)
 	}
@@ -208,4 +130,44 @@ func TestConnection(opts MongoSessionOpts) ([]byte, error) {
 	}
 
 	return b, nil
+}
+
+// BuildInfo represents mongodb build info.
+type BuildInfo struct {
+	Version        string
+	VersionArray   []int  `bson:"versionArray"` // On MongoDB 2.0+; assembled from Version otherwise
+	GitVersion     string `bson:"gitVersion"`
+	OpenSSLVersion string `bson:"OpenSSLVersion"`
+	SysInfo        string `bson:"sysInfo"` // Deprecated and empty on MongoDB 3.2+.
+	Bits           int
+	Debug          bool
+	MaxObjectSize  int `bson:"maxBsonObjectSize"`
+}
+
+// GetBuildInfo gets mongo build info.
+func GetBuildInfo(client *mongo.Client) (info BuildInfo, err error) {
+	res := client.Database("admin").RunCommand(context.TODO(), bson.D{{Key: "buildInfo", Value: "1"}})
+	err = res.Decode(&info)
+
+	if len(info.VersionArray) == 0 {
+		for _, a := range strings.Split(info.Version, ".") {
+			i, err := strconv.Atoi(a)
+			if err != nil {
+				break
+			}
+			info.VersionArray = append(info.VersionArray, i)
+		}
+	}
+	for len(info.VersionArray) < 4 {
+		info.VersionArray = append(info.VersionArray, 0)
+	}
+	if i := strings.IndexByte(info.GitVersion, ' '); i >= 0 {
+		// Strip off the " modules: enterprise" suffix. This is a _git version_.
+		// That information may be moved to another field if people need it.
+		info.GitVersion = info.GitVersion[:i]
+	}
+	if info.SysInfo == "deprecated" {
+		info.SysInfo = ""
+	}
+	return
 }

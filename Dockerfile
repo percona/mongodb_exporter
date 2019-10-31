@@ -1,7 +1,20 @@
-FROM        quay.io/prometheus/busybox:latest
-MAINTAINER  Alexey Palazhchenko <alexey.palazhchenko@percona.com>
+FROM golang:1.11
 
-COPY mongodb_exporter /bin/mongodb_exporter
+LABEL maintainer="Meik Minks <mminks@inoxio.de>"
 
-EXPOSE      9216
-ENTRYPOINT  [ "/bin/mongodb_exporter" ]
+WORKDIR /go/src/github.com/percona/mongodb_exporter
+
+COPY . .
+
+RUN make build
+
+FROM quay.io/prometheus/busybox:latest
+
+LABEL maintainer="Alexey Palazhchenko <alexey.palazhchenko@percona.com>"
+
+COPY --from=0 /go/src/github.com/percona/mongodb_exporter/bin/mongodb_exporter /bin/mongodb_exporter
+
+EXPOSE 9216
+
+ENTRYPOINT [ "/bin/mongodb_exporter" ]
+

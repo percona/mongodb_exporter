@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestCollector(t *testing.T) {
 	}
 
 	collector := NewMongodbCollector(&MongodbCollectorOpts{
-		URI: testMongoDBURL(),
+		URI:                      testMongoDBURL(),
 		CollectDatabaseMetrics:   true,
 		CollectCollectionMetrics: true,
 		CollectTopMetrics:        true,
@@ -55,22 +56,36 @@ func TestCollector(t *testing.T) {
 		close(metricCh)
 	}()
 
-	var descs int
-	for range descCh {
-		descs++
+	descriptors := make(map[string]struct{})
+	var descriptorsCount int
+	for d := range descCh {
+		descriptors[d.String()] = struct{}{}
+		descriptorsCount++
 	}
 
-	var metrics int
+	var metricsCount int
 	var versionInfoFound bool
 	for m := range metricCh {
+
+		if _, ok := descriptors[m.Desc().String()]; ok {
+			delete(descriptors, m.Desc().String())
+		}
+
 		m := helpers.ReadMetric(m)
 		switch m.Name {
-		case "mongodb_mongod_version_info":
+		case "mongodb_version_info":
 			versionInfoFound = true
 		}
-		metrics++
+		metricsCount++
 	}
 
-	assert.Equalf(t, descs, metrics, "got %d descs and %d metrics", descs, metrics)
+	var missingDescMsg string
+	for k := range descriptors {
+		missingDescMsg += fmt.Sprintf("- %s\n", k)
+	}
+
+	assert.True(t, len(descriptors) == 0, "Number of descriptors collected and described should be the same. "+
+		"Got '%d' Descriptors from collector.Describe() and '%d' from collector.Collect().\n"+
+		"Missing descriptors: \n%s", descriptorsCount, metricsCount, missingDescMsg)
 	assert.True(t, versionInfoFound, "version info metric not found")
 }

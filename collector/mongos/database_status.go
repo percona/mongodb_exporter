@@ -1,12 +1,13 @@
 package mongos
 
 import (
+	"context"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
@@ -104,18 +105,19 @@ func (dbStatList *DatabaseStatList) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // GetDatabaseStatList returns stats for all databases
-func GetDatabaseStatList(session *mgo.Session) *DatabaseStatList {
+func GetDatabaseStatList(client *mongo.Client) *DatabaseStatList {
 	dbStatList := &DatabaseStatList{}
-	database_names, err := session.DatabaseNames()
+	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
-		log.Error("Failed to get database names")
+		log.Errorf("Failed to get database names: %s.", err)
 		return nil
 	}
-	for _, db := range database_names {
+	for _, db := range dbNames {
 		dbStatus := DatabaseStatus{}
-		err := session.DB(db).Run(bson.D{{"dbStats", 1}, {"scale", 1}}, &dbStatus)
+		r := client.Database(db).RunCommand(context.TODO(), bson.D{{"dbStats", 1}, {"scale", 1}})
+		err := r.Decode(&dbStatus)
 		if err != nil {
-			log.Error("Failed to get database status.")
+			log.Errorf("Failed to get database status: %s.", err)
 			return nil
 		}
 		dbStatList.Members = append(dbStatList.Members, dbStatus)

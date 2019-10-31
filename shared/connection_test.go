@@ -31,8 +31,10 @@ func TestRedactMongoUri(t *testing.T) {
 }
 
 func TestMongoSession(t *testing.T) {
-	mso := &MongoSessionOpts{}
-	session := MongoSession(mso)
+	mso := &MongoSessionOpts{
+		URI: "mongodb://localhost:27017",
+	}
+	session := MongoClient(mso)
 	require.NotNil(t, session)
 	if session == nil {
 		t.Error("session is nil")
@@ -47,7 +49,20 @@ func TestMongoSession(t *testing.T) {
 }
 
 func TestTestConnection(t *testing.T) {
-	mso := MongoSessionOpts{}
+	mso := MongoSessionOpts{
+		URI: "mongodb://localhost:27017",
+	}
+	_, err := TestConnection(mso)
+	require.NoError(t, err)
+}
+
+func TestTestSSLConnection(t *testing.T) {
+	tlsCertificateKeyFile := "../testdata/client.pem"
+	tlsCAFile := "../testdata/ca.crt"
+
+	mso := MongoSessionOpts{
+		URI: "mongodb://127.0.0.1:27017/admin/?ssl=true&tlsCertificateKeyFile=" + tlsCertificateKeyFile + "&tlsCAFile=" + tlsCAFile + "&tlsInsecure=true&serverSelectionTimeoutMS=2000",
+	}
 	_, err := TestConnection(mso)
 	require.NoError(t, err)
 }

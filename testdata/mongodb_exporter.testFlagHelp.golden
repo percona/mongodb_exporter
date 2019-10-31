@@ -1,53 +1,39 @@
-mongodb_exporter gotest-version exports various MongoDB metrics in Prometheus format.
-Usage: mongodb_exporter [flags]
+usage: mongodb_exporter [<flags>]
+
+exports various MongoDB metrics in Prometheus format.
 
 Flags:
-  -collect.collection
-    	Enable collection of Collection metrics
-  -collect.database
-    	Enable collection of Database metrics
-  -collect.indexusage
-    	Enable collection of per index usage stats
-  -collect.topmetrics
-    	Enable collection of table top metrics
-  -groups.enabled string
-    	Currently ignored
-  -mongodb.max-connections int
-    	Max number of pooled connections to the database. (default 1)
-  -mongodb.socket-timeout duration
-    	Amount of time to wait for a non-responding socket to the database before it is forcefully closed.
-    	    	Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. (default 3s)
-  -mongodb.sync-timeout duration
-    	Amount of time an operation with this session will wait before returning an error in case
-    	    	a connection to a usable server can't be established.
-    	    	Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. (default 1m0s)
-  -mongodb.tls
-    	Enable tls connection with mongo server
-  -mongodb.tls-ca string
-    	Path to PEM file that contains the CAs that are trusted for server connections.
-    	    	If provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.
-    	    	If not provided: System default CAs are used.
-  -mongodb.tls-cert string
-    	Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).
-    	    	This should include the whole certificate chain.
-    	    	If provided: The connection will be opened via TLS to the MongoDB server.
-  -mongodb.tls-disable-hostname-validation
-    	Disable hostname validation for server connection.
-  -mongodb.tls-private-key string
-    	Path to PEM file that contains the decrypted private key (if not contained in mongodb.tls-cert file).
-  -mongodb.uri string
-    	MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options] (default "mongodb://localhost:27017")
-  -test
-    	Check MongoDB connection, print buildInfo() information and exit.
-  -version
-    	Print version information and exit.
-  -web.auth-file string
-    	Path to YAML file with server_user, server_password keys for HTTP Basic authentication (overrides HTTP_AUTH environment variable).
-  -web.listen-address string
-    	Address to listen on for web interface and telemetry. (default ":9216")
-  -web.metrics-path string
-    	Path under which to expose metrics. (default "/metrics")
-  -web.ssl-cert-file string
-    	Path to SSL certificate file.
-  -web.ssl-key-file string
-    	Path to SSL key file.
+  -h, --help                   Show context-sensitive help (also try --help-long
+                               and --help-man).
+      --web.auth-file=WEB.AUTH-FILE  
+                               Path to YAML file with server_user,
+                               server_password keys for HTTP Basic
+                               authentication (overrides HTTP_AUTH environment
+                               variable).
+      --web.ssl-cert-file=WEB.SSL-CERT-FILE  
+                               Path to SSL certificate file.
+      --web.ssl-key-file=WEB.SSL-KEY-FILE  
+                               Path to SSL key file.
+      --web.listen-address=":9216"  
+                               Address to listen on for web interface and
+                               telemetry.
+      --web.telemetry-path="/metrics"  
+                               Path under which to expose metrics.
+      --collect.database       Enable collection of Database metrics
+      --collect.collection     Enable collection of Collection metrics
+      --collect.topmetrics     Enable collection of table top metrics
+      --collect.indexusage     Enable collection of per index usage stats
+      --collect.connpoolstats  Collect MongoDB connpoolstats
+      --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
+                               MongoDB URI, format
+      --test                   Check MongoDB connection, print buildInfo()
+                               information and exit.
+      --version                Show application version.
+      --log.level="info"       Only log messages with the given severity or
+                               above. Valid levels: [debug, info, warn, error,
+                               fatal]
+      --log.format="logger:stderr"  
+                               Set the log target and format. Example:
+                               "logger:syslog?appname=bob&local=7" or
+                               "logger:stdout?json=true"
+

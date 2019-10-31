@@ -19,25 +19,28 @@ import (
 )
 
 var (
-	locksTimeLockedGlobalMicrosecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "locks_time_locked_global_microseconds_total",
-		Help:      "amount of time in microseconds that any database has held the global lock",
-	}, []string{"type", "database"})
+	locksTimeLockedGlobalMicrosecondsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "locks_time_locked_global_microseconds_total"),
+		"amount of time in microseconds that any database has held the global lock",
+		[]string{"type", "database"},
+		nil,
+	)
 )
 var (
-	locksTimeLockedLocalMicrosecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "locks_time_locked_local_microseconds_total",
-		Help:      "amount of time in microseconds that any database has held the local lock",
-	}, []string{"type", "database"})
+	locksTimeLockedLocalMicrosecondsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "locks_time_locked_local_microseconds_total"),
+		"amount of time in microseconds that any database has held the local lock",
+		[]string{"type", "database"},
+		nil,
+	)
 )
 var (
-	locksTimeAcquiringGlobalMicrosecondsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "locks_time_acquiring_global_microseconds_total",
-		Help:      "amount of time in microseconds that any database has spent waiting for the global lock",
-	}, []string{"type", "database"})
+	locksTimeAcquiringGlobalMicrosecondsTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "locks_time_acquiring_global_microseconds_total"),
+		"amount of time in microseconds that any database has spent waiting for the global lock",
+		[]string{"type", "database"},
+		nil,
+	)
 )
 
 // LockStatsMap is a map of lock stats
@@ -64,24 +67,20 @@ func (locks LockStatsMap) Export(ch chan<- prometheus.Metric) {
 			key = "dot"
 		}
 
-		locksTimeLockedGlobalMicrosecondsTotal.WithLabelValues("read", key).Set(locks.TimeLockedMicros.Read)
-		locksTimeLockedGlobalMicrosecondsTotal.WithLabelValues("write", key).Set(locks.TimeLockedMicros.Write)
+		ch <- prometheus.MustNewConstMetric(locksTimeLockedGlobalMicrosecondsTotalDesc, prometheus.CounterValue, locks.TimeLockedMicros.Read, "read", key)
+		ch <- prometheus.MustNewConstMetric(locksTimeLockedGlobalMicrosecondsTotalDesc, prometheus.CounterValue, locks.TimeLockedMicros.Write, "write", key)
 
-		locksTimeLockedLocalMicrosecondsTotal.WithLabelValues("read", key).Set(locks.TimeLockedMicros.ReadLower)
-		locksTimeLockedLocalMicrosecondsTotal.WithLabelValues("write", key).Set(locks.TimeLockedMicros.WriteLower)
+		ch <- prometheus.MustNewConstMetric(locksTimeLockedLocalMicrosecondsTotalDesc, prometheus.CounterValue, locks.TimeLockedMicros.ReadLower, "read", key)
+		ch <- prometheus.MustNewConstMetric(locksTimeLockedLocalMicrosecondsTotalDesc, prometheus.CounterValue, locks.TimeLockedMicros.WriteLower, "write", key)
 
-		locksTimeAcquiringGlobalMicrosecondsTotal.WithLabelValues("read", key).Set(locks.TimeAcquiringMicros.ReadLower)
-		locksTimeAcquiringGlobalMicrosecondsTotal.WithLabelValues("write", key).Set(locks.TimeAcquiringMicros.WriteLower)
+		ch <- prometheus.MustNewConstMetric(locksTimeAcquiringGlobalMicrosecondsTotalDesc, prometheus.CounterValue, locks.TimeAcquiringMicros.ReadLower, "read", key)
+		ch <- prometheus.MustNewConstMetric(locksTimeAcquiringGlobalMicrosecondsTotalDesc, prometheus.CounterValue, locks.TimeAcquiringMicros.WriteLower, "write", key)
 	}
-
-	locksTimeLockedGlobalMicrosecondsTotal.Collect(ch)
-	locksTimeLockedLocalMicrosecondsTotal.Collect(ch)
-	locksTimeAcquiringGlobalMicrosecondsTotal.Collect(ch)
 }
 
 // Describe describes the metrics for prometheus
 func (locks LockStatsMap) Describe(ch chan<- *prometheus.Desc) {
-	locksTimeLockedGlobalMicrosecondsTotal.Describe(ch)
-	locksTimeLockedLocalMicrosecondsTotal.Describe(ch)
-	locksTimeAcquiringGlobalMicrosecondsTotal.Describe(ch)
+	ch <- locksTimeLockedGlobalMicrosecondsTotalDesc
+	ch <- locksTimeLockedLocalMicrosecondsTotalDesc
+	ch <- locksTimeAcquiringGlobalMicrosecondsTotalDesc
 }

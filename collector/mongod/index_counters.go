@@ -28,11 +28,12 @@ var (
 )
 
 var (
-	indexCountersTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "index_counters_total",
-		Help:      "Total indexes by type",
-	}, []string{"type"})
+	indexCountersTotalDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(Namespace, "", "index_counters_total"),
+		"Total indexes by type",
+		[]string{"type"},
+		nil,
+	)
 )
 
 //IndexCounterStats index counter stats
@@ -46,20 +47,19 @@ type IndexCounterStats struct {
 
 // Export exports the data to prometheus.
 func (indexCountersStats *IndexCounterStats) Export(ch chan<- prometheus.Metric) {
-	indexCountersTotal.WithLabelValues("accesses").Set(indexCountersStats.Accesses)
-	indexCountersTotal.WithLabelValues("hits").Set(indexCountersStats.Hits)
-	indexCountersTotal.WithLabelValues("misses").Set(indexCountersStats.Misses)
-	indexCountersTotal.WithLabelValues("resets").Set(indexCountersStats.Resets)
+	ch <- prometheus.MustNewConstMetric(indexCountersTotalDesc, prometheus.CounterValue, indexCountersStats.Accesses, "accesses")
+	ch <- prometheus.MustNewConstMetric(indexCountersTotalDesc, prometheus.CounterValue, indexCountersStats.Hits, "hits")
+	ch <- prometheus.MustNewConstMetric(indexCountersTotalDesc, prometheus.CounterValue, indexCountersStats.Misses, "misses")
+	ch <- prometheus.MustNewConstMetric(indexCountersTotalDesc, prometheus.CounterValue, indexCountersStats.Resets, "resets")
 
 	indexCountersMissRatio.Set(indexCountersStats.MissRatio)
 
-	indexCountersTotal.Collect(ch)
 	indexCountersMissRatio.Collect(ch)
 
 }
 
 // Describe describes the metrics for prometheus
 func (indexCountersStats *IndexCounterStats) Describe(ch chan<- *prometheus.Desc) {
-	indexCountersTotal.Describe(ch)
+	ch <- indexCountersTotalDesc
 	indexCountersMissRatio.Describe(ch)
 }

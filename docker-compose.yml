@@ -24,3 +24,18 @@ services:
     volumes:
       - ./testdata/ca.crt:/etc/ssl/ca.crt
       - ./testdata/server.pem:/etc/ssl/server.pem
+      - ./testdata/client.pem:/etc/ssl/client.pem
+  mongo-replset:
+    image: ${MONGODB_IMAGE:-mongo:3.6}
+    ports:
+      - 127.0.0.1:27019:27017
+    command:
+      - --bind_ip=0.0.0.0
+      - --replSet=rs0
+      - --sslMode=preferSSL
+      - --sslPEMKeyFile=/etc/ssl/server.pem
+      - --sslCAFile=/etc/ssl/ca.crt
+    volumes:
+      - ./testdata/ca.crt:/etc/ssl/ca.crt
+      - ./testdata/server.pem:/etc/ssl/server.pem
+      - ./testdata/client.pem:/etc/ssl/client.pem

@@ -15,9 +15,9 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/percona/exporter_shared"
@@ -25,79 +25,46 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
+	"gopkg.in/alecthomas/kingpin.v2"
+
+	pmmVersion "github.com/percona/pmm/version"
 
 	"github.com/percona/mongodb_exporter/collector"
 	"github.com/percona/mongodb_exporter/shared"
 )
 
 const (
-	program = "mongodb_exporter"
+	program           = "mongodb_exporter"
+	versionDataFormat = "20060102-15:04:05"
 )
 
-func defaultMongoDBURI() string {
-	if u := os.Getenv("MONGODB_URI"); u != "" {
-		return u
-	}
-	return "mongodb://localhost:27017"
-}
-
 var (
-	versionF       = flag.Bool("version", false, "Print version information and exit.")
-	listenAddressF = flag.String("web.listen-address", ":9216", "Address to listen on for web interface and telemetry.")
-	metricsPathF   = flag.String("web.metrics-path", "/metrics", "Path under which to expose metrics.")
+	listenAddressF = kingpin.Flag("web.listen-address", "Address to listen on for web interface and telemetry.").Default(":9216").String()
+	metricsPathF   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
-	collectDatabaseF   = flag.Bool("collect.database", false, "Enable collection of Database metrics")
-	collectCollectionF = flag.Bool("collect.collection", false, "Enable collection of Collection metrics")
-	collectTopF        = flag.Bool("collect.topmetrics", false, "Enable collection of table top metrics")
-	collectIndexUsageF = flag.Bool("collect.indexusage", false, "Enable collection of per index usage stats")
+	collectDatabaseF             = kingpin.Flag("collect.database", "Enable collection of Database metrics").Bool()
+	collectCollectionF           = kingpin.Flag("collect.collection", "Enable collection of Collection metrics").Bool()
+	collectTopF                  = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
+	collectIndexUsageF           = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
+	mongodbCollectConnPoolStatsF = kingpin.Flag("collect.connpoolstats", "Collect MongoDB connpoolstats").Bool()
 
-	uriF     = flag.String("mongodb.uri", defaultMongoDBURI(), "MongoDB URI, format: [mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]")
-	tlsF     = flag.Bool("mongodb.tls", false, "Enable tls connection with mongo server")
-	tlsCertF = flag.String("mongodb.tls-cert", "", "Path to PEM file that contains the certificate (and optionally also the decrypted private key in PEM format).\n"+
-		"    \tThis should include the whole certificate chain.\n"+
-		"    \tIf provided: The connection will be opened via TLS to the MongoDB server.")
-	tlsPrivateKeyF = flag.String("mongodb.tls-private-key", "", "Path to PEM file that contains the decrypted private key (if not contained in mongodb.tls-cert file).")
-	tlsCAF         = flag.String("mongodb.tls-ca", "", "Path to PEM file that contains the CAs that are trusted for server connections.\n"+
-		"    \tIf provided: MongoDB servers connecting to should present a certificate signed by one of this CAs.\n"+
-		"    \tIf not provided: System default CAs are used.")
-	tlsDisableHostnameValidationF = flag.Bool("mongodb.tls-disable-hostname-validation", false, "Disable hostname validation for server connection.")
-	maxConnectionsF               = flag.Int("mongodb.max-connections", 1, "Max number of pooled connections to the database.")
-	testF                         = flag.Bool("test", false, "Check MongoDB connection, print buildInfo() information and exit.")
-
-	socketTimeoutF = flag.Duration("mongodb.socket-timeout", 3*time.Second, "Amount of time to wait for a non-responding socket to the database before it is forcefully closed.\n"+
-		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.")
-	syncTimeoutF = flag.Duration("mongodb.sync-timeout", time.Minute, "Amount of time an operation with this session will wait before returning an error in case\n"+
-		"    \ta connection to a usable server can't be established.\n"+
-		"    \tValid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'.")
-
-	// FIXME currently ignored
-	// enabledGroupsFlag = flag.String("groups.enabled", "asserts,durability,background_flushing,connections,extra_info,global_lock,index_counters,network,op_counters,op_counters_repl,memory,locks,metrics", "Comma-separated list of groups to use, for more info see: docs.mongodb.org/manual/reference/command/serverStatus/")
-	enabledGroupsFlag = flag.String("groups.enabled", "", "Currently ignored")
+	uriF = kingpin.Flag("mongodb.uri", "MongoDB URI, format").
+		PlaceHolder("[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]").
+		Default("mongodb://localhost:27017").
+		Envar("MONGODB_URI").
+		String()
+	testF = kingpin.Flag("test", "Check MongoDB connection, print buildInfo() information and exit.").Bool()
 )
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s %s exports various MongoDB metrics in Prometheus format.\n", os.Args[0], version.Version)
-		fmt.Fprintf(os.Stderr, "Usage: %s [flags]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Flags:\n")
-		flag.PrintDefaults()
-	}
-	flag.Parse()
-
-	uri := os.Getenv("MONGODB_URI")
-	if uri != "" {
-		uriF = &uri
-	}
+	initVersionInfo()
+	log.AddFlags(kingpin.CommandLine)
+	kingpin.Parse()
 
 	if *testF {
 		buildInfo, err := shared.TestConnection(
 			shared.MongoSessionOpts{
-				URI:                   *uriF,
-				TLSConnection:         *tlsF,
-				TLSCertificateFile:    *tlsCertF,
-				TLSPrivateKeyFile:     *tlsPrivateKeyF,
-				TLSCaFile:             *tlsCAF,
-				TLSHostnameValidation: !(*tlsDisableHostnameValidationF),
+				URI: *uriF,
 			},
 		)
 		if err != nil {
@@ -107,27 +74,51 @@ func main() {
 		fmt.Println(string(buildInfo))
 		os.Exit(0)
 	}
-	if *versionF {
-		fmt.Println(version.Print(program))
-		os.Exit(0)
-	}
 
+	// TODO: Maybe we should move version.Info() and version.BuildContext() to https://github.com/percona/exporter_shared
+	// See: https://jira.percona.com/browse/PMM-3250 and https://github.com/percona/mongodb_exporter/pull/132#discussion_r262227248
+	log.Infoln("Starting", program, version.Info())
+	log.Infoln("Build context", version.BuildContext())
+
+	programCollector := version.NewCollector(program)
 	mongodbCollector := collector.NewMongodbCollector(&collector.MongodbCollectorOpts{
 		URI:                      *uriF,
-		TLSConnection:            *tlsF,
-		TLSCertificateFile:       *tlsCertF,
-		TLSPrivateKeyFile:        *tlsPrivateKeyF,
-		TLSCaFile:                *tlsCAF,
-		TLSHostnameValidation:    !(*tlsDisableHostnameValidationF),
-		DBPoolLimit:              *maxConnectionsF,
 		CollectDatabaseMetrics:   *collectDatabaseF,
 		CollectCollectionMetrics: *collectCollectionF,
 		CollectTopMetrics:        *collectTopF,
 		CollectIndexUsageStats:   *collectIndexUsageF,
-		SocketTimeout:            *socketTimeoutF,
-		SyncTimeout:              *syncTimeoutF,
+		CollectConnPoolStats:     *mongodbCollectConnPoolStatsF,
 	})
-	prometheus.MustRegister(mongodbCollector)
+	prometheus.MustRegister(programCollector, mongodbCollector)
 
-	exporter_shared.RunServer("MongoDB", *listenAddressF, *metricsPathF, promhttp.ContinueOnError)
+	promHandler := promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}))
+	exporter_shared.RunServer("MongoDB", *listenAddressF, *metricsPathF, promHandler)
+}
+
+// initVersionInfo sets version info
+// If binary was build for PMM with environment variable PMM_RELEASE_VERSION
+// `--version` will be displayed in PMM format. Also `PMM Version` will be connected
+// to application version and will be printed in all logs.
+// TODO: Refactor after moving version.Info() and version.BuildContext() to https://github.com/percona/exporter_shared
+// See: https://jira.percona.com/browse/PMM-3250 and https://github.com/percona/mongodb_exporter/pull/132#discussion_r262227248
+func initVersionInfo() {
+	version.Version = pmmVersion.Version
+	version.Revision = pmmVersion.FullCommit
+	version.Branch = pmmVersion.Branch
+
+	if buildDate, err := strconv.ParseInt(pmmVersion.Timestamp, 10, 64); err != nil {
+		version.BuildDate = time.Unix(0, 0).Format(versionDataFormat)
+	} else {
+		version.BuildDate = time.Unix(buildDate, 0).Format(versionDataFormat)
+	}
+
+	if pmmVersion.PMMVersion != "" {
+		version.Version += "-pmm-" + pmmVersion.PMMVersion
+		kingpin.Version(pmmVersion.FullInfo())
+	} else {
+		kingpin.Version(version.Print(program))
+	}
+
+	kingpin.HelpFlag.Short('h')
+	kingpin.CommandLine.Help = fmt.Sprintf("%s exports various MongoDB metrics in Prometheus format.\n", pmmVersion.ShortInfo())
 }

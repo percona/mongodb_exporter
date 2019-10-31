@@ -1,11 +1,12 @@
 # Percona MongoDB Exporter
 
-[![Release](https://github-release-version.herokuapp.com/github/percona/mongodb_exporter/release.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
-[![Build Status](https://travis-ci.org/percona/mongodb_exporter.svg?branch=master)](https://travis-ci.org/percona/mongodb_exporter)
+[![Release](https://img.shields.io/github/release/percona/mongodb_exporter.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
+[![Build Status](https://travis-ci.com/percona/mongodb_exporter.svg?branch=master)](https://travis-ci.com/percona/mongodb_exporter)
+[![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
-[![CLA assistant](https://cla-assistant.io/readme/badge/percona/mongodb_exporter)](https://cla-assistant.io/percona/mongodb_exporter)
+[![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
 
-Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado (@dcu), but forked for full sharded support and structure changes.
+Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cuadrado ([@dcu](https://github.com/dcu)), but forked for full sharded support and structure changes.
 
 ## Features
 
@@ -17,19 +18,47 @@ Based on [MongoDB exporter](https://github.com/dcu/mongodb_exporter) by David Cu
 - MongoDB WiredTiger storage-engine metrics (*cache, blockmanger, tickets, etc*)
 - MongoDB Top Metrics per collection (writeLock, readLock, query, etc*)
 
+### Important Note
+
+Metrics `mongodb_mongod_replset_oplog_*` doesn't work in [Master/Slave](https://docs.mongodb.com/v3.4/core/master-slave/) replication mode, because it was *DEPRECATED* in MongoDB `3.2` and removed in `4.0`.
 
 ## Building and running
 
+### Prerequisites:
+
+* [Go compiler](https://golang.org/dl/)
+* Docker and [Docker Compose](https://docs.docker.com/compose/)
+
 ### Building
 
-```bash
-make
-```
+1. Get the code from the Percona repository:
+ 
+    ```bash
+    go get -u github.com/percona/mongodb_exporter
+    ```
+ 2. Switch to the buld directory and just run ``make`` to install all needed tools, format code with `go fmt`, build a binary for your OS and run tests.:
+ 
+    ```bash
+    cd ${GOPATH-$HOME/go}/src/github.com/percona/mongodb_exporter
+    make
+    ```
+    *Note: Running tests requires ``docker`` (as it uses MongoDB) and ``docker-compose``, and you will also need free ``27017`` port, as ``docker-compose`` maps this port into your host OS while testing.*
 
+    1. If you want just build a binary for your OS without codestyle checks and tests you can run command below:
+
+       ```bash
+          make build
+       ```
+
+    2. If you don't have or don't want to install the whole GO stuff, use this docker build that creates a container with a freshly built `mongodb_exporter` binary:
+
+       ```bash
+          make docker
+       ```
 
 ### Running
 
-To define your own MongoDB URL, use environment variable `MONGODB_URI`. If set this variable takes precedence over `-mongodb.uri` flag.
+To define your own MongoDB URL, use environment variable `MONGODB_URI`. If set this variable takes precedence over `--mongodb.uri` flag.
 
 To enable HTTP basic authentication, set environment variable `HTTP_AUTH` to user:password pair. Alternatively, you can
 use YAML file with `server_user` and `server_password` fields.
@@ -37,8 +66,12 @@ use YAML file with `server_user` and `server_password` fields.
 ```bash
 export MONGODB_URI='mongodb://localhost:27017'
 export HTTP_AUTH='user:password'
-./mongodb_exporter <flags>
+./bin/mongodb_exporter [<flags>]
 ```
+
+#### Kubernetes
+
+You can use the chart [prometheus-mongodb-exporter](https://github.com/helm/charts/tree/master/stable/prometheus-mongodb-exporter) from helm stable repository.
 
 ### Flags
 
