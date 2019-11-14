@@ -39,6 +39,12 @@ var (
 		Name:      "my_state",
 		Help:      "An integer between 0 and 10 that represents the replica state of the current member",
 	}, []string{"set"})
+	myReplicaLag = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: subsystem,
+		Name:      "my_replica_lag",
+		Help:      "An integer represents the replication lag in seconds, -1 if no master found",
+	}, []string{"set"})
 	date = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
@@ -130,6 +136,7 @@ var (
 		Help:      "The configVersion value is the replica set configuration version.",
 	}, []string{"set", "name", "state"})
 	primaryOptimeDate        float64
+	myOptimeDate             float64
 	primaryLastHeartbeatRecv float64
 )
 
@@ -169,6 +176,7 @@ type Member struct {
 func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 	myName.Reset()
 	myState.Reset()
+	myReplicaLag.Reset()
 	term.Reset()
 	numberOfMembers.Reset()
 	heartbeatIntervalMillis.Reset()
@@ -199,6 +207,9 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 
 	// Find the Optime and the LastHeartbeatRecv for the Primary.
 	for _, member := range replStatus.Members {
+		if member.Self != nil && *member.Self {
+			myOptimeDate = float64(member.OptimeDate.Unix())
+		}
 		if member.StateStr == "PRIMARY" {
 			// Needed to calcule the replication lag for secondaries.
 			primaryOptimeDate = float64(member.OptimeDate.Unix())
@@ -259,9 +270,15 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 			memberConfigVersion.With(ls).Set(float64(*member.ConfigVersion))
 		}
 	}
+	if primaryOptimeDate != 0 && myOptimeDate != 0 {
+		myReplicaLag.WithLabelValues(replStatus.Set).Set(float64(primaryOptimeDate - myOptimeDate))
+	} else {
+		myReplicaLag.WithLabelValues(replStatus.Set).Set(-1.0)
+	}
 	// collect metrics
 	myName.Collect(ch)
 	myState.Collect(ch)
+	myReplicaLag.Collect(ch)
 	term.Collect(ch)
 	date.Collect(ch)
 	numberOfMembers.Collect(ch)
@@ -282,6 +299,7 @@ func (replStatus *ReplSetStatus) Export(ch chan<- prometheus.Metric) {
 func (replStatus *ReplSetStatus) Describe(ch chan<- *prometheus.Desc) {
 	myName.Describe(ch)
 	myState.Describe(ch)
+	myReplicaLag.Describe(ch)
 	term.Describe(ch)
 	date.Describe(ch)
 	numberOfMembers.Describe(ch)
