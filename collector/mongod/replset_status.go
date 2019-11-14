@@ -60,7 +60,7 @@ var (
 	heartbeatIntervalMillis = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: Namespace,
 		Subsystem: subsystem,
-		Name:      "heatbeat_interval_millis",
+		Name:      "heartbeat_interval_millis",
 		Help:      "The frequency in milliseconds of the heartbeats",
 	}, []string{"set"})
 	memberHealth = prometheus.NewGaugeVec(prometheus.GaugeOpts{
