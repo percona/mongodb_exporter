@@ -319,7 +319,6 @@ type RocksDbStats struct {
 	TransactionEngineKeys      float64               `bson:"transaction-engine-keys"`
 	TransactionEngineSnapshots float64               `bson:"transaction-engine-snapshots"`
 	Stats                      []string              `bson:"stats"`
-	ThreadStatus               []string              `bson:"thread-status"`
 	Counters                   *RocksDbStatsCounters `bson:"counters,omitempty"`
 }
 
