@@ -9,6 +9,13 @@ go:
   - 1.12.x
   # - TODO master
 
+# skip non-trunk PMM-XXXX branch builds, but still build pull requests
+branches:
+  except:
+    - /^PMM\-\d{4}/
+
+go_import_path: github.com/percona/mongodb_exporter
+
 matrix:
   allow_failures:
     - go: master
