@@ -13,6 +13,7 @@ Those flags have been removed: `--mongodb.authentification-database, --mongodb.m
 ### Added
 
 ### Fixed
+- Added a workaround for [GODRIVER-1476](https://jira.mongodb.org/browse/GODRIVER-1476) (mongodb+srv URIs with fully qualified DNS names)
 
 ## [0.10.0]
 ### Changed

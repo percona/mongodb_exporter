@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/percona/exporter_shared"
@@ -60,6 +61,8 @@ func main() {
 	initVersionInfo()
 	log.AddFlags(kingpin.CommandLine)
 	kingpin.Parse()
+
+	workaroundGodriver1476()
 
 	if *testF {
 		buildInfo, err := shared.TestConnection(
@@ -121,4 +124,22 @@ func initVersionInfo() {
 
 	kingpin.HelpFlag.Short('h')
 	kingpin.CommandLine.Help = fmt.Sprintf("%s exports various MongoDB metrics in Prometheus format.\n", pmmVersion.ShortInfo())
+}
+
+// A hack to work around https://jira.mongodb.org/browse/GODRIVER-1476
+// When mongo-driver is updated to include this fix, we can remove this.
+func workaroundGodriver1476() {
+	uri := *uriF
+
+	const SRV_PREFIX = "mongodb+srv://"
+	if strings.HasPrefix(uri, SRV_PREFIX) {
+		// A SRV URI will only ever have one host.
+		// This may also have creds, but we're only stripping a trailing dot, so we're fine.
+		parts := strings.Split(uri[len(SRV_PREFIX):], "/")
+		host := parts[0]
+
+		uri = strings.Replace(uri, host, strings.TrimSuffix(host, "."), 1)
+	}
+
+	uriF = &uri
 }
