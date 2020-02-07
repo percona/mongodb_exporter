@@ -1,6 +1,6 @@
 module github.com/percona/mongodb_exporter
 
-go 1.12
+go 1.13
 
 require (
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
