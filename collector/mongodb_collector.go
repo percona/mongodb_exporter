@@ -40,6 +40,7 @@ type MongodbCollectorOpts struct {
 	CollectTopMetrics        bool
 	CollectIndexUsageStats   bool
 	CollectConnPoolStats     bool
+	CollectChunkMetrics      bool
 }
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
@@ -253,6 +254,14 @@ func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- 
 		connPoolStats := commoncollector.GetConnPoolStats(client)
 		if connPoolStats != nil {
 			connPoolStats.Export(ch)
+		}
+	}
+
+	if exporter.Opts.CollectChunkMetrics {
+		log.Debug("Collecting Chunk Counts From Mongos")
+		chunkCountList := mongos.GetChunkCountList(client)
+		if chunkCountList != nil {
+			chunkCountList.Export(ch)
 		}
 	}
 }

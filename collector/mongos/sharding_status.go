@@ -208,6 +208,7 @@ func (status *ShardingStats) Export(ch chan<- prometheus.Metric) {
 	mongosPing.Collect(ch)
 	mongosBalancerLockState.Collect(ch)
 	mongosBalancerLockTimestamp.Collect(ch)
+
 }
 
 func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
