@@ -95,3 +95,18 @@ func TestGetServerStatusDecodesFine(t *testing.T) {
 	// test
 	assert.NotNil(t, statusDefault)
 }
+
+func TestGetShardChunksDecodesFine(t *testing.T) {
+	// setup
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	client := testutils.MustGetConnectedReplSetClient(ctx, t)
+	defer client.Disconnect(ctx)
+
+	// run
+	status := GetShardChunks(client)
+
+	// test
+	assert.NotNil(t, status)
+}
+
