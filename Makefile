@@ -109,7 +109,8 @@ clean:
 	@echo ">> removing build artifacts"
 	@rm -f $(PREFIX)/coverage.txt
 	@rm -Rf $(PREFIX)/bin
-	docker-compose down
+	@echo ">> downing docker test environment if docker-compose is available"
+	@if docker-compose --version 2>/dev/null >/dev/null ; then docker-compose down ; fi
 
 mongo-db-in-docker:
 	# Start docker containers.
