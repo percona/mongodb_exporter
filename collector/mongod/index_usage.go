@@ -7,16 +7,15 @@ import (
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/percona/mongodb_exporter/collector/common"
 )
 
-var (
-	indexUsage = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Name:      "index_usage_count",
-		Help:      "Contains a usage count of each index",
-	}, []string{"collection", "db", "index"})
-)
+var indexUsage = prometheus.NewCounterVec(prometheus.CounterOpts{
+	Namespace: Namespace,
+	Name:      "index_usage_count",
+	Help:      "Contains a usage count of each index"},
+	[]string{"collection", "db", "index"})
 
 // IndexStatsList represents index usage information
 type IndexStatsList struct {
@@ -55,95 +54,79 @@ func (indexStats *IndexStatsList) Describe(ch chan<- *prometheus.Desc) {
 	indexUsage.Describe(ch)
 }
 
-var (
-	logSuppressIS = make(map[string]bool)
-)
+var logSuppressIS = make(map[string]struct{})
+
+const keyIS = ""
 
 // GetIndexUsageStatList returns stats for a given collection in a database
 func GetIndexUsageStatList(client *mongo.Client, skip map[string]struct{}) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	databaseNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
-		_, logSFound := logSuppressIS[""]
-		if !logSFound {
+		if _, ok := logSuppressIS[keyIS]; !ok {
 			log.Warnf("%s. Index usage stats will not be collected. This log message will be suppressed from now.", err)
-			logSuppressIS[""] = true
+			logSuppressIS[keyIS] = struct{}{}
 		}
 		return nil
 	}
-	delete(logSuppressIS, "")
+
+	delete(logSuppressIS, keyIS)
 	for _, dbName := range databaseNames {
 		if _, ok := skip[dbName]; ok {
 			continue
 		}
 
-		c, err := client.Database(dbName).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
+		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
-			_, logSFound := logSuppressIS[dbName]
-			if !logSFound {
+			if _, ok := logSuppressIS[dbName]; !ok {
 				log.Warnf("%s. Index usage stats will not be collected for this db. This log message will be suppressed from now.", err)
-				logSuppressIS[dbName] = true
+				logSuppressIS[dbName] = struct{}{}
 			}
-		} else {
+			continue
+		}
 
-			type collListItem struct {
-				Name string `bson:"name,omitempty"`
-				Type string `bson:"type,omitempty"`
+		delete(logSuppressIS, dbName)
+		for _, collName := range collNames {
+			fullCollName := common.CollFullName(dbName, collName)
+			if _, ok := skip[fullCollName]; ok {
+				continue
 			}
 
-			delete(logSuppressIS, dbName)
+			collIndexUsageStats := IndexStatsList{}
+			c, err := client.Database(dbName).Collection(collName).Aggregate(context.TODO(), []bson.M{{"$indexStats": bson.M{}}})
+			if err != nil {
+				if _, ok := logSuppressIS[fullCollName]; !ok {
+					log.Warnf("%s. Index usage stats will not be collected for this collection. This log message will be suppressed from now.", err)
+					logSuppressIS[fullCollName] = struct{}{}
+				}
+				continue
+			}
+
 			for c.Next(context.TODO()) {
-				coll := &collListItem{}
-				err := c.Decode(&coll)
-				if err != nil {
+				s := &IndexUsageStats{}
+				if err := c.Decode(s); err != nil {
 					log.Error(err)
 					continue
 				}
-
-				fullCollName := dbName + "." + coll.Name
-				if _, ok := skip[fullCollName]; ok {
-					continue
-				}
-
-				collIndexUsageStats := IndexStatsList{}
-				c, err := client.Database(dbName).Collection(coll.Name).Aggregate(context.TODO(), []bson.M{{"$indexStats": bson.M{}}})
-				if err != nil {
-					_, logSFound := logSuppressIS[fullCollName]
-					if !logSFound {
-						log.Warnf("%s. Index usage stats will not be collected for this collection. This log message will be suppressed from now.", err)
-						logSuppressIS[fullCollName] = true
-					}
-				} else {
-
-					for c.Next(context.TODO()) {
-						s := &IndexUsageStats{}
-						if err := c.Decode(s); err != nil {
-							log.Error(err)
-							continue
-						}
-						collIndexUsageStats.Items = append(collIndexUsageStats.Items, *s)
-					}
-
-					if err := c.Err(); err != nil {
-						log.Error(err)
-					}
-
-					if err := c.Close(context.TODO()); err != nil {
-						log.Errorf("Could not close Aggregate() cursor, reason: %v", err)
-					}
-
-					delete(logSuppressIS, fullCollName)
-					// Label index stats with corresponding db.collection
-					for i := 0; i < len(collIndexUsageStats.Items); i++ {
-						collIndexUsageStats.Items[i].Database = dbName
-						collIndexUsageStats.Items[i].Collection = coll.Name
-					}
-					indexUsageStatsList.Items = append(indexUsageStatsList.Items, collIndexUsageStats.Items...)
-				}
+				collIndexUsageStats.Items = append(collIndexUsageStats.Items, *s)
 			}
+
+			if err := c.Err(); err != nil {
+				log.Error(err)
+			}
+
 			if err := c.Close(context.TODO()); err != nil {
-				log.Errorf("Could not close ListCollections() cursor, reason: %v", err)
+				log.Errorf("Could not close Aggregate() cursor, reason: %v", err)
 			}
+
+			delete(logSuppressIS, fullCollName)
+			// Label index stats with corresponding db.collection
+			for i := 0; i < len(collIndexUsageStats.Items); i++ {
+				collIndexUsageStats.Items[i].Database = dbName
+				collIndexUsageStats.Items[i].Collection = collName
+			}
+			indexUsageStatsList.Items = append(indexUsageStatsList.Items, collIndexUsageStats.Items...)
+
 		}
 	}
 
