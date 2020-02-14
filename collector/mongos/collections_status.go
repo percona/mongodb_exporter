@@ -109,7 +109,7 @@ func GetCollectionStatList(client *mongo.Client, skip map[string]struct{}) *Coll
 	if err != nil {
 		_, logSFound := logSuppressCS[""]
 		if !logSFound {
-			log.Errorf("%s. Collection stats will not be collected. This log message will be suppressed from now.", err)
+			log.Warnf("%s. Collection stats will not be collected. This log message will be suppressed from now.", err)
 			logSuppressCS[""] = true
 		}
 		return nil
@@ -124,7 +124,7 @@ func GetCollectionStatList(client *mongo.Client, skip map[string]struct{}) *Coll
 		if err != nil {
 			_, logSFound := logSuppressCS[dbName]
 			if !logSFound {
-				log.Errorf("%s. Collection stats will not be collected for this db. This log message will be suppressed from now.", err)
+				log.Warnf("%s. Collection stats will not be collected for this db. This log message will be suppressed from now.", err)
 				logSuppressCS[dbName] = true
 			}
 		} else {
@@ -154,7 +154,7 @@ func GetCollectionStatList(client *mongo.Client, skip map[string]struct{}) *Coll
 				if err != nil {
 					_, logSFound := logSuppressCS[fullCollName]
 					if !logSFound {
-						log.Errorf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
+						log.Warnf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
 						logSuppressCS[dbName+"."+coll.Name] = true
 					}
 				} else {

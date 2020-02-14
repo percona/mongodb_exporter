@@ -66,7 +66,7 @@ func GetIndexUsageStatList(client *mongo.Client, skip map[string]struct{}) *Inde
 	if err != nil {
 		_, logSFound := logSuppressIS[""]
 		if !logSFound {
-			log.Errorf("%s. Index usage stats will not be collected. This log message will be suppressed from now.", err)
+			log.Warnf("%s. Index usage stats will not be collected. This log message will be suppressed from now.", err)
 			logSuppressIS[""] = true
 		}
 		return nil
@@ -81,7 +81,7 @@ func GetIndexUsageStatList(client *mongo.Client, skip map[string]struct{}) *Inde
 		if err != nil {
 			_, logSFound := logSuppressIS[dbName]
 			if !logSFound {
-				log.Errorf("%s. Index usage stats will not be collected for this db. This log message will be suppressed from now.", err)
+				log.Warnf("%s. Index usage stats will not be collected for this db. This log message will be suppressed from now.", err)
 				logSuppressIS[dbName] = true
 			}
 		} else {
@@ -110,7 +110,7 @@ func GetIndexUsageStatList(client *mongo.Client, skip map[string]struct{}) *Inde
 				if err != nil {
 					_, logSFound := logSuppressIS[fullCollName]
 					if !logSFound {
-						log.Errorf("%s. Index usage stats will not be collected for this collection. This log message will be suppressed from now.", err)
+						log.Warnf("%s. Index usage stats will not be collected for this collection. This log message will be suppressed from now.", err)
 						logSuppressIS[fullCollName] = true
 					}
 				} else {
