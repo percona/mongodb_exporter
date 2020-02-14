@@ -40,6 +40,7 @@ type MongodbCollectorOpts struct {
 	CollectTopMetrics        bool
 	CollectIndexUsageStats   bool
 	CollectConnPoolStats     bool
+	Skip                     []string
 }
 
 func (in *MongodbCollectorOpts) toSessionOps() *shared.MongoSessionOpts {
@@ -64,6 +65,10 @@ type MongodbCollector struct {
 
 // NewMongodbCollector returns a new instance of a MongodbCollector.
 func NewMongodbCollector(opts *MongodbCollectorOpts) *MongodbCollector {
+	if len(opts.Skip) != 0 {
+		log.Infof("Will skip %v during metrics collection process", opts.Skip)
+	}
+
 	exporter := &MongodbCollector{
 		Opts: opts,
 
@@ -205,21 +210,24 @@ func (exporter *MongodbCollector) scrape(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	skip := sliceToSet(exporter.Opts.Skip)
+
 	log.Debugf("Connected to: %s (node type: %s, server version: %s)", shared.RedactMongoUri(exporter.Opts.URI), nodeType, serverVersion)
 	switch {
 	case nodeType == "mongos":
-		exporter.collectMongos(mongoSess, ch)
+		exporter.collectMongos(mongoSess, ch, skip)
 	case nodeType == "mongod":
-		exporter.collectMongod(mongoSess, ch)
+		exporter.collectMongod(mongoSess, ch, skip)
 	case nodeType == "replset":
-		exporter.collectMongodReplSet(mongoSess, ch)
+		exporter.collectMongodReplSet(mongoSess, ch, skip)
 	default:
 		err = fmt.Errorf("Unrecognized node type %s", nodeType)
 		log.Error(err)
 	}
 }
 
-func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- prometheus.Metric) {
+func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- prometheus.Metric, skip map[string]struct{}) {
+
 	log.Debug("Collecting Server Status")
 	serverStatus := mongos.GetServerStatus(client)
 	if serverStatus != nil {
@@ -242,7 +250,7 @@ func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- 
 
 	if exporter.Opts.CollectCollectionMetrics {
 		log.Debug("Collecting Collection Status From Mongos")
-		collStatList := mongos.GetCollectionStatList(client)
+		collStatList := mongos.GetCollectionStatList(client, skip)
 		if collStatList != nil {
 			collStatList.Export(ch)
 		}
@@ -257,7 +265,7 @@ func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- 
 	}
 }
 
-func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- prometheus.Metric) {
+func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- prometheus.Metric, skip map[string]struct{}) {
 	log.Debug("Collecting Server Status")
 	serverStatus := mongod.GetServerStatus(client)
 	if serverStatus != nil {
@@ -274,7 +282,7 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 
 	if exporter.Opts.CollectCollectionMetrics {
 		log.Debug("Collecting Collection Status From Mongod")
-		collStatList := mongod.GetCollectionStatList(client)
+		collStatList := mongod.GetCollectionStatList(client, skip)
 		if collStatList != nil {
 			collStatList.Export(ch)
 		}
@@ -290,7 +298,7 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 
 	if exporter.Opts.CollectIndexUsageStats {
 		log.Debug("Collecting Index Statistics")
-		indexStatList := mongod.GetIndexUsageStatList(client)
+		indexStatList := mongod.GetIndexUsageStatList(client, skip)
 		if indexStatList != nil {
 			indexStatList.Export(ch)
 		}
@@ -305,8 +313,8 @@ func (exporter *MongodbCollector) collectMongod(client *mongo.Client, ch chan<- 
 	}
 }
 
-func (exporter *MongodbCollector) collectMongodReplSet(client *mongo.Client, ch chan<- prometheus.Metric) {
-	exporter.collectMongod(client, ch)
+func (exporter *MongodbCollector) collectMongodReplSet(client *mongo.Client, ch chan<- prometheus.Metric, skip map[string]struct{}) {
+	exporter.collectMongod(client, ch, skip)
 
 	log.Debug("Collecting ReplSetConf Metrics")
 	replSetConf := mongod.GetReplSetConf(client)
@@ -325,6 +333,15 @@ func (exporter *MongodbCollector) collectMongodReplSet(client *mongo.Client, ch 
 	if oplogStatus != nil {
 		oplogStatus.Export(ch)
 	}
+}
+
+func sliceToSet(s []string) map[string]struct{} {
+	m := make(map[string]struct{})
+	for _, v := range s {
+		m[v] = struct{}{}
+	}
+
+	return m
 }
 
 // check interface

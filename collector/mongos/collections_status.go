@@ -103,7 +103,7 @@ var (
 )
 
 // GetCollectionStatList returns stats for a given database
-func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
+func GetCollectionStatList(client *mongo.Client, skip map[string]struct{}) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
@@ -116,6 +116,10 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	}
 	delete(logSuppressCS, "")
 	for _, dbName := range dbNames {
+		if _, ok := skip[dbName]; ok {
+			continue
+		}
+
 		c, err := client.Database(dbName).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
 		if err != nil {
 			_, logSFound := logSuppressCS[dbName]
@@ -138,17 +142,23 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 					log.Error(err)
 					continue
 				}
+
+				fullCollName := dbName + "." + coll.Name
+				if _, ok := skip[dbName]; ok {
+					continue
+				}
+
 				collStatus := CollectionStatus{}
 				res := client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", coll.Name}, {"scale", 1}})
 				err = res.Decode(&collStatus)
 				if err != nil {
-					_, logSFound := logSuppressCS[dbName+"."+coll.Name]
+					_, logSFound := logSuppressCS[fullCollName]
 					if !logSFound {
 						log.Errorf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
 						logSuppressCS[dbName+"."+coll.Name] = true
 					}
 				} else {
-					delete(logSuppressCS, dbName+"."+coll.Name)
+					delete(logSuppressCS, fullCollName)
 					collStatus.Database = dbName
 					collStatus.Name = coll.Name
 					collectionStatList.Members = append(collectionStatList.Members, collStatus)

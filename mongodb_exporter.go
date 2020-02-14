@@ -48,6 +48,10 @@ var (
 	collectIndexUsageF           = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
 	mongodbCollectConnPoolStatsF = kingpin.Flag("collect.connpoolstats", "Collect MongoDB connpoolstats").Bool()
 
+	skipF = kingpin.Flag("skip", "Specify database or collection to skip during metrics collection process. Can be passed multiple times").
+		PlaceHolder("[db][db.collection]").
+		Strings()
+
 	uriF = kingpin.Flag("mongodb.uri", "MongoDB URI, format").
 		PlaceHolder("[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]").
 		Default("mongodb://localhost:27017").
@@ -87,6 +91,7 @@ func main() {
 		CollectCollectionMetrics: *collectCollectionF,
 		CollectTopMetrics:        *collectTopF,
 		CollectIndexUsageStats:   *collectIndexUsageF,
+		Skip:                     *skipF,
 		CollectConnPoolStats:     *mongodbCollectConnPoolStatsF,
 	})
 	prometheus.MustRegister(programCollector, mongodbCollector)

@@ -60,7 +60,7 @@ var (
 )
 
 // GetIndexUsageStatList returns stats for a given collection in a database
-func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
+func GetIndexUsageStatList(client *mongo.Client, skip map[string]struct{}) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	databaseNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
@@ -73,6 +73,10 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 	}
 	delete(logSuppressIS, "")
 	for _, dbName := range databaseNames {
+		if _, ok := skip[dbName]; ok {
+			continue
+		}
+
 		c, err := client.Database(dbName).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
 		if err != nil {
 			_, logSFound := logSuppressIS[dbName]
@@ -96,13 +100,18 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 					continue
 				}
 
+				fullCollName := dbName + "." + coll.Name
+				if _, ok := skip[fullCollName]; ok {
+					continue
+				}
+
 				collIndexUsageStats := IndexStatsList{}
 				c, err := client.Database(dbName).Collection(coll.Name).Aggregate(context.TODO(), []bson.M{{"$indexStats": bson.M{}}})
 				if err != nil {
-					_, logSFound := logSuppressIS[dbName+"."+coll.Name]
+					_, logSFound := logSuppressIS[fullCollName]
 					if !logSFound {
 						log.Errorf("%s. Index usage stats will not be collected for this collection. This log message will be suppressed from now.", err)
-						logSuppressIS[dbName+"."+coll.Name] = true
+						logSuppressIS[fullCollName] = true
 					}
 				} else {
 
@@ -123,7 +132,7 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 						log.Errorf("Could not close Aggregate() cursor, reason: %v", err)
 					}
 
-					delete(logSuppressIS, dbName+"."+coll.Name)
+					delete(logSuppressIS, fullCollName)
 					// Label index stats with corresponding db.collection
 					for i := 0; i < len(collIndexUsageStats.Items); i++ {
 						collIndexUsageStats.Items[i].Database = dbName

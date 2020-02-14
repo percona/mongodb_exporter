@@ -24,6 +24,10 @@ Flags:
       --collect.topmetrics     Enable collection of table top metrics
       --collect.indexusage     Enable collection of per index usage stats
       --collect.connpoolstats  Collect MongoDB connpoolstats
+      --skip=[db][db.collection] ...  
+                               Specify database or collection to skip during
+                               metrics collection process. Can be passed
+                               multiple times
       --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
                                MongoDB URI, format
       --test                   Check MongoDB connection, print buildInfo()
