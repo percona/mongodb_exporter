@@ -139,29 +139,29 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	}
 
 	delete(logSuppressCS, keyCS)
-	for _, db := range dbNames {
-		if common.IsSystemDB(db) {
+	for _, dbName := range dbNames {
+		if common.IsSystemDB(dbName) {
 			continue
 		}
 
-		collNames, err := client.Database(db).ListCollectionNames(context.TODO(), bson.M{})
+		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
-			if _, ok := logSuppressCS[db]; !ok {
+			if _, ok := logSuppressCS[dbName]; !ok {
 				log.Warnf("%s. Collection stats will not be collected for this db. This log message will be suppressed from now.", err)
-				logSuppressCS[db] = struct{}{}
+				logSuppressCS[dbName] = struct{}{}
 			}
 			continue
 		}
 
-		delete(logSuppressCS, db)
+		delete(logSuppressCS, dbName)
 		for _, collName := range collNames {
 			if common.IsSystemCollection(collName) {
 				continue
 			}
 
-			fullCollName := common.CollFullName(db, collName)
+			fullCollName := common.CollFullName(dbName, collName)
 			collStatus := CollectionStatus{}
-			err = client.Database(db).RunCommand(context.TODO(), bson.D{{"collStats", collName}, {"scale", 1}}).Decode(&collStatus)
+			err = client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", collName}, {"scale", 1}}).Decode(&collStatus)
 			if err != nil {
 				if _, ok := logSuppressCS[fullCollName]; !ok {
 					log.Warnf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
@@ -171,7 +171,7 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 			}
 
 			delete(logSuppressCS, fullCollName)
-			collStatus.Database = db
+			collStatus.Database = dbName
 			collStatus.Name = collName
 			collectionStatList.Members = append(collectionStatList.Members, collStatus)
 		}
