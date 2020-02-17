@@ -104,7 +104,7 @@ var logSuppressCS = make(map[string]struct{})
 const keyCS = ""
 
 // GetCollectionStatList returns stats for a given database
-func GetCollectionStatList(client *mongo.Client, skip map[string]struct{}) *CollectionStatList {
+func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
@@ -117,10 +117,6 @@ func GetCollectionStatList(client *mongo.Client, skip map[string]struct{}) *Coll
 
 	delete(logSuppressCS, keyCS)
 	for _, dbName := range dbNames {
-		if _, ok := skip[dbName]; ok {
-			continue
-		}
-
 		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
 			if _, ok := logSuppressCS[dbName]; !ok {
@@ -133,9 +129,6 @@ func GetCollectionStatList(client *mongo.Client, skip map[string]struct{}) *Coll
 		delete(logSuppressCS, dbName)
 		for _, collName := range collNames {
 			fullCollName := common.CollFullName(dbName, collName)
-			if _, ok := skip[dbName]; ok {
-				continue
-			}
 
 			collStatus := CollectionStatus{}
 			res := client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", collName}, {"scale", 1}})

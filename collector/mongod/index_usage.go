@@ -59,7 +59,7 @@ var logSuppressIS = make(map[string]struct{})
 const keyIS = ""
 
 // GetIndexUsageStatList returns stats for a given collection in a database
-func GetIndexUsageStatList(client *mongo.Client, skip map[string]struct{}) *IndexStatsList {
+func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	databaseNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
@@ -72,10 +72,6 @@ func GetIndexUsageStatList(client *mongo.Client, skip map[string]struct{}) *Inde
 
 	delete(logSuppressIS, keyIS)
 	for _, dbName := range databaseNames {
-		if _, ok := skip[dbName]; ok {
-			continue
-		}
-
 		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
 			if _, ok := logSuppressIS[dbName]; !ok {
@@ -88,9 +84,6 @@ func GetIndexUsageStatList(client *mongo.Client, skip map[string]struct{}) *Inde
 		delete(logSuppressIS, dbName)
 		for _, collName := range collNames {
 			fullCollName := common.CollFullName(dbName, collName)
-			if _, ok := skip[fullCollName]; ok {
-				continue
-			}
 
 			collIndexUsageStats := IndexStatsList{}
 			c, err := client.Database(dbName).Collection(collName).Aggregate(context.TODO(), []bson.M{{"$indexStats": bson.M{}}})
