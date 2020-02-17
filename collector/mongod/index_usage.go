@@ -72,6 +72,10 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 
 	delete(logSuppressIS, keyIS)
 	for _, dbName := range databaseNames {
+		if common.IsSystemDB(dbName) {
+			continue
+		}
+
 		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
 			if _, ok := logSuppressIS[dbName]; !ok {
@@ -83,8 +87,11 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 
 		delete(logSuppressIS, dbName)
 		for _, collName := range collNames {
-			fullCollName := common.CollFullName(dbName, collName)
+			if common.IsSystemCollection(collName) {
+				continue
+			}
 
+			fullCollName := common.CollFullName(dbName, collName)
 			collIndexUsageStats := IndexStatsList{}
 			c, err := client.Database(dbName).Collection(collName).Aggregate(context.TODO(), []bson.M{{"$indexStats": bson.M{}}})
 			if err != nil {

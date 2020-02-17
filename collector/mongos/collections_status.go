@@ -117,6 +117,10 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 
 	delete(logSuppressCS, keyCS)
 	for _, dbName := range dbNames {
+		if common.IsSystemDB(dbName) {
+			continue
+		}
+
 		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
 			if _, ok := logSuppressCS[dbName]; !ok {
@@ -128,8 +132,11 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 
 		delete(logSuppressCS, dbName)
 		for _, collName := range collNames {
-			fullCollName := common.CollFullName(dbName, collName)
+			if common.IsSystemCollection(collName) {
+				continue
+			}
 
+			fullCollName := common.CollFullName(dbName, collName)
 			collStatus := CollectionStatus{}
 			res := client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", collName}, {"scale", 1}})
 			if err = res.Decode(&collStatus); err != nil {
