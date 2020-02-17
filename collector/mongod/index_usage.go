@@ -58,7 +58,7 @@ var logSuppressIS = make(map[string]struct{})
 
 const keyIS = ""
 
-// GetIndexUsageStatList returns stats for a given collection in a database
+// GetIndexUsageStatList returns stats for all non-system collections
 func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	databaseNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})

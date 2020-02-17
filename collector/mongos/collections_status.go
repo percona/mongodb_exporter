@@ -103,7 +103,7 @@ var logSuppressCS = make(map[string]struct{})
 
 const keyCS = ""
 
-// GetCollectionStatList returns stats for a given database
+// GetCollectionStatList returns stats for all non-system collections
 func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
