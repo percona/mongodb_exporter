@@ -50,12 +50,12 @@ var (
 	}, []string{"db", "coll"})
 )
 
-// CollectionStatList contains stats from all collections
+// CollectionStatList contains stats from all collections.
 type CollectionStatList struct {
 	Members []CollectionStatus
 }
 
-// CollectionStatus represents stats about a collection in database (mongod and raw from mongos)
+// CollectionStatus represents stats about a collection in database (mongod and raw from mongos).
 type CollectionStatus struct {
 	Database    string
 	Name        string
@@ -67,7 +67,7 @@ type CollectionStatus struct {
 	IndexesSize int `bson:"totalIndexSize,omitempty"`
 }
 
-// Export exports database stats to prometheus
+// Export exports database stats to prometheus.
 func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 	for _, member := range collStatList.Members {
 		ls := prometheus.Labels{
@@ -89,7 +89,7 @@ func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 	collectionIndexesSize.Collect(ch)
 }
 
-// Describe describes database stats for prometheus
+// Describe describes database stats for prometheus.
 func (collStatList *CollectionStatList) Describe(ch chan<- *prometheus.Desc) {
 	collectionSize.Describe(ch)
 	collectionObjectCount.Describe(ch)
@@ -103,7 +103,7 @@ var logSuppressCS = make(map[string]struct{})
 
 const keyCS = ""
 
-// GetCollectionStatList returns stats for all non-system collections
+// GetCollectionStatList returns stats for all non-system collections.
 func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})

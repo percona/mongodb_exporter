@@ -17,12 +17,12 @@ var indexUsage = prometheus.NewCounterVec(prometheus.CounterOpts{
 	Help:      "Contains a usage count of each index"},
 	[]string{"collection", "db", "index"})
 
-// IndexStatsList represents index usage information
+// IndexStatsList represents index usage information.
 type IndexStatsList struct {
 	Items []IndexUsageStats
 }
 
-// IndexUsageStats represents stats about an Index
+// IndexUsageStats represents stats about an Index.
 type IndexUsageStats struct {
 	Name       string         `bson:"name"`
 	Accesses   IndexUsageInfo `bson:"accesses"`
@@ -30,12 +30,12 @@ type IndexUsageStats struct {
 	Collection string
 }
 
-// IndexUsageInfo represents a single index stats of an Index
+// IndexUsageInfo represents a single index stats of an Index.
 type IndexUsageInfo struct {
 	Ops float64 `bson:"ops"`
 }
 
-// Export exports database stats to prometheus
+// Export exports database stats to prometheus.
 func (indexStats *IndexStatsList) Export(ch chan<- prometheus.Metric) {
 	indexUsage.Reset()
 	for _, indexStat := range indexStats.Items {
@@ -49,7 +49,7 @@ func (indexStats *IndexStatsList) Export(ch chan<- prometheus.Metric) {
 	indexUsage.Collect(ch)
 }
 
-// Describe describes database stats for prometheus
+// Describe describes database stats for prometheus.
 func (indexStats *IndexStatsList) Describe(ch chan<- *prometheus.Desc) {
 	indexUsage.Describe(ch)
 }
@@ -58,7 +58,7 @@ var logSuppressIS = make(map[string]struct{})
 
 const keyIS = ""
 
-// GetIndexUsageStatList returns stats for all non-system collections
+// GetIndexUsageStatList returns stats for all non-system collections.
 func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	databaseNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
@@ -120,7 +120,7 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 			}
 
 			delete(logSuppressIS, fullCollName)
-			// Label index stats with corresponding db.collection
+			// Label index stats with corresponding db.collection.
 			for i := 0; i < len(collIndexUsageStats.Items); i++ {
 				collIndexUsageStats.Items[i].Database = dbName
 				collIndexUsageStats.Items[i].Collection = collName

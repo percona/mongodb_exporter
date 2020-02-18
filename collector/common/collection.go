@@ -14,7 +14,7 @@
 
 package common
 
-// CollFullName returns collections full name
+// CollFullName returns collections full name.
 func CollFullName(dbName, collName string) string {
 	return dbName + "." + collName
 }

@@ -24,7 +24,7 @@ const (
 
 const sysCollPrefix = "system."
 
-// IsSystemDB tests whether system db name passed
+// IsSystemDB tests whether system db name passed.
 func IsSystemDB(dbName string) bool {
 	switch dbName {
 	case adminDB, configDB, localDB:
@@ -34,7 +34,7 @@ func IsSystemDB(dbName string) bool {
 	}
 }
 
-// IsSystemCollection tests whether system collection name passed
+// IsSystemCollection tests whether system collection name passed.
 func IsSystemCollection(collName string) bool {
 	return strings.HasPrefix(collName, sysCollPrefix)
 }
