@@ -16,18 +16,10 @@ package common
 
 import "strings"
 
-const (
-	adminDB  = "admin"
-	configDB = "config"
-	localDB  = "local"
-)
-
-const sysCollPrefix = "system."
-
 // IsSystemDB tests whether system db name passed.
 func IsSystemDB(dbName string) bool {
 	switch dbName {
-	case adminDB, configDB, localDB:
+	case "admin", "config", "local":
 		return true
 	default:
 		return false
@@ -36,5 +28,5 @@ func IsSystemDB(dbName string) bool {
 
 // IsSystemCollection tests whether system collection name passed.
 func IsSystemCollection(collName string) bool {
-	return strings.HasPrefix(collName, sysCollPrefix)
+	return strings.HasPrefix(collName, "system.")
 }
