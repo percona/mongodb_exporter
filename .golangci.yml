@@ -5,8 +5,6 @@ linters-settings:
     packages:
       # use "github.com/pkg/errors" instead
       - errors
-      # use "github.com/golang/protobuf/proto" instead
-      - github.com/gogo/protobuf/proto
 
   goimports:
     local-prefixes: github.com/percona/mongodb_exporter
