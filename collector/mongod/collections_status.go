@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/collector/common"
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 var (
@@ -122,7 +123,7 @@ func (collStatList *CollectionStatList) Describe(ch chan<- *prometheus.Desc) {
 	collectionIndexesSize.Describe(ch)
 }
 
-var logSuppressCS = make(map[string]struct{})
+var logSuppressCS = shared.NewSyncStringSet()
 
 const keyCS = ""
 
@@ -131,14 +132,14 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
-		if _, ok := logSuppressCS[keyCS]; !ok {
+		if !logSuppressCS.Contains(keyCS) {
 			log.Warnf("%s. Collection stats will not be collected. This log message will be suppressed from now.", err)
-			logSuppressCS[keyCS] = struct{}{}
+			logSuppressCS.Add(keyCS)
 		}
 		return nil
 	}
 
-	delete(logSuppressCS, keyCS)
+	logSuppressCS.Delete(keyCS)
 	for _, dbName := range dbNames {
 		if common.IsSystemDB(dbName) {
 			continue
@@ -146,14 +147,14 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 
 		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
-			if _, ok := logSuppressCS[dbName]; !ok {
+			if !logSuppressCS.Contains(dbName) {
 				log.Warnf("%s. Collection stats will not be collected for this db. This log message will be suppressed from now.", err)
-				logSuppressCS[dbName] = struct{}{}
+				logSuppressCS.Add(dbName)
 			}
 			continue
 		}
 
-		delete(logSuppressCS, dbName)
+		logSuppressCS.Delete(dbName)
 		for _, collName := range collNames {
 			if common.IsSystemCollection(collName) {
 				continue
@@ -163,14 +164,14 @@ func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 			collStatus := CollectionStatus{}
 			err = client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", collName}, {"scale", 1}}).Decode(&collStatus)
 			if err != nil {
-				if _, ok := logSuppressCS[fullCollName]; !ok {
+				if !logSuppressCS.Contains(fullCollName) {
 					log.Warnf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
-					logSuppressCS[fullCollName] = struct{}{}
+					logSuppressCS.Add(fullCollName)
 				}
 				continue
 			}
 
-			delete(logSuppressCS, fullCollName)
+			logSuppressCS.Delete(fullCollName)
 			collStatus.Database = dbName
 			collStatus.Name = collName
 			collectionStatList.Members = append(collectionStatList.Members, collStatus)

@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/collector/common"
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 var indexUsage = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -54,7 +55,7 @@ func (indexStats *IndexStatsList) Describe(ch chan<- *prometheus.Desc) {
 	indexUsage.Describe(ch)
 }
 
-var logSuppressIS = make(map[string]struct{})
+var logSuppressIS = shared.NewSyncStringSet()
 
 const keyIS = ""
 
@@ -63,14 +64,14 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 	indexUsageStatsList := &IndexStatsList{}
 	databaseNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
-		if _, ok := logSuppressIS[keyIS]; !ok {
+		if !logSuppressIS.Contains(keyIS) {
 			log.Warnf("%s. Index usage stats will not be collected. This log message will be suppressed from now.", err)
-			logSuppressIS[keyIS] = struct{}{}
+			logSuppressIS.Add(keyIS)
 		}
 		return nil
 	}
 
-	delete(logSuppressIS, keyIS)
+	logSuppressIS.Delete(keyIS)
 	for _, dbName := range databaseNames {
 		if common.IsSystemDB(dbName) {
 			continue
@@ -78,14 +79,14 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 
 		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
-			if _, ok := logSuppressIS[dbName]; !ok {
+			if !logSuppressIS.Contains(dbName) {
 				log.Warnf("%s. Index usage stats will not be collected for this db. This log message will be suppressed from now.", err)
-				logSuppressIS[dbName] = struct{}{}
+				logSuppressIS.Add(dbName)
 			}
 			continue
 		}
 
-		delete(logSuppressIS, dbName)
+		logSuppressIS.Delete(dbName)
 		for _, collName := range collNames {
 			if common.IsSystemCollection(collName) {
 				continue
@@ -95,9 +96,9 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 			collIndexUsageStats := IndexStatsList{}
 			c, err := client.Database(dbName).Collection(collName).Aggregate(context.TODO(), []bson.M{{"$indexStats": bson.M{}}})
 			if err != nil {
-				if _, ok := logSuppressIS[fullCollName]; !ok {
+				if !logSuppressIS.Contains(fullCollName) {
 					log.Warnf("%s. Index usage stats will not be collected for this collection. This log message will be suppressed from now.", err)
-					logSuppressIS[fullCollName] = struct{}{}
+					logSuppressIS.Add(fullCollName)
 				}
 				continue
 			}
@@ -119,7 +120,7 @@ func GetIndexUsageStatList(client *mongo.Client) *IndexStatsList {
 				log.Errorf("Could not close Aggregate() cursor, reason: %v", err)
 			}
 
-			delete(logSuppressIS, fullCollName)
+			logSuppressIS.Delete(fullCollName)
 			// Label index stats with corresponding db.collection.
 			for i := 0; i < len(collIndexUsageStats.Items); i++ {
 				collIndexUsageStats.Items[i].Database = dbName
