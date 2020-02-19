@@ -7,7 +7,9 @@ import (
 	"github.com/prometheus/common/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/percona/mongodb_exporter/collector/common"
+	"github.com/percona/mongodb_exporter/shared"
 )
 
 var (
@@ -49,12 +51,12 @@ var (
 	}, []string{"db", "coll"})
 )
 
-// CollectionStatList contains stats from all collections
+// CollectionStatList contains stats from all collections.
 type CollectionStatList struct {
 	Members []CollectionStatus
 }
 
-// CollectionStatus represents stats about a collection in database (mongod and raw from mongos)
+// CollectionStatus represents stats about a collection in database (mongod and raw from mongos).
 type CollectionStatus struct {
 	Database    string
 	Name        string
@@ -66,7 +68,7 @@ type CollectionStatus struct {
 	IndexesSize int `bson:"totalIndexSize,omitempty"`
 }
 
-// Export exports database stats to prometheus
+// Export exports database stats to prometheus.
 func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 	for _, member := range collStatList.Members {
 		ls := prometheus.Labels{
@@ -88,7 +90,7 @@ func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 	collectionIndexesSize.Collect(ch)
 }
 
-// Describe describes database stats for prometheus
+// Describe describes database stats for prometheus.
 func (collStatList *CollectionStatList) Describe(ch chan<- *prometheus.Desc) {
 	collectionSize.Describe(ch)
 	collectionObjectCount.Describe(ch)
@@ -98,70 +100,58 @@ func (collStatList *CollectionStatList) Describe(ch chan<- *prometheus.Desc) {
 	collectionIndexesSize.Describe(ch)
 }
 
-var (
-	logSuppressCS = make(map[string]bool)
-)
+var logSuppressCS = shared.NewSyncStringSet()
 
-// GetCollectionStatList returns stats for a given database
+const keyCS = ""
+
+// GetCollectionStatList returns stats for all non-system collections.
 func GetCollectionStatList(client *mongo.Client) *CollectionStatList {
 	collectionStatList := &CollectionStatList{}
 	dbNames, err := client.ListDatabaseNames(context.TODO(), bson.M{})
 	if err != nil {
-		_, logSFound := logSuppressCS[""]
-		if !logSFound {
-			log.Errorf("%s. Collection stats will not be collected. This log message will be suppressed from now.", err)
-			logSuppressCS[""] = true
+		if !logSuppressCS.Contains(keyCS) {
+			log.Warnf("%s. Collection stats will not be collected. This log message will be suppressed from now.", err)
+			logSuppressCS.Add(keyCS)
 		}
 		return nil
 	}
-	delete(logSuppressCS, "")
+
+	logSuppressCS.Delete(keyCS)
 	for _, dbName := range dbNames {
-		c, err := client.Database(dbName).ListCollections(context.TODO(), bson.M{}, options.ListCollections().SetNameOnly(true))
+		if common.IsSystemDB(dbName) {
+			continue
+		}
+
+		collNames, err := client.Database(dbName).ListCollectionNames(context.TODO(), bson.M{})
 		if err != nil {
-			_, logSFound := logSuppressCS[dbName]
-			if !logSFound {
-				log.Errorf("%s. Collection stats will not be collected for this db. This log message will be suppressed from now.", err)
-				logSuppressCS[dbName] = true
+			if !logSuppressCS.Contains(dbName) {
+				log.Warnf("%s. Collection stats will not be collected for this db. This log message will be suppressed from now.", err)
+				logSuppressCS.Add(dbName)
 			}
-		} else {
+			continue
+		}
 
-			type collListItem struct {
-				Name string `bson:"name,omitempty"`
-				Type string `bson:"type,omitempty"`
+		logSuppressCS.Delete(dbName)
+		for _, collName := range collNames {
+			if common.IsSystemCollection(collName) {
+				continue
 			}
 
-			delete(logSuppressCS, dbName)
-			for c.Next(context.TODO()) {
-				coll := &collListItem{}
-				err := c.Decode(&coll)
-				if err != nil {
-					log.Error(err)
-					continue
+			fullCollName := common.CollFullName(dbName, collName)
+			collStatus := CollectionStatus{}
+			res := client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", collName}, {"scale", 1}})
+			if err = res.Decode(&collStatus); err != nil {
+				if !logSuppressCS.Contains(fullCollName) {
+					log.Warnf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
+					logSuppressCS.Add(fullCollName)
 				}
-				collStatus := CollectionStatus{}
-				res := client.Database(dbName).RunCommand(context.TODO(), bson.D{{"collStats", coll.Name}, {"scale", 1}})
-				err = res.Decode(&collStatus)
-				if err != nil {
-					_, logSFound := logSuppressCS[dbName+"."+coll.Name]
-					if !logSFound {
-						log.Errorf("%s. Collection stats will not be collected for this collection. This log message will be suppressed from now.", err)
-						logSuppressCS[dbName+"."+coll.Name] = true
-					}
-				} else {
-					delete(logSuppressCS, dbName+"."+coll.Name)
-					collStatus.Database = dbName
-					collStatus.Name = coll.Name
-					collectionStatList.Members = append(collectionStatList.Members, collStatus)
-				}
+				continue
 			}
 
-			if err := c.Err(); err != nil {
-				log.Error(err)
-			}
-
-			if err := c.Close(context.TODO()); err != nil {
-				log.Errorf("Could not close ListCollections() cursor, reason: %v", err)
-			}
+			logSuppressCS.Delete(fullCollName)
+			collStatus.Database = dbName
+			collStatus.Name = collName
+			collectionStatList.Members = append(collectionStatList.Members, collStatus)
 		}
 	}
 
