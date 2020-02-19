@@ -3,6 +3,7 @@ module github.com/percona/mongodb_exporter
 go 1.13
 
 require (
+	github.com/Masterminds/semver/v3 v3.0.1 // indirect
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-cmp v0.3.0 // indirect

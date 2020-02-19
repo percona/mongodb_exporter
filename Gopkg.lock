@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:0579669610e7b4268094959686738fce4833e8274793f09df8fe5ab2ff2f5efd"
+  name = "github.com/Masterminds/semver"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "fe7c21038085e01e67044ec1efe3afb1eaa59f75"
+  version = "v3.0.1"
+
+[[projects]]
   branch = "master"
   digest = "1:f3793f8a708522400cef1dba23385e901aede5519f68971fd69938ef330b07a1"
   name = "github.com/alecthomas/template"
@@ -300,6 +308,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/Masterminds/semver",
     "github.com/andreyvit/diff",
     "github.com/percona/exporter_shared",
     "github.com/percona/exporter_shared/helpers",
