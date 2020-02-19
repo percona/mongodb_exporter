@@ -25,8 +25,7 @@ type SyncStringSet struct {
 // NewSyncStringSet returns new SyncStringSet
 func NewSyncStringSet() *SyncStringSet {
 	return &SyncStringSet{
-		m:  make(map[string]struct{}),
-		mu: sync.RWMutex{},
+		m: make(map[string]struct{}),
 	}
 }
 
