@@ -1,0 +1,8 @@
+---
+version: "3.7"
+services:
+  mongodb:
+    image: ${MONGODB_IMAGE:-percona/percona-server-mongodb:4.2}
+    container_name: mnogo_exporter_mongodb
+    ports:
+      - 127.0.0.1:27017:27017
