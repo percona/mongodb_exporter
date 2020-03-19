@@ -440,6 +440,10 @@ metrics_operation_total:
     help: "scanAndOrder reports the total number of queries that return sorted numbers that cannot perform the sort operation using an index"
     type: counter
 
+  write_conflicts:
+    help: "writeConflicts reports the total number of queries that encountered write conflicts"
+    type: counter
+
 metrics_query_executor_total:
   metadata:
     help: "queryExecutor is a document that reports data from the query execution system"

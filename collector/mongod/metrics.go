@@ -300,9 +300,10 @@ func (getLastErrorStats *GetLastErrorStats) Export(ch chan<- prometheus.Metric) 
 
 // OperationStats are the stats for some kind of operations.
 type OperationStats struct {
-	Fastmod      float64 `bson:"fastmod"`
-	Idhack       float64 `bson:"idhack"`
-	ScanAndOrder float64 `bson:"scanAndOrder"`
+	Fastmod        float64 `bson:"fastmod"`
+	Idhack         float64 `bson:"idhack"`
+	ScanAndOrder   float64 `bson:"scanAndOrder"`
+	WriteConflicts float64 `bson:"writeConflicts"`
 }
 
 // Export exports the operation stats.
@@ -310,6 +311,7 @@ func (operationStats *OperationStats) Export(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(metricsOperationTotalDesc, prometheus.CounterValue, operationStats.Fastmod, "fastmod")
 	ch <- prometheus.MustNewConstMetric(metricsOperationTotalDesc, prometheus.CounterValue, operationStats.Idhack, "idhack")
 	ch <- prometheus.MustNewConstMetric(metricsOperationTotalDesc, prometheus.CounterValue, operationStats.ScanAndOrder, "scan_and_order")
+	ch <- prometheus.MustNewConstMetric(metricsOperationTotalDesc, prometheus.CounterValue, operationStats.WriteConflicts, "write_conflicts")
 }
 
 // QueryExecutorStats are the stats associated with a query execution.
