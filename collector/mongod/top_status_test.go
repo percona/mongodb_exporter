@@ -27,7 +27,7 @@ func Test_ParserTopStatus(t *testing.T) {
 	collections := []string{
 		"admin.system.roles",
 		"admin.system.version",
-		"local.startup_log",
+		"local.oplog.rs",
 		"local.system.replset",
 	}
 
