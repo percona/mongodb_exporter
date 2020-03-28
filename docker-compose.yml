@@ -3,7 +3,7 @@
 version: '3'
 services:
   mongo:
-    image: ${MONGODB_IMAGE:-mongo:4.2}
+    image: ${MONGODB_IMAGE:-mongo:3.6}
     ports:
       - 127.0.0.1:27017:27017
     # Given a signed SSL certificate located at /etc/ssl/server.pem
@@ -17,25 +17,25 @@ services:
     # ```
     # https://docs.mongodb.com/manual/tutorial/configure-ssl/#set-up-mongod-and-mongos-with-certificate-validation
     command:
-      - --tlsMode=preferTLS
-      - --tlsCertificateKeyFile=/etc/ssl/server.pem
-      - --tlsCAFile=/etc/ssl/ca.crt
+      - --sslMode=preferSSL
+      - --sslPEMKeyFile=/etc/ssl/server.pem
+      - --sslCAFile=/etc/ssl/ca.crt
       - --bind_ip=0.0.0.0
     volumes:
-      - ./testdata/ca.crt:/etc/ssl/ca.crt
-      - ./testdata/server.pem:/etc/ssl/server.pem
-      - ./testdata/client.pem:/etc/ssl/client.pem
+      - ${TESTDATA_ROOT:-.}/testdata/ca.crt:/etc/ssl/ca.crt
+      - ${TESTDATA_ROOT:-.}/testdata/server.pem:/etc/ssl/server.pem
+      - ${TESTDATA_ROOT:-.}/testdata/client.pem:/etc/ssl/client.pem
   mongo-replset:
-    image: ${MONGODB_IMAGE:-mongo:4.2}
+    image: ${MONGODB_IMAGE:-mongo:3.6}
     ports:
       - 127.0.0.1:27019:27017
     command:
       - --bind_ip=0.0.0.0
       - --replSet=rs0
-      - --tlsMode=preferTLS
-      - --tlsCertificateKeyFile=/etc/ssl/server.pem
-      - --tlsCAFile=/etc/ssl/ca.crt
+      - --sslMode=preferSSL
+      - --sslPEMKeyFile=/etc/ssl/server.pem
+      - --sslCAFile=/etc/ssl/ca.crt
     volumes:
-      - ./testdata/ca.crt:/etc/ssl/ca.crt
-      - ./testdata/server.pem:/etc/ssl/server.pem
-      - ./testdata/client.pem:/etc/ssl/client.pem
+      - ${TESTDATA_ROOT:-.}/testdata/ca.crt:/etc/ssl/ca.crt
+      - ${TESTDATA_ROOT:-.}/testdata/server.pem:/etc/ssl/server.pem
+      - ${TESTDATA_ROOT:-.}/testdata/client.pem:/etc/ssl/client.pem

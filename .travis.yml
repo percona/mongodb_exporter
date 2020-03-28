@@ -32,6 +32,7 @@ env:
     - MONGODB_IMAGE=mongo:3.4
     - MONGODB_IMAGE=mongo:3.6
     - MONGODB_IMAGE=mongo:4.0
+    - MONGODB_IMAGE=mongo:4.2
 
     # https://www.percona.com/services/policies/percona-software-platform-lifecycle#mongodb
     - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
