@@ -373,7 +373,8 @@ func (vr *valueReader) ReadBinary() (b []byte, btype byte, err error) {
 		return nil, 0, err
 	}
 
-	if btype == 0x02 {
+	// Check length in case it is an old binary without a length.
+	if btype == 0x02 && length > 4 {
 		length, err = vr.readLength()
 		if err != nil {
 			return nil, 0, err
@@ -448,6 +449,9 @@ func (vr *valueReader) ReadCodeWithScope() (code string, dr DocumentReader, err 
 	strLength, err := vr.readLength()
 	if err != nil {
 		return "", nil, err
+	}
+	if strLength <= 0 {
+		return "", nil, fmt.Errorf("invalid string length: %d", strLength)
 	}
 	strBytes, err := vr.readBytes(strLength)
 	if err != nil {
