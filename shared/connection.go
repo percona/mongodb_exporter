@@ -65,6 +65,7 @@ func MongoClient(opts *MongoSessionOpts) *mongo.Client {
 
 	client, err := mongo.NewClient(cOpts)
 	if err != nil {
+		log.Errorf("Cannot create client %s: %s", RedactMongoUri(opts.URI), err)
 		return nil
 	}
 
