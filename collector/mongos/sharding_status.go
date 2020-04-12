@@ -90,6 +90,8 @@ type ShardingStats struct {
 	Topology        *ShardingTopoStats
 	BalancerLock    *MongosBalancerLock
 	Mongos          *[]MongosInfo
+
+	Client *mongo.Client
 }
 
 // GetMongosInfo gets mongos info.
@@ -179,62 +181,73 @@ func IsClusterBalanced(client *mongo.Client) float64 {
 	return 0
 }
 
-func (status *ShardingStats) Export(ch chan<- prometheus.Metric) {
-	if status.Changelog != nil {
-		status.Changelog.Export(ch)
+func (s *ShardingStats) Export(ch chan<- prometheus.Metric) {
+	if s.Changelog != nil {
+		s.Changelog.Export(ch)
 	}
-	if status.Topology != nil {
-		status.Topology.Export(ch)
+	if s.Topology != nil {
+		s.Topology.Export(ch)
 	}
-	if status.Mongos != nil && status.BalancerLock != nil {
-		mongosBalancerLockWho := strings.Split(status.BalancerLock.Who, ":")
+	if s.Mongos != nil && s.BalancerLock != nil {
+		mongosBalancerLockWho := strings.Split(s.BalancerLock.Who, ":")
 		mongosBalancerLockHostPort := mongosBalancerLockWho[0] + ":" + mongosBalancerLockWho[1]
-		mongosBalancerLockTimestamp.WithLabelValues(mongosBalancerLockHostPort).Set(float64(status.BalancerLock.When.Unix()))
-		for _, mongos := range *status.Mongos {
+		mongosBalancerLockTimestamp.WithLabelValues(mongosBalancerLockHostPort).Set(float64(s.BalancerLock.When.Unix()))
+		for _, mongos := range *s.Mongos {
 			mongosUpSecs.WithLabelValues(mongos.Name).Set(mongos.Up)
 			mongosPing.WithLabelValues(mongos.Name).Set(float64(mongos.Ping.Unix()))
 			mongosBalancerLockState.WithLabelValues(mongos.Name).Set(-1)
 			if mongos.Name == mongosBalancerLockHostPort {
-				mongosBalancerLockState.WithLabelValues(mongos.Name).Set(status.BalancerLock.State)
+				mongosBalancerLockState.WithLabelValues(mongos.Name).Set(s.BalancerLock.State)
 			}
 		}
 	}
-	balancerIsEnabled.Set(status.BalancerEnabled)
-	balancerChunksBalanced.Set(status.IsBalanced)
+	balancerIsEnabled.Set(s.BalancerEnabled)
+	balancerChunksBalanced.Set(s.IsBalanced)
 
 	balancerIsEnabled.Collect(ch)
 	balancerChunksBalanced.Collect(ch)
 	mongosUpSecs.Collect(ch)
 	mongosPing.Collect(ch)
-	mongosBalancerLockState.Collect(ch)
-	mongosBalancerLockTimestamp.Collect(ch)
+
+	if shared.MongoServerVersionLessThan("3.6", s.Client) {
+		mongosBalancerLockState.Collect(ch)
+		mongosBalancerLockTimestamp.Collect(ch)
+	}
 }
 
-func (status *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
-	if status.Changelog != nil {
-		status.Changelog.Describe(ch)
+func (s *ShardingStats) Describe(ch chan<- *prometheus.Desc) {
+	if s.Changelog != nil {
+		s.Changelog.Describe(ch)
 	}
-	if status.Topology != nil {
-		status.Topology.Describe(ch)
+	if s.Topology != nil {
+		s.Topology.Describe(ch)
 	}
 	balancerIsEnabled.Describe(ch)
 	balancerChunksBalanced.Describe(ch)
 	mongosUpSecs.Describe(ch)
 	mongosPing.Describe(ch)
-	mongosBalancerLockState.Describe(ch)
-	mongosBalancerLockTimestamp.Describe(ch)
+
+	if shared.MongoServerVersionLessThan("3.6", s.Client) {
+		mongosBalancerLockState.Describe(ch)
+		mongosBalancerLockTimestamp.Describe(ch)
+	}
 }
 
 // GetShardingStatus gets sharding status.
 func GetShardingStatus(client *mongo.Client) *ShardingStats {
-	results := &ShardingStats{}
+	results := &ShardingStats{
+		Client: client,
+	}
 
 	results.IsBalanced = IsClusterBalanced(client)
 	results.BalancerEnabled = IsBalancerEnabled(client)
 	results.Changelog = GetShardingChangelogStatus(client)
 	results.Topology = GetShardingTopoStatus(client)
 	results.Mongos = GetMongosInfo(client)
-	results.BalancerLock = GetMongosBalancerLock(client)
+
+	if shared.MongoServerVersionLessThan("3.6", client) {
+		results.BalancerLock = GetMongosBalancerLock(client)
+	}
 
 	return results
 }

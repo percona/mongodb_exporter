@@ -61,6 +61,10 @@ vet:
 	@echo ">> vetting code"
 	@$(GO) vet $(pkgs)
 
+lint:
+	@echo ">> linter checks"
+	@golangci-lint run
+
 # It's just alias to build binary
 build: release
 
