@@ -61,15 +61,9 @@
   version = "v1.8.0"
 
 [[projects]]
-  digest = "1:2d0636a8c490d2272dd725db26f74a537111b99b9dbdda0d8b98febe63702aa4"
+  digest = "1:318f1c959a8a740366fce4b1e1eb2fd914036b4af58fbd0a003349b305f118ad"
   name = "github.com/golang/protobuf"
-  packages = [
-    "proto",
-    "ptypes",
-    "ptypes/any",
-    "ptypes/duration",
-    "ptypes/timestamp",
-  ]
+  packages = ["proto"]
   pruneopts = "NUT"
   revision = "b5d812f8a3706043e23a9cd5babf2e5423744d30"
   version = "v1.3.1"
@@ -81,6 +75,20 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "2a8bb927dd31d8daada140a5d09578521ce5c36a"
+
+[[projects]]
+  digest = "1:2dd713c0693065684c2bf42cacc632dec86f43dc286fcbda3d58cc6781176ce0"
+  name = "github.com/klauspost/compress"
+  packages = [
+    "fse",
+    "huff0",
+    "snappy",
+    "zstd",
+    "zstd/internal/xxhash",
+  ]
+  pruneopts = "NUT"
+  revision = "e2d2089232ece4911272106ae65a7a06746ea38a"
+  version = "v1.10.4"
 
 [[projects]]
   digest = "1:58999a98719fddbac6303cb17e8d85b945f60b72f48e3a2df6b950b97fa926f1"
@@ -116,6 +124,14 @@
   packages = ["version"]
   pruneopts = "NUT"
   revision = "3b769b4ca86e69a42e60fd8434526388c387f6d3"
+
+[[projects]]
+  digest = "1:4047c378584616813d610c9f993bf90dd0d07aed8d94bd3bc299cd35ececdcba"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "614d223910a179a466c1767a985424175c39b465"
+  version = "v0.9.1"
 
 [[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
@@ -214,11 +230,12 @@
   revision = "73f8eece6fdcd902c185bf651de50f3828bed5ed"
 
 [[projects]]
-  digest = "1:a8c5d3ae2ad4523e7c7e170695b61632b45ed1bcadca213c3bcb579ad7971513"
+  digest = "1:adb3d9d6cc7546033293b0bde63e38eba2772a6f27fe1ecc57df0113229b508a"
   name = "go.mongodb.org/mongo-driver"
   packages = [
     "bson",
     "bson/bsoncodec",
+    "bson/bsonoptions",
     "bson/bsonrw",
     "bson/bsontype",
     "bson/primitive",
@@ -240,6 +257,8 @@
     "x/mongo/driver/connstring",
     "x/mongo/driver/description",
     "x/mongo/driver/dns",
+    "x/mongo/driver/mongocrypt",
+    "x/mongo/driver/mongocrypt/options",
     "x/mongo/driver/operation",
     "x/mongo/driver/session",
     "x/mongo/driver/topology",
@@ -247,8 +266,8 @@
     "x/mongo/driver/wiremessage",
   ]
   pruneopts = "NUT"
-  revision = "c520d023af0a89aec8b7f97717b52da270df2c38"
-  version = "v1.1.1"
+  revision = "dbe9cee06654c7d19e291eb74b9da49b4c6a0fd4"
+  version = "v1.3.2"
 
 [[projects]]
   branch = "master"
