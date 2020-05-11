@@ -36,15 +36,20 @@ var (
 
 // ConnectionStats are connections metrics
 type ConnectionStats struct {
-	Current      float64 `bson:"current"`
-	Available    float64 `bson:"available"`
-	TotalCreated float64 `bson:"totalCreated"`
+	Current      float64  `bson:"current"`
+	Available    float64  `bson:"available"`
+	TotalCreated float64  `bson:"totalCreated"`
+	Active       *float64 `bson:"active,omitempty"`
 }
 
 // Export exports the data to prometheus.
 func (connectionStats *ConnectionStats) Export(ch chan<- prometheus.Metric) {
 	connections.WithLabelValues("current").Set(connectionStats.Current)
 	connections.WithLabelValues("available").Set(connectionStats.Available)
+	// new in Mongo 4.0.7
+	if connectionStats.Active != nil {
+		connections.WithLabelValues("active").Set(*connectionStats.Active)
+	}
 	connections.Collect(ch)
 
 	ch <- prometheus.MustNewConstMetric(connectionsMetricsCreatedTotalDesc, prometheus.CounterValue, connectionStats.TotalCreated)

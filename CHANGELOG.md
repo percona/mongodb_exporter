@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `github.com/prometheus/client_golang` was updated to `v1.5.1`.
 - [PMM-4719](https://jira.percona.com/browse/PMM-4719): Remove redundant flags from "mongodb_exporter" if possible. 
 Those flags have been removed: `--mongodb.authentification-database, --mongodb.max-connections, --mongodb.socket-timeout, --mongodb.sync-timeout`. You can use [connection-string-options](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-options) instead.
-
+- Added lost connection metrics and removed useless file [@nikita-b](https://github.com/nikita-b)
 ### Added
 
 ### Fixed
