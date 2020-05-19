@@ -55,6 +55,18 @@ var (
 		Name:      "index_size",
 		Help:      "The individual index size",
 	}, []string{"db", "coll", "index"})
+	collectionWTReusableFileBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "db_coll",
+		Name:      "wiredtiger_file_reusable_bytes",
+		Help:      "Bytes Available for Reuse",
+	}, []string{"db", "coll"})
+	collectionWTFileSizeInBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "db_coll",
+		Name:      "wiredtiger_file_allocated_bytes",
+		Help:      "Allocated file bytes (file size on disk)",
+	}, []string{"db", "coll"})
 )
 
 // CollectionStatList contains stats from all collections.
@@ -62,16 +74,36 @@ type CollectionStatList struct {
 	Members []CollectionStatus
 }
 
+// Wired Tiger Block Manager Stats
+type BlockManagerStats struct {
+	AllocationsRequiringFileExtension int `bson:"allocations requiring file extension,omitempty"`
+	BlocksAllocated                   int `bson:"blocks allocated,omitempty"`
+	BlocksFreed                       int `bson:"blocks freed,omitempty"`
+	CheckpointSize                    int `bson:"checkpoint size,omitempty"`
+	FileAllocationUnitSize            int `bson:"file allocation unit size,omitempty"`
+	FileBytesAvailableForReuse        int `bson:"file bytes available for reuse,omitempty"`
+	FileMagicNumber                   int `bson:"file magic number,omitempty"`
+	FileMajorVersionNumber            int `bson:"file major version number,omitempty"`
+	FileSizeInBytes                   int `bson:"file size in bytes,omitempty"`
+	MinorVersionNumber                int `bson:"minor version number,omitempty"`
+}
+
+// Collection Wired Tiger Stats
+type CollectionWiredTigerStats struct {
+	BlockManager BlockManagerStats `bson:"block-manager,omitempty"`
+}
+
 // CollectionStatus represents stats about a collection in database (mongod and raw from mongos).
 type CollectionStatus struct {
 	Database    string
 	Name        string
-	Size        int                `bson:"size,omitempty"`
-	Count       int                `bson:"count,omitempty"`
-	AvgObjSize  int                `bson:"avgObjSize,omitempty"`
-	StorageSize int                `bson:"storageSize,omitempty"`
-	IndexesSize int                `bson:"totalIndexSize,omitempty"`
-	IndexSizes  map[string]float64 `bson:"indexSizes,omitempty"`
+	Size        int                       `bson:"size,omitempty"`
+	Count       int                       `bson:"count,omitempty"`
+	AvgObjSize  int                       `bson:"avgObjSize,omitempty"`
+	StorageSize int                       `bson:"storageSize,omitempty"`
+	IndexesSize int                       `bson:"totalIndexSize,omitempty"`
+	IndexSizes  map[string]float64        `bson:"indexSizes,omitempty"`
+	WiredTiger  CollectionWiredTigerStats `bson:"wiredTiger,omitempty"`
 }
 
 // Export exports database stats to prometheus.
@@ -84,6 +116,9 @@ func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 	collectionIndexes.Reset()
 	collectionIndexesSize.Reset()
 	collectionIndexSize.Reset()
+	collectionWTReusableFileBytes.Reset()
+	collectionWTFileSizeInBytes.Reset()
+
 	for _, member := range collStatList.Members {
 		ls := prometheus.Labels{
 			"db":   member.Database,
@@ -95,6 +130,9 @@ func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 		collectionStorageSize.With(ls).Set(float64(member.StorageSize))
 		collectionIndexes.With(ls).Set(float64(len(member.IndexSizes)))
 		collectionIndexesSize.With(ls).Set(float64(member.IndexesSize))
+		collectionWTReusableFileBytes.With(ls).Set(float64(member.WiredTiger.BlockManager.FileBytesAvailableForReuse))
+		collectionWTFileSizeInBytes.With(ls).Set(float64(member.WiredTiger.BlockManager.FileSizeInBytes))
+
 		for indexName, size := range member.IndexSizes {
 			ls = prometheus.Labels{
 				"db":    member.Database,
@@ -111,6 +149,8 @@ func (collStatList *CollectionStatList) Export(ch chan<- prometheus.Metric) {
 	collectionIndexes.Collect(ch)
 	collectionIndexesSize.Collect(ch)
 	collectionIndexSize.Collect(ch)
+	collectionWTReusableFileBytes.Collect(ch)
+	collectionWTFileSizeInBytes.Collect(ch)
 }
 
 // Describe describes database stats for prometheus.
@@ -121,6 +161,8 @@ func (collStatList *CollectionStatList) Describe(ch chan<- *prometheus.Desc) {
 	collectionStorageSize.Describe(ch)
 	collectionIndexes.Describe(ch)
 	collectionIndexesSize.Describe(ch)
+	collectionWTReusableFileBytes.Describe(ch)
+	collectionWTFileSizeInBytes.Describe(ch)
 }
 
 var logSuppressCS = shared.NewSyncStringSet()
