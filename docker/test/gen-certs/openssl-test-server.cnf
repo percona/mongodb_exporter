@@ -1,0 +1,61 @@
+# NOT FOR PRODUCTION USE. OpenSSL configuration file for testing.
+
+
+[ req ]
+default_bits = 4096
+default_keyfile = myTestServerCertificateKey.pem    ## The default private key file name.
+default_md = sha256
+distinguished_name = req_dn
+req_extensions = v3_req
+
+[ v3_req ]
+subjectKeyIdentifier  = hash
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+nsComment = "OpenSSL Generated Certificate for TESTING only.  NOT FOR PRODUCTION USE."
+extendedKeyUsage  = serverAuth, clientAuth
+subjectAltName = @alt_names
+
+[ alt_names ]
+
+DNS.1 = 127.0.0.1
+#DNS.2 = localhost
+
+IP.1 = 127.0.0.1
+#IP.2 = localhost
+
+
+
+[ req_dn ]
+countryName = AR
+countryName_default = AR
+
+countryName_min = 2
+countryName_max = 2
+
+stateOrProvinceName = State or Province Name (full name)
+
+stateOrProvinceName_default = TestServerCertificateState
+
+stateOrProvinceName_max = 64
+
+localityName = Locality Name (eg, city)
+
+localityName_default = TestServerCertificateLocality
+
+localityName_max = 64
+
+organizationName = Organization Name (eg, company)
+
+organizationName_default = TestServerCertificateOrg
+
+organizationName_max = 64
+
+organizationalUnitName = Organizational Unit Name (eg, section)
+
+organizationalUnitName_default = TestServerCertificateOrgUnit
+
+organizationalUnitName_max = 64
+
+commonName = 127.0.0.1
+commonName_max = 64

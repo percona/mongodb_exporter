@@ -1,8 +1,135 @@
 ---
-version: "3.7"
+version: '3'
 services:
-  mongodb:
-    image: ${MONGODB_IMAGE:-percona/percona-server-mongodb:4.2}
-    container_name: mnogo_exporter_mongodb
-    ports:
-      - 127.0.0.1:27017:27017
+  standalone:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --port=27017 
+    volumes:
+    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s1-mongo1:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S1_RS} --port=${TEST_MONGODB_S1_PRIMARY_PORT} --shardsvr
+    volumes:
+    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s1-mongo2:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S1_RS} --port=${TEST_MONGODB_S1_SECONDARY1_PORT} --shardsvr
+    volumes:
+    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s1-mongo3:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S1_RS} --port=${TEST_MONGODB_S1_SECONDARY2_PORT} --shardsvr
+    volumes:
+    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s2-mongo1:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S2_RS} --port=${TEST_MONGODB_S2_PRIMARY_PORT} --shardsvr
+    volumes:
+    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s2-mongo2:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S2_RS} --port=${TEST_MONGODB_S2_SECONDARY1_PORT} --shardsvr
+    volumes:
+    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  s2-mongo3:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_S2_RS} --port=${TEST_MONGODB_S2_SECONDARY2_PORT} --shardsvr
+    volumes:
+    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  configsvr1:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --port=${TEST_MONGODB_CONFIGSVR1_PORT} --configsvr
+    volumes:
+    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+#  configsvr2:
+#    network_mode: host
+#    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+#    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --port=${TEST_MONGODB_CONFIGSVR2_PORT} --configsvr
+#    volumes:
+#    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+#    - ./docker/test/mongod.key:/mongod.key:ro
+#    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+#    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+#  configsvr3:
+#    network_mode: host
+#    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+#    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --port=${TEST_MONGODB_CONFIGSVR3_PORT} --configsvr
+#    volumes:
+#    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
+#    - ./docker/test/mongod.key:/mongod.key:ro
+#    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+#    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
+  mongos:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    command: --port=${TEST_MONGODB_MONGOS_PORT} --configdb=${TEST_MONGODB_CONFIGSVR_RS}/127.0.0.1:${TEST_MONGODB_CONFIGSVR1_PORT} 
+    volumes:
+    - ./docker/test/entrypoint-mongos.sh:/entrypoint.sh:ro
+    - ./docker/test/entrypoint-mongos.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongos.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/mongodb.pem:/mongos.pem:ro
+    depends_on:
+    - configsvr1
+#   - configsvr2
+#   - configsvr3
+  init:
+    network_mode: host
+    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+    volumes:
+    - ./docker/test/init-cluster.sh:/entrypoint.sh:ro
+    - ./docker/test/init-cluster.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    - ./docker/test/mongod.key:/mongod.key:ro
+    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
+    - ./docker/test/ssl/client.pem:/client.pem:ro
+    env_file:
+    - .env
+    depends_on:
+    - standalone
+    - mongos
+    - s1-mongo1
+    - s1-mongo2
+    - s1-mongo3
+    - s2-mongo1
+    - s2-mongo2
+    - s2-mongo3

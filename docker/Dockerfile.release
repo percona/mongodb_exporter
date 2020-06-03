@@ -1,0 +1,9 @@
+FROM goreleaser/goreleaser
+
+RUN apk --no-cache add upx
+
+WORKDIR /go/src/github.com/Percona-Lab/mnogo_exporter
+COPY . .
+
+ENTRYPOINT ["goreleaser"]
+CMD ["release"]
