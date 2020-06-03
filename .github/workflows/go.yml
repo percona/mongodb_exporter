@@ -28,6 +28,8 @@ jobs:
 
     - name: Test
       run: |
+        make format
+        git diff --exit-code
         make test-cluster
         make test
 

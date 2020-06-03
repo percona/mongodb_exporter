@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 
-	"github.com/Percona-Lab/mnogo_exporter/exporter"
 	"github.com/alecthomas/kong"
 	"github.com/sirupsen/logrus"
+
+	"github.com/Percona-Lab/mnogo_exporter/exporter"
 )
 
 var (

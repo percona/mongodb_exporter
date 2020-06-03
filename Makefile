@@ -5,6 +5,7 @@ GO_TEST_EXTRA?=
 GO_TEST_COVER_PROFILE?=cover.out
 GO_TEST_CODECOV?=
 
+TOP_DIR=$(shell git rev-parse --show-toplevel)
 VERSION ?=$(shell git describe --abbrev=0)
 BUILD ?=$(shell date +%FT%T%z)
 GOVERSION ?=$(shell go version | cut -d " " -f3)
@@ -67,13 +68,13 @@ env:
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
-init:
+init:							## Install linters
 	- curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
 	- curl https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
 
 format:							## Format source code.
 	gofmt -w -s $(FILES)
-	goimports -l -w $(FILES)
+	goimports -local github.com/Percona-Lab/mnogo_exporter -l -w $(FILES)
 
 help:                 			## Display this help message.
 	@echo "Please use \`make <target>\` where <target> is one of:"
@@ -83,7 +84,10 @@ help:                 			## Display this help message.
 test: env  						## Run all tests
 	go test -timeout 30s ./...
 
-test-cluster: env				## Starts MongoDB test cluster 
+certs:							## Generate SSL certificates for the MongoDB sandbox
+	docker/test/gen-certs/gen-certs.sh
+
+test-cluster: env certs			## Starts MongoDB test cluster 
 	TEST_PSMDB_VERSION=$(TEST_PSMDB_VERSION) \
 	docker-compose up \
 	--detach \

@@ -30,7 +30,10 @@ func getTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	client, err := mongo.Connect(ctx, co)
 	require.NoError(t, err)
 
-	t.Cleanup(func() { client.Disconnect(ctx) }) //nolint:errcheck
+	t.Cleanup(func() {
+		err := client.Disconnect(ctx)
+		assert.NoError(t, err)
+	})
 
 	err = client.Ping(ctx, nil)
 	require.NoError(t, err)

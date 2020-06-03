@@ -1,1 +1,4 @@
 .env
+bin
+dist
+docker/test/ssl/*
