@@ -2,15 +2,9 @@ package exporter
 
 import (
 	"context"
-	"time"
 
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-)
-
-const (
-	connectTimeout = 10 * time.Second
 )
 
 // Exporter holds Exporter methods and attributes.
@@ -21,7 +15,6 @@ type Exporter struct {
 // Opts holds new exporter options.
 type Opts struct {
 	DSN string
-	Log *logrus.Logger
 }
 
 // New connects to the database and returns a new Exporter instance.
@@ -30,10 +23,7 @@ func New(opts *Opts) (*Exporter, error) {
 		opts = new(Opts)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
-	defer cancel()
-
-	client, err := connect(ctx, opts.DSN)
+	client, err := connect(context.Background(), opts.DSN)
 	if err != nil {
 		return nil, err
 	}

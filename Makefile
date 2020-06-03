@@ -71,6 +71,7 @@ FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 init:							## Install linters
 	- curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
 	- curl https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
+	- go get golang.org/x/tools/cmd/goimports
 
 format:							## Format source code.
 	gofmt -w -s $(FILES)
