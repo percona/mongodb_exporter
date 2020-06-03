@@ -36,25 +36,27 @@ Metrics `mongodb_mongod_replset_oplog_*` doesn't work in [Master/Slave](https://
     ```bash
     go get -u github.com/percona/mongodb_exporter
     ```
- 2. Switch to the buld directory and just run ``make`` to install all needed tools, format code with `go fmt`, build a binary for your OS and run tests.:
+
+2. Switch to the buld directory and just run ``make`` to install all needed tools, format code with `go fmt`, build a binary for your OS and run tests.:
  
     ```bash
     cd ${GOPATH-$HOME/go}/src/github.com/percona/mongodb_exporter
     make
     ```
+
     *Note: Running tests requires ``docker`` (as it uses MongoDB) and ``docker-compose``, and you will also need free ``27017`` port, as ``docker-compose`` maps this port into your host OS while testing.*
 
     1. If you want just build a binary for your OS without codestyle checks and tests you can run command below:
 
-       ```bash
-          make build
-       ```
+        ```bash
+        make build
+        ```
 
     2. If you don't have or don't want to install the whole GO stuff, use this docker build that creates a container with a freshly built `mongodb_exporter` binary:
 
-       ```bash
-          make docker
-       ```
+        ```bash
+        make docker
+        ```
 
 ### Running
 
@@ -69,6 +71,12 @@ export HTTP_AUTH='user:password'
 ./bin/mongodb_exporter [<flags>]
 ```
 
+If you are using hidden nodes, connect to them using the `connect=direct` option. Example:
+
+```bash
+./mongodb_exporter --mongodb.uri=admin:admin123456@127.0.0.3:17003/admin/?connect=direct
+```
+
 #### Kubernetes
 
 You can use the chart [prometheus-mongodb-exporter](https://github.com/helm/charts/tree/master/stable/prometheus-mongodb-exporter) from helm stable repository.
@@ -81,22 +89,22 @@ If you use [MongoDB Authorization](https://docs.mongodb.org/manual/core/authoriz
 
 1. Create a user with '*clusterMonitor*' role and '*read*' on the '*local*' database, like the following (*replace username/password!*):
 
-```js
-db.getSiblingDB("admin").createUser({
-    user: "mongodb_exporter",
-    pwd: "s3cr3tpassw0rd",
-    roles: [
-        { role: "clusterMonitor", db: "admin" },
-        { role: "read", db: "local" }
-    ]
-})
-```
+    ```js
+    db.getSiblingDB("admin").createUser({
+        user: "mongodb_exporter",
+        pwd: "s3cr3tpassw0rd",
+        roles: [
+            { role: "clusterMonitor", db: "admin" },
+            { role: "read", db: "local" }
+        ]
+    })
+    ```
 
 2. Set environment variable `MONGODB_URI` before starting the exporter:
 
-```bash
-export MONGODB_URI=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
-```
+    ```bash
+    export MONGODB_URI=mongodb://mongodb_exporter:s3cr3tpassw0rd@localhost:27017
+    ```
 
 If you use [x.509 Certificates to Authenticate Clients](https://docs.mongodb.com/manual/tutorial/configure-x509-client-authentication/), pass in username and `authMechanism` via [connection options](https://docs.mongodb.com/manual/reference/connection-string/#connections-connection-options) to the MongoDB uri. Eg:
 
