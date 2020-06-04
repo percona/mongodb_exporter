@@ -2,3 +2,4 @@
 bin
 dist
 docker/test/ssl/*
+docker/test/gen-certs/mongodb-test-ca.srl

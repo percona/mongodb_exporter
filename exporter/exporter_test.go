@@ -42,12 +42,10 @@ func getTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 }
 
 func TestConnect(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
-	defer cancel()
-
 	hostname := "127.0.0.1"
 	username := os.Getenv("TEST_MONGODB_ADMIN_USERNAME")
 	password := os.Getenv("TEST_MONGODB_ADMIN_PASSWORD")
+	ctx := context.Background()
 
 	ports := map[string]string{
 		"standalone":          os.Getenv("TEST_MONGODB_STANDALONE_PORT"),

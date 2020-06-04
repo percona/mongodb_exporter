@@ -52,7 +52,6 @@ func main() {
 
 	exporterOpts := &exporter.Opts{
 		DSN: opts.DSN,
-		Log: log,
 	}
 
 	e, err := exporter.New(exporterOpts)
