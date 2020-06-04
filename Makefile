@@ -74,6 +74,7 @@ init:						## Install linters
 	- go get golang.org/x/tools/cmd/goimports
 
 format:						## Format source code.
+	go get golang.org/x/tools/cmd/goimports # Update goimports to update .mod & .sum
 	gofmt -w -s $(FILES)
 	goimports -local github.com/Percona-Lab/mnogo_exporter -l -w $(FILES)
 
