@@ -68,27 +68,27 @@ env:
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
-init:							## Install linters
+init:						## Install linters
 	- curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
 	- curl https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
 	- go get golang.org/x/tools/cmd/goimports
 
-format:							## Format source code.
+format:						## Format source code.
 	gofmt -w -s $(FILES)
 	goimports -local github.com/Percona-Lab/mnogo_exporter -l -w $(FILES)
 
-help:                 			## Display this help message.
+help:						## Display this help message.
 	@echo "Please use \`make <target>\` where <target> is one of:"
 	@grep '^[a-zA-Z]' $(MAKEFILE_LIST) | \
 	awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
-test: env  						## Run all tests
+test: env  				   	## Run all tests
 	go test -timeout 30s ./...
 
-certs:							## Generate SSL certificates for the MongoDB sandbox
+certs:					   	## Generate SSL certificates for the MongoDB sandbox
 	docker/test/gen-certs/gen-certs.sh
 
-test-cluster: env certs			## Starts MongoDB test cluster 
+test-cluster: env certs	   	## Starts MongoDB test cluster 
 	TEST_PSMDB_VERSION=$(TEST_PSMDB_VERSION) \
 	docker-compose up \
 	--detach \
@@ -98,5 +98,5 @@ test-cluster: env certs			## Starts MongoDB test cluster
 	init
 	docker/test/init-cluster-wait.sh
 
-test-cluster-clean: env			## Stops MongoDB test cluster
+test-cluster-clean: env		## Stops MongoDB test cluster
 	docker-compose down -v
