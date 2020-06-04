@@ -69,9 +69,12 @@ env:
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 init:						## Install linters
-	- curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
-	- curl https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
-	- go get golang.org/x/tools/cmd/goimports
+	curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
+	curl https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
+	go get golang.org/x/tools/cmd/goimports
+
+build:						## Build the binaries
+	goreleaser --snapshot --skip-publish --rm-dist
 
 format:						## Format source code.
 	go get golang.org/x/tools/cmd/goimports 
