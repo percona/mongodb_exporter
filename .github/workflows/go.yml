@@ -24,7 +24,7 @@ jobs:
 
     - name: Diff
       run: |
-	    go get golang.org/x/tools/cmd/goimports
+        go get golang.org/x/tools/cmd/goimports
         make format
         git diff --exit-code
 
