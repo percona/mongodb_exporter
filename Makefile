@@ -82,7 +82,7 @@ help:						## Display this help message.
 	@grep '^[a-zA-Z]' $(MAKEFILE_LIST) | \
 	awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
-test: env  				   	## Run all tests
+test: env					## Run all tests
 	go test -timeout 30s ./...
 
 certs:					   	## Generate SSL certificates for the MongoDB sandbox
