@@ -4,6 +4,7 @@ TOP_DIR=$(git rev-parse --show-toplevel)
 cd ${TOP_DIR}/docker/test/gen-certs/
                                            				   	
 CURDIR=$(pwd)
+mkdir -p ${TOP_DIR}/docker/test/ssl/
 echo "Generating certs into $CURDIR"
 rm -f *.key *.pem *.crt *.csr
 
@@ -35,7 +36,5 @@ openssl req -new -key mongodb-test-client.key -out mongodb-test-client.csr -conf
 openssl x509 -sha256 -req -days 365 -in mongodb-test-client.csr -CA mongodb-test-ca.crt -CAkey mongodb-test-ca.key -CAcreateserial -out mongodb-test-client.crt -extfile openssl-test-client.cnf -extensions v3_req 
 cat mongodb-test-client.key mongodb-test-client.crt > test-client.pem
 cp test-client.pem ${TOP_DIR}/docker/test/ssl/client.pem
-ls -la
-ls -la ${TOP_DIR}/docker/test/
 # clean up
 rm -f *.key *.pem *.crt *.csr
