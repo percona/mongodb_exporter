@@ -13,8 +13,7 @@ builds:
     ldflags: 
         - -s -w -X main.version={{.Env.VERSION}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
 archives:
-  -
-    name_template: "{{ .ProjectName }}-{{ .Env.VERSION }}.{{ .Os }}-{{ .Arch }}"
+  - name_template: "{{ .ProjectName }}-{{ .Env.VERSION }}.{{ .Os }}-{{ .Arch }}"
 checksum:
   name_template: '{{ .ProjectName }}-{{ .Env.VERSION }}-checksums.txt'
 snapshot:

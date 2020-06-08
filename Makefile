@@ -1,23 +1,22 @@
+.PHONY: all clean default help test
 default: help
 
-GO_TEST_PATH?=./...
-GO_TEST_EXTRA?=
-GO_TEST_COVER_PROFILE?=cover.out
-GO_TEST_CODECOV?=
+GO_TEST_PATH ?= ./...
+GO_TEST_EXTRA ?=
+GO_TEST_COVER_PROFILE ?= cover.out
+GO_TEST_CODECOV ?=
 
-TOP_DIR=$(shell git rev-parse --show-toplevel)
-VERSION ?=$(shell git describe --abbrev=0)
-BUILD ?=$(shell date +%FT%T%z)
-GOVERSION ?=$(shell go version | cut -d " " -f3)
-COMMIT ?=$(shell git rev-parse HEAD)
-BRANCH ?=$(shell git rev-parse --abbrev-ref HEAD)
-
-GO_BUILD_LDFLAGS=-X main.Version=${VERSION} -X main.Build=${BUILD} -X main.Commit=${COMMIT} -X main.Branch=${BRANCH} -X main.GoVersion=${GOVERSION} -s -w
-
-NAME?=mnogo_exporter
-REPO?=percona/$(NAME)
-GORELEASER_FLAGS?=
-UID?=$(shell id -u)
+TOP_DIR ?= $(shell git rev-parse --show-toplevel)
+VERSION ?= $(shell git describe --abbrev=0)
+BUILD ?= $(shell date +%FT%T%z)
+GOVERSION ?= $(shell go version | cut -d " " -f3)
+COMMIT ?= $(shell git rev-parse HEAD)
+BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
+GO_BUILD_LDFLAGS = -X main.Version=${VERSION} -X main.Build=${BUILD} -X main.Commit=${COMMIT} -X main.Branch=${BRANCH} -X main.GoVersion=${GOVERSION} -s -w
+NAME ?= mnogo_exporter
+REPO ?= percona/$(NAME)
+GORELEASER_FLAGS ?=
+UID ?= $(shell id -u)
 
 export TEST_PSMDB_VERSION?=3.6
 export TEST_MONGODB_FLAVOR?=percona/percona-server-mongodb
@@ -66,7 +65,6 @@ endef
 env:
 	@echo $(TEST_ENV) | tr ' ' '\n' >.env
 
-FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 init:						## Install linters
 	curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
@@ -76,6 +74,7 @@ init:						## Install linters
 build:						## Build the binaries
 	goreleaser --snapshot --skip-publish --rm-dist
 
+FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 format:						## Format source code.
 	go get golang.org/x/tools/cmd/goimports 
 	gofmt -w -s $(FILES)
