@@ -87,7 +87,7 @@ test: env                   ## Run all tests.
 	go test -timeout 30s ./...
 
 test-cluster: env           ## Starts MongoDB test cluster.
-	cd docker; docker-compose -f docker-compose.1.yml -f docker-compose.2.yml -f docker-compose.cnf.yml -f docker-compose.shard.yml -f docker-compose.standalone.yml up -d 
+	docker-compose up -d
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
-	cd docker; docker-compose -f docker-compose.1.yml -f docker-compose.2.yml -f docker-compose.cnf.yml -f docker-compose.shard.yml -f docker-compose.standalone.yml down
+	docker-compose down
