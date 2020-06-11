@@ -1,0 +1,8 @@
+version: '3'
+services:
+    standalone:
+        container_name: "standalone"
+        image: mongo:4.0.1
+        ports:
+            - "${TEST_MONGODB_STANDALONE_PORT}:27017"
+        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16 --noprealloc --smallfiles

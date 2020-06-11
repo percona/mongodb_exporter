@@ -19,18 +19,17 @@ jobs:
         go-version: ^1.14
       id: go
 
+    - name: Initialize dependencies and linters
+      run: |
+        make init
+
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
     - name: Diff
       run: |
-        go get golang.org/x/tools/cmd/goimports
         make format
         git diff --exit-code
-
-    - name: Get dependencies (linters)
-      run: |
-        make init
 
     - name: Test
       run: |

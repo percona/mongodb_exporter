@@ -1,0 +1,46 @@
+version: '3'
+services:
+    mongo-cnf-2:
+        container_name: "mongo-cnf-2"
+        image: mongo:4.0.1
+        ports:
+            - "${TEST_MONGODB_CONFIGSVR1_PORT}:27017"
+        command: mongod --replSet cnf-serv --configsvr --port 27017 --oplogSize 16 --noprealloc --smallfiles
+
+    mongo-cnf-3:
+        container_name: "mongo-cnf-3"
+        image: mongo:4.0.1
+        ports:
+            - "${TEST_MONGODB_CONFIGSVR2_PORT}:27017"
+        command: mongod --replSet cnf-serv --configsvr --port 27017 --oplogSize 16 --noprealloc --smallfiles
+
+    mongo-cnf-1:
+        container_name: "mongo-cnf-1"
+        image: mongo:4.0.1
+        ports:
+            - "${TEST_MONGODB_CONFIGSVR3_PORT}:27017"
+        command: mongod --replSet cnf-serv --configsvr --port 27017 --oplogSize 16 --noprealloc --smallfiles
+        links:
+            - mongo-cnf-2:mongo-cnf-2
+            - mongo-cnf-3:mongo-cnf-3
+
+    mongo-cnf-setup:
+        container_name: "mongo-cnf-setup"
+        image: mongo:4.0.1
+        depends_on:
+            - "mongo-cnf-1"
+            - "mongo-cnf-2"
+            - "mongo-cnf-3"
+        links:
+            - mongo-cnf-1:mongo-cnf-1
+            - mongo-cnf-2:mongo-cnf-2
+            - mongo-cnf-3:mongo-cnf-3
+        volumes:
+            - ./scripts:/scripts
+        environment: 
+            - MONGO1=mongo-cnf-1
+            - MONGO2=mongo-cnf-2
+            - MONGO3=mongo-cnf-3
+            - RS=cnf-serv
+            - PORT=27017
+        entrypoint: [ "/scripts/setup-cnf.sh" ]

@@ -1,0 +1,47 @@
+version: '3'
+services:
+    mongo-1-1:
+        container_name: "mongo-1-1"
+        image: mongo:4.0.1
+        ports:
+            - "${TEST_MONGODB_S1_PRIMARY_PORT}:27017"
+        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16 --noprealloc --smallfiles
+        links:
+            - mongo-1-2:mongo-1-2
+            - mongo-1-3:mongo-1-3
+
+    mongo-1-2:
+        container_name: "mongo-1-2"
+        image: mongo:4.0.1
+        ports:
+            - "${TEST_MONGODB_S1_SECONDARY1_PORT}:27017"
+        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16 --noprealloc --smallfiles
+
+    mongo-1-3:
+        container_name: "mongo-1-3"
+        image: mongo:4.0.1
+        ports:
+            - "${TEST_MONGODB_S1_SECONDARY2_PORT}:27017"
+        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16 --noprealloc --smallfiles
+
+    mongo-rs1-setup:
+        container_name: "mongo-rs1-setup"
+        image: mongo:4.0.1
+        depends_on:
+            - "mongo-1-1"
+            - "mongo-1-2"
+            - "mongo-1-3"
+        links:
+            - mongo-1-1:mongo-1-1
+            - mongo-1-2:mongo-1-2
+            - mongo-1-3:mongo-1-3
+        volumes:
+            - ./scripts:/scripts
+        environment: 
+            - MONGO1=mongo-1-1
+            - MONGO2=mongo-1-2
+            - MONGO3=mongo-1-3
+            - RS=rs1
+        entrypoint: [ "/scripts/setup.sh" ]
+
+        

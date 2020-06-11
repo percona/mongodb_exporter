@@ -20,10 +20,10 @@ UID ?= $(shell id -u)
 
 export TEST_PSMDB_VERSION?=3.6
 export TEST_MONGODB_FLAVOR?=percona/percona-server-mongodb
-export TEST_MONGODB_ADMIN_USERNAME?=admin
-export TEST_MONGODB_ADMIN_PASSWORD?=admin123456
-export TEST_MONGODB_USERNAME?=test
-export TEST_MONGODB_PASSWORD?=123456
+export TEST_MONGODB_ADMIN_USERNAME?=
+export TEST_MONGODB_ADMIN_PASSWORD?=
+export TEST_MONGODB_USERNAME?=
+export TEST_MONGODB_PASSWORD?=
 export TEST_MONGODB_S1_RS?=rs1
 export TEST_MONGODB_STANDALONE_PORT?=27017
 export TEST_MONGODB_S1_PRIMARY_PORT?=17001
@@ -65,9 +65,8 @@ endef
 env:
 	@echo $(TEST_ENV) | tr ' ' '\n' >.env
 
-
 init:                       ## Install linters.
-	curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
+	curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh | sh -s
 	curl https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
 	go get golang.org/x/tools/cmd/goimports
 
@@ -76,7 +75,6 @@ build:                      ## Build the binaries.
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 format:                     ## Format source code.
-	go get golang.org/x/tools/cmd/goimports 
 	gofmt -w -s $(FILES)
 	goimports -local github.com/Percona-Lab/mnogo_exporter -l -w $(FILES)
 
@@ -88,18 +86,8 @@ help:                       ## Display this help message.
 test: env                   ## Run all tests.
 	go test -timeout 30s ./...
 
-certs:                      ## Generate SSL certificates for the MongoDB sandbox.
-	docker/test/gen-certs/gen-certs.sh
-
-test-cluster: env certs     ## Starts MongoDB test cluster.
-	TEST_PSMDB_VERSION=$(TEST_PSMDB_VERSION) \
-	docker-compose up \
-	--detach \
-	--force-recreate \
-	--always-recreate-deps \
-	--renew-anon-volumes \
-	init
-	docker/test/init-cluster-wait.sh
+test-cluster: env           ## Starts MongoDB test cluster.
+	cd docker; docker-compose -f docker-compose.1.yml -f docker-compose.2.yml -f docker-compose.cnf.yml -f docker-compose.shard.yml -f docker-compose.standalone.yml up -d 
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
-	docker-compose down -v
+	cd docker; docker-compose -f docker-compose.1.yml -f docker-compose.2.yml -f docker-compose.cnf.yml -f docker-compose.shard.yml -f docker-compose.standalone.yml down

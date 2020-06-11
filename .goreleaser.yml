@@ -15,7 +15,7 @@ builds:
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Env.VERSION }}.{{ .Os }}-{{ .Arch }}"
 checksum:
-  name_template: '{{ .ProjectName }}-{{ .Env.VERSION }}-checksums.txt'
+  - name_template: "{{ .ProjectName }}-{{ .Env.VERSION }}.{{ .Os }}-{{ .Arch }}-checksum.txt"
 snapshot:
   name_template: "{{ .ShortCommit }}"
 changelog:

@@ -1,135 +1,107 @@
 ---
-version: '3'
+version: '2'
 services:
-  standalone:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --port=27017 
+  mongorsn1:
+    container_name: mongors1n1
+    image: mongo
+    command: mongod --shardsvr --replSet mongors1 --dbpath /data/db --port 27017
+    ports:
+      - 27017:27017
+    expose:
+      - "27017"
+    environment:
+      TERM: xterm
     volumes:
-    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-  s1-mongo1:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --replSet=${TEST_MONGODB_S1_RS} --port=${TEST_MONGODB_S1_PRIMARY_PORT} --shardsvr
+      - /etc/localtime:/etc/localtime:ro
+      - /mongo_cluster/data1:/data/db
+  mongors1n2:
+    container_name: mongors1n2
+    image: mongo
+    command: mongod --shardsvr --replSet mongors1 --dbpath /data/db --port 27017
+    ports:
+      - 27027:27017
+    expose:
+      - "27017"
+    environment:
+      TERM: xterm
     volumes:
-    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-  s1-mongo2:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --replSet=${TEST_MONGODB_S1_RS} --port=${TEST_MONGODB_S1_SECONDARY1_PORT} --shardsvr
+      - /etc/localtime:/etc/localtime:ro
+      - /mongo_cluster/data2:/data/db
+  mongors1n3:
+    container_name: mongors1n3
+    image: mongo
+    command: mongod --shardsvr --replSet mongors1 --dbpath /data/db --port 27017
+    ports:
+      - 27037:27017
+    expose:
+      - "27017"
+    environment:
+      TERM: xterm
     volumes:
-    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-  s1-mongo3:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --replSet=${TEST_MONGODB_S1_RS} --port=${TEST_MONGODB_S1_SECONDARY2_PORT} --shardsvr
+      - /etc/localtime:/etc/localtime:ro
+      - /mongo_cluster/data3:/data/db
+  mongocfg1:
+    container_name: mongocfg1
+    image: mongo
+    command: mongod --configsvr --replSet mongors1conf --dbpath /data/db --port 27017
+    environment:
+      TERM: xterm
+    ports:
+      - 27057:27017
+    expose:
+      - "27017"
     volumes:
-    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-  s2-mongo1:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --replSet=${TEST_MONGODB_S2_RS} --port=${TEST_MONGODB_S2_PRIMARY_PORT} --shardsvr
+      - /etc/localtime:/etc/localtime:ro
+      - /mongo_cluster/config1:/data/db
+  mongocfg2:
+    container_name: mongocfg2
+    image: mongo
+    command: mongod --configsvr --replSet mongors1conf --dbpath /data/db --port 27017
+    environment:
+      TERM: xterm
+    ports:
+      - 27058:27017
+    expose:
+      - "27017"
     volumes:
-    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-  s2-mongo2:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --replSet=${TEST_MONGODB_S2_RS} --port=${TEST_MONGODB_S2_SECONDARY1_PORT} --shardsvr
+      - /etc/localtime:/etc/localtime:ro
+      - /mongo_cluster/config2:/data/db
+  mongocfg3:
+    container_name: mongocfg3
+    image: mongo
+    command: mongod --configsvr --replSet mongors1conf --dbpath /data/db --port 27017
+    environment:
+      TERM: xterm
+    ports:
+      - 27059:27017
+    expose:
+      - "27017"
     volumes:
-    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-  s2-mongo3:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --replSet=${TEST_MONGODB_S2_RS} --port=${TEST_MONGODB_S2_SECONDARY2_PORT} --shardsvr
-    volumes:
-    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-  configsvr1:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --port=${TEST_MONGODB_CONFIGSVR1_PORT} --configsvr
-    volumes:
-    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongod.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-#  configsvr2:
-#    network_mode: host
-#    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-#    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --port=${TEST_MONGODB_CONFIGSVR2_PORT} --configsvr
-#    volumes:
-#    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-#    - ./docker/test/mongod.key:/mongod.key:ro
-#    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-#    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-#  configsvr3:
-#    network_mode: host
-#    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-#    command: --replSet=${TEST_MONGODB_CONFIGSVR_RS} --port=${TEST_MONGODB_CONFIGSVR3_PORT} --configsvr
-#    volumes:
-#    - ./docker/test/entrypoint-mongod.sh:/entrypoint.sh:ro
-#    - ./docker/test/mongod.key:/mongod.key:ro
-#    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-#    - ./docker/test/ssl/mongodb.pem:/mongod.pem:ro
-  mongos:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
-    command: --port=${TEST_MONGODB_MONGOS_PORT} --configdb=${TEST_MONGODB_CONFIGSVR_RS}/127.0.0.1:${TEST_MONGODB_CONFIGSVR1_PORT} 
-    volumes:
-    - ./docker/test/entrypoint-mongos.sh:/entrypoint.sh:ro
-    - ./docker/test/entrypoint-mongos.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongos.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/mongodb.pem:/mongos.pem:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /mongo_cluster/config3:/data/db
+  mongos1:
+    container_name: mongos1
+    image: mongo
     depends_on:
-    - configsvr1
-#   - configsvr2
-#   - configsvr3
-  init:
-    network_mode: host
-    image: ${TEST_MONGODB_FLAVOR}:${TEST_PSMDB_VERSION}
+      - mongocfg1
+      - mongocfg2
+    command: mongos --configdb mongors1conf/mongocfg1:27017,mongocfg2:27017,mongocfg3:27017 --port 27017
+    ports:
+      - 27019:27017
+    expose:
+      - "27017"
     volumes:
-    - ./docker/test/init-cluster.sh:/entrypoint.sh:ro
-    - ./docker/test/init-cluster.sh:/usr/local/bin/docker-entrypoint.sh:ro
-    - ./docker/test/mongod.key:/mongod.key:ro
-    - ./docker/test/ssl/rootCA.crt:/rootCA.crt:ro
-    - ./docker/test/ssl/client.pem:/client.pem:ro
-    env_file:
-    - .env
+      - /etc/localtime:/etc/localtime:ro
+  mongos2:
+    container_name: mongos2
+    image: mongo
     depends_on:
-    - standalone
-    - mongos
-    - s1-mongo1
-    - s1-mongo2
-    - s1-mongo3
-    - s2-mongo1
-    - s2-mongo2
-    - s2-mongo3
+      - mongocfg1
+      - mongocfg2
+    command: mongos --configdb mongors1conf/mongocfg1:27017,mongocfg2:27017,mongocfg3:27017 --port 27017
+    ports:
+      - 27020:27017
+    expose:
+      - "27017"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro

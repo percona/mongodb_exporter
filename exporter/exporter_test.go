@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,14 +18,11 @@ func getTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	hostname := "127.0.0.1"
 	port := os.Getenv("TEST_MONGODB_S1_PRIMARY_PORT") // standalone instance
 	direct := true
+	to := time.Second
 	co := &options.ClientOptions{
-		Auth: &options.Credential{
-			Username:    os.Getenv("TEST_MONGODB_ADMIN_USERNAME"),
-			Password:    os.Getenv("TEST_MONGODB_ADMIN_PASSWORD"),
-			PasswordSet: true,
-		},
-		Hosts:  []string{net.JoinHostPort(hostname, port)},
-		Direct: &direct,
+		ConnectTimeout: &to,
+		Hosts:          []string{net.JoinHostPort(hostname, port)},
+		Direct:         &direct,
 	}
 
 	client, err := mongo.Connect(ctx, co)
@@ -43,8 +41,6 @@ func getTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 
 func TestConnect(t *testing.T) {
 	hostname := "127.0.0.1"
-	username := os.Getenv("TEST_MONGODB_ADMIN_USERNAME")
-	password := os.Getenv("TEST_MONGODB_ADMIN_PASSWORD")
 	ctx := context.Background()
 
 	ports := map[string]string{
@@ -61,18 +57,7 @@ func TestConnect(t *testing.T) {
 
 	t.Run("Connect without SSL", func(t *testing.T) {
 		for name, port := range ports {
-			dsn := fmt.Sprintf("mongodb://%s:%s@%s:%s/admin", username, password, hostname, port)
-			client, err := connect(ctx, dsn)
-			assert.NoError(t, err, name)
-			err = client.Disconnect(ctx)
-			assert.NoError(t, err, name)
-		}
-	})
-
-	t.Run("Connect with SSL", func(t *testing.T) {
-		sslOpts := "ssl=true&tlsInsecure=true&tlsCertificateKeyFile=../docker/test/ssl/client.pem"
-		for name, port := range ports {
-			dsn := fmt.Sprintf("mongodb://%s:%s@%s:%s/admin?%s", username, password, hostname, port, sslOpts)
+			dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, port)
 			client, err := connect(ctx, dsn)
 			assert.NoError(t, err, name)
 			err = client.Disconnect(ctx)
