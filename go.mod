@@ -9,5 +9,6 @@ require (
 	github.com/stretchr/testify v1.5.1
 	go.mongodb.org/mongo-driver v1.3.0
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
+	golang.org/x/tools v0.0.0-20200611032120-1fdcbd130028 // indirect
 	gotest.tools v2.2.0+incompatible
 )
