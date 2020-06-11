@@ -1,4 +1,4 @@
-.PHONY: all build clean default help test format
+.PHONY: all build clean default help init test format
 default: help
 
 GO_TEST_PATH ?= ./...
