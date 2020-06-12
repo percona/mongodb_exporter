@@ -33,11 +33,6 @@ func New(opts *Opts) (*Exporter, error) {
 	}, nil
 }
 
-// Disconnect from the database.
-func (e *Exporter) Disconnect(ctx context.Context) error {
-	return e.client.Disconnect(ctx)
-}
-
 func connect(ctx context.Context, dsn string) (*mongo.Client, error) {
 	clientOpts := options.Client().ApplyURI(dsn)
 	clientOpts.SetDirect(true)
