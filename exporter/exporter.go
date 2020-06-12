@@ -7,7 +7,6 @@ import (
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -15,19 +14,19 @@ import (
 
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
-	client     *mongo.Client
-	collectors []prometheus.Collector
 	path       string
 	port       int
+	client     *mongo.Client
+	log        *logrus.Logger
+	collectors []prometheus.Collector
 }
 
 // Opts holds new exporter options.
 type Opts struct {
-	DSN                  string
-	Log                  *logrus.Logger
-	Path                 string
-	Port                 int
-	CollStatsCollections []string
+	DSN  string
+	Path string
+	Port int
+	Log  *logrus.Logger
 }
 
 // New connects to the database and returns a new Exporter instance.
@@ -46,6 +45,7 @@ func New(opts *Opts) (*Exporter, error) {
 		collectors: make([]prometheus.Collector, 0),
 		path:       opts.Path,
 		port:       opts.Port,
+		log:        opts.Log,
 	}
 
 	return exp, nil
@@ -66,7 +66,7 @@ func (e *Exporter) Run() {
 	// Delegate http serving to Prometheus client library, which will call collector.Collect.
 	handler := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.ContinueOnError,
-		ErrorLog:      log.NewErrorLogger(),
+		ErrorLog:      e.log,
 	})
 
 	addr := fmt.Sprintf(":%d", e.port)
