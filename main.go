@@ -17,9 +17,11 @@ var (
 
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
-	DSN     string `name:"mongodb.dsn" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
-	Debug   bool   `name:"debug" short:"D" help:"Enable debug mode"`
-	Version bool   `name:"version" help:"Show version and exit"`
+	Debug      bool   `name:"debug" short:"D" help:"Enable debug mode"`
+	DSN        string `name:"mongodb.dsn" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	ExposePath string `name:"expose-path" help:"Metrics expose path" default:"/metrics"`
+	ExposePort int    `name:"expose-port" help:"HTTP expose server port" default:"9216"`
+	Version    bool   `name:"version" help:"Show version and exit"`
 }
 
 func main() {
@@ -51,7 +53,10 @@ func main() {
 	}
 
 	exporterOpts := &exporter.Opts{
-		DSN: opts.DSN,
+		DSN:  opts.DSN,
+		Log:  log,
+		Path: opts.ExposePath,
+		Port: opts.ExposePort,
 	}
 
 	e, err := exporter.New(exporterOpts)
@@ -59,5 +64,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_ = e
+	e.Run()
 }
