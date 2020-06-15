@@ -73,11 +73,13 @@ init:                       ## Install linters.
 build:                      ## Build the binaries.
 	goreleaser --snapshot --skip-publish --rm-dist
 
-FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 format:                     ## Format source code.
 	go mod tidy
-	gofmt -w -s $(FILES)
-	bin/goimports -local github.com/Percona-Lab/mnogo_exporter -l -w $(FILES)
+	gofmt -w -s .
+	bin/goimports -local github.com/Percona-Lab/mnogo_exporter -l -w .
+
+check:                      ## Run checks/linters
+	bin/golangci-lint run
 
 help:                       ## Display this help message.
 	@echo "Please use \`make <target>\` where <target> is one of:"
