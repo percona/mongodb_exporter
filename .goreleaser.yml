@@ -1,0 +1,28 @@
+dist: bin
+builds:
+  - binary: mnogo_exporter
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+    flags:
+      - -v
+    ldflags: 
+        - -s -w -X main.version={{.Env.VERSION}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
+archives:
+  - name_template: "{{ .ProjectName }}-{{ .Env.VERSION }}.{{ .Os }}-{{ .Arch }}"
+checksum:
+  - name_template: "{{ .ProjectName }}-{{ .Env.VERSION }}.{{ .Os }}-{{ .Arch }}-checksum.txt"
+snapshot:
+  name_template: "{{ .ShortCommit }}"
+changelog:
+  skip: true
+release:
+  github:
+    owner: percona
+    name: mnogo_exporter
+  draft: true
+  prerelease: auto
