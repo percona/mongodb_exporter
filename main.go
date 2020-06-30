@@ -42,12 +42,10 @@ func main() {
 		fmt.Printf("Version: %s\n", version)
 		fmt.Printf("Commit: %s\n", commit)
 		fmt.Printf("Build date: %s\n", buildDate)
-
 		return
 	}
 
 	log := logrus.New()
-
 	if opts.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}

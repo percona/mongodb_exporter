@@ -87,7 +87,7 @@ help:                       ## Display this help message.
 	awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
 test: env                   ## Run all tests.
-	go test -timeout 30s ./...
+	go test -v -timeout 30s ./...
 
 test-cluster: env           ## Starts MongoDB test cluster.
 	docker-compose up -d
