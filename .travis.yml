@@ -6,6 +6,7 @@ services:
 
 go:
   - 1.13.x
+  - 1.14.x
   # - TODO master
 
 # skip non-trunk PMM-XXXX branch builds, but still build pull requests
@@ -27,6 +28,8 @@ stages:
 env:
   global:
     - TMPDIR=/tmp
+    - secure: "WgxV9gv6R30rGKJDG4TCLjo/K2/Ph85MhutI/jk+dbbaT+OSjQmUmC0YHgaLaHrXn22zymfdi2QR96l3zq1GGteoEFBapJkxgdchCWlhhiVaSfSXf8KE4few7b8+lTfc8ufptpMVbrm8IiYcKd0toi/7jDxSh/DXrVSqyxUjXq1IhaNJ8zTMNtNq/GxAWB7K/Z1hu0JkNyKqzrscmWrkHGEO4GHvoLiekKGLojk+W6nf3/o18cmsSich6XiSLEl+5wtfmDo3Ixhu2xE7e7fUtpyj28NmK458oRdcsWuIYNSVtQuwzCLwjkEZWSZ0SiZbb+Mo9Azu22f3QvUxMRUfY/F6xqsHhOa+fJQslNTBEpLLLsQLCN5hql/pCJAAD3216EWX+lGWp4lu7F655AK4NN6hGgARpzEm9+6LIjqECldKfwoSmZirQ6DgC3434Vm5UFwMzRatR49OK+F+XxyN//PBYs3FQPREswbCVWKZ+KdDX6MCeypgJL3Qwuqe7moQIyBoD/ayDhrVWbTOet2HpIuPd22mqbp3Rv7GbznwxAjLWanMkK/9gMG4443W9Kge4Ec4aWaIBgWKl/XP++Hkn67ZW0Y83AaSBfTQvdS/9nlHTY1YuTbwQDUTUB7M+rbynab2lvNGXFT02dbtg9p/FCFqTLyvqADB2ODnX8QD51Q="
+
   matrix:
     # https://www.mongodb.com/support-policy
     - MONGODB_IMAGE=mongo:3.4
@@ -37,6 +40,16 @@ env:
     - MONGODB_IMAGE=percona/percona-server-mongodb:3.4
     - MONGODB_IMAGE=percona/percona-server-mongodb:3.6
     - MONGODB_IMAGE=percona/percona-server-mongodb:4.0
+
+install:
+  # install reviewdog and golangci-lin
+  - curl https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
+  - curl https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
+
+before_script:
+  # static analyze
+  - bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
+  - bin/golangci-lint run -c=.golangci.yml --out-format=line-number | bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
 
 script: make test-all
 
