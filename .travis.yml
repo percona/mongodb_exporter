@@ -6,7 +6,7 @@ services:
 
 go:
   - 1.14.x
-  # - TODO master
+  - tip
 
 # skip non-trunk PMM-XXXX branch builds, but still build pull requests
 branches:
@@ -17,7 +17,7 @@ go_import_path: github.com/percona/mongodb_exporter
 
 matrix:
   allow_failures:
-    - go: master
+    - go: tip
 
 stages:
   - build
