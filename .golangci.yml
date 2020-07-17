@@ -12,23 +12,13 @@ linters-settings:
     tab-width: 4
 
   unused:
-    check-exported: false
+    check-exported: true
 
   unparam:
     check-exported: true
 
-  goimports:
-    # put imports beginning with prefix after 3rd-party packages;
-    # it's a comma-separated list of prefixes
-    local-prefixes: github.com/Percona-Lab/mnogo_exporter
-
 linters:
   enable-all: true
-  disable:
-      - lll
-      - unused
-      - testpackage
-      - wsl 
 
 issues:
   exclude-use-default: false

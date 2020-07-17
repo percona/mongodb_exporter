@@ -1,27 +1,10 @@
-// mnogo_exporter
-// Copyright (C) 2017 Percona LLC
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package exporter
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -66,7 +49,7 @@ var (
 	// with the form ss.opcounters.<operation> where operation is each one of the fields inside
 	// the structure (insert, query, update, etc), those keys will become labels for the same
 	// metric name. The label name is defined as the value for each metric name in the map and
-	// the value the label will have is the field name in the structure. Example.
+	// the value the labeil will have is the field name in the structure. Example.
 	//
 	//   mongodb_ss_opcounters{legacy_op_type="insert"} 4
 	//   mongodb_ss_opcounters{legacy_op_type="query"} 2118
@@ -150,17 +133,17 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 		f = v
 	case primitive.DateTime:
 		f = float64(v)
-	case primitive.A, primitive.ObjectID, primitive.Timestamp, primitive.Binary, string, []uint8, time.Time:
+	case primitive.A, primitive.ObjectID, primitive.Timestamp, string:
 		return nil, nil
 	default:
-		return nil, errors.Wrapf(errCannotHandleType, "%T", v)
+		return nil, fmt.Errorf("makeRawMetric: unhandled type %T", v)
 	}
 
 	if labels == nil {
 		labels = map[string]string{}
 	}
 
-	help := metricHelp(prefix, name)
+	help := metricHelp(prefix)
 	typ := prometheus.UntypedValue
 
 	fqName, label := nameAndLabel(prefix, name)
@@ -187,22 +170,11 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 // It is a very very very simple function, but the idea is if the future we want
 // to improve the help somehow, there is only one place to change it for the real
 // functions and for all the tests.
-// Use only prefix or name but not both because 2 metrics cannot have same name but different help.
-// For metrics where we labelize some keys, if we put the real metric name here it will be rejected
-// by prometheus. For first level metrics, there is no prefix so we should use the metric name or
-// the help would be empty.
-func metricHelp(prefix, name string) string {
-	if prefix != "" {
-		return prefix
-	}
-
-	return name
-}
-
-// buildMetrics is a wrapper around makeMetrics, because makeMetrics is recursive and requires a prefix
-// and a map of labels. From the collectors we call buildMetrics which has a simpler signature.
-func buildMetrics(m bson.M) []prometheus.Metric {
-	return makeMetrics("", m, nil)
+// Use only prefix because 2 metrics cannot have same name but different help. For metrics
+// where we labelize some keys, if we put the real metric name here it will be rejected
+// by prometheus
+func metricHelp(prefix string) string {
+	return prefix
 }
 
 func makeMetrics(prefix string, m bson.M, labels map[string]string) []prometheus.Metric {
@@ -223,14 +195,14 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string) []prometheus
 			res = append(res, processSlice(prefix, k, v)...)
 		case []interface{}:
 			continue
+
 		default:
 			metric, err := makeRawMetric(prefix, k, v, labels)
 			if err != nil {
-				metric = prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+				// TODO
+				panic(err)
 			}
 
-			// makeRawMetric returns a nil metric for some data types like strings
-			// because we cannot extract data from all types
 			if metric != nil {
 				res = append(res, metric)
 			}
@@ -240,8 +212,6 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string) []prometheus
 	return res
 }
 
-// Extract maps from arrays. Only some structures like replicasets have arrays of members
-// and each member is represented by a map[string]interface{}.
 func processSlice(prefix, k string, v []interface{}) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 	labels := make(map[string]string)
@@ -254,11 +224,8 @@ func processSlice(prefix, k string, v []interface{}) []prometheus.Metric {
 			s = i
 		case primitive.M:
 			s = map[string]interface{}(i)
-		default:
-			continue
 		}
 
-		// use the replicaset or server name as a label
 		if name, ok := s["name"].(string); ok {
 			labels["member_idx"] = name
 		}

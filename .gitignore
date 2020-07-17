@@ -1,6 +1,5 @@
 .env
-.dist
-mnogo_exporter
 bin
 dist
-.vscode/
+docker/test/ssl/*
+docker/test/gen-certs/mongodb-test-ca.srl

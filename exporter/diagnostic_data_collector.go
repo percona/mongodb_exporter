@@ -1,25 +1,9 @@
-// mnogo_exporter
-// Copyright (C) 2017 Percona LLC
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package exporter
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,6 +12,7 @@ import (
 type diagnosticDataCollector struct {
 	ctx    context.Context
 	client *mongo.Client
+	// l      log.Logger
 }
 
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -47,13 +32,13 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 
 	m, ok := m["data"].(bson.M)
 	if !ok {
-		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
+		err := fmt.Errorf("unexpected %T for data", m["data"])
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 
 		return
 	}
 
-	for _, metric := range buildMetrics(m) {
+	for _, metric := range makeMetrics("", m, nil) {
 		ch <- metric
 	}
 }
