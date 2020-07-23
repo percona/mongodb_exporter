@@ -19,35 +19,37 @@ package exporter
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type diagnosticDataCollector struct {
+const (
+	replicationNotEnabled        = 76
+	replicationNotYetInitialized = 94
+)
+
+type replSetGetStatusCollector struct {
 	ctx    context.Context
 	client *mongo.Client
 }
 
-func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
+func (d *replSetGetStatusCollector) Describe(ch chan<- *prometheus.Desc) {
 	prometheus.DescribeByCollect(d, ch)
 }
 
-func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
-	var m bson.M
-
-	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
+func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
+	cmd := bson.D{{Key: "replSetGetStatus", Value: "1"}}
 	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
 
-	if err := res.Decode(&m); err != nil {
-		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-		return
-	}
+	var m bson.M
 
-	m, ok := m["data"].(bson.M)
-	if !ok {
-		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
+	if err := res.Decode(&m); err != nil {
+		if e, ok := err.(mongo.CommandError); ok {
+			if e.Code == replicationNotYetInitialized || e.Code == replicationNotEnabled {
+				return
+			}
+		}
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 
 		return
@@ -57,6 +59,3 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- metric
 	}
 }
-
-// check interface.
-var _ prometheus.Collector = (*diagnosticDataCollector)(nil)

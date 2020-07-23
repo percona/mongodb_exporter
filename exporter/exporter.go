@@ -1,3 +1,20 @@
+// mnogo_exporter
+// Copyright (C) 2017 Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+// Package exporter implements the collectors and metrics handlers.
 package exporter
 
 import (
@@ -23,11 +40,17 @@ type Exporter struct {
 
 // Opts holds new exporter options.
 type Opts struct {
-	DSN  string
-	Path string
-	Port int
-	Log  *logrus.Logger
+	CollStatsCollections []string
+	DSN                  string
+	Log                  *logrus.Logger
+	Path                 string
+	Port                 int
 }
+
+var (
+	errCannotHandleType   = fmt.Errorf("don't know how to handle data type")
+	errUnexpectedDataType = fmt.Errorf("unexpected data type")
+)
 
 // New connects to the database and returns a new Exporter instance.
 func New(opts *Opts) (*Exporter, error) {
@@ -45,8 +68,16 @@ func New(opts *Opts) (*Exporter, error) {
 		collectors: make([]prometheus.Collector, 0),
 		path:       opts.Path,
 		port:       opts.Port,
-		log:        opts.Log,
 	}
+
+	ctx := context.Background()
+
+	if len(opts.CollStatsCollections) > 0 {
+		exp.collectors = append(exp.collectors, &collstatsCollector{ctx: ctx, client: client, collections: opts.CollStatsCollections})
+	}
+
+	exp.collectors = append(exp.collectors, &diagnosticDataCollector{ctx: ctx, client: client})
+	exp.collectors = append(exp.collectors, &replSetGetStatusCollector{ctx: ctx, client: client})
 
 	return exp, nil
 }

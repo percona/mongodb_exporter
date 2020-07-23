@@ -1,3 +1,19 @@
+// mnogo_exporter
+// Copyright (C) 2017 Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package exporter
 
 import (
@@ -116,28 +132,27 @@ func TestMakeRawMetric(t *testing.T) {
 	prefix := "serverStatus.transactions."
 	name := "retriedCommandsCount"
 	testCases := []struct {
-		value     interface{}
-		wantVal   *float64
-		wantError bool
+		value   interface{}
+		wantVal *float64
 	}{
-		{value: true, wantVal: pointer.ToFloat64(1), wantError: false},
-		{value: false, wantVal: pointer.ToFloat64(0), wantError: false},
-		{value: int32(1), wantVal: pointer.ToFloat64(1), wantError: false},
-		{value: int64(2), wantVal: pointer.ToFloat64(2), wantError: false},
-		{value: float32(1.23), wantVal: pointer.ToFloat64(float64(float32(1.23))), wantError: false},
-		{value: float64(1.23), wantVal: pointer.ToFloat64(1.23), wantError: false},
-		{value: primitive.A{}, wantVal: nil, wantError: false},
-		{value: primitive.Timestamp{}, wantVal: nil, wantError: false},
-		{value: "zapp", wantVal: nil, wantError: false},
-		{value: []byte{}, wantVal: nil, wantError: true},
-		{value: time.Date(2020, 06, 15, 0, 0, 0, 0, time.UTC), wantVal: nil, wantError: true},
+		{value: true, wantVal: pointer.ToFloat64(1)},
+		{value: false, wantVal: pointer.ToFloat64(0)},
+		{value: int32(1), wantVal: pointer.ToFloat64(1)},
+		{value: int64(2), wantVal: pointer.ToFloat64(2)},
+		{value: float32(1.23), wantVal: pointer.ToFloat64(float64(float32(1.23)))},
+		{value: float64(1.23), wantVal: pointer.ToFloat64(1.23)},
+		{value: primitive.A{}, wantVal: nil},
+		{value: primitive.Timestamp{}, wantVal: nil},
+		{value: "zapp", wantVal: nil},
+		{value: []byte{}, wantVal: nil},
+		{value: time.Date(2020, 06, 15, 0, 0, 0, 0, time.UTC), wantVal: nil},
 	}
 
 	ln := make([]string, 0) // needs pre-allocation to accomplish pre-allocation for labels
 	lv := make([]string, 0)
 
 	fqName := prometheusize(prefix + name)
-	help := metricHelp(prefix)
+	help := metricHelp(prefix, name)
 	typ := prometheus.UntypedValue
 	d := prometheus.NewDesc(fqName, help, ln, nil)
 
@@ -149,7 +164,7 @@ func TestMakeRawMetric(t *testing.T) {
 
 		m, err := makeRawMetric(prefix, name, tc.value, nil)
 
-		assert.Equal(t, tc.wantError, err != nil)
+		assert.NoError(t, err)
 		assert.Equal(t, want, m)
 	}
 }
