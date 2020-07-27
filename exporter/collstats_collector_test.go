@@ -18,7 +18,6 @@ package exporter
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -38,43 +37,36 @@ func TestCollStatsCollector(t *testing.T) {
 
 	database := client.Database("testdb")
 	database.Drop(ctx) //nolint
-	for i := 0; i < 3; i++ {
-		col := fmt.Sprintf("c%d", i)
-		for j := 0; j < 100; j++ {
-			_, err := database.Collection(col).InsertOne(ctx, bson.M{"f1": 1, "f2": "2"})
-			assert.NoError(t, err)
-		}
-	}
+	collection := database.Collection("testcol")
+	_, err := collection.InsertOne(ctx, bson.M{"f1": 1, "f2": "2"})
+	assert.NoError(t, err)
 
 	c := &collstatsCollector{
-		ctx:         ctx,
 		client:      client,
-		collections: []string{"testdb.c0", "testdb.c1", "testdb.c2"},
+		collections: []string{"testdb.testcol"},
 	}
 
-	// It is important to keep repeated metric names from different collections because
-	// there cannot be duplicated metric names so, testing for repeated collection names
-	// we ensure that metric naming with prefixes and labels are working ok.
+	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_testdb_c0_capped testdb.c0.
-# TYPE mongodb_testdb_c0_capped untyped
-mongodb_testdb_c0_capped{collection="c0",database="testdb"} 0
-# HELP mongodb_testdb_c1_capped testdb.c1.
-# TYPE mongodb_testdb_c1_capped untyped
-mongodb_testdb_c1_capped{collection="c1",database="testdb"} 0
-# HELP mongodb_testdb_c2_capped testdb.c2.
-# TYPE mongodb_testdb_c2_capped untyped
-mongodb_testdb_c2_capped{collection="c2",database="testdb"} 0` + "\n")
+# HELP mongodb_latencyStats_commands_latency latencyStats.commands.
+# TYPE mongodb_latencyStats_commands_latency untyped
+mongodb_latencyStats_commands_latency 0
+# HELP mongodb_latencyStats_commands_ops latencyStats.commands.
+# TYPE mongodb_latencyStats_commands_ops untyped
+mongodb_latencyStats_commands_ops 0
+# HELP mongodb_latencyStats_writes_ops latencyStats.writes.
+# TYPE mongodb_latencyStats_writes_ops untyped
+mongodb_latencyStats_writes_ops 1` + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_testdb_c0_capped",
-		"mongodb_testdb_c1_capped",
-		"mongodb_testdb_c2_capped",
+		"mongodb_latencyStats_commands_latency",
+		"mongodb_latencyStats_commands_ops",
+		"mongodb_latencyStats_writes_ops",
 	}
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }

@@ -26,7 +26,6 @@ import (
 )
 
 type diagnosticDataCollector struct {
-	ctx    context.Context
 	client *mongo.Client
 }
 
@@ -38,7 +37,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
-	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
+	res := d.client.Database("admin").RunCommand(context.TODO(), cmd)
 
 	if err := res.Decode(&m); err != nil {
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
