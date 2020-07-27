@@ -10,6 +10,12 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    strategy:
+        matrix:
+            image: 
+                - "mongo:3.6"
+                - "mongo:4.0"
+                - "mongo:4.2"
     steps:
 
     - name: Set up Go 1.x
@@ -27,8 +33,9 @@ jobs:
 
     - name: Test
       run: |
-        make test-cluster
+        TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
         make test
+        make test-cluster-clean
 
     - name: Run checks/linters
       run: |
