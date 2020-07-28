@@ -1,6 +1,7 @@
-.env
 .dist
-mnogo_exporter
-bin
-dist
+.env
 .vscode/
+bin
+build
+dist
+mnogo_exporter

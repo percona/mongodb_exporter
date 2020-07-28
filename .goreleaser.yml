@@ -1,4 +1,4 @@
-dist: bin
+dist: build
 builds:
   - binary: mnogo_exporter
     env:
@@ -11,11 +11,9 @@ builds:
     flags:
       - -v
     ldflags: 
-        - -s -w -X main.version={{.Env.VERSION}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
+        - -s -w -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
 archives:
-  - name_template: "{{ .ProjectName }}-{{ .Env.VERSION }}.{{ .Os }}-{{ .Arch }}"
-checksum:
-  - name_template: "{{ .ProjectName }}-{{ .Env.VERSION }}.{{ .Os }}-{{ .Arch }}-checksum.txt"
+  - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
 snapshot:
   name_template: "{{ .ShortCommit }}"
 changelog:

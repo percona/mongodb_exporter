@@ -69,7 +69,13 @@ init:                       ## Install linters.
 	go build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
 
 build:                      ## Build the binaries.
-	goreleaser --snapshot --skip-publish --rm-dist
+	docker run --rm --privileged \
+		-v ${PWD}:/go/src/github.com/user/repo \
+		-w /go/src/github.com/user/repo \
+		goreleaser/goreleaser release --snapshot --skip-publish --rm-dist
+
+
+FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
