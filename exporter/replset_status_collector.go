@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -30,8 +31,9 @@ const (
 )
 
 type replSetGetStatusCollector struct {
-	ctx    context.Context
-	client *mongo.Client
+	ctx            context.Context
+	client         *mongo.Client
+	compatibleMode bool
 }
 
 func (d *replSetGetStatusCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -55,7 +57,10 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	for _, metric := range buildMetrics(m) {
+	logrus.Debug("replSetGetStatus result:")
+	debugResult(m)
+
+	for _, metric := range buildMetrics(m, d.compatibleMode) {
 		ch <- metric
 	}
 }

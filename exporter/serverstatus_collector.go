@@ -20,13 +20,15 @@ import (
 	"context"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type serverStatusCollector struct {
-	ctx    context.Context
-	client *mongo.Client
+	ctx            context.Context
+	client         *mongo.Client
+	compatibleMode bool
 }
 
 func (d *serverStatusCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -43,7 +45,10 @@ func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	for _, metric := range buildMetrics(m) {
+	logrus.Debug("serverStatus result:")
+	debugResult(m)
+
+	for _, metric := range buildMetrics(m, d.compatibleMode) {
 		ch <- metric
 	}
 }

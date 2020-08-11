@@ -36,6 +36,7 @@ var (
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
 	CollStatsCollections string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get stats"`
+	CompatibleMode       bool   `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" default:"true"`
 	DSN                  string `name:"mongodb.dsn" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
 	ExposePath           string `name:"expose-path" help:"Metrics expose path" default:"/metrics"`
 	ExposePort           int    `name:"expose-port" help:"HTTP expose server port" default:"9216"`
@@ -65,23 +66,23 @@ func main() {
 		return
 	}
 
-	log := logrus.New()
-
 	if opts.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	logrus.Debugf("Compatible mode: %v", opts.CompatibleMode)
+
 	exporterOpts := &exporter.Opts{
 		CollStatsCollections: strings.Split(opts.CollStatsCollections, ","),
+		CompatibleMode:       opts.CompatibleMode,
 		DSN:                  opts.DSN,
-		Log:                  log,
 		Path:                 opts.ExposePath,
 		Port:                 opts.ExposePort,
 	}
 
 	e, err := exporter.New(exporterOpts)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	e.Run()

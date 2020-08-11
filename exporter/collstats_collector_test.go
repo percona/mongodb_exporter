@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -37,36 +38,45 @@ func TestCollStatsCollector(t *testing.T) {
 
 	database := client.Database("testdb")
 	database.Drop(ctx) //nolint
-	collection := database.Collection("testcol")
-	_, err := collection.InsertOne(ctx, bson.M{"f1": 1, "f2": "2"})
-	assert.NoError(t, err)
+
+	defer func() {
+		err := database.Drop(ctx)
+		assert.NoError(t, err)
+	}()
+
+	for i := 0; i < 3; i++ {
+		coll := fmt.Sprintf("testcol_%02d", i)
+		_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": 1, "f2": "2"})
+		assert.NoError(t, err)
+	}
 
 	c := &collstatsCollector{
 		client:      client,
-		collections: []string{"testdb.testcol"},
+		collections: []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
 	}
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_latencyStats_commands_latency latencyStats.commands.
-# TYPE mongodb_latencyStats_commands_latency untyped
-mongodb_latencyStats_commands_latency 0
-# HELP mongodb_latencyStats_commands_ops latencyStats.commands.
-# TYPE mongodb_latencyStats_commands_ops untyped
-mongodb_latencyStats_commands_ops 0
-# HELP mongodb_latencyStats_writes_ops latencyStats.writes.
-# TYPE mongodb_latencyStats_writes_ops untyped
-mongodb_latencyStats_writes_ops 1` + "\n")
+# HELP mongodb_testdb_testcol_00_latencyStats_commands_latency testdb.testcol_00.latencyStats.commands.
+# TYPE mongodb_testdb_testcol_00_latencyStats_commands_latency untyped
+mongodb_testdb_testcol_00_latencyStats_commands_latency{collection="testcol_00",database="testdb"} 0
+# HELP mongodb_testdb_testcol_01_latencyStats_commands_latency testdb.testcol_01.latencyStats.commands.
+# TYPE mongodb_testdb_testcol_01_latencyStats_commands_latency untyped
+mongodb_testdb_testcol_01_latencyStats_commands_latency{collection="testcol_01",database="testdb"} 0
+# HELP mongodb_testdb_testcol_02_latencyStats_commands_latency testdb.testcol_02.latencyStats.commands.
+# TYPE mongodb_testdb_testcol_02_latencyStats_commands_latency untyped
+mongodb_testdb_testcol_02_latencyStats_commands_latency{collection="testcol_02",database="testdb"} 0` +
+		"\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_latencyStats_commands_latency",
-		"mongodb_latencyStats_commands_ops",
-		"mongodb_latencyStats_writes_ops",
+		"mongodb_testdb_testcol_00_latencyStats_commands_latency",
+		"mongodb_testdb_testcol_01_latencyStats_commands_latency",
+		"mongodb_testdb_testcol_02_latencyStats_commands_latency",
 	}
-	err = testutil.CollectAndCompare(c, expected, filter...)
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }

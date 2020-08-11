@@ -49,10 +49,7 @@ mongodb_mem_bits 64
 mongodb_metrics_commands_cloneCollection_failed 0
 # HELP mongodb_metrics_commands_connPoolSync_failed metrics.commands.connPoolSync.
 # TYPE mongodb_metrics_commands_connPoolSync_failed untyped
-mongodb_metrics_commands_connPoolSync_failed 0
-# HELP mongodb_wiredTiger_log_slot_join_calls_yielded wiredTiger.log.
-# TYPE mongodb_wiredTiger_log_slot_join_calls_yielded untyped
-mongodb_wiredTiger_log_slot_join_calls_yielded 0` + "\n")
+mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
@@ -61,7 +58,6 @@ mongodb_wiredTiger_log_slot_join_calls_yielded 0` + "\n")
 		"mongodb_mem_bits",
 		"mongodb_metrics_commands_cloneCollection_failed",
 		"mongodb_metrics_commands_connPoolSync_failed",
-		"mongodb_wiredTiger_log_slot_join_calls_yielded",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)

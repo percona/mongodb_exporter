@@ -11,8 +11,9 @@ import (
 )
 
 type collstatsCollector struct {
-	client      *mongo.Client
-	collections []string
+	client         *mongo.Client
+	collections    []string
+	compatibleMode bool
 }
 
 func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -47,8 +48,17 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		for _, m := range stats {
-			for _, metric := range buildMetrics(m) {
+		logrus.Debugf("$collStats metrics for %s.%s", database, collection)
+		debugResult(stats)
+
+		// Since all collections will have the same fields, we need to use a metric prefix (db+col)
+		// to differentiate metrics between collection. Labels are being set only to matke it easier
+		// to filter
+		prefix := database + "." + collection
+		labels := map[string]string{"database": database, "collection": collection}
+
+		for _, metrics := range stats {
+			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {
 				ch <- metric
 			}
 		}

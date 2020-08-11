@@ -74,10 +74,6 @@ build:                      ## Build the binaries.
 		-w /go/src/github.com/user/repo \
 		goreleaser/goreleaser release --snapshot --skip-publish --rm-dist
 
-
-FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
-
-
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 format:                     ## Format source code.

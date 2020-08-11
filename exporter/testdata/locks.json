@@ -1,0 +1,79 @@
+{
+  "serverStatus": {
+    "locks": {
+      "Collection": {
+        "acquireCount": {
+          "R": 2,
+          "W": 1099,
+          "r": 130495,
+          "w": 13402
+        }
+      },
+      "Database": {
+        "acquireCount": {
+          "W": 1643,
+          "r": 740504,
+          "w": 16049
+        },
+        "acquireWaitCount": {
+          "W": 2,
+          "r": 2,
+          "w": 2
+        },
+        "timeAcquiringMicros": {
+          "W": 21319,
+          "r": 73,
+          "w": 311
+        }
+      },
+      "Global": {
+        "acquireCount": {
+          "R": 1,
+          "W": 5,
+          "r": 973318,
+          "w": 28198
+        },
+        "acquireWaitCount": {
+          "W": 1,
+          "w": 1
+        },
+        "timeAcquiringMicros": {
+          "W": 53,
+          "w": 34117
+        }
+      },
+      "Mutex": {
+        "acquireCount": {
+          "W": 3080,
+          "r": 576555
+        }
+      },
+      "ParallelBatchWriterMode": {
+        "acquireCount": {
+          "r": 168547
+        }
+      },
+      "ReplicationStateTransition": {
+        "acquireCount": {
+          "W": 2,
+          "w": 1001570
+        },
+        "acquireWaitCount": {
+          "W": 2,
+          "w": 1
+        },
+        "timeAcquiringMicros": {
+          "W": 24,
+          "w": 217
+        }
+      },
+      "oplog": {
+        "acquireCount": {
+          "W": 1,
+          "r": 610644,
+          "w": 515
+        }
+      }
+    }
+  }
+}

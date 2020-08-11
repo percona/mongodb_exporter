@@ -21,12 +21,14 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type diagnosticDataCollector struct {
-	client *mongo.Client
+	client         *mongo.Client
+	compatibleMode bool
 }
 
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -52,7 +54,17 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	for _, metric := range buildMetrics(m) {
+	logrus.Debug("getDiagnosticData result")
+	debugResult(m)
+
+	metrics := buildMetrics(m, d.compatibleMode)
+
+	// build metrics doesn't add the lock metrics
+	if d.compatibleMode {
+		metrics = append(metrics, locksMetrics(m)...)
+	}
+
+	for _, metric := range metrics {
 		ch <- metric
 	}
 }

@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -153,13 +152,18 @@ func TestMakeRawMetric(t *testing.T) {
 
 	fqName := prometheusize(prefix + name)
 	help := metricHelp(prefix, name)
-	typ := prometheus.UntypedValue
-	d := prometheus.NewDesc(fqName, help, ln, nil)
 
 	for _, tc := range testCases {
-		var want prometheus.Metric
+		var want *rawMetric
 		if tc.wantVal != nil {
-			want, _ = prometheus.NewConstMetric(d, typ, *tc.wantVal, lv...)
+			want = &rawMetric{
+				fqName: fqName,
+				help:   help,
+				ln:     ln,
+				lv:     lv,
+				val:    *tc.wantVal,
+				vt:     3,
+			}
 		}
 
 		m, err := makeRawMetric(prefix, name, tc.value, nil)

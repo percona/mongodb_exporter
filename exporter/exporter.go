@@ -41,8 +41,8 @@ type Exporter struct {
 // Opts holds new exporter options.
 type Opts struct {
 	CollStatsCollections []string
+	CompatibleMode       bool
 	DSN                  string
-	Log                  *logrus.Logger
 	Path                 string
 	Port                 int
 }
@@ -71,11 +71,22 @@ func New(opts *Opts) (*Exporter, error) {
 	}
 
 	if len(opts.CollStatsCollections) > 0 {
-		exp.collectors = append(exp.collectors, &collstatsCollector{client: client, collections: opts.CollStatsCollections})
+		exp.collectors = append(exp.collectors, &collstatsCollector{
+			client:         client,
+			collections:    opts.CollStatsCollections,
+			compatibleMode: opts.CompatibleMode,
+		})
 	}
 
-	exp.collectors = append(exp.collectors, &diagnosticDataCollector{client: client})
-	exp.collectors = append(exp.collectors, &replSetGetStatusCollector{client: client})
+	exp.collectors = append(exp.collectors, &diagnosticDataCollector{
+		client:         client,
+		compatibleMode: opts.CompatibleMode,
+	})
+
+	exp.collectors = append(exp.collectors, &replSetGetStatusCollector{
+		client:         client,
+		compatibleMode: opts.CompatibleMode,
+	})
 
 	return exp, nil
 }
