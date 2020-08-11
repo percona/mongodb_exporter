@@ -95,7 +95,7 @@ help:                       ## Display this help message.
 test: env                   ## Run all tests.
 	go test -v -timeout 30s ./...
 
-test-cluster: env           ## Starts MongoDB test cluster.
+test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
 	docker-compose up -d
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.

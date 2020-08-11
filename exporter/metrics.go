@@ -149,27 +149,12 @@ func nameAndLabel(prefix, name string) (string, string) {
 // makeRawMetric creates a Prometheus metric based on the parameters we collected by
 // traversing the MongoDB structures returned by the collector functions.
 func makeRawMetric(prefix, name string, value interface{}, labels map[string]string) (*rawMetric, error) {
-	var f float64
-
-	switch v := value.(type) {
-	case bool:
-		if v {
-			f = 1
-		}
-	case int32:
-		f = float64(v)
-	case int64:
-		f = float64(v)
-	case float32:
-		f = float64(v)
-	case float64:
-		f = v
-	case primitive.DateTime:
-		f = float64(v)
-	case primitive.A, primitive.ObjectID, primitive.Timestamp, primitive.Binary, string, []uint8, time.Time:
+	f, err := asFloat64(value)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil {
 		return nil, nil
-	default:
-		return nil, errors.Wrapf(errCannotHandleType, "%T", v)
 	}
 
 	if labels == nil {
@@ -186,7 +171,7 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 	rm := &rawMetric{
 		fqName: fqName,
 		help:   help,
-		val:    f,
+		val:    *f,
 		vt:     prometheus.UntypedValue,
 		ln:     make([]string, 0, len(labels)),
 		lv:     make([]string, 0, len(labels)),
@@ -198,6 +183,33 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 	}
 
 	return rm, nil
+}
+
+func asFloat64(value interface{}) (*float64, error) {
+	var f float64
+	switch v := value.(type) {
+	case bool:
+		if v {
+			f = 1
+		}
+	case int:
+		f = float64(v)
+	case int32:
+		f = float64(v)
+	case int64:
+		f = float64(v)
+	case float32:
+		f = float64(v)
+	case float64:
+		f = v
+	case primitive.DateTime:
+		f = float64(v)
+	case primitive.A, primitive.ObjectID, primitive.Timestamp, primitive.Binary, string, []uint8, time.Time:
+		return nil, nil
+	default:
+		return nil, errors.Wrapf(errCannotHandleType, "%T", v)
+	}
+	return &f, nil
 }
 
 func rawToPrometheusMetric(rm *rawMetric) (prometheus.Metric, error) {

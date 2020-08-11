@@ -3,9 +3,7 @@ package exporter
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -560,29 +558,15 @@ func locksMetrics(m bson.M) []prometheus.Metric {
 }
 
 func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
-	var f float64
 	val := walkTo(m, lm.path)
+	f, err := asFloat64(val)
 
-	switch v := val.(type) {
-	case bool:
-		if v {
-			f = 1
-		}
-	case int32:
-		f = float64(v)
-	case int64:
-		f = float64(v)
-	case float32:
-		f = float64(v)
-	case float64:
-		f = v
-	case primitive.DateTime:
-		f = float64(v)
-	case primitive.A, primitive.ObjectID, primitive.Timestamp, primitive.Binary, string, []uint8, time.Time:
-		return nil, nil
-	default:
-		err := errors.Wrapf(errInvalidMetric, "value for %s is not float64, it is %T", lm.path, v)
+	if err != nil {
 		return prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err), err
+	}
+
+	if f == nil {
+		return nil, nil
 	}
 
 	ln := make([]string, 0, len(lm.labels))
@@ -594,7 +578,7 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 
 	d := prometheus.NewDesc(lm.name, lm.name, ln, nil)
 
-	return prometheus.NewConstMetric(d, prometheus.UntypedValue, f, lv...)
+	return prometheus.NewConstMetric(d, prometheus.UntypedValue, *f, lv...)
 }
 
 func walkTo(m primitive.M, path []string) interface{} {
