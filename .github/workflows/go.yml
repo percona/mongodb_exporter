@@ -16,6 +16,9 @@ jobs:
                 - "mongo:3.6"
                 - "mongo:4.0"
                 - "mongo:4.2"
+                - "percona/percona-server-mongodb:3.6"
+                - "percona/percona-server-mongodb:4.0"
+                - "percona/percona-server-mongodb:4.2"
     steps:
 
     - name: Set up Go 1.x

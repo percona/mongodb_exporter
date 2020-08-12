@@ -94,21 +94,21 @@ services:
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_CONFIGSVR1_PORT:-17007}:27017"
-        command: mongod --replSet cnf-serv --configsvr --port 27017 --oplogSize 16 
+        command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16
 
     mongo-cnf-3:
         container_name: "mongo-cnf-3"
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_CONFIGSVR2_PORT:-17008}:27017"
-        command: mongod --replSet cnf-serv --configsvr --port 27017 --oplogSize 16 
+        command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16
 
     mongo-cnf-1:
         container_name: "mongo-cnf-1"
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_CONFIGSVR3_PORT:-17009}:27017"
-        command: mongod --replSet cnf-serv --configsvr --port 27017 --oplogSize 16 
+        command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16 
         links:
             - mongo-cnf-2:mongo-cnf-2
             - mongo-cnf-3:mongo-cnf-3
