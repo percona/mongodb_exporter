@@ -25,6 +25,7 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -62,6 +63,7 @@ func TestIndexStatsCollector(t *testing.T) {
 	c := &indexstatsCollector{
 		client:      client,
 		collections: []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
+		logger:      logrus.New(),
 	}
 
 	// The last \n at the end of this string is important

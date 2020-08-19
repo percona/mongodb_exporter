@@ -8,14 +8,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func debugResult(m interface{}) {
-	if !logrus.IsLevelEnabled(logrus.DebugLevel) {
+func debugResult(log *logrus.Logger, m interface{}) {
+	if !log.IsLevelEnabled(logrus.DebugLevel) {
 		return
 	}
 
 	debugStr, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		logrus.Errorf("cannot marshal struct for debug: %s", err)
+		log.Errorf("cannot marshal struct for debug: %s", err)
 		return
 	}
 

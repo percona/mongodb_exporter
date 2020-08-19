@@ -34,6 +34,7 @@ type replSetGetStatusCollector struct {
 	ctx            context.Context
 	client         *mongo.Client
 	compatibleMode bool
+	logger         *logrus.Logger
 }
 
 func (d *replSetGetStatusCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -57,8 +58,8 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	logrus.Debug("replSetGetStatus result:")
-	debugResult(m)
+	d.logger.Debug("replSetGetStatus result:")
+	debugResult(d.logger, m)
 
 	for _, metric := range buildMetrics(m, d.compatibleMode) {
 		ch <- metric

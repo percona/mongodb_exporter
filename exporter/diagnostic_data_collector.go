@@ -29,6 +29,7 @@ import (
 type diagnosticDataCollector struct {
 	client         *mongo.Client
 	compatibleMode bool
+	logger         *logrus.Logger
 }
 
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -54,15 +55,11 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	logrus.Debug("getDiagnosticData result")
-	debugResult(m)
+	d.logger.Debug("getDiagnosticData result")
+	debugResult(d.logger, m)
 
 	metrics := buildMetrics(m, d.compatibleMode)
-
-	// build metrics doesn't add the lock metrics
-	if d.compatibleMode {
-		metrics = append(metrics, locksMetrics(m)...)
-	}
+	metrics = append(metrics, locksMetrics(m)...)
 
 	for _, metric := range metrics {
 		ch <- metric

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Percona-Lab/mnogo_exporter/internal/tu"
@@ -36,6 +37,7 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	c := &diagnosticDataCollector{
 		client: client,
+		logger: logrus.New(),
 	}
 
 	// The last \n at the end of this string is important

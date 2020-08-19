@@ -11,14 +11,19 @@ import (
 )
 
 func TestDebug(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
+	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
+
 	olderr := os.Stderr
 	r, w, _ := os.Pipe()
+
 	os.Stderr = w
 	defer func() {
 		os.Stderr = olderr
 		logrus.SetLevel(logrus.ErrorLevel)
 	}()
+
+	log.Out = w
 
 	m := bson.M{
 		"f1": 1,
@@ -35,8 +40,9 @@ func TestDebug(t *testing.T) {
   }
 }` + "\n"
 
-	debugResult(m)
+	debugResult(log, m)
 	assert.NoError(t, w.Close())
 	out, _ := ioutil.ReadAll(r)
+
 	assert.Equal(t, want, string(out))
 }

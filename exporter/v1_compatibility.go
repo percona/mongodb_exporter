@@ -64,11 +64,22 @@ func rawToCompatibleRawMetric(rm *rawMetric) *rawMetric {
 	// if it exists, it should be converted.
 	for _, cm := range conversions() {
 		switch {
-		case rm.fqName == cm.newName: // first renaming case. See (1)
+		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
 			return newToOldMetric(rm, cm)
 
 		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
-			return createOldMetricFromNew(rm, cm)
+			conversionSuffix := strings.TrimPrefix(rm.fqName, cm.prefix)
+			conversionSuffix = strings.TrimPrefix(conversionSuffix, "_")
+
+			// Check that also the suffix matches.
+			// In the conversion array, there are metrics with the same prefix but the 'old' name varies
+			// also depending on the metic suffix
+			for suffix := range cm.suffixMapping {
+				if suffix == conversionSuffix {
+					om := createOldMetricFromNew(rm, cm)
+					return om
+				}
+			}
 		}
 	}
 
@@ -443,7 +454,7 @@ func conversions() []conversion {
 			prefix:      "mongodb_ss_wt_log",                           //_[log records compressed|log_records_not_compressed]
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
-				"log records compressed":     "compressed",
+				"log_records_compressed":     "compressed",
 				"log_records_not_compressed": "uncompressed",
 			},
 		},
@@ -502,7 +513,7 @@ func lockMetrics() []lockMetric {
 		},
 		{
 			name:   "mongodb_ss_locks_acquireCount",
-			path:   []string{"serverStatus", "locks", "ParallelBatchWriterMode", "acquireCount", "r"},
+			path:   []string{"serverStatus", "locks", "ParallelBatchWriterMode", "acquireCount", "w"},
 			labels: map[string]string{"lock_mode": "w", "resource": "ReplicationStateTransition"},
 		},
 		{
@@ -547,8 +558,11 @@ func locksMetrics(m bson.M) []prometheus.Metric {
 
 	for _, lm := range lockMetrics() {
 		mm, err := makeLockMetric(m, lm)
+		if mm == nil {
+			continue
+		}
 		if err != nil {
-			logrus.Errorf("cannot convert lock metric to old style: %s", err)
+			logrus.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
 			continue
 		}
 		res = append(res, mm)
@@ -559,6 +573,10 @@ func locksMetrics(m bson.M) []prometheus.Metric {
 
 func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 	val := walkTo(m, lm.path)
+	if val == nil {
+		return nil, nil
+	}
+
 	f, err := asFloat64(val)
 
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -93,19 +94,23 @@ func TestAddLocksMetrics(t *testing.T) {
 	for _, metric := range metrics {
 		// Fix description since labels don't have a specific order because they are stores in a map.
 		ms := metric.Desc().String()
+		var m dto.Metric
+		err := metric.Write(&m)
+		assert.NoError(t, err)
+
 		ms = strings.ReplaceAll(ms, "resource lock_mode", "lock_mode resource")
 		desc = append(desc, ms)
 	}
+
 	sort.Strings(desc)
 	want := []string{
-		`Desc{fqName: "mongodb_ss_locks_acquireCount", help: "mongodb_ss_locks_acquireCount", constLabels: {}, variableLabels: [lock_mode resource]}`,
-		`Desc{fqName: "mongodb_ss_locks_acquireCount", help: "mongodb_ss_locks_acquireCount", constLabels: {}, variableLabels: [lock_mode resource]}`,
-		`Desc{fqName: "mongodb_ss_locks_acquireCount", help: "mongodb_ss_locks_acquireCount", constLabels: {}, variableLabels: [lock_mode resource]}`,
-		`Desc{fqName: "mongodb_ss_locks_acquireCount", help: "mongodb_ss_locks_acquireCount", constLabels: {}, variableLabels: [lock_mode resource]}`,
-		`Desc{fqName: "mongodb_ss_locks_acquireCount", help: "mongodb_ss_locks_acquireCount", constLabels: {}, variableLabels: [lock_mode resource]}`,
-		`Desc{fqName: "mongodb_ss_locks_acquireCount", help: "mongodb_ss_locks_acquireCount", constLabels: {}, variableLabels: [lock_mode resource]}`,
-		`Desc{fqName: "mongodb_ss_locks_acquireWaitCount", help: "mongodb_ss_locks_acquireWaitCount", constLabels: {}, variableLabels: [lock_mode resource]}`,
-		`Desc{fqName: "mongodb_ss_locks_timeAcquiringMicros", help: "mongodb_ss_locks_timeAcquiringMicros", constLabels: {}, variableLabels: [lock_mode resource]}`,
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireWaitCount\", help: \"mongodb_ss_locks_acquireWaitCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
+		"Desc{fqName: \"mongodb_ss_locks_timeAcquiringMicros\", help: \"mongodb_ss_locks_timeAcquiringMicros\", constLabels: {}, variableLabels: [lock_mode resource]}",
 	}
 
 	assert.Equal(t, want, desc)

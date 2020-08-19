@@ -34,17 +34,19 @@ type Exporter struct {
 	path       string
 	port       int
 	client     *mongo.Client
-	log        *logrus.Logger
 	collectors []prometheus.Collector
+	logger     *logrus.Logger
 }
 
 // Opts holds new exporter options.
 type Opts struct {
-	CollStatsCollections []string
-	CompatibleMode       bool
-	DSN                  string
-	Path                 string
-	Port                 int
+	CollStatsCollections  []string
+	IndexStatsCollections []string
+	CompatibleMode        bool
+	DSN                   string
+	Path                  string
+	Port                  int
+	Logger                *logrus.Logger
 }
 
 var (
@@ -63,11 +65,16 @@ func New(opts *Opts) (*Exporter, error) {
 		return nil, err
 	}
 
+	if opts.Logger == nil {
+		opts.Logger = logrus.New()
+	}
+
 	exp := &Exporter{
 		client:     client,
 		collectors: make([]prometheus.Collector, 0),
 		path:       opts.Path,
 		port:       opts.Port,
+		logger:     opts.Logger,
 	}
 
 	if len(opts.CollStatsCollections) > 0 {
@@ -75,17 +82,28 @@ func New(opts *Opts) (*Exporter, error) {
 			client:         client,
 			collections:    opts.CollStatsCollections,
 			compatibleMode: opts.CompatibleMode,
+			logger:         opts.Logger,
+		})
+	}
+
+	if len(opts.IndexStatsCollections) > 0 {
+		exp.collectors = append(exp.collectors, &indexstatsCollector{
+			client:      client,
+			collections: opts.IndexStatsCollections,
+			logger:      opts.Logger,
 		})
 	}
 
 	exp.collectors = append(exp.collectors, &diagnosticDataCollector{
 		client:         client,
 		compatibleMode: opts.CompatibleMode,
+		logger:         opts.Logger,
 	})
 
 	exp.collectors = append(exp.collectors, &replSetGetStatusCollector{
 		client:         client,
 		compatibleMode: opts.CompatibleMode,
+		logger:         opts.Logger,
 	})
 
 	return exp, nil
@@ -106,7 +124,7 @@ func (e *Exporter) Run() {
 	// Delegate http serving to Prometheus client library, which will call collector.Collect.
 	handler := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.ContinueOnError,
-		ErrorLog:      e.log,
+		ErrorLog:      e.logger,
 	})
 
 	addr := fmt.Sprintf(":%d", e.port)

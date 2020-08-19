@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Percona-Lab/mnogo_exporter/internal/tu"
@@ -37,6 +38,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 	c := &replSetGetStatusCollector{
 		ctx:    ctx,
 		client: client,
+		logger: logrus.New(),
 	}
 
 	// The last \n at the end of this string is important

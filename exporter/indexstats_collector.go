@@ -30,6 +30,7 @@ import (
 type indexstatsCollector struct {
 	client      *mongo.Client
 	collections []string
+	logger      *logrus.Logger
 }
 
 func (d *indexstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -58,18 +59,18 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 
 		cursor, err := d.client.Database(database).Collection(collection).Aggregate(ctx, mongo.Pipeline{aggregation})
 		if err != nil {
-			logrus.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
+			d.logger.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(ctx, &stats); err != nil {
-			logrus.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
+			d.logger.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
 			continue
 		}
 
-		logrus.Debugf("indexStats for %s.%s", database, collection)
-		debugResult(stats)
+		d.logger.Debugf("indexStats for %s.%s", database, collection)
+		debugResult(d.logger, stats)
 
 		for _, m := range stats {
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the

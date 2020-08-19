@@ -30,6 +30,7 @@ type collstatsCollector struct {
 	client         *mongo.Client
 	collections    []string
 	compatibleMode bool
+	logger         *logrus.Logger
 }
 
 func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -54,18 +55,18 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 
 		cursor, err := d.client.Database(database).Collection(collection).Aggregate(ctx, mongo.Pipeline{aggregation})
 		if err != nil {
-			logrus.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
+			d.logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(ctx, &stats); err != nil {
-			logrus.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
+			d.logger.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
 			continue
 		}
 
-		logrus.Debugf("$collStats metrics for %s.%s", database, collection)
-		debugResult(stats)
+		d.logger.Debugf("$collStats metrics for %s.%s", database, collection)
+		debugResult(d.logger, stats)
 
 		// Since all collections will have the same fields, we need to use a metric prefix (db+col)
 		// to differentiate metrics between collection. Labels are being set only to matke it easier
