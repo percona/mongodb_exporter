@@ -37,6 +37,7 @@ export TEST_MONGODB_CONFIGSVR1_PORT?=17007
 export TEST_MONGODB_CONFIGSVR2_PORT?=17008
 export TEST_MONGODB_CONFIGSVR3_PORT?=17009
 export TEST_MONGODB_MONGOS_PORT?=17000
+export PMM_RELEASE_PATH?=.
 
 define TEST_ENV
 	TEST_MONGODB_ADMIN_USERNAME=$(TEST_MONGODB_ADMIN_USERNAME) \
@@ -69,7 +70,7 @@ init:                       ## Install linters.
 	go build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
 
 build:                      ## Compile using plain go build
-	go build -ldflags="$(GO_BUILD_LDFLAGS)"
+	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mnogo_exporter
 
 release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
