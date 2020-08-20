@@ -12,7 +12,7 @@ BUILD ?= $(shell date +%FT%T%z)
 GOVERSION ?= $(shell go version | cut -d " " -f3)
 COMMIT ?= $(shell git rev-parse HEAD)
 BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
-GO_BUILD_LDFLAGS = -X main.Version=${VERSION} -X main.Build=${BUILD} -X main.Commit=${COMMIT} -X main.Branch=${BRANCH} -X main.GoVersion=${GOVERSION} -s -w
+GO_BUILD_LDFLAGS = -X main.version=${VERSION} -X main.buildDate=${BUILD} -X main.commit=${COMMIT} -X main.Branch=${BRANCH} -X main.GoVersion=${GOVERSION} -s -w
 NAME ?= mnogo_exporter
 REPO ?= percona/$(NAME)
 GORELEASER_FLAGS ?=
@@ -68,7 +68,10 @@ init:                       ## Install linters.
 	go build -modfile=tools/go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
 	go build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
 
-build:                      ## Build the binaries.
+build:                      ## Compile using plain go build
+	go build -ldflags="$(GO_BUILD_LDFLAGS)"
+
+release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
 		-v ${PWD}:/go/src/github.com/user/repo \
 		-w /go/src/github.com/user/repo \
