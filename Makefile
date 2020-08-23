@@ -13,7 +13,7 @@ GOVERSION ?= $(shell go version | cut -d " " -f3)
 COMMIT ?= $(shell git rev-parse HEAD)
 BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
 GO_BUILD_LDFLAGS = -X main.version=${VERSION} -X main.buildDate=${BUILD} -X main.commit=${COMMIT} -X main.Branch=${BRANCH} -X main.GoVersion=${GOVERSION} -s -w
-NAME ?= mnogo_exporter
+NAME ?= mongodb_exporter
 REPO ?= percona/$(NAME)
 GORELEASER_FLAGS ?=
 UID ?= $(shell id -u)
@@ -70,7 +70,7 @@ init:                       ## Install linters.
 	go build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
 
 build:                      ## Compile using plain go build
-	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mnogo_exporter
+	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
 
 release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
@@ -83,7 +83,7 @@ FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 format:                     ## Format source code.
 	go mod tidy
 	gofmt -w -s $(FILES)
-	bin/goimports -local github.com/Percona-Lab/mnogo_exporter -l -w $(FILES)
+	bin/goimports -local github.com/percona/mongodb_exporter -l -w $(FILES)
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run

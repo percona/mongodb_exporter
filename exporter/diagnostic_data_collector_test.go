@@ -1,4 +1,4 @@
-// mnogo_exporter
+// mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
 // This program is free software: you can redistribute it and/or modify
@@ -26,7 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/Percona-Lab/mnogo_exporter/internal/tu"
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestDiagnosticDataCollector(t *testing.T) {

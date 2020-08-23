@@ -1,4 +1,4 @@
-// mnogo_exporter
+// mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
 // This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sirupsen/logrus"
 
-	"github.com/Percona-Lab/mnogo_exporter/exporter"
+	"github.com/percona/mongodb_exporter/exporter"
 )
 
 //nolint:gochecknoglobals
@@ -48,7 +48,7 @@ type GlobalFlags struct {
 func main() {
 	var opts GlobalFlags
 	_ = kong.Parse(&opts,
-		kong.Name("mnogo_exporter"),
+		kong.Name("mongodb_exporter"),
 		kong.Description("MongoDB Prometheus exporter"),
 		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{

@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
         matrix:
-            image: 
+            image:
                 - "mongo:3.6"
                 - "mongo:4.0"
                 - "mongo:4.2"

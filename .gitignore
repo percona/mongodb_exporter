@@ -4,4 +4,4 @@
 bin
 build
 dist
-mnogo_exporter
+mongodb_exporter

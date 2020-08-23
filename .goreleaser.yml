@@ -1,6 +1,6 @@
 dist: build
 builds:
-  - binary: mnogo_exporter
+  - binary: mongodb_exporter
     env:
       - CGO_ENABLED=0
     goos:
@@ -10,7 +10,7 @@ builds:
       - amd64
     flags:
       - -v
-    ldflags: 
+    ldflags:
         - -s -w -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
@@ -21,6 +21,6 @@ changelog:
 release:
   github:
     owner: percona
-    name: mnogo_exporter
+    name: mongodb_exporter
   draft: true
   prerelease: auto

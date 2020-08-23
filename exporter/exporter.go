@@ -1,4 +1,4 @@
-// mnogo_exporter
+// mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
 // This program is free software: you can redistribute it and/or modify
@@ -134,7 +134,7 @@ func (e *Exporter) Run() {
 func connect(ctx context.Context, dsn string) (*mongo.Client, error) {
 	clientOpts := options.Client().ApplyURI(dsn)
 	clientOpts.SetDirect(true)
-	clientOpts.SetAppName("mnogo_exporter")
+	clientOpts.SetAppName("mongodb_exporter")
 
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {

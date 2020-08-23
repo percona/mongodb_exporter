@@ -1,4 +1,4 @@
-// mnogo_exporter
+// mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
 // This program is free software: you can redistribute it and/or modify
@@ -32,7 +32,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/Percona-Lab/mnogo_exporter/internal/tu"
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestIndexStatsCollector(t *testing.T) {

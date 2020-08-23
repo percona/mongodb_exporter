@@ -102,7 +102,7 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 	copy(oldMetric.lv, rm.lv)
 
 	// Some label names should be converted from the new (current) name to the
-	// mongo_exporter v1 compatible name
+	// mongodb_exporter v1 compatible name
 	for _, newLabelName := range rm.ln {
 		// if it should be converted, append the old-compatible name
 		if oldLabel, ok := c.labelConversions[newLabelName]; ok {

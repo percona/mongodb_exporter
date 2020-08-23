@@ -20,7 +20,7 @@ linters-settings:
   goimports:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
-    local-prefixes: github.com/Percona-Lab/mnogo_exporter
+    local-prefixes: github.com/percona/mongodb_exporter
 
 linters:
   enable-all: true
@@ -28,7 +28,7 @@ linters:
       - lll
       - unused
       - testpackage
-      - wsl 
+      - wsl
 
 issues:
   exclude-use-default: false
