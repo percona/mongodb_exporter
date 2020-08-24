@@ -1,4 +1,4 @@
-// mongodb_exporter
+// mnogo_exporter
 // Copyright (C) 2017 Percona LLC
 //
 // This program is free software: you can redistribute it and/or modify
@@ -31,11 +31,11 @@ import (
 
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
-	path       string
-	port       int
-	client     *mongo.Client
-	collectors []prometheus.Collector
-	logger     *logrus.Logger
+	path             string
+	client           *mongo.Client
+	collectors       []prometheus.Collector
+	logger           *logrus.Logger
+	webListenAddress string
 }
 
 // Opts holds new exporter options.
@@ -43,9 +43,9 @@ type Opts struct {
 	CollStatsCollections  []string
 	IndexStatsCollections []string
 	CompatibleMode        bool
-	DSN                   string
+	URI                   string
 	Path                  string
-	Port                  int
+	WebListenAddress      string
 	Logger                *logrus.Logger
 }
 
@@ -60,7 +60,7 @@ func New(opts *Opts) (*Exporter, error) {
 		opts = new(Opts)
 	}
 
-	client, err := connect(context.Background(), opts.DSN)
+	client, err := connect(context.Background(), opts.URI)
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +70,11 @@ func New(opts *Opts) (*Exporter, error) {
 	}
 
 	exp := &Exporter{
-		client:     client,
-		collectors: make([]prometheus.Collector, 0),
-		path:       opts.Path,
-		port:       opts.Port,
-		logger:     opts.Logger,
+		client:           client,
+		collectors:       make([]prometheus.Collector, 0),
+		path:             opts.Path,
+		logger:           opts.Logger,
+		webListenAddress: opts.WebListenAddress,
 	}
 
 	if len(opts.CollStatsCollections) > 0 {
@@ -127,14 +127,13 @@ func (e *Exporter) Run() {
 		ErrorLog:      e.logger,
 	})
 
-	addr := fmt.Sprintf(":%d", e.port)
-	exporter_shared.RunServer("MongoDB", addr, e.path, handler)
+	exporter_shared.RunServer("MongoDB", e.webListenAddress, e.path, handler)
 }
 
 func connect(ctx context.Context, dsn string) (*mongo.Client, error) {
 	clientOpts := options.Client().ApplyURI(dsn)
 	clientOpts.SetDirect(true)
-	clientOpts.SetAppName("mongodb_exporter")
+	clientOpts.SetAppName("mnogo_exporter")
 
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
