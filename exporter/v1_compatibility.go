@@ -599,6 +599,16 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 	return prometheus.NewConstMetric(d, prometheus.UntypedValue, *f, lv...)
 }
 
+// PMM dashboards looks for this metric so, in compatibility mode, we must expose it.
+func mongodbUpMetric() prometheus.Metric {
+	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
+	up, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+	if err != nil {
+		panic(err)
+	}
+	return up
+}
+
 func walkTo(m primitive.M, path []string) interface{} {
 	val, ok := m[path[0]]
 	if !ok {

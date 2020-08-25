@@ -61,6 +61,11 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	metrics := buildMetrics(m, d.compatibleMode)
 	metrics = append(metrics, locksMetrics(m)...)
 
+	// PMM dashboards looks for this metric so, in compatibility mode, we must expose it.
+	if d.compatibleMode {
+		metrics = append(metrics, mongodbUpMetric())
+	}
+
 	for _, metric := range metrics {
 		ch <- metric
 	}

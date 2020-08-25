@@ -24,7 +24,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/sirupsen/logrus"
 
-	"github.com/Percona-Lab/mnogo_exporter/exporter"
+	"github.com/percona/mongodb_exporter/exporter"
 )
 
 //nolint:gochecknoglobals
@@ -92,6 +92,10 @@ func main() {
 
 	if opts.URI == "" {
 		opts.URI = os.Getenv("MONGODB_URI")
+	}
+
+	if !strings.HasPrefix(opts.URI, "mongodb") && !strings.HasPrefix(opts.URI, "mongodb+srv") {
+		opts.URI = "mongodb://" + opts.URI
 	}
 
 	exporterOpts := &exporter.Opts{
