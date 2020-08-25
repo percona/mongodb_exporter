@@ -41,7 +41,7 @@ type GlobalFlags struct {
 	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
 	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
-	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debbug, info, warn, error, fatal]" enum:"debbug,info,warn,error,fatal" default:"error"`
+	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
 	CompatibleMode bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
 	Version        bool `name:"version" help:"Show version and exit"`
@@ -72,11 +72,11 @@ func main() {
 	log := logrus.New()
 
 	levels := map[string]logrus.Level{
-		"debbug": logrus.DebugLevel,
-		"error":  logrus.ErrorLevel,
-		"fatal":  logrus.FatalLevel,
-		"info":   logrus.InfoLevel,
-		"warn":   logrus.WarnLevel,
+		"debug": logrus.DebugLevel,
+		"error": logrus.ErrorLevel,
+		"fatal": logrus.FatalLevel,
+		"info":  logrus.InfoLevel,
+		"warn":  logrus.WarnLevel,
 	}
 	log.SetLevel(levels[opts.LogLevel])
 
