@@ -6,13 +6,12 @@ GO_TEST_EXTRA ?=
 GO_TEST_COVER_PROFILE ?= cover.out
 GO_TEST_CODECOV ?=
 
-TOP_DIR ?= $(shell git rev-parse --show-toplevel)
-VERSION ?= $(shell git describe --abbrev=0)
 BUILD ?= $(shell date +%FT%T%z)
 GOVERSION ?= $(shell go version | cut -d " " -f3)
-COMMIT ?= $(shell git rev-parse HEAD)
-BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
-GO_BUILD_LDFLAGS = -X main.version=${VERSION} -X main.buildDate=${BUILD} -X main.commit=${COMMIT} -X main.Branch=${BRANCH} -X main.GoVersion=${GOVERSION} -s -w
+COMPONENT_VERSION ?= $(shell git describe --abbrev=0 --always)
+COMPONENT_BRANCH ?= $(shell git describe --always --contains --all)
+PMM_RELEASE_FULLCOMMIT ?= $(shell git rev-parse HEAD)
+GO_BUILD_LDFLAGS = -X main.version=${COMPONENT_VERSION} -X main.buildDate=${BUILD} -X main.commit=${PMM_RELEASE_FULLCOMMIT} -X main.Branch=${COMPONENT_BRANCH} -X main.GoVersion=${GOVERSION} -s -w
 NAME ?= mongodb_exporter
 REPO ?= percona/$(NAME)
 GORELEASER_FLAGS ?=
