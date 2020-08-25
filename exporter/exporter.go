@@ -133,7 +133,7 @@ func (e *Exporter) Run() {
 func connect(ctx context.Context, dsn string) (*mongo.Client, error) {
 	clientOpts := options.Client().ApplyURI(dsn)
 	clientOpts.SetDirect(true)
-	clientOpts.SetAppName("mnogo_exporter")
+	clientOpts.SetAppName("mongodb_exporter")
 
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {

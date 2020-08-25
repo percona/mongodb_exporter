@@ -37,28 +37,20 @@ var (
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
 	CollStatsCollections  string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1.col1,db2.col2"`
-	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
-	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
-	ExposePort            int    `name:"expose-port" help:"HTTP expose server port" default:"9216"`
-	CompatibleMode        bool   `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" default:"true"`
-	Version               bool   `name:"version" help:"Show version and exit"`
+	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
+	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
+	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debbug, info, warn, error, fatal]" enum:"debbug,info,warn,error,fatal" default:"error"`
 
-	// To make this exporter a drop-in replacement of origimal one
-	LogLevel             string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debbug, info, warn, error, fatal]" enum:"debbug,info,warn,error,fatal" default:"error"`
-	Test                 bool   `name:"test" help:"Check MongoDB connection, print BuildInfo() information and exit. (Not implemented yet)"`
-	CollectCollection    bool   `name:"collect.collection" help:"Enable collection of Collection metrics. (Deprecated. Use --mongodb.collstats-colls)"`
-	CollectDatabase      bool   `name:"collect.database" help:"Enable collection of Database metrics. (Deprecated)"`
-	CollectTopMetrics    bool   `name:"collect.topmetrics" help:"Enable collection of table top metrics (Deprecated)"`
-	NoCollectIndexUsage  bool   `name:"no-collect.indexusage" help:"Enable collection of per index usage stats (Deprecated. Use --mongodb.indexstats-colls)"`
-	NoCollecConPoolStats bool   `name:"no-collect.connpoolstats" help:"Enable collection of connection pool stats. (Deprecated)"`
-	WebListenAddress     string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
+	CompatibleMode bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
+	Version        bool `name:"version" help:"Show version and exit"`
 }
 
 func main() {
 	var opts GlobalFlags
 	_ = kong.Parse(&opts,
-		kong.Name("mnogo_exporter"),
+		kong.Name("mongodb_exporter"),
 		kong.Description("MongoDB Prometheus exporter"),
 		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{
@@ -69,7 +61,7 @@ func main() {
 		})
 
 	if opts.Version {
-		fmt.Println("mnogo-exporter - MongoDB Prometheus exporter")
+		fmt.Println("mongodb_exporter - MongoDB Prometheus exporter")
 		fmt.Printf("Version: %s\n", version)
 		fmt.Printf("Commit: %s\n", commit)
 		fmt.Printf("Build date: %s\n", buildDate)
@@ -94,17 +86,17 @@ func main() {
 		opts.URI = os.Getenv("MONGODB_URI")
 	}
 
-	if !strings.HasPrefix(opts.URI, "mongodb") && !strings.HasPrefix(opts.URI, "mongodb+srv") {
+	if !strings.HasPrefix(opts.URI, "mongodb") {
 		opts.URI = "mongodb://" + opts.URI
 	}
 
 	exporterOpts := &exporter.Opts{
 		CollStatsCollections:  strings.Split(opts.CollStatsCollections, ","),
-		IndexStatsCollections: strings.Split(opts.CollStatsCollections, ","),
 		CompatibleMode:        opts.CompatibleMode,
-		URI:                   opts.URI,
-		Path:                  opts.WebTelemetryPath,
+		IndexStatsCollections: strings.Split(opts.CollStatsCollections, ","),
 		Logger:                log,
+		Path:                  opts.WebTelemetryPath,
+		URI:                   opts.URI,
 		WebListenAddress:      opts.WebListenAddress,
 	}
 
