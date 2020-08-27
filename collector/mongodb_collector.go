@@ -227,12 +227,12 @@ func (exporter *MongodbCollector) collectMongos(client *mongo.Client, ch chan<- 
 		serverStatus.Export(ch)
 	}
 
-    if exporter.Opts.CollectShardingStatus == "true" {
-        log.Debug("Collecting Sharding Status")
-        shardingStatus := mongos.GetShardingStatus(client)
-        if shardingStatus != nil {
-            shardingStatus.Export(ch)
-        }
+	if exporter.Opts.CollectShardingStatus == "true" {
+		log.Debug("Collecting Sharding Status")
+		shardingStatus := mongos.GetShardingStatus(client)
+		if shardingStatus != nil {
+			shardingStatus.Export(ch)
+		}
 	}
 
 	if exporter.Opts.CollectDatabaseMetrics {

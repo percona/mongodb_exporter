@@ -164,14 +164,14 @@ func IsClusterBalanced(client *mongo.Client) float64 {
 	var maxChunkCount float64 = 0
 	shardChunkInfoAll := GetTotalChunksByShard(client)
 	if shardChunkInfoAll != nil {
-        for _, shard := range *shardChunkInfoAll {
-            if shard.Chunks > maxChunkCount {
-                maxChunkCount = shard.Chunks
-            }
-            if minChunkCount == -1 || shard.Chunks < minChunkCount {
-                minChunkCount = shard.Chunks
-            }
-        }
+		for _, shard := range *shardChunkInfoAll {
+			if shard.Chunks > maxChunkCount {
+				maxChunkCount = shard.Chunks
+			}
+			if minChunkCount == -1 || shard.Chunks < minChunkCount {
+				minChunkCount = shard.Chunks
+			}
+		}
 	}
 
 	// return true if the difference between the min and max is < the thresold
