@@ -128,7 +128,10 @@ func GetTotalChunks(client *mongo.Client) float64 {
 // GetTotalChunksByShard gets total chunks by shard.
 func GetTotalChunksByShard(client *mongo.Client) *[]ShardingTopoChunkInfo {
 	var results []ShardingTopoChunkInfo
-	c, err := client.Database("config").Collection("chunks").Aggregate(context.TODO(), []bson.M{{"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}})
+	//Adding {"$sort": {"shard": 1}} is a workaround to https://jira.mongodb.org/browse/SERVER-4507 aggregation pipeline optimization failure
+	//Requires that users manually create index {"shard": 1} on config.chunks to make this query as fast as possible.
+	//Not compulsory to create the extra index. Benefit noticeable only when chunks collection is very large (e.g. many 100's of thousands of docs)
+	c, err := client.Database("config").Collection("chunks").Aggregate(context.TODO(), []bson.M{{"$sort": {"shard": 1}}, {"$group": bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}}})
 	if err != nil {
 		log.Errorf("Failed to execute find query on 'config.chunks': %s.", err)
 		return nil
