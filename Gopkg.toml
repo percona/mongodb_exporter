@@ -6,3 +6,11 @@
 [[constraint]]
   name = "github.com/percona/pmm"
   branch = "PMM-2.0"
+
+[[constraint]]
+  name = "github.com/Masterminds/semver"
+  version = "3.0.1"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "=v1.4.0"

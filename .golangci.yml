@@ -1,0 +1,39 @@
+linters-settings:
+  depguard:
+    list-type: blacklist
+    include-go-root: true
+    packages:
+      # use "github.com/pkg/errors" instead
+      - errors
+
+  goimports:
+    local-prefixes: github.com/percona/mongodb_exporter
+
+  lll:
+    line-length: 170
+    tab-width: 4
+
+  unused:
+    check-exported: true
+
+  unparam:
+    check-exported: true
+
+linters:
+  enable-all: true
+  disable:
+    - scopelint         # too many false positives
+    - gochecknoglobals  # mostly useless
+    - wsl               # too annoying
+
+
+issues:
+  exclude-use-default: false
+  exclude:
+    # gas: duplicated errcheck checks
+    - 'G104: Errors unhandled'
+  exclude-rules:
+    # gomnd: tests are full of magic numbers
+    - path: _test\.go
+      linters:
+        - gomnd
