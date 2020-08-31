@@ -62,6 +62,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	metrics = append(metrics, locksMetrics(m)...)
 
 	// PMM dashboards looks for this metric so, in compatibility mode, we must expose it.
+	// FIXME Add it in both modes: https://jira.percona.com/browse/PMM-6585
 	if d.compatibleMode {
 		metrics = append(metrics, mongodbUpMetric())
 	}

@@ -600,6 +600,7 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 }
 
 // PMM dashboards looks for this metric so, in compatibility mode, we must expose it.
+// FIXME Add it in both modes, move away from that file: https://jira.percona.com/browse/PMM-6585
 func mongodbUpMetric() prometheus.Metric {
 	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
 	up, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
