@@ -46,9 +46,6 @@ func TestServerStatusDataCollector(t *testing.T) {
 # HELP mongodb_mem_bits mem.
 # TYPE mongodb_mem_bits untyped
 mongodb_mem_bits 64
-# HELP mongodb_metrics_commands_cloneCollection_failed metrics.commands.cloneCollection.
-# TYPE mongodb_metrics_commands_cloneCollection_failed untyped
-mongodb_metrics_commands_cloneCollection_failed 0
 # HELP mongodb_metrics_commands_connPoolSync_failed metrics.commands.connPoolSync.
 # TYPE mongodb_metrics_commands_connPoolSync_failed untyped
 mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
@@ -58,7 +55,6 @@ mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
 		"mongodb_mem_bits",
-		"mongodb_metrics_commands_cloneCollection_failed",
 		"mongodb_metrics_commands_connPoolSync_failed",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)

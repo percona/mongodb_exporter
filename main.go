@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -36,13 +37,14 @@ var (
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
 	CollStatsCollections  string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1.col1,db2.col2"`
-	DSN                   string `name:"mongodb.dsn" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
-	ExposePath            string `name:"expose-path" help:"Metrics expose path" default:"/metrics"`
 	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
-	ExposePort            int    `name:"expose-port" help:"HTTP expose server port" default:"9216"`
-	CompatibleMode        bool   `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
-	Debug                 bool   `name:"debug" short:"D" help:"Enable debug mode"`
-	Version               bool   `name:"version" help:"Show version and exit"`
+	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
+	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
+	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
+
+	CompatibleMode bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
+	Version        bool `name:"version" help:"Show version and exit"`
 }
 
 func main() {
@@ -59,7 +61,7 @@ func main() {
 		})
 
 	if opts.Version {
-		fmt.Println("mnogo-exporter - MongoDB Prometheus exporter")
+		fmt.Println("mongodb_exporter - MongoDB Prometheus exporter")
 		fmt.Printf("Version: %s\n", version)
 		fmt.Printf("Commit: %s\n", commit)
 		fmt.Printf("Build date: %s\n", buildDate)
@@ -69,20 +71,33 @@ func main() {
 
 	log := logrus.New()
 
-	if opts.Debug {
-		log.SetLevel(logrus.DebugLevel)
+	levels := map[string]logrus.Level{
+		"debug": logrus.DebugLevel,
+		"error": logrus.ErrorLevel,
+		"fatal": logrus.FatalLevel,
+		"info":  logrus.InfoLevel,
+		"warn":  logrus.WarnLevel,
 	}
+	log.SetLevel(levels[opts.LogLevel])
 
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
 
+	if opts.URI == "" {
+		opts.URI = os.Getenv("MONGODB_URI")
+	}
+
+	if !strings.HasPrefix(opts.URI, "mongodb") {
+		opts.URI = "mongodb://" + opts.URI
+	}
+
 	exporterOpts := &exporter.Opts{
 		CollStatsCollections:  strings.Split(opts.CollStatsCollections, ","),
-		IndexStatsCollections: strings.Split(opts.CollStatsCollections, ","),
 		CompatibleMode:        opts.CompatibleMode,
-		DSN:                   opts.DSN,
-		Path:                  opts.ExposePath,
-		Port:                  opts.ExposePort,
+		IndexStatsCollections: strings.Split(opts.CollStatsCollections, ","),
 		Logger:                log,
+		Path:                  opts.WebTelemetryPath,
+		URI:                   opts.URI,
+		WebListenAddress:      opts.WebListenAddress,
 	}
 
 	e, err := exporter.New(exporterOpts)
