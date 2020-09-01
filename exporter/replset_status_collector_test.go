@@ -35,8 +35,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti, err := newTopologyInfo(context.TODO(), client)
-	assert.NoError(t, err)
+	ti := labelsGetterMock{}
 
 	c := &replSetGetStatusCollector{
 		ctx:          ctx,
@@ -49,17 +48,16 @@ func TestReplsetStatusCollector(t *testing.T) {
 	expected := strings.NewReader(`
 # HELP mongodb_myState myState
 # TYPE mongodb_myState untyped
-mongodb_myState{cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shardsvr",rs_nm="rs1",rs_state="1"} 1
+mongodb_myState 1
 # HELP mongodb_ok ok
 # TYPE mongodb_ok untyped
-mongodb_ok{cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shardsvr",rs_nm="rs1",rs_state="1"} 1
+mongodb_ok 1
 # HELP mongodb_optimes_appliedOpTime_t optimes.appliedOpTime.
 # TYPE mongodb_optimes_appliedOpTime_t untyped
-mongodb_optimes_appliedOpTime_t{cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shardsvr",rs_nm="rs1",rs_state="1"} 1
+mongodb_optimes_appliedOpTime_t 1
 # HELP mongodb_optimes_durableOpTime_t optimes.durableOpTime.
 # TYPE mongodb_optimes_durableOpTime_t untyped
-mongodb_optimes_durableOpTime_t{cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shardsvr",rs_nm="rs1",rs_state="1"} 1` +
-		"\n")
+mongodb_optimes_durableOpTime_t 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
@@ -70,7 +68,7 @@ mongodb_optimes_durableOpTime_t{cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shards
 		"mongodb_optimes_appliedOpTime_t",
 		"mongodb_optimes_durableOpTime_t",
 	}
-	err = testutil.CollectAndCompare(c, expected, filter...)
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
 
@@ -80,8 +78,7 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 
 	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
 
-	ti, err := newTopologyInfo(context.TODO(), client)
-	assert.NoError(t, err)
+	ti := labelsGetterMock{}
 
 	c := &replSetGetStatusCollector{
 		ctx:          ctx,
@@ -90,6 +87,6 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 	}
 
 	expected := strings.NewReader(``)
-	err = testutil.CollectAndCompare(c, expected)
+	err := testutil.CollectAndCompare(c, expected)
 	assert.NoError(t, err)
 }

@@ -53,7 +53,7 @@ var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 func newTopologyInfo(ctx context.Context, client *mongo.Client) (labelsGetter, error) {
 	ti := &topologyInfo{
 		client: client,
-		labels: map[string]string{},
+		labels: make(map[string]string),
 	}
 
 	err := ti.loadLabels(ctx)

@@ -46,21 +46,23 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	expected := strings.NewReader(`
 # HELP mongodb_oplog_stats_ok local.oplog.rs.stats.
 # TYPE mongodb_oplog_stats_ok untyped
-mongodb_oplog_stats_ok{assert_type="msg",cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shardsvr",cmd_name="<UNKNOWN>",concern_type="local",conn_type="active",count_type="writers",csr_type="noTimeout",doc_op_type="updated",legacy_op_type="command",perf_bucket="operation write latency histogram (bucket 3) - 500-999us",rs_nm="rs1",rs_state="1"} 1
+mongodb_oplog_stats_ok 1
 # HELP mongodb_oplog_stats_wt_btree_fixed_record_size local.oplog.rs.stats.wiredTiger.btree.
 # TYPE mongodb_oplog_stats_wt_btree_fixed_record_size untyped
-mongodb_oplog_stats_wt_btree_fixed_record_size{assert_type="msg",cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shardsvr",cmd_name="<UNKNOWN>",concern_type="local",conn_type="active",count_type="writers",csr_type="noTimeout",doc_op_type="updated",legacy_op_type="command",perf_bucket="operation write latency histogram (bucket 3) - 500-999us",rs_nm="rs1",rs_state="1"} 0` +
+mongodb_oplog_stats_wt_btree_fixed_record_size 0
+# HELP mongodb_oplog_stats_wt_transaction_update_conflicts local.oplog.rs.stats.wiredTiger.transaction.
+# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
+mongodb_oplog_stats_wt_transaction_update_conflicts 0` +
 		"\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
-	//filter := []string{
-	//	"mongodb_oplog_stats_ok",
-	//	"mongodb_oplog_stats_wt_btree_fixed_record_size",
-	//	//"mongodb_oplog_stats_wt_transaction_update_conflicts",
-	//}
-	// err := testutil.CollectAndCompare(c, expected, filter...)
-	err := testutil.CollectAndCompare(c, expected)
+	filter := []string{
+		"mongodb_oplog_stats_ok",
+		"mongodb_oplog_stats_wt_btree_fixed_record_size",
+		"mongodb_oplog_stats_wt_transaction_update_conflicts",
+	}
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
