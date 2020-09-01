@@ -31,6 +31,7 @@ type collstatsCollector struct {
 	collections    []string
 	compatibleMode bool
 	logger         *logrus.Logger
+	topologyInfo   labelsGetter
 }
 
 func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -72,7 +73,10 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		// to differentiate metrics between collection. Labels are being set only to matke it easier
 		// to filter
 		prefix := database + "." + collection
-		labels := map[string]string{"database": database, "collection": collection}
+
+		labels := d.topologyInfo.baseLabels()
+		labels["database"] = database
+		labels["collection"] = collection
 
 		for _, metrics := range stats {
 			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {

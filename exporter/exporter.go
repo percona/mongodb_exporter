@@ -36,6 +36,7 @@ type Exporter struct {
 	collectors       []prometheus.Collector
 	logger           *logrus.Logger
 	webListenAddress string
+	topologyInfo     labelsGetter
 }
 
 // Opts holds new exporter options.
@@ -69,12 +70,18 @@ func New(opts *Opts) (*Exporter, error) {
 		opts.Logger = logrus.New()
 	}
 
+	ti, err := newTopologyInfo(context.TODO(), client)
+	if err != nil {
+		return nil, err
+	}
+
 	exp := &Exporter{
 		client:           client,
 		collectors:       make([]prometheus.Collector, 0),
 		path:             opts.Path,
 		logger:           opts.Logger,
 		webListenAddress: opts.WebListenAddress,
+		topologyInfo:     ti,
 	}
 
 	if len(opts.CollStatsCollections) > 0 {
@@ -83,14 +90,16 @@ func New(opts *Opts) (*Exporter, error) {
 			collections:    opts.CollStatsCollections,
 			compatibleMode: opts.CompatibleMode,
 			logger:         opts.Logger,
+			topologyInfo:   ti,
 		})
 	}
 
 	if len(opts.IndexStatsCollections) > 0 {
 		exp.collectors = append(exp.collectors, &indexstatsCollector{
-			client:      client,
-			collections: opts.IndexStatsCollections,
-			logger:      opts.Logger,
+			client:       client,
+			collections:  opts.IndexStatsCollections,
+			logger:       opts.Logger,
+			topologyInfo: ti,
 		})
 	}
 
@@ -98,12 +107,14 @@ func New(opts *Opts) (*Exporter, error) {
 		client:         client,
 		compatibleMode: opts.CompatibleMode,
 		logger:         opts.Logger,
+		topologyInfo:   ti,
 	})
 
 	exp.collectors = append(exp.collectors, &replSetGetStatusCollector{
 		client:         client,
 		compatibleMode: opts.CompatibleMode,
 		logger:         opts.Logger,
+		topologyInfo:   ti,
 	})
 
 	return exp, nil

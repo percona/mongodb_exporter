@@ -144,7 +144,7 @@ func TestMakeRawMetric(t *testing.T) {
 		{value: primitive.Timestamp{}, wantVal: nil},
 		{value: "zapp", wantVal: nil},
 		{value: []byte{}, wantVal: nil},
-		{value: time.Date(2020, 06, 15, 0, 0, 0, 0, time.UTC), wantVal: nil},
+		{value: time.Date(2020, 0o6, 15, 0, 0, 0, 0, time.UTC), wantVal: nil},
 	}
 
 	ln := make([]string, 0) // needs pre-allocation to accomplish pre-allocation for labels

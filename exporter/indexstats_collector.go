@@ -28,9 +28,10 @@ import (
 )
 
 type indexstatsCollector struct {
-	client      *mongo.Client
-	collections []string
-	logger      *logrus.Logger
+	client       *mongo.Client
+	collections  []string
+	logger       *logrus.Logger
+	topologyInfo labelsGetter
 }
 
 func (d *indexstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -76,10 +77,10 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the
 			// same, for different collections.
 			prefix := fmt.Sprintf("%s_%s_%s", database, collection, m["name"])
-			labels := map[string]string{
-				"namespace": database + "." + collection,
-				"key_name":  fmt.Sprintf("%s", m["name"]),
-			}
+			labels := d.topologyInfo.baseLabels()
+			labels["namespace"] = database + "." + collection
+			labels["key_name"] = fmt.Sprintf("%s", m["name"])
+
 			metrics := sanitizeMetrics(m)
 			for _, metric := range makeMetrics(prefix, metrics, labels, false) {
 				ch <- metric

@@ -235,8 +235,8 @@ func metricHelp(prefix, name string) string {
 
 // buildMetrics is a wrapper around makeMetrics, because makeMetrics is recursive and requires a prefix
 // and a map of labels. From the collectors we call buildMetrics which has a simpler signature.
-func buildMetrics(m bson.M, compatibleMode bool) []prometheus.Metric {
-	return makeMetrics("", m, nil, compatibleMode)
+func buildMetrics(labels map[string]string, m bson.M, compatibleMode bool) []prometheus.Metric {
+	return makeMetrics("", m, labels, compatibleMode)
 }
 
 func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {

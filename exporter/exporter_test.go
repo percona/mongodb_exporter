@@ -26,6 +26,16 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
+type labelsGetterMock struct{}
+
+func (l labelsGetterMock) baseLabels() map[string]string {
+	return map[string]string{}
+}
+
+func (l labelsGetterMock) loadLabels(context.Context) error {
+	return nil
+}
+
 func TestConnect(t *testing.T) {
 	hostname := "127.0.0.1"
 	ctx := context.Background()

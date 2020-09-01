@@ -30,6 +30,7 @@ type serverStatusCollector struct {
 	client         *mongo.Client
 	compatibleMode bool
 	logger         *logrus.Logger
+	topologyInfo   labelsGetter
 }
 
 func (d *serverStatusCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -49,7 +50,7 @@ func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
 	logrus.Debug("serverStatus result:")
 	debugResult(d.logger, m)
 
-	for _, metric := range buildMetrics(m, d.compatibleMode) {
+	for _, metric := range buildMetrics(d.topologyInfo.baseLabels(), m, d.compatibleMode) {
 		ch <- metric
 	}
 }

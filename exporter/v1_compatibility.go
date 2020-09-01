@@ -10,9 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var (
-	errInvalidMetric = fmt.Errorf("invalid value type for metric")
-)
+var errInvalidMetric = fmt.Errorf("invalid value type for metric")
 
 /*
   This is used to convert a new metric like: mongodb_ss_asserts{assert_type=*} (1)
@@ -578,7 +576,6 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 	}
 
 	f, err := asFloat64(val)
-
 	if err != nil {
 		return prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err), err
 	}

@@ -35,20 +35,25 @@ func TestServerStatusDataCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
+	ti, err := newTopologyInfo(context.TODO(), client)
+	assert.NoError(t, err)
+
 	c := &serverStatusCollector{
-		ctx:    ctx,
-		client: client,
-		logger: logrus.New(),
+		ctx:          ctx,
+		client:       client,
+		logger:       logrus.New(),
+		topologyInfo: ti,
 	}
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
 # HELP mongodb_mem_bits mem.
 # TYPE mongodb_mem_bits untyped
-mongodb_mem_bits 64
+mongodb_mem_bits{cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shardsvr",rs_nm="rs1",rs_state="1"} 64
 # HELP mongodb_metrics_commands_connPoolSync_failed metrics.commands.connPoolSync.
 # TYPE mongodb_metrics_commands_connPoolSync_failed untyped
-mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
+mongodb_metrics_commands_connPoolSync_failed{cl_id="5f4da51a76bfb5fe22797fcf",cl_role="shardsvr",rs_nm="rs1",rs_state="1"} 0` +
+		"\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
@@ -57,6 +62,6 @@ mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
 		"mongodb_mem_bits",
 		"mongodb_metrics_commands_connPoolSync_failed",
 	}
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
