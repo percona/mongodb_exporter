@@ -271,6 +271,10 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 				continue
 			}
 
+			if renamedMetric := rawToCompatibleRawMetric(rm, specialConversions()); renamedMetric != nil {
+				rm = renamedMetric
+			}
+
 			metric, err := rawToPrometheusMetric(rm)
 			if err != nil {
 				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)

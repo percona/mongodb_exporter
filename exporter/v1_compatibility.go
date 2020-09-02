@@ -1,17 +1,12 @@
 package exporter
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-)
-
-var (
-	errInvalidMetric = fmt.Errorf("invalid value type for metric")
 )
 
 /*
@@ -59,10 +54,10 @@ type conversion struct {
 	suffixMapping    map[string]string
 }
 
-func rawToCompatibleRawMetric(rm *rawMetric) *rawMetric {
+func rawToCompatibleRawMetric(rm *rawMetric, convs []conversion) *rawMetric {
 	// check if the metric exists in the conversions array.
 	// if it exists, it should be converted.
-	for _, cm := range conversions() {
+	for _, cm := range convs {
 		switch {
 		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
 			return newToOldMetric(rm, cm)
@@ -154,7 +149,7 @@ func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 
 // Converts new metric to the old metric style and append it to the response slice.
 func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus.Metric {
-	compatibleMetric := rawToCompatibleRawMetric(rm)
+	compatibleMetric := rawToCompatibleRawMetric(rm, conversions())
 	if compatibleMetric == nil {
 		return res
 	}
@@ -578,7 +573,6 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 	}
 
 	f, err := asFloat64(val)
-
 	if err != nil {
 		return prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err), err
 	}
@@ -628,4 +622,66 @@ func walkTo(m primitive.M, path []string) interface{} {
 	}
 
 	return val
+}
+
+// specialConversions returns a list of special conversions we want to implement.
+// See: https://jira.percona.com/browse/PMM-6506
+func specialConversions() []conversion {
+	return []conversion{
+		{
+			oldName:     "mongodb_ss_opLatencies_ops",
+			prefix:      "mongodb_ss_opLatencies",
+			suffixLabel: "op_type",
+			suffixMapping: map[string]string{
+				"commands_ops":     "commands",
+				"reads_ops":        "reads",
+				"transactions_ops": "transactions",
+				"writes_ops":       "writes",
+			},
+		},
+		{
+			oldName:     "mongodb_ss_opLatencies_latency",
+			prefix:      "mongodb_ss_opLatencies",
+			suffixLabel: "op_type",
+			suffixMapping: map[string]string{
+				"commands_latency":     "commands",
+				"reads_latency":        "reads",
+				"transactions_latency": "transactions",
+				"writes_latency":       "writes",
+			},
+		},
+		// mongodb_ss_wt_concurrentTransactions_read_out
+		// mongodb_ss_wt_concurrentTransactions_write_out
+		{
+			oldName:     "mongodb_ss_wt_concurrentTransactions_out",
+			prefix:      "mongodb_ss_wt_concurrentTransactions",
+			suffixLabel: "txn_rw",
+			suffixMapping: map[string]string{
+				"read_out":  "read",
+				"write_out": "write",
+			},
+		},
+		// mongodb_ss_wt_concurrentTransactions_read_available
+		// mongodb_ss_wt_concurrentTransactions_write_available
+		{
+			oldName:     "mongodb_ss_wt_concurrentTransactions_available",
+			prefix:      "mongodb_ss_wt_concurrentTransactions",
+			suffixLabel: "txn_rw",
+			suffixMapping: map[string]string{
+				"read_available":  "read",
+				"write_available": "write",
+			},
+		},
+		// mongodb_ss_wt_concurrentTransactions_read_totalTickets
+		// mongodb_ss_wt_concurrentTransactions_write_totalTickets
+		{
+			oldName:     "mongodb_ss_wt_concurrentTransactions_totalTickets",
+			prefix:      "mongodb_ss_wt_concurrentTransactions",
+			suffixLabel: "txn_rw",
+			suffixMapping: map[string]string{
+				"read_totalTickets":  "read",
+				"write_totalTickets": "write",
+			},
+		},
+	}
 }
