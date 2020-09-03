@@ -271,7 +271,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 				continue
 			}
 
-			if renamedMetric := rawToCompatibleRawMetric(rm, specialConversions()); renamedMetric != nil {
+			if renamedMetric := metricRenameAndLabel(rm, specialConversions()); renamedMetric != nil {
 				rm = renamedMetric
 			}
 

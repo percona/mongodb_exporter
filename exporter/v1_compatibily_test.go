@@ -154,7 +154,7 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		cm := rawToCompatibleRawMetric(tc.in, specialConversions())
-		assert.Equal(t, cm, tc.want)
+		m := metricRenameAndLabel(tc.in, specialConversions())
+		assert.Equal(t, m, tc.want)
 	}
 }

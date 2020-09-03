@@ -54,7 +54,7 @@ type conversion struct {
 	suffixMapping    map[string]string
 }
 
-func rawToCompatibleRawMetric(rm *rawMetric, convs []conversion) *rawMetric {
+func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {
 	// check if the metric exists in the conversions array.
 	// if it exists, it should be converted.
 	for _, cm := range convs {
@@ -149,7 +149,7 @@ func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 
 // Converts new metric to the old metric style and append it to the response slice.
 func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus.Metric {
-	compatibleMetric := rawToCompatibleRawMetric(rm, conversions())
+	compatibleMetric := metricRenameAndLabel(rm, conversions())
 	if compatibleMetric == nil {
 		return res
 	}
