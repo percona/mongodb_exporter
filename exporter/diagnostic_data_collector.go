@@ -43,15 +43,14 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	res := d.client.Database("admin").RunCommand(context.TODO(), cmd)
 
 	if err := res.Decode(&m); err != nil {
-		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		d.logger.Errorf("cannot run getDiagnosticData: %s", err)
 		return
 	}
 
 	m, ok := m["data"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
-		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-
+		d.logger.Errorf("cannot decode getDiagnosticData: %s", err)
 		return
 	}
 

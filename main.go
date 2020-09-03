@@ -43,6 +43,9 @@ type GlobalFlags struct {
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
+	DisableDiagnosticData   bool `name:"disable.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
+	DisableReplicasetStatus bool `name:"disable.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
+
 	CompatibleMode bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
 	Version        bool `name:"version" help:"Show version and exit"`
 }
@@ -84,20 +87,26 @@ func main() {
 
 	if opts.URI == "" {
 		opts.URI = os.Getenv("MONGODB_URI")
+		log.Debugf("Using URI from MONGODB_URI env var")
 	}
 
 	if !strings.HasPrefix(opts.URI, "mongodb") {
+		log.Debugf("Prepending mongodb:// to the URI")
 		opts.URI = "mongodb://" + opts.URI
 	}
 
+	log.Debugf("Connection URI: %s", opts.URI)
+
 	exporterOpts := &exporter.Opts{
-		CollStatsCollections:  strings.Split(opts.CollStatsCollections, ","),
-		CompatibleMode:        opts.CompatibleMode,
-		IndexStatsCollections: strings.Split(opts.CollStatsCollections, ","),
-		Logger:                log,
-		Path:                  opts.WebTelemetryPath,
-		URI:                   opts.URI,
-		WebListenAddress:      opts.WebListenAddress,
+		CollStatsCollections:    strings.Split(opts.CollStatsCollections, ","),
+		CompatibleMode:          opts.CompatibleMode,
+		IndexStatsCollections:   strings.Split(opts.CollStatsCollections, ","),
+		Logger:                  log,
+		Path:                    opts.WebTelemetryPath,
+		URI:                     opts.URI,
+		WebListenAddress:        opts.WebListenAddress,
+		DisableDiagnosticData:   opts.DisableDiagnosticData,
+		DisableReplicasetStatus: opts.DisableReplicasetStatus,
 	}
 
 	e, err := exporter.New(exporterOpts)
