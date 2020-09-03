@@ -6,7 +6,7 @@ require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/Percona-Lab/mdbutils v0.0.0-20200901133312-eab39b495509
 	github.com/alecthomas/kong v0.2.11
-	github.com/aws/aws-sdk-go v1.34.15 // indirect
+	github.com/aws/aws-sdk-go v1.34.16 // indirect
 	github.com/kr/pretty v0.2.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/percona/exporter_shared v0.7.2

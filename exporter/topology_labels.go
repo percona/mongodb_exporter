@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Percona-Lab/mdbutils"
 	"github.com/pkg/errors"
@@ -44,6 +45,7 @@ type topologyInfo struct {
 	// by a new connector, able to reconnect if needed. In case of reconnection, we should
 	// call loadLabels to refresh the labels because they might have changed
 	client *mongo.Client
+	lock   *sync.Mutex
 	labels map[string]string
 }
 
@@ -53,6 +55,7 @@ var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 func newTopologyInfo(ctx context.Context, client *mongo.Client) (labelsGetter, error) {
 	ti := &topologyInfo{
 		client: client,
+		lock:   &sync.Mutex{},
 		labels: make(map[string]string),
 	}
 
@@ -72,12 +75,16 @@ func (t topologyInfo) baseLabels() map[string]string {
 	for k, v := range t.labels {
 		c[k] = v
 	}
+
 	return c
 }
 
 // TopologyLabels reads several values from MongoDB instance like replicaset name, and other
 // topology information and returns a map of labels used to better identify the current monitored instance.
 func (t *topologyInfo) loadLabels(ctx context.Context) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
 	t.labels = make(map[string]string)
 
 	hi, err := mdbutils.GetHostInfo(ctx, t.client)

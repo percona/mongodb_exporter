@@ -52,8 +52,7 @@ mongodb_oplog_stats_ok 1
 mongodb_oplog_stats_wt_btree_fixed_record_size 0
 # HELP mongodb_oplog_stats_wt_transaction_update_conflicts local.oplog.rs.stats.wiredTiger.transaction.
 # TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
-mongodb_oplog_stats_wt_transaction_update_conflicts 0` +
-		"\n")
+mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime

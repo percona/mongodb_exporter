@@ -157,16 +157,9 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 		return nil, nil
 	}
 
-	if labels == nil {
-		labels = map[string]string{}
-	}
-
 	help := metricHelp(prefix, name)
 
 	fqName, label := nameAndLabel(prefix, name)
-	if label != "" {
-		labels[label] = name
-	}
 
 	rm := &rawMetric{
 		fqName: fqName,
@@ -177,9 +170,16 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 		lv:     make([]string, 0, len(labels)),
 	}
 
+	// Add original labels to the metric
 	for k, v := range labels {
 		rm.ln = append(rm.ln, k)
 		rm.lv = append(rm.lv, v)
+	}
+
+	// Add predefined label, if any
+	if label != "" {
+		rm.ln = append(rm.ln, label)
+		rm.lv = append(rm.lv, name)
 	}
 
 	return rm, nil
@@ -233,28 +233,8 @@ func metricHelp(prefix, name string) string {
 	return name
 }
 
-// buildMetrics is a wrapper around makeMetrics, because makeMetrics is recursive and requires a prefix
-// and a map of labels. From the collectors we call buildMetrics which has a simpler signature.
-func buildMetrics(labels map[string]string, m bson.M, compatibleMode bool) []prometheus.Metric {
-	return makeMetrics("", m, labels, compatibleMode)
-}
-
 func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
 	var res []prometheus.Metric
-
-	originalLabels := func() map[string]string {
-		labelsCopy := map[string]string{}
-		for k, v := range labels {
-			labelsCopy[k] = v
-		}
-
-		return labelsCopy
-	}
-
-	// We need to use this copy of the original labels because while looping through the incoming map,
-	// we are adding more labels depending on each metric renaming rule but, we must clean the labels for
-	// the next metric being processed in the for looop
-	workingLabels := originalLabels()
 
 	if prefix != "" {
 		prefix += "."
@@ -263,17 +243,16 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	for k, val := range m {
 		switch v := val.(type) {
 		case bson.M:
-			res = append(res, makeMetrics(prefix+k, v, workingLabels, compatibleMode)...)
+			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
 		case map[string]interface{}:
-			res = append(res, makeMetrics(prefix+k, v, workingLabels, compatibleMode)...)
+			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
 		case primitive.A:
 			v = []interface{}(v)
 			res = append(res, processSlice(prefix, k, v, compatibleMode)...)
 		case []interface{}:
 			continue
 		default:
-			rm, err := makeRawMetric(prefix, k, v, workingLabels)
-			workingLabels = originalLabels() // Cleanup before processing a new metric
+			rm, err := makeRawMetric(prefix, k, v, labels)
 			if err != nil {
 				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 				res = append(res, invalidMetric)

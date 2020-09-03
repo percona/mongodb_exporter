@@ -50,7 +50,7 @@ func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
 	logrus.Debug("serverStatus result:")
 	debugResult(d.logger, m)
 
-	for _, metric := range buildMetrics(d.topologyInfo.baseLabels(), m, d.compatibleMode) {
+	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric
 	}
 }

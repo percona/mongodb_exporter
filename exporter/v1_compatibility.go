@@ -1,7 +1,6 @@
 package exporter
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -9,8 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
-
-var errInvalidMetric = fmt.Errorf("invalid value type for metric")
 
 /*
   This is used to convert a new metric like: mongodb_ss_asserts{assert_type=*} (1)
