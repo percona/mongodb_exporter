@@ -72,9 +72,11 @@ func newTopologyInfo(ctx context.Context, client *mongo.Client) (labelsGetter, e
 func (t topologyInfo) baseLabels() map[string]string {
 	c := map[string]string{}
 
+	t.lock.Lock()
 	for k, v := range t.labels {
 		c[k] = v
 	}
+	t.lock.Unlock()
 
 	return c
 }
