@@ -51,10 +51,10 @@ func TestReplsetStatusCollector(t *testing.T) {
                 mongodb_ok 1
                 # HELP mongodb_optimes_appliedOpTime_t optimes.appliedOpTime.
                 # TYPE mongodb_optimes_appliedOpTime_t untyped
-                mongodb_optimes_appliedOpTime_t 4
+                mongodb_optimes_appliedOpTime_t 1
                 # HELP mongodb_optimes_durableOpTime_t optimes.durableOpTime.
                 # TYPE mongodb_optimes_durableOpTime_t untyped
-                mongodb_optimes_durableOpTime_t 4` + "\n")
+                mongodb_optimes_durableOpTime_t 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
