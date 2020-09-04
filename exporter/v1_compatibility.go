@@ -45,41 +45,6 @@ import (
 
    Third renaming form: see (3) below.
 */
-type conversion struct {
-	newName          string
-	oldName          string
-	labelConversions map[string]string // key: current label, value: old exporter (compatible) label
-	prefix           string
-	suffixLabel      string
-	suffixMapping    map[string]string
-}
-
-func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {
-	// check if the metric exists in the conversions array.
-	// if it exists, it should be converted.
-	for _, cm := range convs {
-		switch {
-		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
-			return newToOldMetric(rm, cm)
-
-		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
-			conversionSuffix := strings.TrimPrefix(rm.fqName, cm.prefix)
-			conversionSuffix = strings.TrimPrefix(conversionSuffix, "_")
-
-			// Check that also the suffix matches.
-			// In the conversion array, there are metrics with the same prefix but the 'old' name varies
-			// also depending on the metic suffix
-			for suffix := range cm.suffixMapping {
-				if suffix == conversionSuffix {
-					om := createOldMetricFromNew(rm, cm)
-					return om
-				}
-			}
-		}
-	}
-
-	return nil
-}
 
 // For simple metric renaming, only some fields should be updated like the metric name, the help and some
 // labels that have 1 to 1 mapping (1).
