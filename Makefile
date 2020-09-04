@@ -96,7 +96,7 @@ help:                       ## Display this help message.
 	awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
 test: env                   ## Run all tests.
-	go test -v -timeout 30s ./...
+	go test -race -v -timeout 30s ./...
 
 test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
 	docker-compose up -d

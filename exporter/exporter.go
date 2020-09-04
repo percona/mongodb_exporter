@@ -35,9 +35,9 @@ const contentEncodingHeader = "Content-Encoding"
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
 	path             string
+	client           *mongo.Client
 	logger           *logrus.Logger
 	opts             *Opts
-	client           *mongo.Client
 	webListenAddress string
 }
 
@@ -132,49 +132,51 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 	return registry
 }
 
-// Run starts the exporter.
-func (e *Exporter) Run() {
-	handler := func() http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
+func (e *Exporter) handler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 
-			// Use per-request connection.
-			if !e.opts.GlobalConnPool {
-				var err error
-				e.client, err = connect(ctx, e.opts.URI)
-				if err != nil {
-					e.logger.Errorf("Cannot connect to MongoDB: %v", err)
-					w.Header().Del(contentEncodingHeader)
-					http.Error(
-						w,
-						"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
-						http.StatusInternalServerError,
-					)
-				}
-
-				defer func() {
-					if err = e.client.Disconnect(ctx); err != nil {
-						e.logger.Errorf("Cannot disconnect mongo client: %v", err)
-					}
-				}()
+		client := e.client
+		// Use per-request connection.
+		if !e.opts.GlobalConnPool {
+			var err error
+			client, err = connect(ctx, e.opts.URI)
+			if err != nil {
+				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
+				w.Header().Del(contentEncodingHeader)
+				http.Error(
+					w,
+					"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
+					http.StatusInternalServerError,
+				)
 			}
 
-			registry := e.makeRegistry(ctx, e.client)
+			defer func() {
+				if err = client.Disconnect(ctx); err != nil {
+					e.logger.Errorf("Cannot disconnect mongo client: %v", err)
+				}
+			}()
+		}
 
-			gatherers := prometheus.Gatherers{}
-			gatherers = append(gatherers, prometheus.DefaultGatherer)
-			gatherers = append(gatherers, registry)
+		registry := e.makeRegistry(ctx, client)
 
-			// Delegate http serving to Prometheus client library, which will call collector.Collect.
-			h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
-				ErrorHandling: promhttp.ContinueOnError,
-				ErrorLog:      e.logger,
-			})
+		gatherers := prometheus.Gatherers{}
+		gatherers = append(gatherers, prometheus.DefaultGatherer)
+		gatherers = append(gatherers, registry)
 
-			h.ServeHTTP(w, r)
+		// Delegate http serving to Prometheus client library, which will call collector.Collect.
+		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
+			ErrorHandling: promhttp.ContinueOnError,
+			ErrorLog:      e.logger,
 		})
-	}()
 
+		h.ServeHTTP(w, r)
+	})
+}
+
+// Run starts the exporter.
+func (e *Exporter) Run() {
+	handler := e.handler()
 	exporter_shared.RunServer("MongoDB", e.webListenAddress, e.path, handler)
 }
 
