@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kr/pretty"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -62,4 +64,34 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
+}
+
+func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	c := &diagnosticDataCollector{
+		client: client,
+		logger: logrus.New(),
+	}
+
+	metrics := collect(c)
+	pretty.Println(metrics)
+}
+
+func collect(c prometheus.Collector) []prometheus.Metric {
+	m := []prometheus.Metric{}
+	ch := make(chan prometheus.Metric)
+
+	go func() {
+		for metric := range ch {
+			m = append(m, metric)
+		}
+	}()
+
+	c.Collect(ch)
+
+	return m
 }
