@@ -40,13 +40,15 @@ type Exporter struct {
 
 // Opts holds new exporter options.
 type Opts struct {
-	CollStatsCollections  []string
-	IndexStatsCollections []string
-	CompatibleMode        bool
-	URI                   string
-	Path                  string
-	WebListenAddress      string
-	Logger                *logrus.Logger
+	CollStatsCollections    []string
+	IndexStatsCollections   []string
+	CompatibleMode          bool
+	URI                     string
+	Path                    string
+	WebListenAddress        string
+	Logger                  *logrus.Logger
+	DisableDiagnosticData   bool
+	DisableReplicasetStatus bool
 }
 
 var (
@@ -94,17 +96,21 @@ func New(opts *Opts) (*Exporter, error) {
 		})
 	}
 
-	exp.collectors = append(exp.collectors, &diagnosticDataCollector{
-		client:         client,
-		compatibleMode: opts.CompatibleMode,
-		logger:         opts.Logger,
-	})
+	if !opts.DisableDiagnosticData {
+		exp.collectors = append(exp.collectors, &diagnosticDataCollector{
+			client:         client,
+			compatibleMode: opts.CompatibleMode,
+			logger:         opts.Logger,
+		})
+	}
 
-	exp.collectors = append(exp.collectors, &replSetGetStatusCollector{
-		client:         client,
-		compatibleMode: opts.CompatibleMode,
-		logger:         opts.Logger,
-	})
+	if !opts.DisableReplicasetStatus {
+		exp.collectors = append(exp.collectors, &replSetGetStatusCollector{
+			client:         client,
+			compatibleMode: opts.CompatibleMode,
+			logger:         opts.Logger,
+		})
+	}
 
 	return exp, nil
 }
