@@ -52,7 +52,7 @@ type topologyInfo struct {
 // ErrCannotGetTopologyLabels Cannot read topology labels.
 var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 
-func newTopologyInfo(ctx context.Context, client *mongo.Client) (labelsGetter, error) {
+func newTopologyInfo(ctx context.Context, client *mongo.Client) (*topologyInfo, error) {
 	ti := &topologyInfo{
 		client: client,
 		lock:   &sync.Mutex{},
