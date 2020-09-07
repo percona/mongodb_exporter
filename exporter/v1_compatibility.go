@@ -1,17 +1,12 @@
 package exporter
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-)
-
-var (
-	errInvalidMetric = fmt.Errorf("invalid value type for metric")
 )
 
 /*
@@ -50,41 +45,6 @@ var (
 
    Third renaming form: see (3) below.
 */
-type conversion struct {
-	newName          string
-	oldName          string
-	labelConversions map[string]string // key: current label, value: old exporter (compatible) label
-	prefix           string
-	suffixLabel      string
-	suffixMapping    map[string]string
-}
-
-func rawToCompatibleRawMetric(rm *rawMetric) *rawMetric {
-	// check if the metric exists in the conversions array.
-	// if it exists, it should be converted.
-	for _, cm := range conversions() {
-		switch {
-		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
-			return newToOldMetric(rm, cm)
-
-		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
-			conversionSuffix := strings.TrimPrefix(rm.fqName, cm.prefix)
-			conversionSuffix = strings.TrimPrefix(conversionSuffix, "_")
-
-			// Check that also the suffix matches.
-			// In the conversion array, there are metrics with the same prefix but the 'old' name varies
-			// also depending on the metic suffix
-			for suffix := range cm.suffixMapping {
-				if suffix == conversionSuffix {
-					om := createOldMetricFromNew(rm, cm)
-					return om
-				}
-			}
-		}
-	}
-
-	return nil
-}
 
 // For simple metric renaming, only some fields should be updated like the metric name, the help and some
 // labels that have 1 to 1 mapping (1).
@@ -154,7 +114,7 @@ func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 
 // Converts new metric to the old metric style and append it to the response slice.
 func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus.Metric {
-	compatibleMetric := rawToCompatibleRawMetric(rm)
+	compatibleMetric := metricRenameAndLabel(rm, conversions())
 	if compatibleMetric == nil {
 		return res
 	}
@@ -573,7 +533,6 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 	}
 
 	f, err := asFloat64(val)
-
 	if err != nil {
 		return prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err), err
 	}
