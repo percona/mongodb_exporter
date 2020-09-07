@@ -88,8 +88,7 @@ mongodb_testdb_testcol_01_idx_01_accesses_ops{key_name="idx_01",namespace="testd
 mongodb_testdb_testcol_02_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_02"} 0
 # HELP mongodb_testdb_testcol_02_idx_01_accesses_ops testdb_testcol_02_idx_01.accesses.
 # TYPE mongodb_testdb_testcol_02_idx_01_accesses_ops untyped
-mongodb_testdb_testcol_02_idx_01_accesses_ops{key_name="idx_01",namespace="testdb.testcol_02"} 0` +
-		"\n")
+mongodb_testdb_testcol_02_idx_01_accesses_ops{key_name="idx_01",namespace="testdb.testcol_02"} 0` + "\n")
 
 	err := testutil.CollectAndCompare(c, expected)
 	assert.NoError(t, err)
