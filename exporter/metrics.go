@@ -265,6 +265,10 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 				continue
 			}
 
+			if renamedMetric := metricRenameAndLabel(rm, specialConversions()); renamedMetric != nil {
+				rm = renamedMetric
+			}
+
 			metric, err := rawToPrometheusMetric(rm)
 			if err != nil {
 				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
@@ -310,4 +314,102 @@ func processSlice(prefix, k string, v []interface{}, compatibleMode bool) []prom
 	}
 
 	return metrics
+}
+
+type conversion struct {
+	newName          string
+	oldName          string
+	labelConversions map[string]string // key: current label, value: old exporter (compatible) label
+	prefix           string
+	suffixLabel      string
+	suffixMapping    map[string]string
+}
+
+func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {
+	// check if the metric exists in the conversions array.
+	// if it exists, it should be converted.
+	for _, cm := range convs {
+		switch {
+		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
+			return newToOldMetric(rm, cm)
+
+		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
+			conversionSuffix := strings.TrimPrefix(rm.fqName, cm.prefix)
+			conversionSuffix = strings.TrimPrefix(conversionSuffix, "_")
+
+			// Check that also the suffix matches.
+			// In the conversion array, there are metrics with the same prefix but the 'old' name varies
+			// also depending on the metic suffix
+			for suffix := range cm.suffixMapping {
+				if suffix == conversionSuffix {
+					om := createOldMetricFromNew(rm, cm)
+					return om
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// specialConversions returns a list of special conversions we want to implement.
+// See: https://jira.percona.com/browse/PMM-6506
+func specialConversions() []conversion {
+	return []conversion{
+		{
+			oldName:     "mongodb_ss_opLatencies_ops",
+			prefix:      "mongodb_ss_opLatencies",
+			suffixLabel: "op_type",
+			suffixMapping: map[string]string{
+				"commands_ops":     "commands",
+				"reads_ops":        "reads",
+				"transactions_ops": "transactions",
+				"writes_ops":       "writes",
+			},
+		},
+		{
+			oldName:     "mongodb_ss_opLatencies_latency",
+			prefix:      "mongodb_ss_opLatencies",
+			suffixLabel: "op_type",
+			suffixMapping: map[string]string{
+				"commands_latency":     "commands",
+				"reads_latency":        "reads",
+				"transactions_latency": "transactions",
+				"writes_latency":       "writes",
+			},
+		},
+		// mongodb_ss_wt_concurrentTransactions_read_out
+		// mongodb_ss_wt_concurrentTransactions_write_out
+		{
+			oldName:     "mongodb_ss_wt_concurrentTransactions_out",
+			prefix:      "mongodb_ss_wt_concurrentTransactions",
+			suffixLabel: "txn_rw",
+			suffixMapping: map[string]string{
+				"read_out":  "read",
+				"write_out": "write",
+			},
+		},
+		// mongodb_ss_wt_concurrentTransactions_read_available
+		// mongodb_ss_wt_concurrentTransactions_write_available
+		{
+			oldName:     "mongodb_ss_wt_concurrentTransactions_available",
+			prefix:      "mongodb_ss_wt_concurrentTransactions",
+			suffixLabel: "txn_rw",
+			suffixMapping: map[string]string{
+				"read_available":  "read",
+				"write_available": "write",
+			},
+		},
+		// mongodb_ss_wt_concurrentTransactions_read_totalTickets
+		// mongodb_ss_wt_concurrentTransactions_write_totalTickets
+		{
+			oldName:     "mongodb_ss_wt_concurrentTransactions_totalTickets",
+			prefix:      "mongodb_ss_wt_concurrentTransactions",
+			suffixLabel: "txn_rw",
+			suffixMapping: map[string]string{
+				"read_totalTickets":  "read",
+				"write_totalTickets": "write",
+			},
+		},
+	}
 }
