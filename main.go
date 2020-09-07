@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -38,7 +37,7 @@ var (
 type GlobalFlags struct {
 	CollStatsCollections  string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1.col1,db2.col2"`
 	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
-	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
 	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
@@ -84,11 +83,6 @@ func main() {
 	log.SetLevel(levels[opts.LogLevel])
 
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
-
-	if opts.URI == "" {
-		opts.URI = os.Getenv("MONGODB_URI")
-		log.Debugf("Using URI from MONGODB_URI env var")
-	}
 
 	if !strings.HasPrefix(opts.URI, "mongodb") {
 		log.Debugf("Prepending mongodb:// to the URI")
