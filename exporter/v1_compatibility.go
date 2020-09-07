@@ -1,17 +1,12 @@
 package exporter
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-)
-
-var (
-	errInvalidMetric = fmt.Errorf("invalid value type for metric")
 )
 
 /*
@@ -50,41 +45,6 @@ var (
 
    Third renaming form: see (3) below.
 */
-type conversion struct {
-	newName          string
-	oldName          string
-	labelConversions map[string]string // key: current label, value: old exporter (compatible) label
-	prefix           string
-	suffixLabel      string
-	suffixMapping    map[string]string
-}
-
-func rawToCompatibleRawMetric(rm *rawMetric) *rawMetric {
-	// check if the metric exists in the conversions array.
-	// if it exists, it should be converted.
-	for _, cm := range conversions() {
-		switch {
-		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
-			return newToOldMetric(rm, cm)
-
-		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
-			conversionSuffix := strings.TrimPrefix(rm.fqName, cm.prefix)
-			conversionSuffix = strings.TrimPrefix(conversionSuffix, "_")
-
-			// Check that also the suffix matches.
-			// In the conversion array, there are metrics with the same prefix but the 'old' name varies
-			// also depending on the metic suffix
-			for suffix := range cm.suffixMapping {
-				if suffix == conversionSuffix {
-					om := createOldMetricFromNew(rm, cm)
-					return om
-				}
-			}
-		}
-	}
-
-	return nil
-}
 
 // For simple metric renaming, only some fields should be updated like the metric name, the help and some
 // labels that have 1 to 1 mapping (1).
@@ -154,7 +114,7 @@ func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 
 // Converts new metric to the old metric style and append it to the response slice.
 func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus.Metric {
-	compatibleMetric := rawToCompatibleRawMetric(rm)
+	compatibleMetric := metricRenameAndLabel(rm, conversions())
 	if compatibleMetric == nil {
 		return res
 	}
@@ -174,26 +134,21 @@ func conversions() []conversion {
 	return []conversion{
 		{
 			newName:          "mongodb_ss_asserts",
-			oldName:          "mongodb_mongod_asserts_total",
+			oldName:          "mongodb_asserts_total",
 			labelConversions: map[string]string{"assert_type": "type"},
 		},
 		{
-			oldName:          "mongodb_mongod_connections",
-			newName:          "mongodb_ss_connections",
-			labelConversions: map[string]string{"con_type": "state"},
-		},
-		{
-			oldName:          "mongodb_mongod_asserts_total",
+			oldName:          "mongodb_asserts_total",
 			newName:          "mongodb_ss_asserts",
 			labelConversions: map[string]string{"assert_type": "type"},
 		},
 		{
-			oldName:          "mongodb_mongod_connections",
+			oldName:          "mongodb_connections",
 			newName:          "mongodb_ss_connections",
 			labelConversions: map[string]string{"con_type": "state"},
 		},
 		{
-			oldName: "mongodb_mongod_connections_metrics_created_total",
+			oldName: "mongodb_connections_metrics_created_total",
 			newName: "mongodb_ss_connections_totalCreated",
 		},
 		{
@@ -211,12 +166,12 @@ func conversions() []conversion {
 			labelConversions: map[string]string{"count_type": "type"},
 		},
 		{
-			oldName: "mongodb_mongod_instance_local_time",
+			oldName: "mongodb_instance_local_time",
 			newName: "mongodb_start",
 		},
 
 		{
-			oldName: "mongodb_mongod_instance_uptime_seconds",
+			oldName: "mongodb_instance_uptime_seconds",
 			newName: "mongodb_ss_uptime",
 		},
 		{
@@ -224,7 +179,7 @@ func conversions() []conversion {
 			newName: "mongodb_ss_locks_Local_acquireCount_[rw]",
 		},
 		{
-			oldName: "mongodb_mongod_memory", //{"resident|virtual|mapped|mapped_with_journal"}
+			oldName: "mongodb_memory", //{"resident|virtual|mapped|mapped_with_journal"}
 			newName: "mongodb_ss_mem_[resident|virtual]",
 		},
 		{
@@ -325,22 +280,22 @@ func conversions() []conversion {
 			newName: "mongodb_ss_metrics_ttl_passes",
 		},
 		{
-			oldName:     "mongodb_mongod_network_bytes_total", // {state="in_bytes|out_bytes"}
-			prefix:      "mongodb_ss_network",                 //_[bytesIn|bytesOut]
+			oldName:     "mongodb_network_bytes_total", // {state="in_bytes|out_bytes"}
+			prefix:      "mongodb_ss_network",          //_[bytesIn|bytesOut]
 			suffixLabel: "state",
 		},
 		{
-			oldName: "mongodb_mongod_network_metrics_num_requests_total",
+			oldName: "mongodb_network_metrics_num_requests_total",
 			newName: "mongodb_ss_network_numRequests",
 		},
 		{
-			oldName:          "mongodb_mongod_op_counters_repl_total", //{type=*}
-			newName:          "mongodb_ss_opcountersRepl",             //{legacy_op_type=*}
+			oldName:          "mongodb_op_counters_repl_total", //{type=*}
+			newName:          "mongodb_ss_opcountersRepl",      //{legacy_op_type=*}
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
-			oldName:          "mongodb_mongod_op_counters_total", // {type=*}
-			newName:          "mongodb_ss_opcounters",            //{legacy_op_type=*}
+			oldName:          "mongodb_op_counters_total", // {type=*}
+			newName:          "mongodb_ss_opcounters",     //{legacy_op_type=*}
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
@@ -578,7 +533,6 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 	}
 
 	f, err := asFloat64(val)
-
 	if err != nil {
 		return prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err), err
 	}

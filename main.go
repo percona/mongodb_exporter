@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -38,11 +37,14 @@ var (
 type GlobalFlags struct {
 	CollStatsCollections  string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1.col1,db2.col2"`
 	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
-	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
 	GlobalConnPool        bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request."`
 	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
+
+	DisableDiagnosticData   bool `name:"disable.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
+	DisableReplicasetStatus bool `name:"disable.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
 
 	CompatibleMode bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
 	Version        bool `name:"version" help:"Show version and exit"`
@@ -83,23 +85,24 @@ func main() {
 
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
 
-	if opts.URI == "" {
-		opts.URI = os.Getenv("MONGODB_URI")
-	}
-
 	if !strings.HasPrefix(opts.URI, "mongodb") {
+		log.Debugf("Prepending mongodb:// to the URI")
 		opts.URI = "mongodb://" + opts.URI
 	}
 
+	log.Debugf("Connection URI: %s", opts.URI)
+
 	exporterOpts := &exporter.Opts{
-		CollStatsCollections:  strings.Split(opts.CollStatsCollections, ","),
-		CompatibleMode:        opts.CompatibleMode,
-		IndexStatsCollections: strings.Split(opts.CollStatsCollections, ","),
-		Logger:                log,
-		Path:                  opts.WebTelemetryPath,
-		URI:                   opts.URI,
-		GlobalConnPool:        opts.GlobalConnPool,
-		WebListenAddress:      opts.WebListenAddress,
+		CollStatsCollections:    strings.Split(opts.CollStatsCollections, ","),
+		CompatibleMode:          opts.CompatibleMode,
+		IndexStatsCollections:   strings.Split(opts.CollStatsCollections, ","),
+		Logger:                  log,
+		Path:                    opts.WebTelemetryPath,
+		URI:                     opts.URI,
+		GlobalConnPool:          opts.GlobalConnPool,
+		WebListenAddress:        opts.WebListenAddress,
+		DisableDiagnosticData:   opts.DisableDiagnosticData,
+		DisableReplicasetStatus: opts.DisableReplicasetStatus,
 	}
 
 	e, err := exporter.New(exporterOpts)

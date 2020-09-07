@@ -43,14 +43,16 @@ type Exporter struct {
 
 // Opts holds new exporter options.
 type Opts struct {
-	CompatibleMode        bool
-	GlobalConnPool        bool
-	URI                   string
-	Path                  string
-	WebListenAddress      string
-	IndexStatsCollections []string
-	CollStatsCollections  []string
-	Logger                *logrus.Logger
+	CompatibleMode          bool
+	GlobalConnPool          bool
+	URI                     string
+	Path                    string
+	WebListenAddress        string
+	IndexStatsCollections   []string
+	CollStatsCollections    []string
+	Logger                  *logrus.Logger
+	DisableDiagnosticData   bool
+	DisableReplicasetStatus bool
 }
 
 var (
@@ -113,21 +115,25 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 		registry.MustRegister(&ic)
 	}
 
-	ddc := diagnosticDataCollector{
-		ctx:            ctx,
-		client:         client,
-		compatibleMode: e.opts.CompatibleMode,
-		logger:         e.opts.Logger,
+	if !e.opts.DisableDiagnosticData {
+		ddc := diagnosticDataCollector{
+			ctx:            ctx,
+			client:         client,
+			compatibleMode: e.opts.CompatibleMode,
+			logger:         e.opts.Logger,
+		}
+		registry.MustRegister(&ddc)
 	}
-	registry.MustRegister(&ddc)
 
-	rsgsc := replSetGetStatusCollector{
-		ctx:            ctx,
-		client:         client,
-		compatibleMode: e.opts.CompatibleMode,
-		logger:         e.opts.Logger,
+	if !e.opts.DisableReplicasetStatus {
+		rsgsc := replSetGetStatusCollector{
+			ctx:            ctx,
+			client:         client,
+			compatibleMode: e.opts.CompatibleMode,
+			logger:         e.opts.Logger,
+		}
+		registry.MustRegister(&rsgsc)
 	}
-	registry.MustRegister(&rsgsc)
 
 	return registry
 }

@@ -53,7 +53,7 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 				return
 			}
 		}
-		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		d.logger.Errorf("cannot get replSetGetStatus: %s", err)
 
 		return
 	}

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -144,7 +145,7 @@ func TestMakeRawMetric(t *testing.T) {
 		{value: primitive.Timestamp{}, wantVal: nil},
 		{value: "zapp", wantVal: nil},
 		{value: []byte{}, wantVal: nil},
-		{value: time.Date(2020, 06, 15, 0, 0, 0, 0, time.UTC), wantVal: nil},
+		{value: time.Date(2020, 6, 15, 0, 0, 0, 0, time.UTC), wantVal: nil},
 	}
 
 	ln := make([]string, 0) // needs pre-allocation to accomplish pre-allocation for labels
@@ -170,5 +171,48 @@ func TestMakeRawMetric(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, want, m)
+	}
+}
+
+func TestRawToCompatibleRawMetric(t *testing.T) {
+	testCases := []struct {
+		in   *rawMetric
+		want *rawMetric
+	}{
+		{
+			in: &rawMetric{
+				fqName: "mongodb_ss_opLatencies_commands_latency",
+				val:    float64(1),
+				vt:     prometheus.UntypedValue,
+			},
+			want: &rawMetric{
+				fqName: "mongodb_ss_opLatencies_latency",
+				help:   "mongodb_ss_opLatencies_latency",
+				ln:     []string{"op_type"},
+				lv:     []string{"commands"},
+				val:    1,
+				vt:     3,
+			},
+		},
+		{
+			in: &rawMetric{
+				fqName: "mongodb_ss_opLatencies_commands_ops",
+				val:    float64(1),
+				vt:     prometheus.UntypedValue,
+			},
+			want: &rawMetric{
+				fqName: "mongodb_ss_opLatencies_ops",
+				help:   "mongodb_ss_opLatencies_ops",
+				ln:     []string{"op_type"},
+				lv:     []string{"commands"},
+				val:    1,
+				vt:     3,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		m := metricRenameAndLabel(tc.in, specialConversions())
+		assert.Equal(t, m, tc.want)
 	}
 }
