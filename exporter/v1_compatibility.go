@@ -174,26 +174,21 @@ func conversions() []conversion {
 	return []conversion{
 		{
 			newName:          "mongodb_ss_asserts",
-			oldName:          "mongodb_mongod_asserts_total",
+			oldName:          "mongodb_asserts_total",
 			labelConversions: map[string]string{"assert_type": "type"},
 		},
 		{
-			oldName:          "mongodb_mongod_connections",
-			newName:          "mongodb_ss_connections",
-			labelConversions: map[string]string{"con_type": "state"},
-		},
-		{
-			oldName:          "mongodb_mongod_asserts_total",
+			oldName:          "mongodb_asserts_total",
 			newName:          "mongodb_ss_asserts",
 			labelConversions: map[string]string{"assert_type": "type"},
 		},
 		{
-			oldName:          "mongodb_mongod_connections",
+			oldName:          "mongodb_connections",
 			newName:          "mongodb_ss_connections",
 			labelConversions: map[string]string{"con_type": "state"},
 		},
 		{
-			oldName: "mongodb_mongod_connections_metrics_created_total",
+			oldName: "mongodb_connections_metrics_created_total",
 			newName: "mongodb_ss_connections_totalCreated",
 		},
 		{
@@ -211,12 +206,12 @@ func conversions() []conversion {
 			labelConversions: map[string]string{"count_type": "type"},
 		},
 		{
-			oldName: "mongodb_mongod_instance_local_time",
+			oldName: "mongodb_instance_local_time",
 			newName: "mongodb_start",
 		},
 
 		{
-			oldName: "mongodb_mongod_instance_uptime_seconds",
+			oldName: "mongodb_instance_uptime_seconds",
 			newName: "mongodb_ss_uptime",
 		},
 		{
@@ -224,7 +219,7 @@ func conversions() []conversion {
 			newName: "mongodb_ss_locks_Local_acquireCount_[rw]",
 		},
 		{
-			oldName: "mongodb_mongod_memory", //{"resident|virtual|mapped|mapped_with_journal"}
+			oldName: "mongodb_memory", //{"resident|virtual|mapped|mapped_with_journal"}
 			newName: "mongodb_ss_mem_[resident|virtual]",
 		},
 		{
@@ -325,22 +320,22 @@ func conversions() []conversion {
 			newName: "mongodb_ss_metrics_ttl_passes",
 		},
 		{
-			oldName:     "mongodb_mongod_network_bytes_total", // {state="in_bytes|out_bytes"}
-			prefix:      "mongodb_ss_network",                 //_[bytesIn|bytesOut]
+			oldName:     "mongodb_network_bytes_total", // {state="in_bytes|out_bytes"}
+			prefix:      "mongodb_ss_network",          //_[bytesIn|bytesOut]
 			suffixLabel: "state",
 		},
 		{
-			oldName: "mongodb_mongod_network_metrics_num_requests_total",
+			oldName: "mongodb_network_metrics_num_requests_total",
 			newName: "mongodb_ss_network_numRequests",
 		},
 		{
-			oldName:          "mongodb_mongod_op_counters_repl_total", //{type=*}
-			newName:          "mongodb_ss_opcountersRepl",             //{legacy_op_type=*}
+			oldName:          "mongodb_op_counters_repl_total", //{type=*}
+			newName:          "mongodb_ss_opcountersRepl",      //{legacy_op_type=*}
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
-			oldName:          "mongodb_mongod_op_counters_total", // {type=*}
-			newName:          "mongodb_ss_opcounters",            //{legacy_op_type=*}
+			oldName:          "mongodb_op_counters_total", // {type=*}
+			newName:          "mongodb_ss_opcounters",     //{legacy_op_type=*}
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
