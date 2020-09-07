@@ -23,11 +23,11 @@ import (
 	"time"
 
 	"github.com/kr/pretty"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -78,20 +78,13 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 
 	metrics := collect(c)
-	pretty.Println(metrics)
-}
+	actualMetrics := helpers.ReadMetrics(metrics)
+	actualMetrics = filterMetrics(actualMetrics)
+	pretty.Println(actualMetrics)
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
 
-func collect(c prometheus.Collector) []prometheus.Metric {
-	m := []prometheus.Metric{}
-	ch := make(chan prometheus.Metric)
-
-	go func() {
-		for metric := range ch {
-			m = append(m, metric)
-		}
-	}()
-
-	c.Collect(ch)
-
-	return m
+	//if *golden {
+	//	writeTestDataJSON(t, instanceName, []byte(messages[instance.ResourceID]))
+	//}
+	pretty.Println(actualLines)
 }
