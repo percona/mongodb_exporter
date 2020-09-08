@@ -110,6 +110,7 @@ func New(opts *Opts) (*Exporter, error) {
 			client:         client,
 			compatibleMode: opts.CompatibleMode,
 			logger:         opts.Logger,
+			topologyInfo:   ti,
 		})
 	}
 
@@ -118,6 +119,7 @@ func New(opts *Opts) (*Exporter, error) {
 			client:         client,
 			compatibleMode: opts.CompatibleMode,
 			logger:         opts.Logger,
+			topologyInfo:   ti,
 		})
 	}
 
