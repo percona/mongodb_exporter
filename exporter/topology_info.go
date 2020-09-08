@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Percona-Lab/mdbutils"
+	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -89,24 +89,24 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 
 	t.labels = make(map[string]string)
 
-	hi, err := mdbutils.GetHostInfo(ctx, t.client)
+	hi, err := util.GetHostInfo(ctx, t.client)
 	if err != nil {
 		return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting host info: %s", err)
 	}
 	t.labels[labelClusterRole] = hi.NodeType
 
 	// Standalone instances or mongos instances won't have a replicaset name
-	if rs, err := mdbutils.ReplicasetConfig(ctx, t.client); err == nil {
+	if rs, err := util.ReplicasetConfig(ctx, t.client); err == nil {
 		t.labels[labelReplicasetName] = rs.Config.ID
 	}
 
-	cid, err := mdbutils.ClusterID(ctx, t.client)
+	cid, err := util.ClusterID(ctx, t.client)
 	if err != nil {
 		return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting cluster ID: %s", err)
 	}
 	t.labels[labelClusterID] = cid
 
-	state, err := mdbutils.MyState(ctx, t.client)
+	state, err := util.MyState(ctx, t.client)
 	if err != nil {
 		return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting replicaset state: %s", err)
 	}
