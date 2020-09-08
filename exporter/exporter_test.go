@@ -65,7 +65,7 @@ func TestConnect(t *testing.T) {
 		exporterOpts := &Opts{
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
-			SharedConnPool: false,
+			GlobalConnPool: false,
 		}
 
 		e, err := New(exporterOpts)
@@ -101,7 +101,7 @@ func TestConnect(t *testing.T) {
 		exporterOpts := &Opts{
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
-			SharedConnPool: true,
+			GlobalConnPool: true,
 		}
 
 		e, err := New(exporterOpts)

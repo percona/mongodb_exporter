@@ -42,7 +42,7 @@ type Exporter struct {
 // Opts holds new exporter options.
 type Opts struct {
 	CompatibleMode          bool
-	SharedConnPool          bool
+	GlobalConnPool          bool
 	URI                     string
 	Path                    string
 	WebListenAddress        string
@@ -72,7 +72,7 @@ func New(opts *Opts) (*Exporter, error) {
 	var client *mongo.Client
 	var err error
 	// Use shared connection pool.
-	if opts.SharedConnPool {
+	if opts.GlobalConnPool {
 		client, err = connect(ctx, opts.URI)
 		if err != nil {
 			return nil, err
@@ -91,7 +91,8 @@ func New(opts *Opts) (*Exporter, error) {
 }
 
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prometheus.Registry {
-	registry := prometheus.NewPedanticRegistry()
+	// TODO: use NewPedanticRegistry when code becomes stable.
+	registry := prometheus.NewRegistry()
 	if len(e.opts.CollStatsCollections) > 0 {
 		cc := collstatsCollector{
 			ctx:            ctx,
@@ -142,7 +143,7 @@ func (e *Exporter) handler() http.Handler {
 
 		client := e.client
 		// Use per-request connection.
-		if !e.opts.SharedConnPool {
+		if !e.opts.GlobalConnPool {
 			var err error
 			client, err = connect(ctx, e.opts.URI)
 			if err != nil {

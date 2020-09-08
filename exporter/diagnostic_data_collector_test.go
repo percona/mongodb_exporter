@@ -64,7 +64,8 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 		"mongodb_oplog_stats_wt_btree_fixed_record_size",
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
 	}
-	reg := prometheus.NewPedanticRegistry()
+	// TODO: use NewPedanticRegistry when code becomes stable.
+	reg := prometheus.NewRegistry()
 	err := reg.Register(c)
 	require.NoError(t, err)
 	err = testutil.GatherAndCompare(reg, expected, filter...)
