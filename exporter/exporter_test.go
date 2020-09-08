@@ -31,7 +31,7 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
-//nolint:tolong
+//nolint:funlen
 func TestConnect(t *testing.T) {
 	hostname := "127.0.0.1"
 	ctx := context.Background()
@@ -65,7 +65,7 @@ func TestConnect(t *testing.T) {
 		exporterOpts := &Opts{
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
-			GlobalConnPool: false,
+			SharedConnPool: false,
 		}
 
 		e, err := New(exporterOpts)
@@ -74,11 +74,13 @@ func TestConnect(t *testing.T) {
 		}
 
 		ts := httptest.NewServer(e.handler())
+		defer ts.Close()
 
 		var wg sync.WaitGroup
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				res, err := http.Get(ts.URL) //nolint:noctx
 				assert.Nil(t, e.client)
 				assert.NoError(t, err)
@@ -86,8 +88,6 @@ func TestConnect(t *testing.T) {
 				_ = res.Body.Close()
 				assert.NoError(t, err)
 				assert.NotEmpty(t, g)
-				defer ts.Close()
-				defer wg.Done()
 			}()
 		}
 
@@ -101,7 +101,7 @@ func TestConnect(t *testing.T) {
 		exporterOpts := &Opts{
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
-			GlobalConnPool: true,
+			SharedConnPool: true,
 		}
 
 		e, err := New(exporterOpts)
@@ -110,11 +110,13 @@ func TestConnect(t *testing.T) {
 		}
 
 		ts := httptest.NewServer(e.handler())
+		defer ts.Close()
 
 		var wg sync.WaitGroup
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				res, err := http.Get(ts.URL) //nolint:noctx
 				assert.NotNil(t, e.client)
 				assert.NoError(t, err)
@@ -122,8 +124,6 @@ func TestConnect(t *testing.T) {
 				_ = res.Body.Close()
 				assert.NoError(t, err)
 				assert.NotEmpty(t, g)
-				defer ts.Close()
-				defer wg.Done()
 			}()
 		}
 

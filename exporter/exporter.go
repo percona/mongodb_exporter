@@ -30,8 +30,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const contentEncodingHeader = "Content-Encoding"
-
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
 	path             string
@@ -44,7 +42,7 @@ type Exporter struct {
 // Opts holds new exporter options.
 type Opts struct {
 	CompatibleMode          bool
-	GlobalConnPool          bool
+	SharedConnPool          bool
 	URI                     string
 	Path                    string
 	WebListenAddress        string
@@ -73,8 +71,8 @@ func New(opts *Opts) (*Exporter, error) {
 	ctx := context.Background()
 	var client *mongo.Client
 	var err error
-	// Use global connection pool.
-	if opts.GlobalConnPool {
+	// Use shared connection pool.
+	if opts.SharedConnPool {
 		client, err = connect(ctx, opts.URI)
 		if err != nil {
 			return nil, err
@@ -93,7 +91,7 @@ func New(opts *Opts) (*Exporter, error) {
 }
 
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prometheus.Registry {
-	registry := prometheus.NewRegistry()
+	registry := prometheus.NewPedanticRegistry()
 	if len(e.opts.CollStatsCollections) > 0 {
 		cc := collstatsCollector{
 			ctx:            ctx,
@@ -144,17 +142,17 @@ func (e *Exporter) handler() http.Handler {
 
 		client := e.client
 		// Use per-request connection.
-		if !e.opts.GlobalConnPool {
+		if !e.opts.SharedConnPool {
 			var err error
 			client, err = connect(ctx, e.opts.URI)
 			if err != nil {
 				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
-				w.Header().Del(contentEncodingHeader)
 				http.Error(
 					w,
 					"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
 					http.StatusInternalServerError,
 				)
+				return
 			}
 
 			defer func() {
