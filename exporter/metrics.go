@@ -323,12 +323,13 @@ func processSlice(prefix, k string, v []interface{}, compatibleMode bool) []prom
 }
 
 type conversion struct {
-	newName          string
-	oldName          string
-	labelConversions map[string]string // key: current label, value: old exporter (compatible) label
-	prefix           string
-	suffixLabel      string
-	suffixMapping    map[string]string
+	newName               string
+	oldName               string
+	labelConversions      map[string]string // key: current label, value: old exporter (compatible) label
+	labelValueConversions map[string]string // key: current label, value: old exporter (compatible) label
+	prefix                string
+	suffixLabel           string
+	suffixMapping         map[string]string
 }
 
 func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {

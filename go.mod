@@ -7,7 +7,7 @@ require (
 	github.com/alecthomas/kong v0.2.11
 	github.com/aws/aws-sdk-go v1.34.10 // indirect
 	github.com/klauspost/compress v1.10.11 // indirect
-	github.com/kr/pretty v0.2.0 // indirect
+	github.com/kr/pretty v0.2.0
 	github.com/percona/exporter_shared v0.7.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1

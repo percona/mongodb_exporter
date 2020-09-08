@@ -55,11 +55,19 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 		val:    rm.val,
 		vt:     rm.vt,
 		ln:     make([]string, 0, len(rm.ln)),
-		lv:     make([]string, len(rm.lv)),
+		lv:     make([]string, 0, len(rm.lv)),
 	}
 
 	// Label values remain the same
-	copy(oldMetric.lv, rm.lv)
+	// copy(oldMetric.lv, rm.lv)
+
+	for _, val := range rm.lv {
+		if newLabelVal, ok := c.labelValueConversions[val]; ok {
+			oldMetric.lv = append(oldMetric.lv, newLabelVal)
+			continue
+		}
+		oldMetric.lv = append(oldMetric.lv, val)
+	}
 
 	// Some label names should be converted from the new (current) name to the
 	// mongodb_exporter v1 compatible name
@@ -145,7 +153,7 @@ func conversions() []conversion {
 		{
 			oldName:          "mongodb_connections",
 			newName:          "mongodb_ss_connections",
-			labelConversions: map[string]string{"con_type": "state"},
+			labelConversions: map[string]string{"conn_type": "state"},
 		},
 		{
 			oldName: "mongodb_connections_metrics_created_total",
@@ -164,6 +172,10 @@ func conversions() []conversion {
 			oldName:          "mongodb_mongod_global_lock_current_queue",
 			newName:          "mongodb_ss_globalLock_currentQueue",
 			labelConversions: map[string]string{"count_type": "type"},
+			labelValueConversions: map[string]string{
+				"readers": "reader",
+				"writers": "writer",
+			},
 		},
 		{
 			oldName: "mongodb_instance_local_time",
@@ -445,8 +457,54 @@ func conversions() []conversion {
 				"max_time_msecs": "max",
 			},
 		},
+		// New metrics PMM-6610
+		// Rule #2
+		{
+			oldName:          "mongodb_mongod_global_lock_current_queue",
+			prefix:           "mongodb_mongod_global_lock_current_queue",
+			labelConversions: map[string]string{"op_type": "type"},
+		},
+		// Rule #3
+		{
+			oldName:          "mongodb_mongod_op_latencies_ops_total",
+			prefix:           "mongodb_ss_opLatencies_ops",
+			labelConversions: map[string]string{"op_type": "type"},
+			labelValueConversions: map[string]string{
+				"commands": "command",
+			},
+		},
+		{
+			oldName:          "mongodb_mongod_metrics_document_total",
+			newName:          "mongodb_ss_metrics_document",
+			labelConversions: map[string]string{"doc_op_type": "state"},
+		},
+		{
+			oldName:     "mongodb_mongod_metrics_query_executor_total",
+			prefix:      "mongodb_ss_metrics_queryExecutor",
+			suffixLabel: "state",
+			suffixMapping: map[string]string{
+				"scanned":        "scanned",
+				"scannedObjects": "scanned_objects",
+			},
+		},
 	}
 }
+
+/*
+mongodb_mongod_global_lock_current_queue {type="reader"} 	            mongodb_mongod_global_lock_current_queue {type="readers"}
+mongodb_mongod_global_lock_current_queue {type="writer"} 	            mongodb_mongod_global_lock_current_queue {type="writers"}
+
+mongodb_mongod_metrics_document_total {state="deleted"} 	            mongodb_ss_metrics_document {doc_op_type="deleted"}
+
+mongodb_mongod_metrics_query_executor_total {state="scanned"}	        mongodb_ss_metrics_queryExecutor_scanned
+mongodb_mongod_metrics_query_executor_total {state="scanned_objects"} 	mongodb_ss_metrics_queryExecutor_scannedObjects
+
+mongodb_mongod_op_latencies_latency_total {type="command"}	            mongodb_ss_opLatencies_latency{op_type="commands"}
+mongodb_mongod_op_latencies_latency_total {type="write"}	            mongodb_ss_opLatencies_latency{op_type="writes"}
+
+mongodb_mongod_op_latencies_ops_total {type="command"}  	            mongodb_ss_opLatencies_ops{op_type="commands"}
+mongodb_mongod_op_latencies_ops_total{type="write"}	                    mongodb_ss_opLatencies_ops{op_type="writes"}
+*/
 
 // Third metric renaming case (3).
 // Lock* metrics don't fit in (1) nor in (2) and since they are just a few, and we know they always exists

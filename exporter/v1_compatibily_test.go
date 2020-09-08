@@ -115,3 +115,11 @@ func TestAddLocksMetrics(t *testing.T) {
 
 	assert.Equal(t, want, desc)
 }
+
+func TestMetricRenameAndLabel(t *testing.T) {
+	// {
+	// 	oldName:          "mongodb_connections",
+	// 	newName:          "mongodb_ss_connections",
+	// 	labelConversions: map[string]string{"con_type": "state"},
+	// },
+}
