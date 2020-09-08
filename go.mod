@@ -11,7 +11,7 @@ require (
 	github.com/kr/pretty v0.2.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/percona/exporter_shared v0.7.2
-	github.com/percona/percona-toolkit v3.2.2-0.20200908000500-816a365b8466+incompatible
+	github.com/percona/percona-toolkit v0.0.0-20200908142019-d7ece0aecc2e
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/client_model v0.2.0
