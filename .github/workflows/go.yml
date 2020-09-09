@@ -70,7 +70,7 @@ jobs:
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
-          make test
+          make test-race
           make test-cluster-clean
 
       - name: Run checks/linters

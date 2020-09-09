@@ -22,9 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -34,10 +36,12 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
 
 	c := &diagnosticDataCollector{
 		client: client,
-		logger: logrus.New(),
+		logger: logger,
 	}
 
 	// The last \n at the end of this string is important
@@ -60,6 +64,10 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 		"mongodb_oplog_stats_wt_btree_fixed_record_size",
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
 	}
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
+	reg := prometheus.NewRegistry()
+	err := reg.Register(c)
+	require.NoError(t, err)
+	err = testutil.GatherAndCompare(reg, expected, filter...)
 	assert.NoError(t, err)
 }

@@ -27,6 +27,7 @@ import (
 )
 
 type diagnosticDataCollector struct {
+	ctx            context.Context
 	client         *mongo.Client
 	compatibleMode bool
 	logger         *logrus.Logger
@@ -40,7 +41,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
-	res := d.client.Database("admin").RunCommand(context.TODO(), cmd)
+	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
 
 	if err := res.Decode(&m); err != nil {
 		d.logger.Errorf("cannot run getDiagnosticData: %s", err)

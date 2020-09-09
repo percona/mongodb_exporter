@@ -19,13 +19,19 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
+//nolint:funlen
 func TestConnect(t *testing.T) {
 	hostname := "127.0.0.1"
 	ctx := context.Background()
@@ -50,5 +56,77 @@ func TestConnect(t *testing.T) {
 			err = client.Disconnect(ctx)
 			assert.NoError(t, err, name)
 		}
+	})
+
+	//nolint:dupl
+	t.Run("Test per-request connection", func(t *testing.T) {
+		log := logrus.New()
+
+		exporterOpts := &Opts{
+			Logger:         log,
+			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
+			GlobalConnPool: false,
+		}
+
+		e, err := New(exporterOpts)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		ts := httptest.NewServer(e.handler())
+		defer ts.Close()
+
+		var wg sync.WaitGroup
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				res, err := http.Get(ts.URL) //nolint:noctx
+				assert.Nil(t, e.client)
+				assert.NoError(t, err)
+				g, err := ioutil.ReadAll(res.Body)
+				_ = res.Body.Close()
+				assert.NoError(t, err)
+				assert.NotEmpty(t, g)
+			}()
+		}
+
+		wg.Wait()
+	})
+
+	//nolint:dupl
+	t.Run("Test global connection", func(t *testing.T) {
+		log := logrus.New()
+
+		exporterOpts := &Opts{
+			Logger:         log,
+			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
+			GlobalConnPool: true,
+		}
+
+		e, err := New(exporterOpts)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		ts := httptest.NewServer(e.handler())
+		defer ts.Close()
+
+		var wg sync.WaitGroup
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				res, err := http.Get(ts.URL) //nolint:noctx
+				assert.NotNil(t, e.client)
+				assert.NoError(t, err)
+				g, err := ioutil.ReadAll(res.Body)
+				_ = res.Body.Close()
+				assert.NoError(t, err)
+				assert.NotEmpty(t, g)
+			}()
+		}
+
+		wg.Wait()
 	})
 }
