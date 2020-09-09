@@ -37,7 +37,6 @@ type Exporter struct {
 	logger           *logrus.Logger
 	opts             *Opts
 	webListenAddress string
-	topologyInfo     labelsGetter
 }
 
 // Opts holds new exporter options.
@@ -61,6 +60,8 @@ var (
 
 // New connects to the database and returns a new Exporter instance.
 func New(opts *Opts) (*Exporter, error) {
+	var client *mongo.Client
+
 	if opts == nil {
 		opts = new(Opts)
 	}
@@ -71,14 +72,12 @@ func New(opts *Opts) (*Exporter, error) {
 
 	ctx := context.Background()
 
-	client, err := connect(ctx, opts.URI)
-	if err != nil {
-		return nil, err
-	}
-
-	ti, err := newTopologyInfo(context.TODO(), client)
-	if err != nil {
-		return nil, err
+	if opts.GlobalConnPool {
+		var err error
+		client, err = connect(ctx, opts.URI)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	exp := &Exporter{
@@ -87,7 +86,6 @@ func New(opts *Opts) (*Exporter, error) {
 		logger:           opts.Logger,
 		opts:             opts,
 		webListenAddress: opts.WebListenAddress,
-		topologyInfo:     ti,
 	}
 
 	return exp, nil
@@ -96,6 +94,19 @@ func New(opts *Opts) (*Exporter, error) {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prometheus.Registry {
 	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
 	registry := prometheus.NewRegistry()
+
+	ti, err := newTopologyInfo(context.TODO(), client)
+	if err != nil {
+		e.opts.Logger.Errorf("Cannot create topology info getter: %s", err)
+	}
+
+	gc := generalCollector{
+		ctx:    ctx,
+		client: client,
+	}
+
+	registry.MustRegister(&gc)
+
 	if len(e.opts.CollStatsCollections) > 0 {
 		cc := collstatsCollector{
 			ctx:            ctx,
@@ -103,7 +114,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			collections:    e.opts.CollStatsCollections,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   e.topologyInfo,
+			topologyInfo:   ti,
 		}
 		registry.MustRegister(&cc)
 	}
@@ -114,7 +125,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:       client,
 			collections:  e.opts.IndexStatsCollections,
 			logger:       e.opts.Logger,
-			topologyInfo: e.topologyInfo,
+			topologyInfo: ti,
 		}
 		registry.MustRegister(&ic)
 	}
@@ -125,7 +136,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:         client,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   e.topologyInfo,
+			topologyInfo:   ti,
 		}
 		registry.MustRegister(&ddc)
 	}
@@ -136,7 +147,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:         client,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   e.topologyInfo,
+			topologyInfo:   ti,
 		}
 		registry.MustRegister(&rsgsc)
 	}

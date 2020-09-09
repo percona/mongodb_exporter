@@ -60,11 +60,7 @@ func newTopologyInfo(ctx context.Context, client *mongo.Client) (*topologyInfo, 
 	}
 
 	err := ti.loadLabels(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return ti, nil
+	return ti, err
 }
 
 // baseLabels returns a copy of the topology labels because in some collectors like
