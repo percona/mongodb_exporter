@@ -301,13 +301,13 @@ func conversions() []conversion {
 			newName: "mongodb_ss_network_numRequests",
 		},
 		{
-			oldName:          "mongodb_op_counters_repl_total", //{type=*}
-			newName:          "mongodb_ss_opcountersRepl",      //{legacy_op_type=*}
+			oldName:          "mongodb_mongod_op_counters_repl_total",
+			newName:          "mongodb_ss_opcountersRepl",
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
-			oldName:          "mongodb_op_counters_total", // {type=*}
-			newName:          "mongodb_ss_opcounters",     //{legacy_op_type=*}
+			oldName:          "mongodb_mongod_op_counters_total", // {type=*}
+			newName:          "mongodb_ss_opcounters",            //{legacy_op_type=*}
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
@@ -369,6 +369,7 @@ func conversions() []conversion {
 				"bytes_written": "written",
 			},
 		},
+		// the 2 metrics bellow have the same prefix.
 		{
 			oldName:     "mongodb_mongod_wiredtiger_cache_bytes", //{type="total|dirty|internal_pages|leaf_pages"}
 			prefix:      "mongodb_ss_wt_cache_bytes",             //_[bytes_currently_in_the_cache|tracked_dirty_bytes_in_the_cache|tracked_bytes_belonging_to_internal_pages_in_the_cache|tracked_bytes_belonging_to_leaf_pages_in_the_cache]
@@ -378,6 +379,15 @@ func conversions() []conversion {
 				"tracked_dirty_bytes_in_the_cache":                       "dirty",
 				"tracked_bytes_belonging_to_internal_pages_in_the_cache": " internal_pages",
 				"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
+			},
+		},
+		{
+			oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total",
+			prefix:      "mongodb_ss_wt_cache",
+			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"bytes_read_into_cache":    "read",
+				"bytes_written_from_cache": "written",
 			},
 		},
 		{
@@ -503,17 +513,28 @@ func conversions() []conversion {
 				"writes":       "write",
 			},
 		},
+		// PMM-6610 Naylia comments
+		{
+			oldName:     "mongodb_memory",
+			prefix:      "mongodb_ss_mem",
+			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"resident": "resident",
+				"virtual":  "virtual",
+			},
+		},
+		{
+			oldName: "mongodb_mongod_metrics_get_last_error_wtime_total_milliseconds",
+			newName: "mongodb_ss_metrics_getLastError_wtime_totalMillis",
+		},
+		{
+			oldName: "mongodb_ss_wt_cache_maximum_bytes_configured",
+			newName: "mongodb_mongod_wiredtiger_cache_max_bytes", 
+		},
+		{
+
 	}
 }
-
-/*
-
-
-
-mongodb_mongod_op_latencies_latency_total {type="command"}	            mongodb_ss_opLatencies_latency{op_type="commands"}
-mongodb_mongod_op_latencies_latency_total {type="write"}	            mongodb_ss_opLatencies_latency{op_type="writes"}
-
-*/
 
 // Third metric renaming case (3).
 // Lock* metrics don't fit in (1) nor in (2) and since they are just a few, and we know they always exists

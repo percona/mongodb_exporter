@@ -42,13 +42,13 @@ func filterMetrics(metrics []*helpers.Metric, filters []string) []*helpers.Metri
 	return res
 }
 
-func getMetricNames(lines []string) []string {
-	names := []string{}
+func getMetricNames(lines []string) map[string]bool {
+	names := map[string]bool{}
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "# TYPE ") {
 			m := strings.Split(line, " ")
-			names = append(names, m[2])
+			names[m[2]] = true
 		}
 	}
 

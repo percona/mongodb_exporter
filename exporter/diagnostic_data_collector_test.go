@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -100,7 +101,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	metricNames := getMetricNames(actualLines)
 
 	sort.Strings(filters)
-	sort.Strings(metricNames)
-
-	assert.Equal(t, filters, metricNames)
+	for _, want := range filters {
+		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
+	}
 }

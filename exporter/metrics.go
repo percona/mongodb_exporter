@@ -17,10 +17,12 @@
 package exporter
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -338,7 +340,15 @@ func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {
 	for _, cm := range convs {
 		switch {
 		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
-			return newToOldMetric(rm, cm)
+			nm := newToOldMetric(rm, cm)
+			if cm.newName == "mongodb_ss_metrics_cursor_open" {
+				fmt.Println(">>")
+				pretty.Println(rm)
+				fmt.Println("--")
+				pretty.Println(nm)
+				fmt.Println("<<")
+			}
+			return nm
 
 		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
 			conversionSuffix := strings.TrimPrefix(rm.fqName, cm.prefix)
