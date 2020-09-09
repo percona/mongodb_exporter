@@ -66,3 +66,5 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- metric
 	}
 }
+
+var _ prometheus.Collector = (*replSetGetStatusCollector)(nil)

@@ -20,6 +20,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
@@ -33,20 +34,21 @@ import (
 type Exporter struct {
 	path             string
 	client           *mongo.Client
-	collectors       []prometheus.Collector
 	logger           *logrus.Logger
+	opts             *Opts
 	webListenAddress string
 	topologyInfo     labelsGetter
 }
 
 // Opts holds new exporter options.
 type Opts struct {
-	CollStatsCollections    []string
-	IndexStatsCollections   []string
 	CompatibleMode          bool
+	GlobalConnPool          bool
 	URI                     string
 	Path                    string
 	WebListenAddress        string
+	IndexStatsCollections   []string
+	CollStatsCollections    []string
 	Logger                  *logrus.Logger
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
@@ -63,13 +65,15 @@ func New(opts *Opts) (*Exporter, error) {
 		opts = new(Opts)
 	}
 
-	client, err := connect(context.Background(), opts.URI)
-	if err != nil {
-		return nil, err
-	}
-
 	if opts.Logger == nil {
 		opts.Logger = logrus.New()
+	}
+
+	ctx := context.Background()
+
+	client, err := connect(ctx, opts.URI)
+	if err != nil {
+		return nil, err
 	}
 
 	ti, err := newTopologyInfo(context.TODO(), client)
@@ -79,71 +83,112 @@ func New(opts *Opts) (*Exporter, error) {
 
 	exp := &Exporter{
 		client:           client,
-		collectors:       make([]prometheus.Collector, 0),
 		path:             opts.Path,
 		logger:           opts.Logger,
+		opts:             opts,
 		webListenAddress: opts.WebListenAddress,
 		topologyInfo:     ti,
-	}
-
-	if len(opts.CollStatsCollections) > 0 {
-		exp.collectors = append(exp.collectors, &collstatsCollector{
-			client:         client,
-			collections:    opts.CollStatsCollections,
-			compatibleMode: opts.CompatibleMode,
-			logger:         opts.Logger,
-			topologyInfo:   ti,
-		})
-	}
-
-	if len(opts.IndexStatsCollections) > 0 {
-		exp.collectors = append(exp.collectors, &indexstatsCollector{
-			client:       client,
-			collections:  opts.IndexStatsCollections,
-			logger:       opts.Logger,
-			topologyInfo: ti,
-		})
-	}
-
-	if !opts.DisableDiagnosticData {
-		exp.collectors = append(exp.collectors, &diagnosticDataCollector{
-			client:         client,
-			compatibleMode: opts.CompatibleMode,
-			logger:         opts.Logger,
-			topologyInfo:   ti,
-		})
-	}
-
-	if !opts.DisableReplicasetStatus {
-		exp.collectors = append(exp.collectors, &replSetGetStatusCollector{
-			client:         client,
-			compatibleMode: opts.CompatibleMode,
-			logger:         opts.Logger,
-			topologyInfo:   ti,
-		})
 	}
 
 	return exp, nil
 }
 
-// Run starts the exporter.
-func (e *Exporter) Run() {
+func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prometheus.Registry {
+	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
 	registry := prometheus.NewRegistry()
-
-	for _, collector := range e.collectors {
-		registry.MustRegister(collector)
+	if len(e.opts.CollStatsCollections) > 0 {
+		cc := collstatsCollector{
+			ctx:            ctx,
+			client:         client,
+			collections:    e.opts.CollStatsCollections,
+			compatibleMode: e.opts.CompatibleMode,
+			logger:         e.opts.Logger,
+			topologyInfo:   e.topologyInfo,
+		}
+		registry.MustRegister(&cc)
 	}
 
-	gatherers := prometheus.Gatherers{}
-	gatherers = append(gatherers, prometheus.DefaultGatherer)
-	gatherers = append(gatherers, registry)
+	if len(e.opts.IndexStatsCollections) > 0 {
+		ic := indexstatsCollector{
+			ctx:          ctx,
+			client:       client,
+			collections:  e.opts.IndexStatsCollections,
+			logger:       e.opts.Logger,
+			topologyInfo: e.topologyInfo,
+		}
+		registry.MustRegister(&ic)
+	}
 
-	// Delegate http serving to Prometheus client library, which will call collector.Collect.
-	handler := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
-		ErrorHandling: promhttp.ContinueOnError,
-		ErrorLog:      e.logger,
+	if !e.opts.DisableDiagnosticData {
+		ddc := diagnosticDataCollector{
+			ctx:            ctx,
+			client:         client,
+			compatibleMode: e.opts.CompatibleMode,
+			logger:         e.opts.Logger,
+			topologyInfo:   e.topologyInfo,
+		}
+		registry.MustRegister(&ddc)
+	}
+
+	if !e.opts.DisableReplicasetStatus {
+		rsgsc := replSetGetStatusCollector{
+			ctx:            ctx,
+			client:         client,
+			compatibleMode: e.opts.CompatibleMode,
+			logger:         e.opts.Logger,
+			topologyInfo:   e.topologyInfo,
+		}
+		registry.MustRegister(&rsgsc)
+	}
+
+	return registry
+}
+
+func (e *Exporter) handler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		client := e.client
+		// Use per-request connection.
+		if !e.opts.GlobalConnPool {
+			var err error
+			client, err = connect(ctx, e.opts.URI)
+			if err != nil {
+				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
+				http.Error(
+					w,
+					"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			defer func() {
+				if err = client.Disconnect(ctx); err != nil {
+					e.logger.Errorf("Cannot disconnect mongo client: %v", err)
+				}
+			}()
+		}
+
+		registry := e.makeRegistry(ctx, client)
+
+		gatherers := prometheus.Gatherers{}
+		gatherers = append(gatherers, prometheus.DefaultGatherer)
+		gatherers = append(gatherers, registry)
+
+		// Delegate http serving to Prometheus client library, which will call collector.Collect.
+		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
+			ErrorHandling: promhttp.ContinueOnError,
+			ErrorLog:      e.logger,
+		})
+
+		h.ServeHTTP(w, r)
 	})
+}
 
+// Run starts the exporter.
+func (e *Exporter) Run() {
+	handler := e.handler()
 	exporter_shared.RunServer("MongoDB", e.webListenAddress, e.path, handler)
 }
 
@@ -157,7 +202,7 @@ func connect(ctx context.Context, dsn string) (*mongo.Client, error) {
 		return nil, err
 	}
 
-	if err = client.Ping(context.TODO(), nil); err != nil {
+	if err = client.Ping(ctx, nil); err != nil {
 		return nil, err
 	}
 
