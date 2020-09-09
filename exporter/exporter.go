@@ -37,6 +37,7 @@ type Exporter struct {
 	logger           *logrus.Logger
 	opts             *Opts
 	webListenAddress string
+	topologyInfo     labelsGetter
 }
 
 // Opts holds new exporter options.
@@ -69,14 +70,15 @@ func New(opts *Opts) (*Exporter, error) {
 	}
 
 	ctx := context.Background()
-	var client *mongo.Client
-	var err error
-	// Use shared connection pool.
-	if opts.GlobalConnPool {
-		client, err = connect(ctx, opts.URI)
-		if err != nil {
-			return nil, err
-		}
+
+	client, err := connect(ctx, opts.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	ti, err := newTopologyInfo(context.TODO(), client)
+	if err != nil {
+		return nil, err
 	}
 
 	exp := &Exporter{
@@ -85,6 +87,7 @@ func New(opts *Opts) (*Exporter, error) {
 		logger:           opts.Logger,
 		opts:             opts,
 		webListenAddress: opts.WebListenAddress,
+		topologyInfo:     ti,
 	}
 
 	return exp, nil
@@ -100,16 +103,18 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			collections:    e.opts.CollStatsCollections,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
+			topologyInfo:   e.topologyInfo,
 		}
 		registry.MustRegister(&cc)
 	}
 
 	if len(e.opts.IndexStatsCollections) > 0 {
 		ic := indexstatsCollector{
-			ctx:         ctx,
-			client:      client,
-			collections: e.opts.IndexStatsCollections,
-			logger:      e.opts.Logger,
+			ctx:          ctx,
+			client:       client,
+			collections:  e.opts.IndexStatsCollections,
+			logger:       e.opts.Logger,
+			topologyInfo: e.topologyInfo,
 		}
 		registry.MustRegister(&ic)
 	}
@@ -120,6 +125,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:         client,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
+			topologyInfo:   e.topologyInfo,
 		}
 		registry.MustRegister(&ddc)
 	}
@@ -130,6 +136,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:         client,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
+			topologyInfo:   e.topologyInfo,
 		}
 		registry.MustRegister(&rsgsc)
 	}

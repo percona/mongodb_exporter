@@ -157,16 +157,9 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 		return nil, nil
 	}
 
-	if labels == nil {
-		labels = map[string]string{}
-	}
-
 	help := metricHelp(prefix, name)
 
 	fqName, label := nameAndLabel(prefix, name)
-	if label != "" {
-		labels[label] = name
-	}
 
 	rm := &rawMetric{
 		fqName: fqName,
@@ -177,9 +170,16 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 		lv:     make([]string, 0, len(labels)),
 	}
 
+	// Add original labels to the metric
 	for k, v := range labels {
 		rm.ln = append(rm.ln, k)
 		rm.lv = append(rm.lv, v)
+	}
+
+	// Add predefined label, if any
+	if label != "" {
+		rm.ln = append(rm.ln, label)
+		rm.lv = append(rm.lv, name)
 	}
 
 	return rm, nil
@@ -231,12 +231,6 @@ func metricHelp(prefix, name string) string {
 	}
 
 	return name
-}
-
-// buildMetrics is a wrapper around makeMetrics, because makeMetrics is recursive and requires a prefix
-// and a map of labels. From the collectors we call buildMetrics which has a simpler signature.
-func buildMetrics(m bson.M, compatibleMode bool) []prometheus.Metric {
-	return makeMetrics("", m, nil, compatibleMode)
 }
 
 func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {

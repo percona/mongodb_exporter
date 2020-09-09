@@ -35,6 +35,7 @@ type replSetGetStatusCollector struct {
 	client         *mongo.Client
 	compatibleMode bool
 	logger         *logrus.Logger
+	topologyInfo   labelsGetter
 }
 
 func (d *replSetGetStatusCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -61,7 +62,7 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 	d.logger.Debug("replSetGetStatus result:")
 	debugResult(d.logger, m)
 
-	for _, metric := range buildMetrics(m, d.compatibleMode) {
+	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric
 	}
 }

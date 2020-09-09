@@ -31,6 +31,7 @@ type diagnosticDataCollector struct {
 	client         *mongo.Client
 	compatibleMode bool
 	logger         *logrus.Logger
+	topologyInfo   labelsGetter
 }
 
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -58,7 +59,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	d.logger.Debug("getDiagnosticData result")
 	debugResult(d.logger, m)
 
-	metrics := buildMetrics(m, d.compatibleMode)
+	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(m)...)
 
 	// PMM dashboards looks for this metric so, in compatibility mode, we must expose it.
