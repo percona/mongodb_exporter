@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -62,4 +64,43 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
+}
+
+func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	c := &diagnosticDataCollector{
+		client:         client,
+		logger:         logrus.New(),
+		compatibleMode: true,
+	}
+
+	metrics := collect(c)
+	actualMetrics := helpers.ReadMetrics(metrics)
+	filters := []string{
+		"mongodb_mongod_metrics_cursor_open",
+		"mongodb_mongod_metrics_get_last_error_wtimeouts_total",
+		"mongodb_mongod_wiredtiger_cache_bytes_total",
+		"mongodb_mongod_wiredtiger_cache_evicted_total",
+		"mongodb_op_counters_total",
+		"mongodb_ss_mem_resident",
+		"mongodb_ss_mem_virtual",
+		"mongodb_ss_metrics_cursor_open",
+		"mongodb_ss_metrics_getLastError_wtime_totalMillis",
+		"mongodb_ss_opcounters",
+		"mongodb_ss_opcountersRepl",
+		"mongodb_ss_wt_cache_maximum_bytes_configured",
+		"mongodb_ss_wt_cache_modified_pages_evicted",
+	}
+	actualMetrics = filterMetrics(actualMetrics, filters)
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+	metricNames := getMetricNames(actualLines)
+
+	sort.Strings(filters)
+	sort.Strings(metricNames)
+
+	assert.Equal(t, filters, metricNames)
 }
