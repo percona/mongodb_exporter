@@ -64,7 +64,7 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 		"mongodb_oplog_stats_wt_btree_fixed_record_size",
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
 	}
-	// TODO: use NewPedanticRegistry when code becomes stable.
+	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
 	reg := prometheus.NewRegistry()
 	err := reg.Register(c)
 	require.NoError(t, err)
