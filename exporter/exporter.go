@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
@@ -37,6 +38,7 @@ type Exporter struct {
 	logger           *logrus.Logger
 	opts             *Opts
 	webListenAddress string
+	lock             *sync.Mutex
 	topologyInfo     *topologyInfo
 }
 
@@ -87,6 +89,7 @@ func New(opts *Opts) (*Exporter, error) {
 		logger:           opts.Logger,
 		opts:             opts,
 		webListenAddress: opts.WebListenAddress,
+		lock:             &sync.Mutex{},
 	}
 
 	return exp, nil
@@ -96,6 +99,7 @@ func New(opts *Opts) (*Exporter, error) {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prometheus.Registry {
 	registry := prometheus.NewPedanticRegistry()
 
+	e.lock.Lock()
 	if e.topologyInfo == nil {
 		var err error
 
@@ -103,6 +107,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			e.opts.Logger.Errorf("Cannot create topology info getter: %s", err)
 		}
 	}
+	e.lock.Unlock()
 
 	gc := generalCollector{
 		ctx:    ctx,
