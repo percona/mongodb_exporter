@@ -413,3 +413,11 @@ func specialConversions() []conversion {
 		},
 	}
 }
+
+func topologyLabels(ti labelsGetter) map[string]string {
+	if ti == nil {
+		return make(map[string]string)
+	}
+
+	return ti.baseLabels()
+}

@@ -37,18 +37,19 @@ type Exporter struct {
 	logger           *logrus.Logger
 	opts             *Opts
 	webListenAddress string
+	topologyInfo     *topologyInfo
 }
 
 // Opts holds new exporter options.
 type Opts struct {
-	CompatibleMode          bool
-	GlobalConnPool          bool
 	URI                     string
 	Path                    string
 	WebListenAddress        string
 	IndexStatsCollections   []string
 	CollStatsCollections    []string
 	Logger                  *logrus.Logger
+	CompatibleMode          bool
+	GlobalConnPool          bool
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
 }
@@ -91,13 +92,16 @@ func New(opts *Opts) (*Exporter, error) {
 	return exp, nil
 }
 
+//nolint:funlen
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prometheus.Registry {
-	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
-	registry := prometheus.NewRegistry()
+	registry := prometheus.NewPedanticRegistry()
 
-	ti, err := newTopologyInfo(context.TODO(), client)
-	if err != nil {
-		e.opts.Logger.Errorf("Cannot create topology info getter: %s", err)
+	if e.topologyInfo == nil {
+		var err error
+
+		if e.topologyInfo, err = newTopologyInfo(ctx, client); err != nil {
+			e.opts.Logger.Errorf("Cannot create topology info getter: %s", err)
+		}
 	}
 
 	gc := generalCollector{
@@ -114,7 +118,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			collections:    e.opts.CollStatsCollections,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   ti,
+			topologyInfo:   e.topologyInfo,
 		}
 		registry.MustRegister(&cc)
 	}
@@ -125,7 +129,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:       client,
 			collections:  e.opts.IndexStatsCollections,
 			logger:       e.opts.Logger,
-			topologyInfo: ti,
+			topologyInfo: e.topologyInfo,
 		}
 		registry.MustRegister(&ic)
 	}
@@ -136,7 +140,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:         client,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   ti,
+			topologyInfo:   e.topologyInfo,
 		}
 		registry.MustRegister(&ddc)
 	}
@@ -147,7 +151,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:         client,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   ti,
+			topologyInfo:   e.topologyInfo,
 		}
 		registry.MustRegister(&rsgsc)
 	}
@@ -171,6 +175,7 @@ func (e *Exporter) handler() http.Handler {
 					"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
 					http.StatusInternalServerError,
 				)
+
 				return
 			}
 

@@ -35,13 +35,10 @@ func TestServerStatusDataCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti := labelsGetterMock{}
-
 	c := &serverStatusCollector{
-		ctx:          ctx,
-		client:       client,
-		logger:       logrus.New(),
-		topologyInfo: ti,
+		ctx:    ctx,
+		client: client,
+		logger: logrus.New(),
 	}
 
 	// The last \n at the end of this string is important

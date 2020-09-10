@@ -37,12 +37,10 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 	logger := logrus.New()
-	ti := labelsGetterMock{}
 
 	c := &diagnosticDataCollector{
-		client:       client,
-		logger:       logger,
-		topologyInfo: ti,
+		client: client,
+		logger: logger,
 	}
 
 	// The last \n at the end of this string is important

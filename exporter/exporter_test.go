@@ -31,18 +31,6 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
-// Use this for testing because labels like cluster ID are not constant in docker containers
-// so we cannot use the real topology labels in tests.
-type labelsGetterMock struct{}
-
-func (l labelsGetterMock) baseLabels() map[string]string {
-	return map[string]string{}
-}
-
-func (l labelsGetterMock) loadLabels(context.Context) error {
-	return nil
-}
-
 //nolint:funlen
 func TestConnect(t *testing.T) {
 	hostname := "127.0.0.1"

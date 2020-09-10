@@ -46,6 +46,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 
 	if err := res.Decode(&m); err != nil {
 		d.logger.Errorf("cannot run getDiagnosticData: %s", err)
+
 		return
 	}
 
@@ -53,13 +54,14 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
 		d.logger.Errorf("cannot decode getDiagnosticData: %s", err)
+
 		return
 	}
 
 	d.logger.Debug("getDiagnosticData result")
 	debugResult(d.logger, m)
 
-	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
+	metrics := makeMetrics("", m, topologyLabels(d.topologyInfo), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(m)...)
 
 	for _, metric := range metrics {

@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	// MongoDBS1PrimaryPort MongoDB Shard 1 Primary Port
+	// MongoDBS1PrimaryPort MongoDB Shard 1 Primary Port.
 	MongoDBS1PrimaryPort = "17001"
-	// MongoDBStandAlonePort MongoDB stand alone instance Port
+	// MongoDBStandAlonePort MongoDB stand alone instance Port.
 	MongoDBStandAlonePort = "27017"
 )
 
@@ -73,7 +73,7 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 	t.Cleanup(func() {
 		// In some cases, we manually disconnect the client so, don't check for errors,
 		// it might be already disconnected.
-		client.Disconnect(ctx) //nolint
+		client.Disconnect(ctx) //nolint:errcheck
 	})
 
 	err = client.Ping(ctx, nil)
