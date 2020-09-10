@@ -46,7 +46,7 @@ func TestGeneralCollector(t *testing.T) {
 # TYPE mongodb_up gauge
 mongodb_up 1` + "\n")
 	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
-	reg := prometheus.NewRegistry()
+	reg := prometheus.NewPedanticRegistry()
 	err := reg.Register(c)
 	require.NoError(t, err)
 	err = testutil.GatherAndCompare(reg, expected)
