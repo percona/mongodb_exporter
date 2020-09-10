@@ -44,6 +44,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 
 	if err := res.Decode(&m); err != nil {
 		d.logger.Errorf("cannot run getDiagnosticData: %s", err)
+
 		return
 	}
 
@@ -51,6 +52,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
 		d.logger.Errorf("cannot decode getDiagnosticData: %s", err)
+
 		return
 	}
 
@@ -64,6 +66,10 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	// FIXME Add it in both modes: https://jira.percona.com/browse/PMM-6585
 	if d.compatibleMode {
 		metrics = append(metrics, mongodbUpMetric())
+
+		if cem, err := cacheEvictedTotalMetric(m); err == nil {
+			metrics = append(metrics, cem)
+		}
 	}
 
 	for _, metric := range metrics {

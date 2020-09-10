@@ -1,12 +1,19 @@
 package exporter
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var (
+	ErrInvalidMetricPath  = fmt.Errorf("invalid metric path")
+	ErrInvalidMetricValue = fmt.Errorf("invalid metric value")
 )
 
 /*
@@ -118,6 +125,44 @@ func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 	}
 
 	return oldMetric
+}
+
+func cacheEvictedTotalMetric(m bson.M) (prometheus.Metric, error) {
+	s, err := sumMetrics(m, [][]string{
+		{"serverStatus", "wiredTiger", "cache", "modified pages evicted"},
+		{"serverStatus", "wiredTiger", "cache", "unmodified pages evicted"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	d := prometheus.NewDesc("mongodb_mongod_wiredtiger_cache_evicted_total", "wiredtiger cache evicted total", nil, nil)
+	metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s)
+	if err != nil {
+		return nil, err
+	}
+
+	return metric, nil
+}
+
+func sumMetrics(m bson.M, paths [][]string) (float64, error) {
+	var total float64
+
+	for _, path := range paths {
+		v := walkTo(m, path)
+		if v == nil {
+			return 0, errors.Wrapf(ErrInvalidMetricPath, "%v", path)
+		}
+
+		f, err := asFloat64(v)
+		if err != nil {
+			return 0, errors.Wrapf(ErrInvalidMetricValue, "%v", v)
+		}
+
+		total += *f
+	}
+
+	return total, nil
 }
 
 // Converts new metric to the old metric style and append it to the response slice.
@@ -399,15 +444,15 @@ func conversions() []conversion {
 				"bytes_written_from_cache": "written",
 			},
 		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_evicted_total", //{type="modified|unmodified"}
-			prefix:      "mongodb_ss_wt_cache",                           //_[modified pages evicted|unmodified_pages_evicted]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"modified_pages_evicted":   "modified",
-				"unmodified_pages_evicted": "unmodified",
-			},
-		},
+		// {
+		// 	oldName:     "mongodb_mongod_wiredtiger_cache_evicted_total", //{type="modified|unmodified"}
+		// 	prefix:      "mongodb_ss_wt_cache",                           //_[modified pages evicted|unmodified_pages_evicted]
+		// 	suffixLabel: "type",
+		// 	suffixMapping: map[string]string{
+		// 		"modified_pages_evicted":   "modified",
+		// 		"unmodified_pages_evicted": "unmodified",
+		// 	},
+		// },
 		{
 			oldName:     "mongodb_mongod_wiredtiger_cache_pages", //{type="total|dirty"}
 			prefix:      "mongodb_ss_wt_cache",                   //_[pages_currently_held_in_the_cache|tracked_dirty_pages_in_the_cache]
@@ -529,10 +574,8 @@ func conversions() []conversion {
 		},
 		{
 			oldName: "mongodb_ss_wt_cache_maximum_bytes_configured",
-			newName: "mongodb_mongod_wiredtiger_cache_max_bytes", 
+			newName: "mongodb_mongod_wiredtiger_cache_max_bytes",
 		},
-		{
-
 	}
 }
 
