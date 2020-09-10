@@ -28,9 +28,11 @@ import (
 )
 
 type indexstatsCollector struct {
-	client      *mongo.Client
-	collections []string
-	logger      *logrus.Logger
+	ctx          context.Context
+	client       *mongo.Client
+	collections  []string
+	logger       *logrus.Logger
+	topologyInfo labelsGetter
 }
 
 func (d *indexstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -38,12 +40,6 @@ func (d *indexstatsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
-	// prometheus.Collector interface only receives a channel but no a context.
-	// In order to make it possible to cancel, we should change the general implementation
-	// and create a new collector instance every time we want to collect data and pass the
-	// context as a parameter in a New() method. Until that's implemented, context = TODO()
-	ctx := context.TODO()
-
 	for _, dbCollection := range d.collections {
 		parts := strings.Split(dbCollection, ".")
 		if len(parts) != 2 { //nolint:gomnd
@@ -57,14 +53,14 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			{Key: "$indexStats", Value: bson.M{}},
 		}
 
-		cursor, err := d.client.Database(database).Collection(collection).Aggregate(ctx, mongo.Pipeline{aggregation})
+		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
 		if err != nil {
 			d.logger.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
 			continue
 		}
 
 		var stats []bson.M
-		if err = cursor.All(ctx, &stats); err != nil {
+		if err = cursor.All(d.ctx, &stats); err != nil {
 			d.logger.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
 			continue
 		}
@@ -76,10 +72,10 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the
 			// same, for different collections.
 			prefix := fmt.Sprintf("%s_%s_%s", database, collection, m["name"])
-			labels := map[string]string{
-				"namespace": database + "." + collection,
-				"key_name":  fmt.Sprintf("%s", m["name"]),
-			}
+			labels := d.topologyInfo.baseLabels()
+			labels["namespace"] = database + "." + collection
+			labels["key_name"] = fmt.Sprintf("%s", m["name"])
+
 			metrics := sanitizeMetrics(m)
 			for _, metric := range makeMetrics(prefix, metrics, labels, false) {
 				ch <- metric

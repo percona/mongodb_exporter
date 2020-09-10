@@ -27,10 +27,12 @@ import (
 )
 
 type collstatsCollector struct {
+	ctx            context.Context
 	client         *mongo.Client
 	collections    []string
 	compatibleMode bool
 	logger         *logrus.Logger
+	topologyInfo   labelsGetter
 }
 
 func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -38,8 +40,6 @@ func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
-	ctx := context.TODO()
-
 	for _, dbCollection := range d.collections {
 		parts := strings.Split(dbCollection, ".")
 		if len(parts) != 2 { //nolint:gomnd
@@ -53,14 +53,14 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			{Key: "$collStats", Value: bson.M{"latencyStats": bson.E{Key: "histograms", Value: true}}},
 		}
 
-		cursor, err := d.client.Database(database).Collection(collection).Aggregate(ctx, mongo.Pipeline{aggregation})
+		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
 		if err != nil {
 			d.logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
 			continue
 		}
 
 		var stats []bson.M
-		if err = cursor.All(ctx, &stats); err != nil {
+		if err = cursor.All(d.ctx, &stats); err != nil {
 			d.logger.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
 			continue
 		}
@@ -72,7 +72,10 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		// to differentiate metrics between collection. Labels are being set only to matke it easier
 		// to filter
 		prefix := database + "." + collection
-		labels := map[string]string{"database": database, "collection": collection}
+
+		labels := d.topologyInfo.baseLabels()
+		labels["database"] = database
+		labels["collection"] = collection
 
 		for _, metrics := range stats {
 			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {
