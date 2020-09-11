@@ -409,6 +409,12 @@ func conversions() []conversion {
 			oldName:     "mongodb_mongod_wiredtiger_transactions_total", // {type="begins|checkpoints|committed|rolledback"}
 			prefix:      "mongodb_ss_wt_txn_transactions",               //_[begins|checkpoints|committed|rolled_back]
 			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"begins":      "begins",
+				"checkpoints": "checkpoints",
+				"committed":   "committed",
+				"rolled_back": "rolled_back",
+			},
 		},
 		{
 			oldName:     "mongodb_mongod_wiredtiger_blockmanager_bytes_total", //{type=read|read_mapped|written"}
@@ -425,19 +431,10 @@ func conversions() []conversion {
 			prefix:      "mongodb_ss_wt_cache_bytes",             //_[bytes_currently_in_the_cache|tracked_dirty_bytes_in_the_cache|tracked_bytes_belonging_to_internal_pages_in_the_cache|tracked_bytes_belonging_to_leaf_pages_in_the_cache]
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
-				"bytes_currently_in_the_cache":                           "total",
+				"currently_in_the_cache":                                 "total",
 				"tracked_dirty_bytes_in_the_cache":                       "dirty",
 				"tracked_bytes_belonging_to_internal_pages_in_the_cache": " internal_pages",
 				"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total",
-			prefix:      "mongodb_ss_wt_cache",
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"bytes_read_into_cache":    "read",
-				"bytes_written_from_cache": "written",
 			},
 		},
 		{
@@ -737,7 +734,10 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	metrics = append(metrics, storageEngine(m))
 	metrics = append(metrics, serverVersion(m))
 
-	if ms, err := myState(ctx, client); err == nil {
+	ms, err := myState(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for my state: %s", err)
+	} else {
 		metrics = append(metrics, ms)
 	}
 
@@ -888,29 +888,44 @@ func replicationLag(m bson.M) prometheus.Metric {
 	return metric
 }
 
-func mongosMetrics(ctx context.Context, client *mongo.Client) []prometheus.Metric {
+func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
 	metrics := []prometheus.Metric{}
 
-	if metric, err := databasesTotal(ctx, client); err == nil {
+	metric, err := databasesTotal(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for database total: %s", err)
+	} else {
 		metrics = append(metrics, metric)
 	}
 
-	if metric, err := collectionsTotal(ctx, client); err == nil {
+	metric, err = collectionsTotal(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for collections total: %s", err)
+	} else {
 		metrics = append(metrics, metric)
 	}
 
 	metrics = append(metrics, balancerEnabled(ctx, client))
 
-	if ms, err := chunksTotal(ctx, client); err == nil {
+	ms, err := chunksTotal(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for collections total: %s", err)
+	} else {
 		metrics = append(metrics, ms...)
 	}
 
-	if metric, err := chunksBalanced(ctx, client); err == nil {
+	metric, err = chunksBalanced(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for chunks balanced: %s", err)
+	} else {
 		metrics = append(metrics, metric)
 	}
 
-	if metric, err := changelog10m(ctx, client); err == nil {
-		metrics = append(metrics, metric...)
+	ms, err = changelog10m(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for changelog: %s", err)
+	} else {
+		metrics = append(metrics, ms...)
 	}
 
 	metrics = append(metrics, dbstatsMetrics(ctx, client)...)

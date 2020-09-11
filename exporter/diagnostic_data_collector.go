@@ -79,7 +79,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 		if err != nil {
 			d.logger.Errorf("cannot get host info: %s", err)
 		} else if hi.NodeType == util.TypeMongos {
-			metrics = append(metrics, mongosMetrics(d.ctx, d.client)...)
+			metrics = append(metrics, mongosMetrics(d.ctx, d.client, d.logger)...)
 		}
 	}
 

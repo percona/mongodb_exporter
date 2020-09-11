@@ -1,10 +1,6 @@
 package exporter
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -12,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func collect(c prometheus.Collector) []prometheus.Metric {
+func collect(c helpers.Collector) []prometheus.Metric {
 	m := make([]prometheus.Metric, 0)
 	ch := make(chan prometheus.Metric)
 
@@ -60,29 +56,4 @@ func getMetricNames(lines []string) map[string]bool {
 	}
 
 	return names
-}
-
-func readTestMetrics(filename string) ([]*helpers.Metric, error) {
-	m := []*helpers.Metric{}
-
-	buf, err := ioutil.ReadFile(filepath.Clean(filename))
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(buf, &m)
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
-}
-
-func writeTestDataJSON(filename string, data interface{}) error {
-	buf, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(filename, buf, os.ModePerm)
 }

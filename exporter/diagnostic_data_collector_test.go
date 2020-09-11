@@ -24,13 +24,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/percona/exporter_shared/helpers"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -99,6 +98,8 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	filters := []string{
 		"mongodb_mongod_metrics_cursor_open",
 		"mongodb_mongod_metrics_get_last_error_wtimeouts_total",
+		"mongodb_mongod_wiredtiger_cache_bytes",
+		"mongodb_mongod_wiredtiger_transactions_total",
 		"mongodb_mongod_wiredtiger_cache_bytes_total",
 		"mongodb_mongod_op_counters_total",
 		"mongodb_ss_mem_resident",

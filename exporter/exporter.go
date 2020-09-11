@@ -161,6 +161,7 @@ func (e *Exporter) handler() http.Handler {
 					"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
 					http.StatusInternalServerError,
 				)
+
 				return
 			}
 
@@ -178,6 +179,7 @@ func (e *Exporter) handler() http.Handler {
 					"An error has occurred while getting topology info:\n\n"+err.Error(),
 					http.StatusInternalServerError,
 				)
+
 				return
 			}
 		}
