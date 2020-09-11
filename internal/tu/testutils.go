@@ -35,9 +35,11 @@ import (
 )
 
 const (
-	// MongoDBS1PrimaryPort MongoDB Shard 1 Primary Port
+	// MongosPort MongoDB mongos Port.
+	MongosPort = "17000"
+	// MongoDBS1PrimaryPort MongoDB Shard 1 Primary Port.
 	MongoDBS1PrimaryPort = "17001"
-	// MongoDBStandAlonePort MongoDB stand alone instance Port
+	// MongoDBStandAlonePort MongoDB stand alone instance Port.
 	MongoDBStandAlonePort = "27017"
 )
 

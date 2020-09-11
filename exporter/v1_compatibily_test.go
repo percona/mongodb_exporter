@@ -1,20 +1,15 @@
 package exporter
 
 import (
-	"context"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/kr/pretty"
-	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -119,20 +114,4 @@ func TestAddLocksMetrics(t *testing.T) {
 	}
 
 	assert.Equal(t, want, desc)
-}
-
-func TestSM1(t *testing.T) {
-	m, err := tu.LoadJSON("testdata/get_diagnostic_data.json")
-	assert.NoError(t, err)
-
-	v := specialMetrics(m, logrus.New())
-	pretty.Println(v)
-}
-
-func TestSM2(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	client := tu.DefaultTestClient(ctx, t)
-	databasesTotal(ctx, client)
 }

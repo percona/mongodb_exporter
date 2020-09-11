@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/percona/exporter_shared/helpers"
+
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 

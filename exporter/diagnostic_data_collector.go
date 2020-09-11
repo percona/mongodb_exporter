@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 
+	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -68,9 +69,17 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	// FIXME Add it in both modes: https://jira.percona.com/browse/PMM-6585
 	if d.compatibleMode {
 		metrics = append(metrics, mongodbUpMetric())
+		metrics = append(metrics, specialMetrics(d.ctx, d.client, m, d.logger)...)
 
 		if cem, err := cacheEvictedTotalMetric(m); err == nil {
 			metrics = append(metrics, cem)
+		}
+
+		hi, err := util.GetHostInfo(d.ctx, d.client)
+		if err != nil {
+			d.logger.Errorf("cannot get host info: %s", err)
+		} else if hi.NodeType == util.TypeMongos {
+			metrics = append(metrics, mongosMetrics(d.ctx, d.client)...)
 		}
 	}
 

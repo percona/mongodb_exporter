@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/kr/pretty"
+	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -155,7 +156,6 @@ func sumMetrics(m bson.M, paths [][]string) (float64, error) {
 	for _, path := range paths {
 		v := walkTo(m, path)
 		if v == nil {
-			log.Errorf("metric path %v doesn't exists", path)
 			continue
 		}
 
@@ -449,15 +449,6 @@ func conversions() []conversion {
 				"bytes_written_from_cache": "written",
 			},
 		},
-		// {
-		// 	oldName:     "mongodb_mongod_wiredtiger_cache_evicted_total", //{type="modified|unmodified"}
-		// 	prefix:      "mongodb_ss_wt_cache",                           //_[modified pages evicted|unmodified_pages_evicted]
-		// 	suffixLabel: "type",
-		// 	suffixMapping: map[string]string{
-		// 		"modified_pages_evicted":   "modified",
-		// 		"unmodified_pages_evicted": "unmodified",
-		// 	},
-		// },
 		{
 			oldName:     "mongodb_mongod_wiredtiger_cache_pages", //{type="total|dirty"}
 			prefix:      "mongodb_ss_wt_cache",                   //_[pages_currently_held_in_the_cache|tracked_dirty_pages_in_the_cache]
@@ -552,18 +543,6 @@ func conversions() []conversion {
 				"scannedObjects": "scanned_objects",
 			},
 		},
-		{
-			oldName:          "mongodb_mongod_op_latencies_latency_total",
-			newName:          "mongodb_ss_opLatencies_latency",
-			labelConversions: map[string]string{"op_type": "type"},
-			labelValueConversions: map[string]string{
-				"commands":     "command",
-				"reads":        "read",
-				"transactions": "transaction",
-				"writes":       "write",
-			},
-		},
-		// PMM-6610 Naylia comments
 		{
 			oldName:     "mongodb_memory",
 			prefix:      "mongodb_ss_mem",
@@ -707,7 +686,7 @@ type specialMetric struct {
 	help   string
 }
 
-func specialMetrics(m bson.M, l *logrus.Logger) []prometheus.Metric {
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Logger) []prometheus.Metric {
 	defs := []specialMetric{
 		{
 			name: "mongodb_mongod_locks_time_acquiring_global_microseconds_total",
@@ -733,14 +712,6 @@ func specialMetrics(m bson.M, l *logrus.Logger) []prometheus.Metric {
 				{"serverStatus", "opLatencies", "commands", "ops"},
 			},
 		},
-		{
-			name:   "mongodb_mongod_metrics_document_total",
-			help:   "serverStatus.metrics.document.returned",
-			labels: map[string]string{"state": "returned"},
-			paths: [][]string{
-				{"serverStatus", "metrics", "document", "returned"},
-			},
-		},
 	}
 
 	metrics := []prometheus.Metric{}
@@ -762,75 +733,433 @@ func specialMetrics(m bson.M, l *logrus.Logger) []prometheus.Metric {
 		metrics = append(metrics, metric)
 	}
 
+	metrics = append(metrics, storageEngine(m))
+	metrics = append(metrics, serverVersion(m))
+
+	if ms, err := myState(ctx, client); err == nil {
+		metrics = append(metrics, ms)
+	}
+
+	if ed := electionDate(m); ed != nil {
+		metrics = append(metrics, ed)
+	}
+
+	if rl := replicationLag(m); rl != nil {
+		metrics = append(metrics, rl)
+	}
+
 	return metrics
 }
 
-func databasesTotal(ctx context.Context, client *mongo.Client) { // (prometheus.Metric, error) {
-	filter := bson.M{
-		"$or": []bson.M{
-			{"partitioned": true},
-			{"sharded": true},
-			{"enabled": true},
-		},
-	}
+func storageEngine(m bson.M) prometheus.Metric {
+	v := walkTo(m, []string{"serverStatus", "storageEngine", "name"})
+	name := "mongodb_mongod_storage_engine"
+	help := "The storage engine used by the MongoDB instance"
 
-	res, err := client.ListDatabases(ctx, filter)
-	fmt.Println(err)
-	pretty.Println(res)
+	labels := map[string]string{"engine": v.(string)}
+
+	d := prometheus.NewDesc(name, help, nil, labels)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+
+	return metric
 }
 
-// // serverStatus.metrics.document.returned
-// func sm1(m bson.M) (prometheus.Metric, error) {
-// 	paths := [][]string{
-// 		{"serverStatus", "locks", "ReplicationStateTransition", "timeAcquiringMicros", "r"},
-// 		{"serverStatus", "locks", "ReplicationStateTransition", "timeAcquiringMicros", "w"},
-// 	}
-//
-// 	val, err := sumMetrics(m, paths)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	name := "mongodb_mongod_locks_time_acquiring_global_microseconds_total"
-// 	help := "sum of serverStatus.locks.ReplicationStateTransition.timeAcquiringMicros.[r|w]"
-// 	d := prometheus.NewDesc(name, help, nil, nil)
-//
-// 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
-// }
+func serverVersion(m bson.M) prometheus.Metric {
+	v := walkTo(m, []string{"serverStatus", "version"})
+	name := "mongodb_version_info"
+	help := "The server version"
 
-// func sm2(m bson.M) (prometheus.Metric, error) {
-// 	paths := [][]string{
-// 		{"serverStatus", "opLatencies", "commands", "latency"},
-// 	}
-//
-// 	val, err := sumMetrics(m, paths)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	name := "mongodb_mongod_op_latencies_latency_total"
-// 	help := ".serverStatus.opLatencies.commands.latency"
-// 	d := prometheus.NewDesc(name, help, nil, map[string]string{"type": "command"})
-//
-// 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
-// }
+	labels := map[string]string{"mongodb": v.(string)}
 
-// func sm3(m bson.M) (prometheus.Metric, error) {
-// 	paths := [][]string{
-// 		{"serverStatus", "opLatencies", "commands", "ops"},
-// 	}
-//
-// 	val, err := sumMetrics(m, paths)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	name := "mongodb_mongod_op_latencies_ops_total"
-// 	help := ".serverStatus.opLatencies.commands.ops"
-// 	d := prometheus.NewDesc(name, help, nil, map[string]string{"type": "command"})
-//
-// 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
-// }
+	d := prometheus.NewDesc(name, help, nil, labels)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+
+	return metric
+}
+
+func myState(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	state, err := util.MyState(ctx, client)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot get my state")
+	}
+
+	rs, err := util.ReplicasetConfig(ctx, client)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot get replicaset config")
+	}
+
+	// 	HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
+	// # TYPE mongodb_mongod_replset_my_state gauge
+	// mongodb_mongod_replset_my_state{set="s1rs"} 1
+
+	name := "mongodb_mongod_replset_my_state"
+	help := "An integer between 0 and 10 that represents the replica state of the current member"
+
+	labels := map[string]string{"set": rs.Config.ID}
+
+	d := prometheus.NewDesc(name, help, nil, labels)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(state))
+
+	return metric, nil
+}
+
+func electionDate(m bson.M) prometheus.Metric {
+	for _, member := range m["replSetGetStatus"].(bson.M)["members"].(primitive.A) {
+		if date, ok := member.(bson.M)["electionTime"].(primitive.Timestamp); ok {
+			name := "mongodb_mongod_replset_member_election_date"
+			help := "The timestamp the node was elected as replica leader"
+
+			labels := map[string]string{"name": member.(bson.M)["name"].(string)}
+			d := prometheus.NewDesc(name, help, nil, labels)
+			metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(date.T))
+
+			return metric
+		}
+	}
+
+	return nil
+}
+
+func replicationLag(m bson.M) prometheus.Metric {
+	var primaryTS, selfTS primitive.Timestamp
+	var hasPrimary bool
+	var name, statestr string
+
+	for _, member := range m["replSetGetStatus"].(bson.M)["members"].(primitive.A) {
+		if statestr, ok := member.(bson.M)["stateStr"].(string); ok && statestr == "PRIMARY" {
+			if optime, ok := member.(bson.M)["optime"].(bson.M); ok {
+				if ts, tok := optime["ts"].(primitive.Timestamp); tok {
+					primaryTS = ts
+					hasPrimary = true
+				}
+			}
+		}
+
+		if self, ok := member.(bson.M)["self"].(bool); ok && self {
+			if optime, ok := member.(bson.M)["optime"].(bson.M); ok {
+				if ts, tok := optime["ts"].(primitive.Timestamp); tok {
+					selfTS = ts
+					name, _ = member.(bson.M)["name"].(string)
+					statestr, _ = member.(bson.M)["stateStr"].(string)
+				}
+			}
+		}
+	}
+
+	if !hasPrimary {
+		return nil
+	}
+
+	if statestr == "PRIMARY" {
+		return nil
+	}
+
+	val := float64(primaryTS.T - selfTS.T)
+	set, _ := m["replSetGetStatus"].(bson.M)["set"].(string)
+
+	metricName := "mongodb_mongod_replset_member_replication_lag"
+	help := "The replication lag that this member has with the primary."
+
+	labels := map[string]string{
+		"name":  name,
+		"state": statestr,
+		"set":   set,
+	}
+	d := prometheus.NewDesc(metricName, help, nil, labels)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
+
+	return metric
+}
+
+func mongosMetrics(ctx context.Context, client *mongo.Client) []prometheus.Metric {
+	metrics := []prometheus.Metric{}
+
+	if metric, err := databasesTotal(ctx, client); err == nil {
+		metrics = append(metrics, metric)
+	}
+
+	if metric, err := collectionsTotal(ctx, client); err == nil {
+		metrics = append(metrics, metric)
+	}
+
+	metrics = append(metrics, balancerEnabled(ctx, client))
+
+	if ms, err := chunksTotal(ctx, client); err == nil {
+		metrics = append(metrics, ms...)
+	}
+
+	if metric, err := chunksBalanced(ctx, client); err == nil {
+		metrics = append(metrics, metric)
+	}
+
+	if metric, err := changelog10m(ctx, client); err == nil {
+		metrics = append(metrics, metric...)
+	}
+
+	metrics = append(metrics, dbstatsMetrics(ctx, client)...)
+
+	return metrics
+}
+
+func databasesTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	n, err := client.Database("config").Collection("databases").CountDocuments(ctx, bson.M{"partitioned": true})
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_sharding_databases_total"
+	help := "Total number of sharded databases"
+	labels := map[string]string{"type": "partitioned"}
+
+	d := prometheus.NewDesc(name, help, nil, labels)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+func collectionsTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	n, err := client.Database("config").Collection("collections").CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_db_collections_total"
+	help := "Total number of collections"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	var m struct {
+		InBalancerRound bool `bson:"inBalancerRound"`
+	}
+
+	cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
+	res := client.Database("admin").RunCommand(ctx, cmd)
+
+	if err := res.Decode(&m); err != nil {
+		return nil, err
+	}
+
+	value := float64(0)
+	if !m.InBalancerRound {
+		value = 1
+	}
+
+	name := "mongodb_mongos_sharding_chunks_is_balanced"
+	help := "Shards are balanced"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
+}
+
+func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metric {
+	type bss struct {
+		stopped bool `bson:"stopped"`
+	}
+	var bs bss
+	enabled := 0
+
+	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
+	if err != nil {
+		enabled = 1
+	} else if !bs.stopped {
+		enabled = 1
+	}
+
+	name := "mongodb_mongos_sharding_balancer_enabled"
+	help := "Balancer is enabled"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
+
+	return metric
+}
+
+func chunksTotal(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+	aggregation := bson.D{
+		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
+	}
+
+	cursor, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
+	if err != nil {
+		return nil, err
+	}
+
+	var shards []bson.M
+	if err = cursor.All(ctx, &shards); err != nil {
+		return nil, err
+	}
+
+	var metrics []prometheus.Metric
+
+	for _, shard := range shards {
+		name := "mongodb_mongos_sharding_shard_chunks_total"
+		help := "Total number of chunks per shard"
+		labels := map[string]string{"shard": shard["_id"].(string)}
+
+		d := prometheus.NewDesc(name, help, nil, labels)
+		val, ok := shard["count"].(int32)
+		if !ok {
+			continue
+		}
+
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(val))
+		if err != nil {
+			continue
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	return metrics, nil
+}
+
+type ShardingChangelogSummaryId struct {
+	Event string `bson:"event"`
+	Note  string `bson:"note"`
+}
+
+type ShardingChangelogSummary struct {
+	Id    *ShardingChangelogSummaryId `bson:"_id"`
+	Count float64                     `bson:"count"`
+}
+
+type ShardingChangelogStats struct {
+	Items *[]ShardingChangelogSummary
+}
+
+func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+	var metrics []prometheus.Metric
+
+	coll := client.Database("config").Collection("changelog")
+	match := bson.M{"time": bson.M{"$gt": time.Now().Add(-10 * time.Minute)}}
+	group := bson.M{"_id": bson.M{"event": "$what", "note": "$details.note"}, "count": bson.M{"$sum": 1}}
+
+	c, err := coll.Aggregate(ctx, []bson.M{{"$match": match}, {"$group": group}})
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate sharding changelog events: %s", err)
+	}
+
+	defer c.Close(ctx) //nolint:errcheck
+
+	for c.Next(ctx) {
+		s := &ShardingChangelogSummary{}
+		if err := c.Decode(s); err != nil {
+			log.Error(err)
+			continue
+		}
+
+		name := "mongodb_mongos_sharding_changelog_10min_total"
+		help := "mongodb_mongos_sharding_changelog_10min_total"
+
+		labelValue := s.Id.Event
+		if s.Id.Note != "" {
+			labelValue += "." + s.Id.Note
+		}
+
+		d := prometheus.NewDesc(name, help, nil, map[string]string{"event": labelValue})
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s.Count)
+		if err != nil {
+			continue
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	if err := c.Err(); err != nil {
+		return nil, err
+	}
+
+	return metrics, nil
+}
+
+// DatabaseStatList contains stats from all databases.
+type databaseStatList struct {
+	Members []databaseStatus
+}
+
+// DatabaseStatus represents stats about a database (mongod and raw from mongos).
+type databaseStatus struct {
+	rawStatus                       // embed to collect top-level attributes
+	Shards    map[string]*rawStatus `bson:"raw,omitempty"`
+}
+
+// RawStatus represents stats about a database from Mongos side.
+type rawStatus struct {
+	Name        string `bson:"db,omitempty"`
+	IndexSize   int    `bson:"indexSize,omitempty"`
+	DataSize    int    `bson:"dataSize,omitempty"`
+	Collections int    `bson:"collections,omitempty"`
+	Objects     int    `bson:"objects,omitempty"`
+	Indexes     int    `bson:"indexes,omitempty"`
+}
+
+func getDatabaseStatList(ctx context.Context, client *mongo.Client) *databaseStatList {
+	dbStatList := &databaseStatList{}
+	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
+	if err != nil {
+		log.Errorf("Failed to get database names: %s.", err)
+		return nil
+	}
+	for _, db := range dbNames {
+		dbStatus := databaseStatus{}
+		r := client.Database(db).RunCommand(context.TODO(), bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}})
+		err := r.Decode(&dbStatus)
+		if err != nil {
+			log.Errorf("Failed to get database status: %s.", err)
+			return nil
+		}
+		dbStatList.Members = append(dbStatList.Members, dbStatus)
+	}
+
+	return dbStatList
+}
+
+func dbstatsMetrics(ctx context.Context, client *mongo.Client) []prometheus.Metric {
+	var metrics []prometheus.Metric
+
+	dbStatList := getDatabaseStatList(ctx, client)
+
+	for _, member := range dbStatList.Members {
+		if len(member.Shards) > 0 {
+			for shard, stats := range member.Shards {
+				labels := prometheus.Labels{
+					"db":    stats.Name,
+					"shard": strings.Split(shard, "/")[0],
+				}
+
+				name := "mongodb_mongos_db_data_size_bytes"
+				help := "The total size in bytes of the uncompressed data held in this database"
+
+				d := prometheus.NewDesc(name, help, nil, labels)
+				metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(stats.DataSize))
+				if err == nil {
+					metrics = append(metrics, metric)
+				}
+
+				name = "mongodb_mongos_db_indexes_total"
+				help = "Contains a count of the total number of indexes across all collections in the database"
+
+				d = prometheus.NewDesc(name, help, nil, labels)
+				metric, err = prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(stats.Indexes))
+				if err == nil {
+					metrics = append(metrics, metric)
+				}
+
+				name = "mongodb_mongos_db_index_size_bytes"
+				help = "The total size in bytes of all indexes created on this database"
+
+				d = prometheus.NewDesc(name, help, nil, labels)
+				metric, err = prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(stats.IndexSize))
+				if err == nil {
+					metrics = append(metrics, metric)
+				}
+			}
+		}
+	}
+
+	return metrics
+}
 
 func walkTo(m primitive.M, path []string) interface{} {
 	val, ok := m[path[0]]
