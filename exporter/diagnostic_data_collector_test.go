@@ -84,10 +84,14 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
+	ti, err := newTopologyInfo(ctx, client)
+	require.NoError(t, err)
+
 	c := &diagnosticDataCollector{
 		client:         client,
 		logger:         logrus.New(),
 		compatibleMode: true,
+		topologyInfo:   ti,
 	}
 
 	metrics := collect(c)

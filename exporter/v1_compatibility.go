@@ -714,7 +714,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		},
 	}
 
-	metrics := []prometheus.Metric{}
+	metrics := make([]prometheus.Metric, 0)
 
 	for _, def := range defs {
 		val, err := sumMetrics(m, def.paths)
@@ -804,7 +804,15 @@ func myState(ctx context.Context, client *mongo.Client) (prometheus.Metric, erro
 }
 
 func electionDate(m bson.M) prometheus.Metric {
-	for _, member := range m["replSetGetStatus"].(bson.M)["members"].(primitive.A) {
+	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
+	if !ok {
+		return nil
+	}
+	members, ok := replSetGetStatus["members"].(primitive.A)
+	if !ok {
+		return nil
+	}
+	for _, member := range members {
 		if date, ok := member.(bson.M)["electionTime"].(primitive.Timestamp); ok {
 			name := "mongodb_mongod_replset_member_election_date"
 			help := "The timestamp the node was elected as replica leader"
@@ -825,7 +833,15 @@ func replicationLag(m bson.M) prometheus.Metric {
 	var hasPrimary bool
 	var name, statestr string
 
-	for _, member := range m["replSetGetStatus"].(bson.M)["members"].(primitive.A) {
+	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
+	if !ok {
+		return nil
+	}
+	members, ok := replSetGetStatus["members"].(primitive.A)
+	if !ok {
+		return nil
+	}
+	for _, member := range members {
 		if statestr, ok := member.(bson.M)["stateStr"].(string); ok && statestr == "PRIMARY" {
 			if optime, ok := member.(bson.M)["optime"].(bson.M); ok {
 				if ts, tok := optime["ts"].(primitive.Timestamp); tok {
@@ -855,7 +871,7 @@ func replicationLag(m bson.M) prometheus.Metric {
 	}
 
 	val := float64(primaryTS.T - selfTS.T)
-	set, _ := m["replSetGetStatus"].(bson.M)["set"].(string)
+	set, _ := replSetGetStatus["set"].(string)
 
 	metricName := "mongodb_mongod_replset_member_replication_lag"
 	help := "The replication lag that this member has with the primary."
