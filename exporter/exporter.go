@@ -96,6 +96,13 @@ func New(opts *Opts) (*Exporter, error) {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter) *prometheus.Registry {
 	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
 	registry := prometheus.NewRegistry()
+
+	gc := generalCollector{
+		ctx:    ctx,
+		client: client,
+	}
+	registry.MustRegister(&gc)
+
 	if len(e.opts.CollStatsCollections) > 0 {
 		cc := collstatsCollector{
 			ctx:            ctx,
