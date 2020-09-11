@@ -27,9 +27,11 @@ import (
 )
 
 type diagnosticDataCollector struct {
+	ctx            context.Context
 	client         *mongo.Client
 	compatibleMode bool
 	logger         *logrus.Logger
+	topologyInfo   labelsGetter
 }
 
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -40,7 +42,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
-	res := d.client.Database("admin").RunCommand(context.TODO(), cmd)
+	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
 
 	if err := res.Decode(&m); err != nil {
 		d.logger.Errorf("cannot run getDiagnosticData: %s", err)
@@ -59,7 +61,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	d.logger.Debug("getDiagnosticData result")
 	debugResult(d.logger, m)
 
-	metrics := buildMetrics(m, d.compatibleMode)
+	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(m)...)
 
 	// PMM dashboards looks for this metric so, in compatibility mode, we must expose it.

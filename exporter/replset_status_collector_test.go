@@ -35,26 +35,29 @@ func TestReplsetStatusCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
+	ti := labelsGetterMock{}
+
 	c := &replSetGetStatusCollector{
-		ctx:    ctx,
-		client: client,
-		logger: logrus.New(),
+		ctx:          ctx,
+		client:       client,
+		logger:       logrus.New(),
+		topologyInfo: ti,
 	}
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-                # HELP mongodb_myState myState
-                # TYPE mongodb_myState untyped
-                mongodb_myState 1
-                # HELP mongodb_ok ok
-                # TYPE mongodb_ok untyped
-                mongodb_ok 1
-                # HELP mongodb_optimes_appliedOpTime_t optimes.appliedOpTime.
-                # TYPE mongodb_optimes_appliedOpTime_t untyped
-                mongodb_optimes_appliedOpTime_t 1
-                # HELP mongodb_optimes_durableOpTime_t optimes.durableOpTime.
-                # TYPE mongodb_optimes_durableOpTime_t untyped
-                mongodb_optimes_durableOpTime_t 1` + "\n")
+# HELP mongodb_myState myState
+# TYPE mongodb_myState untyped
+mongodb_myState 1
+# HELP mongodb_ok ok
+# TYPE mongodb_ok untyped
+mongodb_ok 1
+# HELP mongodb_optimes_appliedOpTime_t optimes.appliedOpTime.
+# TYPE mongodb_optimes_appliedOpTime_t untyped
+mongodb_optimes_appliedOpTime_t 1
+# HELP mongodb_optimes_durableOpTime_t optimes.durableOpTime.
+# TYPE mongodb_optimes_durableOpTime_t untyped
+mongodb_optimes_durableOpTime_t 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
@@ -75,9 +78,12 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 
 	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
 
+	ti := labelsGetterMock{}
+
 	c := &replSetGetStatusCollector{
-		ctx:    ctx,
-		client: client,
+		ctx:          ctx,
+		client:       client,
+		topologyInfo: ti,
 	}
 
 	expected := strings.NewReader(``)

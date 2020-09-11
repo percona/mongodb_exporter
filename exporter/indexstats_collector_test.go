@@ -41,6 +41,8 @@ func TestIndexStatsCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
+	ti := labelsGetterMock{}
+
 	database := client.Database("testdb")
 	database.Drop(ctx) //nolint
 	for i := 0; i < 3; i++ {
@@ -61,9 +63,10 @@ func TestIndexStatsCollector(t *testing.T) {
 	}
 
 	c := &indexstatsCollector{
-		client:      client,
-		collections: []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
-		logger:      logrus.New(),
+		client:       client,
+		collections:  []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
+		logger:       logrus.New(),
+		topologyInfo: ti,
 	}
 
 	// The last \n at the end of this string is important
