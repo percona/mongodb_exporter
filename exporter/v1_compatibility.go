@@ -624,15 +624,16 @@ func lockMetrics() []lockMetric {
 // ready to be exposed, taking the value for each metric from th provided bson.M structure from
 // getDiagnosticData.
 func locksMetrics(m bson.M) []prometheus.Metric {
-	res := make([]prometheus.Metric, 0, len(lockMetrics()))
+	metrics := lockMetrics()
+	res := make([]prometheus.Metric, 0, len(metrics))
 
-	for _, lm := range lockMetrics() {
+	for _, lm := range metrics {
 		mm, err := makeLockMetric(m, lm)
 		if mm == nil {
 			continue
 		}
 		if err != nil {
-			logrus.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
+			logrus.Errorf("cannot convert rw metric %s to old style: %s", mm.Desc(), err)
 			continue
 		}
 		res = append(res, mm)

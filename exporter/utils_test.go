@@ -6,22 +6,29 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 func collect(c prometheus.Collector) []prometheus.Metric {
-	m := []prometheus.Metric{}
+	m := make([]prometheus.Metric, 0)
 	ch := make(chan prometheus.Metric)
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		for metric := range ch {
 			m = append(m, metric)
 		}
+		wg.Done()
 	}()
 
 	c.Collect(ch)
+	close(ch)
+
+	wg.Wait()
 
 	return m
 }

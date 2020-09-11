@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -33,7 +34,7 @@ func TestTopologyLabels(t *testing.T) {
 	client := tu.DefaultTestClient(ctx, t)
 
 	ti, err := newTopologyInfo(ctx, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	bl := ti.baseLabels()
 
 	assert.Equal(t, "rs1", bl[labelReplicasetName])

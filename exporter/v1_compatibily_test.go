@@ -88,7 +88,7 @@ func TestAddLocksMetrics(t *testing.T) {
 	assert.NoError(t, err)
 
 	var metrics []prometheus.Metric
-	metrics = append(metrics, locksMetrics(m)...)
+	metrics = locksMetrics(m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
