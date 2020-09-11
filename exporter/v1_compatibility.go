@@ -1,14 +1,18 @@
 package exporter
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
@@ -151,7 +155,8 @@ func sumMetrics(m bson.M, paths [][]string) (float64, error) {
 	for _, path := range paths {
 		v := walkTo(m, path)
 		if v == nil {
-			return 0, errors.Wrapf(ErrInvalidMetricPath, "%v", path)
+			log.Errorf("metric path %v doesn't exists", path)
+			continue
 		}
 
 		f, err := asFloat64(v)
@@ -694,6 +699,138 @@ func mongodbUpMetric() prometheus.Metric {
 	}
 	return up
 }
+
+type specialMetric struct {
+	paths  [][]string
+	labels map[string]string
+	name   string
+	help   string
+}
+
+func specialMetrics(m bson.M, l *logrus.Logger) []prometheus.Metric {
+	defs := []specialMetric{
+		{
+			name: "mongodb_mongod_locks_time_acquiring_global_microseconds_total",
+			help: "sum of serverStatus.locks.ReplicationStateTransition.timeAcquiringMicros.[r|w]",
+			paths: [][]string{
+				{"serverStatus", "locks", "ReplicationStateTransition", "timeAcquiringMicros", "r"},
+				{"serverStatus", "locks", "ReplicationStateTransition", "timeAcquiringMicros", "w"},
+			},
+		},
+		{
+			name:   "mongodb_mongod_op_latencies_latency_total",
+			help:   ".serverStatus.opLatencies.commands.latency",
+			labels: map[string]string{"type": "command"},
+			paths: [][]string{
+				{"serverStatus", "opLatencies", "commands", "latency"},
+			},
+		},
+		{
+			name:   "mongodb_mongod_op_latencies_ops_total",
+			help:   ".serverStatus.opLatencies.commands.ops",
+			labels: map[string]string{"type": "command"},
+			paths: [][]string{
+				{"serverStatus", "opLatencies", "commands", "ops"},
+			},
+		},
+		{
+			name:   "mongodb_mongod_metrics_document_total",
+			help:   "serverStatus.metrics.document.returned",
+			labels: map[string]string{"state": "returned"},
+			paths: [][]string{
+				{"serverStatus", "metrics", "document", "returned"},
+			},
+		},
+	}
+
+	metrics := []prometheus.Metric{}
+
+	for _, def := range defs {
+		val, err := sumMetrics(m, def.paths)
+		if err != nil {
+			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
+			continue
+		}
+
+		d := prometheus.NewDesc(def.name, def.help, nil, def.labels)
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
+		if err != nil {
+			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
+			continue
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	return metrics
+}
+
+func databasesTotal(ctx context.Context, client *mongo.Client) { // (prometheus.Metric, error) {
+	filter := bson.M{
+		"$or": []bson.M{
+			{"partitioned": true},
+			{"sharded": true},
+			{"enabled": true},
+		},
+	}
+
+	res, err := client.ListDatabases(ctx, filter)
+	fmt.Println(err)
+	pretty.Println(res)
+}
+
+// // serverStatus.metrics.document.returned
+// func sm1(m bson.M) (prometheus.Metric, error) {
+// 	paths := [][]string{
+// 		{"serverStatus", "locks", "ReplicationStateTransition", "timeAcquiringMicros", "r"},
+// 		{"serverStatus", "locks", "ReplicationStateTransition", "timeAcquiringMicros", "w"},
+// 	}
+//
+// 	val, err := sumMetrics(m, paths)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	name := "mongodb_mongod_locks_time_acquiring_global_microseconds_total"
+// 	help := "sum of serverStatus.locks.ReplicationStateTransition.timeAcquiringMicros.[r|w]"
+// 	d := prometheus.NewDesc(name, help, nil, nil)
+//
+// 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
+// }
+
+// func sm2(m bson.M) (prometheus.Metric, error) {
+// 	paths := [][]string{
+// 		{"serverStatus", "opLatencies", "commands", "latency"},
+// 	}
+//
+// 	val, err := sumMetrics(m, paths)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	name := "mongodb_mongod_op_latencies_latency_total"
+// 	help := ".serverStatus.opLatencies.commands.latency"
+// 	d := prometheus.NewDesc(name, help, nil, map[string]string{"type": "command"})
+//
+// 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
+// }
+
+// func sm3(m bson.M) (prometheus.Metric, error) {
+// 	paths := [][]string{
+// 		{"serverStatus", "opLatencies", "commands", "ops"},
+// 	}
+//
+// 	val, err := sumMetrics(m, paths)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	name := "mongodb_mongod_op_latencies_ops_total"
+// 	help := ".serverStatus.opLatencies.commands.ops"
+// 	d := prometheus.NewDesc(name, help, nil, map[string]string{"type": "command"})
+//
+// 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
+// }
 
 func walkTo(m primitive.M, path []string) interface{} {
 	val, ok := m[path[0]]

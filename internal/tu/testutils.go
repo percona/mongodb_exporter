@@ -19,13 +19,17 @@ package tu
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -80,4 +84,20 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 	require.NoError(t, err)
 
 	return client
+}
+
+// LoadJSON loads a file and returns the result of unmarshaling it into a bson.M structure.
+func LoadJSON(filename string) (bson.M, error) {
+	buf, err := ioutil.ReadFile(filepath.Clean(filename))
+	if err != nil {
+		return nil, err
+	}
+
+	var m bson.M
+	err = json.Unmarshal(buf, &m)
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
