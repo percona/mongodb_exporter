@@ -49,7 +49,7 @@ func mongodbUpMetric(ctx context.Context, client *mongo.Client) prometheus.Metri
 	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
 	up, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
 	if err != nil {
-		panic(err)
+		return prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 	}
 
 	return up
