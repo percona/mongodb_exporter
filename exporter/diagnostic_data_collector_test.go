@@ -22,12 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -72,4 +72,27 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 	require.NoError(t, err)
 	err = testutil.GatherAndCompare(reg, expected, filter...)
 	assert.NoError(t, err)
+}
+
+func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	c := &diagnosticDataCollector{
+		client: client,
+		logger: logrus.New(),
+	}
+
+	metrics := collect(c)
+	actualMetrics := helpers.ReadMetrics(metrics)
+	actualMetrics = filterMetrics(actualMetrics)
+	pretty.Println(actualMetrics)
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+
+	//if *golden {
+	//	writeTestDataJSON(t, instanceName, []byte(messages[instance.ResourceID]))
+	//}
+	pretty.Println(actualLines)
 }
