@@ -100,6 +100,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	gc := generalCollector{
 		ctx:    ctx,
 		client: client,
+		logger: e.opts.Logger,
 	}
 	registry.MustRegister(&gc)
 

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
@@ -29,6 +30,7 @@ import (
 type generalCollector struct {
 	ctx    context.Context
 	client *mongo.Client
+	logger *logrus.Logger
 }
 
 func (d *generalCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -36,10 +38,10 @@ func (d *generalCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
-	ch <- mongodbUpMetric(d.ctx, d.client)
+	ch <- mongodbUpMetric(d.ctx, d.client, d.logger)
 }
 
-func mongodbUpMetric(ctx context.Context, client *mongo.Client) prometheus.Metric {
+func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {
 	var value float64
 
 	if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {
@@ -49,7 +51,7 @@ func mongodbUpMetric(ctx context.Context, client *mongo.Client) prometheus.Metri
 	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
 	up, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
 	if err != nil {
-		return prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		log.Errorf("cannot get mongo_up metric: %s", err)
 	}
 
 	return up
