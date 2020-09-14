@@ -115,3 +115,50 @@ func TestAddLocksMetrics(t *testing.T) {
 
 	assert.Equal(t, want, desc)
 }
+
+func Test_sumMetrics(t *testing.T) {
+	tests := []struct {
+		name    string
+		paths   [][]string
+		want    float64
+		wantErr bool
+	}{
+		{
+			name: "timeAcquire",
+			paths: [][]string{
+				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "W"},
+				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "w"},
+			},
+			want:    42361,
+			wantErr: false,
+		},
+		{
+			name: "timeAcquire",
+			paths: [][]string{
+				{"serverStatus", "locks", "Global", "acquireCount", "r"},
+				{"serverStatus", "locks", "Global", "acquireCount", "w"},
+			},
+			want:    158671,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf, err := ioutil.ReadFile(filepath.Join("testdata/", "get_diagnostic_data.json"))
+			assert.NoError(t, err)
+
+			var m bson.M
+			err = json.Unmarshal(buf, &m)
+			assert.NoError(t, err)
+
+			got, err := sumMetrics(m, tt.paths)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("sumMetrics() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("sumMetrics() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

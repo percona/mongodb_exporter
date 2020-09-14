@@ -210,8 +210,20 @@ func conversions() []conversion {
 			newName: "mongodb_ss_connections_totalCreated",
 		},
 		{
-			oldName: "mongodb_mongod_extra_info_page_faults_total",
+			oldName: "mongodb_extra_info_page_faults_total",
 			newName: "mongodb_ss_extra_info_page_faults",
+		},
+		{
+			oldName: "mongodb_mongod_durability_journaled_megabytes",
+			newName: "mongodb_ss_dur_journaledMB",
+		},
+		{
+			oldName: "mongodb_mongod_durability_commits",
+			newName: "mongodb_ss_dur_commits",
+		},
+		{
+			oldName: "mongodb_mongod_background_flushing_average_milliseconds",
+			newName: "mongodb_ss_backgroundFlushing_average_ms",
 		},
 		{
 			oldName:     "mongodb_mongod_global_lock_client",   // {type="readers|writers"}
@@ -233,7 +245,7 @@ func conversions() []conversion {
 		},
 
 		{
-			oldName: "mongodb_instance_uptime_seconds",
+			oldName: "mongodb_mongod_instance_uptime_seconds",
 			newName: "mongodb_ss_uptime",
 		},
 		{
@@ -356,8 +368,8 @@ func conversions() []conversion {
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
-			oldName:          "mongodb_mongod_op_counters_total", // {type=*}
-			newName:          "mongodb_ss_opcounters",            //{legacy_op_type=*}
+			oldName:          "mongodb_op_counters_total", // {type=*}
+			newName:          "mongodb_ss_opcounters",     //{legacy_op_type=*}
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
@@ -517,10 +529,24 @@ func conversions() []conversion {
 		// mongodb_mongod_op_latencies_ops_total{type="write"}	     mongodb_ss_opLatencies_ops{op_type="writes"}
 		{
 			oldName:          "mongodb_mongod_op_latencies_ops_total",
-			prefix:           "mongodb_ss_opLatencies_ops",
+			newName:          "mongodb_ss_opLatencies_ops",
 			labelConversions: map[string]string{"op_type": "type"},
 			labelValueConversions: map[string]string{
 				"commands": "command",
+				"reads":    "read",
+				"writes":   "write",
+			},
+		},
+		// mongodb_mongod_op_latencies_latency_total {type="command"}  	 mongodb_ss_opLatencies_latency{op_type="commands"}
+		// mongodb_mongod_op_latencies_latency_total{type="write"}	     mongodb_ss_opLatencies_latency{op_type="writes"}
+		{
+			oldName:          "mongodb_mongod_op_latencies_latency_total",
+			newName:          "mongodb_ss_opLatencies_latency",
+			labelConversions: map[string]string{"op_type": "type"},
+			labelValueConversions: map[string]string{
+				"commands": "command",
+				"reads":    "read",
+				"writes":   "write",
 			},
 		},
 		// mongodb_mongod_metrics_document_total {state="deleted"} 	 mongodb_ss_metrics_document {doc_op_type="deleted"}
@@ -688,26 +714,10 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	defs := []specialMetric{
 		{
 			name: "mongodb_mongod_locks_time_acquiring_global_microseconds_total",
-			help: "sum of serverStatus.locks.ReplicationStateTransition.timeAcquiringMicros.[r|w]",
+			help: "sum of serverStatus.locks.Global.timeAcquiringMicros.[r|w]",
 			paths: [][]string{
-				{"serverStatus", "locks", "ReplicationStateTransition", "timeAcquiringMicros", "r"},
-				{"serverStatus", "locks", "ReplicationStateTransition", "timeAcquiringMicros", "w"},
-			},
-		},
-		{
-			name:   "mongodb_mongod_op_latencies_latency_total",
-			help:   ".serverStatus.opLatencies.commands.latency",
-			labels: map[string]string{"type": "command"},
-			paths: [][]string{
-				{"serverStatus", "opLatencies", "commands", "latency"},
-			},
-		},
-		{
-			name:   "mongodb_mongod_op_latencies_ops_total",
-			help:   ".serverStatus.opLatencies.commands.ops",
-			labels: map[string]string{"type": "command"},
-			paths: [][]string{
-				{"serverStatus", "opLatencies", "commands", "ops"},
+				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "r"},
+				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "w"},
 			},
 		},
 	}
