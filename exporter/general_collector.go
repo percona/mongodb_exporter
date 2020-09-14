@@ -45,6 +45,7 @@ func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logg
 	var value float64
 
 	if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {
+		log.Errorf("error while checking mongodb connection: %s", err)
 		value = 1
 	}
 
