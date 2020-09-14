@@ -44,10 +44,11 @@ func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
 func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {
 	var value float64
 
-	if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {
-		log.Errorf("error while checking mongodb connection: %s", err)
+	err := client.Ping(ctx, readpref.PrimaryPreferred())
+	if err == nil {
 		value = 1
 	}
+	log.Errorf("error while checking mongodb connection: %s", err)
 
 	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
 	up, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
