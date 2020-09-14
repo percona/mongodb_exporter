@@ -101,7 +101,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 		"mongodb_mongod_wiredtiger_cache_bytes",
 		"mongodb_mongod_wiredtiger_transactions_total",
 		"mongodb_mongod_wiredtiger_cache_bytes_total",
-		"mongodb_mongod_op_counters_total",
+		"mongodb_op_counters_total",
 		"mongodb_ss_mem_resident",
 		"mongodb_ss_mem_virtual",
 		"mongodb_ss_metrics_cursor_open",
