@@ -24,6 +24,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,6 +39,7 @@ func TestGeneralCollector(t *testing.T) {
 	c := &generalCollector{
 		ctx:    ctx,
 		client: client,
+		logger: logrus.New(),
 	}
 
 	// The last \n at the end of this string is important
