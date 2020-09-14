@@ -17,7 +17,9 @@ import (
 )
 
 var (
-	ErrInvalidMetricPath  = fmt.Errorf("invalid metric path")
+	// ErrCannotAggregateShardingChangelogEvent Cannot aggregate a new Sharding Changelog Event.
+	ErrCannotAggregateShardingChangelogEvent = fmt.Errorf("failed to aggregate sharding changelog events")
+	// ErrInvalidMetricValue cannot create a new metric due to an invalid value.
 	ErrInvalidMetricValue = fmt.Errorf("invalid metric value")
 )
 
@@ -185,9 +187,11 @@ func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus
 	}
 
 	res = append(res, metric)
+
 	return res
 }
 
+//nolint:funlen
 func conversions() []conversion {
 	return []conversion{
 		{
@@ -226,8 +230,8 @@ func conversions() []conversion {
 			newName: "mongodb_ss_backgroundFlushing_average_ms",
 		},
 		{
-			oldName:     "mongodb_mongod_global_lock_client",   // {type="readers|writers"}
-			prefix:      "mongodb_ss_globalLock_activeClients", // _[readers|writers]
+			oldName:     "mongodb_mongod_global_lock_client",
+			prefix:      "mongodb_ss_globalLock_activeClients",
 			suffixLabel: "type",
 		},
 		{
@@ -249,16 +253,16 @@ func conversions() []conversion {
 			newName: "mongodb_ss_uptime",
 		},
 		{
-			oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total", //{database=*,lock_type="read|write"}
+			oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total",
 			newName: "mongodb_ss_locks_Local_acquireCount_[rw]",
 		},
 		{
-			oldName: "mongodb_memory", //{"resident|virtual|mapped|mapped_with_journal"}
+			oldName: "mongodb_memory",
 			newName: "mongodb_ss_mem_[resident|virtual]",
 		},
 		{
-			oldName:          "mongodb_mongod_metrics_cursor_open", //{state="noTimeout|pinned|total"}
-			newName:          "mongodb_ss_metrics_cursor_open",     //{csr_type="noTimeout|pinned|total""}
+			oldName:          "mongodb_mongod_metrics_cursor_open",
+			newName:          "mongodb_ss_metrics_cursor_open",
 			labelConversions: map[string]string{"csr_type": "state"},
 		},
 		{
@@ -279,13 +283,13 @@ func conversions() []conversion {
 			newName: "mongodb_ss_metrics_getLastError_wtimeouts",
 		},
 		{
-			oldName:     "mongodb_mongod_metrics_operation_total", //{state="fastmod|idhack|scan_and_order"}
-			prefix:      "mongodb_ss_metrics_operation",           // _[fastmod|idhack|scanAndOrder] (I'm pretty sure fastmod is deprecated; idhack might be deprecated too.
+			oldName:     "mongodb_mongod_metrics_operation_total",
+			prefix:      "mongodb_ss_metrics_operation",
 			suffixLabel: "state",
 		},
 		{
-			oldName:     "mongodb_mongod_metrics_query_executor_total", //{state="scanned|scannedObjects"}
-			prefix:      "mongodb_ss_metrics_query",                    // _[scanned|scannedObjects]
+			oldName:     "mongodb_mongod_metrics_query_executor_total",
+			prefix:      "mongodb_ss_metrics_query",
 			suffixLabel: "state",
 		},
 		{
@@ -317,8 +321,8 @@ func conversions() []conversion {
 			newName: "mongodb_ss_metrics_repl_buffer_sizeBytes",
 		},
 		{
-			oldName:     "mongodb_mongod_metrics_repl_executor_queue", //{type=*}
-			prefix:      "mongodb_ss_metrics_repl_executor_queues",    //_[networkInProgress|sleepers]
+			oldName:     "mongodb_mongod_metrics_repl_executor_queue",
+			prefix:      "mongodb_ss_metrics_repl_executor_queues",
 			suffixLabel: "type",
 		},
 		{
@@ -354,8 +358,8 @@ func conversions() []conversion {
 			newName: "mongodb_ss_metrics_ttl_passes",
 		},
 		{
-			oldName:     "mongodb_network_bytes_total", // {state="in_bytes|out_bytes"}
-			prefix:      "mongodb_ss_network",          //_[bytesIn|bytesOut]
+			oldName:     "mongodb_network_bytes_total",
+			prefix:      "mongodb_ss_network",
 			suffixLabel: "state",
 		},
 		{
@@ -368,13 +372,13 @@ func conversions() []conversion {
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
-			oldName:          "mongodb_op_counters_total", // {type=*}
-			newName:          "mongodb_ss_opcounters",     //{legacy_op_type=*}
+			oldName:          "mongodb_op_counters_total",
+			newName:          "mongodb_ss_opcounters",
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_blockmanager_blocks_total", //{type="read|read_mapped|pre_loaded|written"}
-			prefix:      "mongodb_ss_wt_block_manager",                         //_[blocks_read|mapped_blocks_read|blocks_written|blocks_pre_loaded]
+			oldName:     "mongodb_mongod_wiredtiger_blockmanager_blocks_total",
+			prefix:      "mongodb_ss_wt_block_manager",
 			suffixLabel: "type",
 		},
 		{
@@ -418,8 +422,8 @@ func conversions() []conversion {
 			newName: "mongodb_ss_wt_txn_transaction_checkpoint_currently_running",
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_transactions_total", // {type="begins|checkpoints|committed|rolledback"}
-			prefix:      "mongodb_ss_wt_txn_transactions",               //_[begins|checkpoints|committed|rolled_back]
+			oldName:     "mongodb_mongod_wiredtiger_transactions_total",
+			prefix:      "mongodb_ss_wt_txn_transactions",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"begins":      "begins",
@@ -429,8 +433,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_blockmanager_bytes_total", //{type=read|read_mapped|written"}
-			prefix:      "mongodb_ss_wt_block_manager",                        //_[bytes_read|mapped_bytes_read|bytes_written]
+			oldName:     "mongodb_mongod_wiredtiger_blockmanager_bytes_total",
+			prefix:      "mongodb_ss_wt_block_manager",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"bytes_read": "read", "mapped_bytes_read": "read_mapped",
@@ -439,8 +443,8 @@ func conversions() []conversion {
 		},
 		// the 2 metrics bellow have the same prefix.
 		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_bytes", //{type="total|dirty|internal_pages|leaf_pages"}
-			prefix:      "mongodb_ss_wt_cache_bytes",             //_[bytes_currently_in_the_cache|tracked_dirty_bytes_in_the_cache|tracked_bytes_belonging_to_internal_pages_in_the_cache|tracked_bytes_belonging_to_leaf_pages_in_the_cache]
+			oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
+			prefix:      "mongodb_ss_wt_cache_bytes",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"currently_in_the_cache":                                 "total",
@@ -450,8 +454,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total", //{type="read", "written"}
-			prefix:      "mongodb_ss_wt_cache",                         //_[bytes read into cache|bytes written from cache]
+			oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total",
+			prefix:      "mongodb_ss_wt_cache",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"bytes_read_into_cache":    "read",
@@ -459,8 +463,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_pages", //{type="total|dirty"}
-			prefix:      "mongodb_ss_wt_cache",                   //_[pages_currently_held_in_the_cache|tracked_dirty_pages_in_the_cache]
+			oldName:     "mongodb_mongod_wiredtiger_cache_pages",
+			prefix:      "mongodb_ss_wt_cache",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"pages_currently_held_in_the_cache": "total",
@@ -468,8 +472,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_pages_total", //{type="read|written"}
-			prefix:      "mongodb_ss_wt_cache",                         //_[pages_read_into_cache|pages_written_from_cache]
+			oldName:     "mongodb_mongod_wiredtiger_cache_pages_total",
+			prefix:      "mongodb_ss_wt_cache",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"pages_read_into_cache":    "read",
@@ -477,8 +481,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_log_records_total", //{type="compressed|uncompressed"}
-			prefix:      "mongodb_ss_wt_log",                           //_[log records compressed|log_records_not_compressed]
+			oldName:     "mongodb_mongod_wiredtiger_log_records_total",
+			prefix:      "mongodb_ss_wt_log",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"log_records_compressed":     "compressed",
@@ -486,8 +490,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_log_bytes_total", //{type="payload|unwritten"}
-			prefix:      "mongodb_ss_wt_log",                         //_[log_bytes_of_payload_data|log_bytes_written
+			oldName:     "mongodb_mongod_wiredtiger_log_bytes_total",
+			prefix:      "mongodb_ss_wt_log",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"log_bytes_of_payload_data": "payload",
@@ -495,7 +499,7 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_log_operations_total", //{type="
+			oldName:     "mongodb_mongod_wiredtiger_log_operations_total",
 			prefix:      "mongodb_ss_wt_log",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
@@ -509,24 +513,19 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds", //{type="min|max"}
-			prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",                       //_[min|max]_time_msecs
+			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
+			prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"min_time_msecs": "min",
 				"max_time_msecs": "max",
 			},
 		},
-		// New metrics PMM-6610
-		// mongodb_mongod_global_lock_current_queue {type="reader"}  mongodb_mongod_global_lock_current_queue {type="readers"}
-		// mongodb_mongod_global_lock_current_queue {type="writer"}  mongodb_mongod_global_lock_current_queue {type="writers"}
 		{
 			oldName:          "mongodb_mongod_global_lock_current_queue",
 			prefix:           "mongodb_mongod_global_lock_current_queue",
 			labelConversions: map[string]string{"op_type": "type"},
 		},
-		// mongodb_mongod_op_latencies_ops_total {type="command"}  	 mongodb_ss_opLatencies_ops{op_type="commands"}
-		// mongodb_mongod_op_latencies_ops_total{type="write"}	     mongodb_ss_opLatencies_ops{op_type="writes"}
 		{
 			oldName:          "mongodb_mongod_op_latencies_ops_total",
 			newName:          "mongodb_ss_opLatencies_ops",
@@ -537,8 +536,6 @@ func conversions() []conversion {
 				"writes":   "write",
 			},
 		},
-		// mongodb_mongod_op_latencies_latency_total {type="command"}  	 mongodb_ss_opLatencies_latency{op_type="commands"}
-		// mongodb_mongod_op_latencies_latency_total{type="write"}	     mongodb_ss_opLatencies_latency{op_type="writes"}
 		{
 			oldName:          "mongodb_mongod_op_latencies_latency_total",
 			newName:          "mongodb_ss_opLatencies_latency",
@@ -549,15 +546,12 @@ func conversions() []conversion {
 				"writes":   "write",
 			},
 		},
-		// mongodb_mongod_metrics_document_total {state="deleted"} 	 mongodb_ss_metrics_document {doc_op_type="deleted"}
 		{
 			oldName:          "mongodb_mongod_metrics_document_total",
 			newName:          "mongodb_ss_metrics_document",
 			labelConversions: map[string]string{"doc_op_type": "state"},
 		},
 		{
-			// mongodb_mongod_metrics_query_executor_total {state="scanned"}	        mongodb_ss_metrics_queryExecutor_scanned
-			// mongodb_mongod_metrics_query_executor_total {state="scanned_objects"} 	mongodb_ss_metrics_queryExecutor_scannedObjects
 			oldName:     "mongodb_mongod_metrics_query_executor_total",
 			prefix:      "mongodb_ss_metrics_queryExecutor",
 			suffixLabel: "state",
@@ -710,8 +704,8 @@ type specialMetric struct {
 	help   string
 }
 
-func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Logger) []prometheus.Metric {
-	defs := []specialMetric{
+func specialMetricDefinitions() []specialMetric {
+	return []specialMetric{
 		{
 			name: "mongodb_mongod_locks_time_acquiring_global_microseconds_total",
 			help: "sum of serverStatus.locks.Global.timeAcquiringMicros.[r|w]",
@@ -721,10 +715,12 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 			},
 		},
 	}
+}
 
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Logger) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
-	for _, def := range defs {
+	for _, def := range specialMetricDefinitions() {
 		val, err := sumMetrics(m, def.paths)
 		if err != nil {
 			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
@@ -1056,16 +1052,19 @@ func chunksTotal(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return metrics, nil
 }
 
-type ShardingChangelogSummaryId struct {
+// ShardingChangelogSummaryId Sharding Changelog Summary ID.
+type ShardingChangelogSummaryID struct {
 	Event string `bson:"event"`
 	Note  string `bson:"note"`
 }
 
+// ShardingChangelogSummary Sharding Changelog Summary.
 type ShardingChangelogSummary struct {
-	Id    *ShardingChangelogSummaryId `bson:"_id"`
+	ID    *ShardingChangelogSummaryID `bson:"_id"`
 	Count float64                     `bson:"count"`
 }
 
+// ShardingChangelogStats is an array of Sharding changelog stats.
 type ShardingChangelogStats struct {
 	Items *[]ShardingChangelogSummary
 }
@@ -1079,7 +1078,7 @@ func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metri
 
 	c, err := coll.Aggregate(ctx, []bson.M{{"$match": match}, {"$group": group}})
 	if err != nil {
-		return nil, fmt.Errorf("failed to aggregate sharding changelog events: %s", err)
+		return nil, errors.Wrap(err, ErrCannotAggregateShardingChangelogEvent.Error())
 	}
 
 	defer c.Close(ctx) //nolint:errcheck
@@ -1094,9 +1093,9 @@ func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metri
 		name := "mongodb_mongos_sharding_changelog_10min_total"
 		help := "mongodb_mongos_sharding_changelog_10min_total"
 
-		labelValue := s.Id.Event
-		if s.Id.Note != "" {
-			labelValue += "." + s.Id.Note
+		labelValue := s.ID.Event
+		if s.ID.Note != "" {
+			labelValue += "." + s.ID.Note
 		}
 
 		d := prometheus.NewDesc(name, help, nil, map[string]string{"event": labelValue})

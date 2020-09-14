@@ -37,6 +37,7 @@ func filterMetrics(metrics []*helpers.Metric, filters []string) []*helpers.Metri
 		for _, filterName := range filters {
 			if m.Name == filterName {
 				res = append(res, m)
+
 				break
 			}
 		}

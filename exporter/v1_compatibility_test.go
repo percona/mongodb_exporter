@@ -143,6 +143,8 @@ func Test_sumMetrics(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		testCase := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			buf, err := ioutil.ReadFile(filepath.Join("testdata/", "get_diagnostic_data.json"))
 			assert.NoError(t, err)
@@ -151,13 +153,13 @@ func Test_sumMetrics(t *testing.T) {
 			err = json.Unmarshal(buf, &m)
 			assert.NoError(t, err)
 
-			got, err := sumMetrics(m, tt.paths)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("sumMetrics() error = %v, wantErr %v", err, tt.wantErr)
+			got, err := sumMetrics(m, testCase.paths)
+			if (err != nil) != testCase.wantErr {
+				t.Errorf("sumMetrics() error = %v, wantErr %v", err, testCase.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("sumMetrics() got = %v, want %v", got, tt.want)
+			if got != testCase.want {
+				t.Errorf("sumMetrics() got = %v, want %v", got, testCase.want)
 			}
 		})
 	}
