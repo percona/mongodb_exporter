@@ -763,7 +763,11 @@ func storageEngine(m bson.M) prometheus.Metric {
 	name := "mongodb_mongod_storage_engine"
 	help := "The storage engine used by the MongoDB instance"
 
-	labels := map[string]string{"engine": v.(string)}
+	engine, ok := v.(string)
+	if !ok {
+		engine = "Engine not available"
+	}
+	labels := map[string]string{"engine": engine}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
@@ -776,7 +780,11 @@ func serverVersion(m bson.M) prometheus.Metric {
 	name := "mongodb_version_info"
 	help := "The server version"
 
-	labels := map[string]string{"mongodb": v.(string)}
+	serverVersion, ok := v.(string)
+	if !ok {
+		serverVersion = "server version is not available"
+	}
+	labels := map[string]string{"mongodb": serverVersion}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
