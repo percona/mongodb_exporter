@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -78,8 +77,9 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		err := client.Disconnect(ctx)
-		assert.NoError(t, err)
+		// In some tests we manually disconnect the client so, don't check
+		// for errors, the client might be already disconnected.
+		client.Disconnect(ctx) //nolint:errcheck
 	})
 
 	err = client.Ping(ctx, nil)
