@@ -88,7 +88,7 @@ func TestAddLocksMetrics(t *testing.T) {
 	assert.NoError(t, err)
 
 	var metrics []prometheus.Metric
-	metrics = append(metrics, locksMetrics(m)...)
+	metrics = locksMetrics(m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
@@ -114,4 +114,73 @@ func TestAddLocksMetrics(t *testing.T) {
 	}
 
 	assert.Equal(t, want, desc)
+}
+
+func TestSumMetrics(t *testing.T) {
+	tests := []struct {
+		name     string
+		paths    [][]string
+		expected float64
+	}{
+		{
+			name: "timeAcquire",
+			paths: [][]string{
+				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "W"},
+				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "w"},
+			},
+			expected: 42361,
+		},
+		{
+			name: "timeAcquire",
+			paths: [][]string{
+				{"serverStatus", "locks", "Global", "acquireCount", "r"},
+				{"serverStatus", "locks", "Global", "acquireCount", "w"},
+			},
+			expected: 158671,
+		},
+	}
+	for _, tt := range tests {
+		testCase := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			buf, err := ioutil.ReadFile(filepath.Join("testdata/", "get_diagnostic_data.json"))
+			assert.NoError(t, err)
+
+			var m bson.M
+			err = json.Unmarshal(buf, &m)
+			assert.NoError(t, err)
+
+			sum, err := sumMetrics(m, testCase.paths)
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.expected, sum)
+		})
+	}
+}
+
+func TestCreateOldMetricFromNew(t *testing.T) {
+	rm := &rawMetric{
+		// Full Qualified Name
+		fqName: "mongodb_ss_globalLock_activeClients_mmm",
+		help:   "mongodb_ss_globalLock_activeClients_mmm",
+		ln:     []string{},
+		lv:     []string{},
+		val:    1,
+		vt:     prometheus.UntypedValue,
+	}
+	c := conversion{
+		oldName:     "mongodb_mongod_global_lock_client",
+		prefix:      "mongodb_ss_globalLock_activeClients",
+		suffixLabel: "type",
+	}
+
+	want := &rawMetric{
+		fqName: "mongodb_mongod_global_lock_client",
+		help:   "mongodb_mongod_global_lock_client",
+		ln:     []string{"type"},
+		lv:     []string{"mmm"}, // suffix is being converted. no mapping
+		val:    1,
+		vt:     3,
+	}
+	nm := createOldMetricFromNew(rm, c)
+	assert.Equal(t, want, nm)
 }

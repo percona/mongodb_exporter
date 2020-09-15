@@ -71,31 +71,39 @@ func New(opts *Opts) (*Exporter, error) {
 
 	ctx := context.Background()
 
-	client, err := connect(ctx, opts.URI)
-	if err != nil {
-		return nil, err
-	}
-
-	ti, err := newTopologyInfo(context.TODO(), client)
-	if err != nil {
-		return nil, err
-	}
-
 	exp := &Exporter{
-		client:           client,
 		path:             opts.Path,
 		logger:           opts.Logger,
 		opts:             opts,
 		webListenAddress: opts.WebListenAddress,
-		topologyInfo:     ti,
+	}
+	if opts.GlobalConnPool {
+		var err error
+		exp.client, err = connect(ctx, opts.URI)
+		if err != nil {
+			return nil, err
+		}
+
+		exp.topologyInfo, err = newTopologyInfo(context.TODO(), exp.client)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return exp, nil
 }
 
-func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prometheus.Registry {
+func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter) *prometheus.Registry {
 	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
 	registry := prometheus.NewRegistry()
+
+	gc := generalCollector{
+		ctx:    ctx,
+		client: client,
+		logger: e.opts.Logger,
+	}
+	registry.MustRegister(&gc)
+
 	if len(e.opts.CollStatsCollections) > 0 {
 		cc := collstatsCollector{
 			ctx:            ctx,
@@ -103,7 +111,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			collections:    e.opts.CollStatsCollections,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   e.topologyInfo,
+			topologyInfo:   topologyInfo,
 		}
 		registry.MustRegister(&cc)
 	}
@@ -114,7 +122,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:       client,
 			collections:  e.opts.IndexStatsCollections,
 			logger:       e.opts.Logger,
-			topologyInfo: e.topologyInfo,
+			topologyInfo: topologyInfo,
 		}
 		registry.MustRegister(&ic)
 	}
@@ -125,7 +133,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:         client,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   e.topologyInfo,
+			topologyInfo:   topologyInfo,
 		}
 		registry.MustRegister(&ddc)
 	}
@@ -136,7 +144,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client) *prom
 			client:         client,
 			compatibleMode: e.opts.CompatibleMode,
 			logger:         e.opts.Logger,
-			topologyInfo:   e.topologyInfo,
+			topologyInfo:   topologyInfo,
 		}
 		registry.MustRegister(&rsgsc)
 	}
@@ -149,6 +157,7 @@ func (e *Exporter) handler() http.Handler {
 		ctx := r.Context()
 
 		client := e.client
+		topologyInfo := e.topologyInfo
 		// Use per-request connection.
 		if !e.opts.GlobalConnPool {
 			var err error
@@ -160,6 +169,7 @@ func (e *Exporter) handler() http.Handler {
 					"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
 					http.StatusInternalServerError,
 				)
+
 				return
 			}
 
@@ -168,9 +178,21 @@ func (e *Exporter) handler() http.Handler {
 					e.logger.Errorf("Cannot disconnect mongo client: %v", err)
 				}
 			}()
+
+			topologyInfo, err = newTopologyInfo(context.TODO(), client)
+			if err != nil {
+				e.logger.Errorf("Cannot get topology info: %v", err)
+				http.Error(
+					w,
+					"An error has occurred while getting topology info:\n\n"+err.Error(),
+					http.StatusInternalServerError,
+				)
+
+				return
+			}
 		}
 
-		registry := e.makeRegistry(ctx, client)
+		registry := e.makeRegistry(ctx, client, topologyInfo)
 
 		gatherers := prometheus.Gatherers{}
 		gatherers = append(gatherers, prometheus.DefaultGatherer)

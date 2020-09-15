@@ -45,7 +45,7 @@ type topologyInfo struct {
 	// by a new connector, able to reconnect if needed. In case of reconnection, we should
 	// call loadLabels to refresh the labels because they might have changed
 	client *mongo.Client
-	lock   *sync.Mutex
+	rw     sync.RWMutex
 	labels map[string]string
 }
 
@@ -55,7 +55,6 @@ var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 func newTopologyInfo(ctx context.Context, client *mongo.Client) (*topologyInfo, error) {
 	ti := &topologyInfo{
 		client: client,
-		lock:   &sync.Mutex{},
 		labels: make(map[string]string),
 	}
 
@@ -69,14 +68,14 @@ func newTopologyInfo(ctx context.Context, client *mongo.Client) (*topologyInfo, 
 
 // baseLabels returns a copy of the topology labels because in some collectors like
 // collstats collector, we must use these base labels and add the namespace or other labels.
-func (t topologyInfo) baseLabels() map[string]string {
+func (t *topologyInfo) baseLabels() map[string]string {
 	c := map[string]string{}
 
-	t.lock.Lock()
+	t.rw.RLock()
 	for k, v := range t.labels {
 		c[k] = v
 	}
-	t.lock.Unlock()
+	t.rw.RUnlock()
 
 	return c
 }
@@ -84,8 +83,8 @@ func (t topologyInfo) baseLabels() map[string]string {
 // TopologyLabels reads several values from MongoDB instance like replicaset name, and other
 // topology information and returns a map of labels used to better identify the current monitored instance.
 func (t *topologyInfo) loadLabels(ctx context.Context) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.rw.Lock()
+	defer t.rw.Unlock()
 
 	t.labels = make(map[string]string)
 

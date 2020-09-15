@@ -18,27 +18,49 @@ package exporter
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
-func TestTopologyLabels(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+func TestGeneralCollector(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
+	c := &generalCollector{
+		ctx:    ctx,
+		client: client,
+		logger: logrus.New(),
+	}
 
-	ti, err := newTopologyInfo(ctx, client)
+	// The last \n at the end of this string is important
+	expected := strings.NewReader(`
+# HELP mongodb_up Whether MongoDB is up.
+# TYPE mongodb_up gauge
+mongodb_up 1` + "\n")
+
+	reg := prometheus.NewPedanticRegistry()
+	err := reg.Register(c)
 	require.NoError(t, err)
-	bl := ti.baseLabels()
 
-	assert.Equal(t, "rs1", bl[labelReplicasetName])
-	assert.Equal(t, "1", bl[labelReplicasetState])
-	assert.Equal(t, "shardsvr", bl[labelClusterRole])
-	assert.NotEmpty(t, bl[labelClusterID]) // this is variable inside a container
+	err = testutil.GatherAndCompare(reg, expected)
+	assert.NoError(t, err)
+
+	assert.NoError(t, client.Disconnect(ctx))
+
+	expected = strings.NewReader(`
+# HELP mongodb_up Whether MongoDB is up.
+# TYPE mongodb_up gauge
+mongodb_up 0` + "\n")
+	err = testutil.GatherAndCompare(reg, expected)
+	assert.NoError(t, err)
 }

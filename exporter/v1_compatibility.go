@@ -1,12 +1,26 @@
 package exporter
 
 import (
+	"context"
+	"fmt"
 	"strings"
+	"time"
 
+	"github.com/percona/percona-toolkit/src/go/mongolib/util"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+)
+
+var (
+	// ErrCannotAggregateShardingChangelogEvent Cannot aggregate a new Sharding Changelog Event.
+	ErrCannotAggregateShardingChangelogEvent = fmt.Errorf("failed to aggregate sharding changelog events")
+	// ErrInvalidMetricValue cannot create a new metric due to an invalid value.
+	ErrInvalidMetricValue = fmt.Errorf("invalid metric value")
 )
 
 /*
@@ -55,11 +69,19 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 		val:    rm.val,
 		vt:     rm.vt,
 		ln:     make([]string, 0, len(rm.ln)),
-		lv:     make([]string, len(rm.lv)),
+		lv:     make([]string, 0, len(rm.lv)),
 	}
 
 	// Label values remain the same
-	copy(oldMetric.lv, rm.lv)
+	// copy(oldMetric.lv, rm.lv)
+
+	for _, val := range rm.lv {
+		if newLabelVal, ok := c.labelValueConversions[val]; ok {
+			oldMetric.lv = append(oldMetric.lv, newLabelVal)
+			continue
+		}
+		oldMetric.lv = append(oldMetric.lv, val)
+	}
 
 	// Some label names should be converted from the new (current) name to the
 	// mongodb_exporter v1 compatible name
@@ -88,7 +110,7 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 //	 	suffixMapping: map[string]string{
 //	 		"bytes_currently_in_the_cache":                           "total",
 //	 		"tracked_dirty_bytes_in_the_cache":                       "dirty",
-//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": " internal_pages",
+//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
 //	 		"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
 //	 	},
 //	 },
@@ -112,31 +134,68 @@ func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 	return oldMetric
 }
 
+func cacheEvictedTotalMetric(m bson.M) (prometheus.Metric, error) {
+	s, err := sumMetrics(m, [][]string{
+		{"serverStatus", "wiredTiger", "cache", "modified pages evicted"},
+		{"serverStatus", "wiredTiger", "cache", "unmodified pages evicted"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	d := prometheus.NewDesc("mongodb_mongod_wiredtiger_cache_evicted_total", "wiredtiger cache evicted total", nil, nil)
+	metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s)
+	if err != nil {
+		return nil, err
+	}
+
+	return metric, nil
+}
+
+func sumMetrics(m bson.M, paths [][]string) (float64, error) {
+	var total float64
+
+	for _, path := range paths {
+		v := walkTo(m, path)
+		if v == nil {
+			continue
+		}
+
+		f, err := asFloat64(v)
+		if err != nil {
+			return 0, errors.Wrapf(ErrInvalidMetricValue, "%v", v)
+		}
+
+		total += *f
+	}
+
+	return total, nil
+}
+
 // Converts new metric to the old metric style and append it to the response slice.
 func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus.Metric {
-	compatibleMetric := metricRenameAndLabel(rm, conversions())
-	if compatibleMetric == nil {
+	compatibleMetrics := metricRenameAndLabel(rm, conversions())
+	if compatibleMetrics == nil {
 		return res
 	}
 
-	metric, err := rawToPrometheusMetric(compatibleMetric)
-	if err != nil {
-		invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-		res = append(res, invalidMetric)
-		return res
+	for _, compatibleMetric := range compatibleMetrics {
+		metric, err := rawToPrometheusMetric(compatibleMetric)
+		if err != nil {
+			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			res = append(res, invalidMetric)
+			return res
+		}
+
+		res = append(res, metric)
 	}
 
-	res = append(res, metric)
 	return res
 }
 
+//nolint:funlen
 func conversions() []conversion {
 	return []conversion{
-		{
-			newName:          "mongodb_ss_asserts",
-			oldName:          "mongodb_asserts_total",
-			labelConversions: map[string]string{"assert_type": "type"},
-		},
 		{
 			oldName:          "mongodb_asserts_total",
 			newName:          "mongodb_ss_asserts",
@@ -145,25 +204,46 @@ func conversions() []conversion {
 		{
 			oldName:          "mongodb_connections",
 			newName:          "mongodb_ss_connections",
-			labelConversions: map[string]string{"con_type": "state"},
+			labelConversions: map[string]string{"conn_type": "state"},
 		},
 		{
 			oldName: "mongodb_connections_metrics_created_total",
 			newName: "mongodb_ss_connections_totalCreated",
 		},
 		{
-			oldName: "mongodb_mongod_extra_info_page_faults_total",
+			oldName: "mongodb_extra_info_page_faults_total",
 			newName: "mongodb_ss_extra_info_page_faults",
 		},
 		{
-			oldName:     "mongodb_mongod_global_lock_client",   // {type="readers|writers"}
-			prefix:      "mongodb_ss_globalLock_activeClients", // _[readers|writers]
+			oldName: "mongodb_mongod_durability_journaled_megabytes",
+			newName: "mongodb_ss_dur_journaledMB",
+		},
+		{
+			oldName: "mongodb_mongod_durability_commits",
+			newName: "mongodb_ss_dur_commits",
+		},
+		{
+			oldName: "mongodb_mongod_background_flushing_average_milliseconds",
+			newName: "mongodb_ss_backgroundFlushing_average_ms",
+		},
+		{
+			oldName:     "mongodb_mongod_global_lock_client",
+			prefix:      "mongodb_ss_globalLock_activeClients",
 			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"readers": "reader",
+				"writers": "writer",
+				"total":   "total",
+			},
 		},
 		{
 			oldName:          "mongodb_mongod_global_lock_current_queue",
 			newName:          "mongodb_ss_globalLock_currentQueue",
 			labelConversions: map[string]string{"count_type": "type"},
+			labelValueConversions: map[string]string{
+				"readers": "reader",
+				"writers": "writer",
+			},
 		},
 		{
 			oldName: "mongodb_instance_local_time",
@@ -171,20 +251,33 @@ func conversions() []conversion {
 		},
 
 		{
+			oldName: "mongodb_mongod_instance_uptime_seconds",
+			newName: "mongodb_ss_uptime",
+		},
+		{
 			oldName: "mongodb_instance_uptime_seconds",
 			newName: "mongodb_ss_uptime",
 		},
 		{
-			oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total", //{database=*,lock_type="read|write"}
+			oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total",
 			newName: "mongodb_ss_locks_Local_acquireCount_[rw]",
 		},
 		{
-			oldName: "mongodb_memory", //{"resident|virtual|mapped|mapped_with_journal"}
+			oldName: "mongodb_memory",
 			newName: "mongodb_ss_mem_[resident|virtual]",
 		},
 		{
-			oldName:          "mongodb_mongod_metrics_cursor_open", //{state="noTimeout|pinned|total"}
-			newName:          "mongodb_ss_metrics_cursor_open",     //{csr_type="noTimeout|pinned|total""}
+			oldName:     "mongodb_memory",
+			prefix:      "mongodb_ss_mem",
+			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"mapped":            "mapped",
+				"mappedWithJournal": "mapped_with_journal",
+			},
+		},
+		{
+			oldName:          "mongodb_mongod_metrics_cursor_open",
+			newName:          "mongodb_ss_metrics_cursor_open",
 			labelConversions: map[string]string{"csr_type": "state"},
 		},
 		{
@@ -205,13 +298,17 @@ func conversions() []conversion {
 			newName: "mongodb_ss_metrics_getLastError_wtimeouts",
 		},
 		{
-			oldName:     "mongodb_mongod_metrics_operation_total", //{state="fastmod|idhack|scan_and_order"}
-			prefix:      "mongodb_ss_metrics_operation",           // _[fastmod|idhack|scanAndOrder] (I'm pretty sure fastmod is deprecated; idhack might be deprecated too.
+			oldName:     "mongodb_mongod_metrics_operation_total",
+			prefix:      "mongodb_ss_metrics_operation",
 			suffixLabel: "state",
+			suffixMapping: map[string]string{
+				"scanAndOrder":   "scanAndOrder",
+				"writeConflicts": "writeConflicts",
+			},
 		},
 		{
-			oldName:     "mongodb_mongod_metrics_query_executor_total", //{state="scanned|scannedObjects"}
-			prefix:      "mongodb_ss_metrics_query",                    // _[scanned|scannedObjects]
+			oldName:     "mongodb_mongod_metrics_query_executor_total",
+			prefix:      "mongodb_ss_metrics_query",
 			suffixLabel: "state",
 		},
 		{
@@ -243,8 +340,8 @@ func conversions() []conversion {
 			newName: "mongodb_ss_metrics_repl_buffer_sizeBytes",
 		},
 		{
-			oldName:     "mongodb_mongod_metrics_repl_executor_queue", //{type=*}
-			prefix:      "mongodb_ss_metrics_repl_executor_queues",    //_[networkInProgress|sleepers]
+			oldName:     "mongodb_mongod_metrics_repl_executor_queue",
+			prefix:      "mongodb_ss_metrics_repl_executor_queues",
 			suffixLabel: "type",
 		},
 		{
@@ -280,8 +377,8 @@ func conversions() []conversion {
 			newName: "mongodb_ss_metrics_ttl_passes",
 		},
 		{
-			oldName:     "mongodb_network_bytes_total", // {state="in_bytes|out_bytes"}
-			prefix:      "mongodb_ss_network",          //_[bytesIn|bytesOut]
+			oldName:     "mongodb_network_bytes_total",
+			prefix:      "mongodb_ss_network",
 			suffixLabel: "state",
 		},
 		{
@@ -289,18 +386,18 @@ func conversions() []conversion {
 			newName: "mongodb_ss_network_numRequests",
 		},
 		{
-			oldName:          "mongodb_op_counters_repl_total", //{type=*}
-			newName:          "mongodb_ss_opcountersRepl",      //{legacy_op_type=*}
+			oldName:          "mongodb_mongod_op_counters_repl_total",
+			newName:          "mongodb_ss_opcountersRepl",
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
-			oldName:          "mongodb_op_counters_total", // {type=*}
-			newName:          "mongodb_ss_opcounters",     //{legacy_op_type=*}
+			oldName:          "mongodb_op_counters_total",
+			newName:          "mongodb_ss_opcounters",
 			labelConversions: map[string]string{"legacy_op_type": "type"},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_blockmanager_blocks_total", //{type="read|read_mapped|pre_loaded|written"}
-			prefix:      "mongodb_ss_wt_block_manager",                         //_[blocks_read|mapped_blocks_read|blocks_written|blocks_pre_loaded]
+			oldName:     "mongodb_mongod_wiredtiger_blockmanager_blocks_total",
+			prefix:      "mongodb_ss_wt_block_manager",
 			suffixLabel: "type",
 		},
 		{
@@ -344,33 +441,40 @@ func conversions() []conversion {
 			newName: "mongodb_ss_wt_txn_transaction_checkpoint_currently_running",
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_transactions_total", // {type="begins|checkpoints|committed|rolledback"}
-			prefix:      "mongodb_ss_wt_txn_transactions",               //_[begins|checkpoints|committed|rolled_back]
+			oldName:     "mongodb_mongod_wiredtiger_transactions_total",
+			prefix:      "mongodb_ss_wt_txn_transactions",
 			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"begins":      "begins",
+				"checkpoints": "checkpoints",
+				"committed":   "committed",
+				"rolled_back": "rolled_back",
+			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_blockmanager_bytes_total", //{type=read|read_mapped|written"}
-			prefix:      "mongodb_ss_wt_block_manager",                        //_[bytes_read|mapped_bytes_read|bytes_written]
+			oldName:     "mongodb_mongod_wiredtiger_blockmanager_bytes_total",
+			prefix:      "mongodb_ss_wt_block_manager",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"bytes_read": "read", "mapped_bytes_read": "read_mapped",
 				"bytes_written": "written",
 			},
 		},
+		// the 2 metrics bellow have the same prefix.
 		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_bytes", //{type="total|dirty|internal_pages|leaf_pages"}
-			prefix:      "mongodb_ss_wt_cache_bytes",             //_[bytes_currently_in_the_cache|tracked_dirty_bytes_in_the_cache|tracked_bytes_belonging_to_internal_pages_in_the_cache|tracked_bytes_belonging_to_leaf_pages_in_the_cache]
+			oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
+			prefix:      "mongodb_ss_wt_cache_bytes",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
-				"bytes_currently_in_the_cache":                           "total",
+				"currently_in_the_cache":                                 "total",
 				"tracked_dirty_bytes_in_the_cache":                       "dirty",
 				"tracked_bytes_belonging_to_internal_pages_in_the_cache": " internal_pages",
 				"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total", //{type="read", "written"}
-			prefix:      "mongodb_ss_wt_cache",                         //_[bytes read into cache|bytes written from cache]
+			oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total",
+			prefix:      "mongodb_ss_wt_cache",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"bytes_read_into_cache":    "read",
@@ -378,17 +482,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_evicted_total", //{type="modified|unmodified"}
-			prefix:      "mongodb_ss_wt_cache",                           //_[modified pages evicted|unmodified_pages_evicted]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"modified_pages_evicted":   "modified",
-				"unmodified_pages_evicted": "unmodified",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_pages", //{type="total|dirty"}
-			prefix:      "mongodb_ss_wt_cache",                   //_[pages_currently_held_in_the_cache|tracked_dirty_pages_in_the_cache]
+			oldName:     "mongodb_mongod_wiredtiger_cache_pages",
+			prefix:      "mongodb_ss_wt_cache",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"pages_currently_held_in_the_cache": "total",
@@ -396,8 +491,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_pages_total", //{type="read|written"}
-			prefix:      "mongodb_ss_wt_cache",                         //_[pages_read_into_cache|pages_written_from_cache]
+			oldName:     "mongodb_mongod_wiredtiger_cache_pages_total",
+			prefix:      "mongodb_ss_wt_cache",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"pages_read_into_cache":    "read",
@@ -405,8 +500,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_log_records_total", //{type="compressed|uncompressed"}
-			prefix:      "mongodb_ss_wt_log",                           //_[log records compressed|log_records_not_compressed]
+			oldName:     "mongodb_mongod_wiredtiger_log_records_total",
+			prefix:      "mongodb_ss_wt_log",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"log_records_compressed":     "compressed",
@@ -414,8 +509,8 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_log_bytes_total", //{type="payload|unwritten"}
-			prefix:      "mongodb_ss_wt_log",                         //_[log_bytes_of_payload_data|log_bytes_written
+			oldName:     "mongodb_mongod_wiredtiger_log_bytes_total",
+			prefix:      "mongodb_ss_wt_log",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"log_bytes_of_payload_data": "payload",
@@ -423,7 +518,7 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_log_operations_total", //{type="
+			oldName:     "mongodb_mongod_wiredtiger_log_operations_total",
 			prefix:      "mongodb_ss_wt_log",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
@@ -437,13 +532,69 @@ func conversions() []conversion {
 			},
 		},
 		{
-			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds", //{type="min|max"}
-			prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",                       //_[min|max]_time_msecs
+			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
+			prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"min_time_msecs": "min",
 				"max_time_msecs": "max",
 			},
+		},
+		{
+			oldName:          "mongodb_mongod_global_lock_current_queue",
+			prefix:           "mongodb_mongod_global_lock_current_queue",
+			labelConversions: map[string]string{"op_type": "type"},
+		},
+		{
+			oldName:          "mongodb_mongod_op_latencies_ops_total",
+			newName:          "mongodb_ss_opLatencies_ops",
+			labelConversions: map[string]string{"op_type": "type"},
+			labelValueConversions: map[string]string{
+				"commands": "command",
+				"reads":    "read",
+				"writes":   "write",
+			},
+		},
+		{
+			oldName:          "mongodb_mongod_op_latencies_latency_total",
+			newName:          "mongodb_ss_opLatencies_latency",
+			labelConversions: map[string]string{"op_type": "type"},
+			labelValueConversions: map[string]string{
+				"commands": "command",
+				"reads":    "read",
+				"writes":   "write",
+			},
+		},
+		{
+			oldName:          "mongodb_mongod_metrics_document_total",
+			newName:          "mongodb_ss_metrics_document",
+			labelConversions: map[string]string{"doc_op_type": "state"},
+		},
+		{
+			oldName:     "mongodb_mongod_metrics_query_executor_total",
+			prefix:      "mongodb_ss_metrics_queryExecutor",
+			suffixLabel: "state",
+			suffixMapping: map[string]string{
+				"scanned":        "scanned",
+				"scannedObjects": "scanned_objects",
+			},
+		},
+		{
+			oldName:     "mongodb_memory",
+			prefix:      "mongodb_ss_mem",
+			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"resident": "resident",
+				"virtual":  "virtual",
+			},
+		},
+		{
+			oldName: "mongodb_mongod_metrics_get_last_error_wtime_total_milliseconds",
+			newName: "mongodb_ss_metrics_getLastError_wtime_totalMillis",
+		},
+		{
+			oldName: "mongodb_ss_wt_cache_maximum_bytes_configured",
+			newName: "mongodb_mongod_wiredtiger_cache_max_bytes",
 		},
 	}
 }
@@ -509,15 +660,16 @@ func lockMetrics() []lockMetric {
 // ready to be exposed, taking the value for each metric from th provided bson.M structure from
 // getDiagnosticData.
 func locksMetrics(m bson.M) []prometheus.Metric {
-	res := make([]prometheus.Metric, 0, len(lockMetrics()))
+	metrics := lockMetrics()
+	res := make([]prometheus.Metric, 0, len(metrics))
 
-	for _, lm := range lockMetrics() {
+	for _, lm := range metrics {
 		mm, err := makeLockMetric(m, lm)
 		if mm == nil {
 			continue
 		}
 		if err != nil {
-			logrus.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
+			logrus.Errorf("cannot convert rw metric %s to old style: %s", mm.Desc(), err)
 			continue
 		}
 		res = append(res, mm)
@@ -553,15 +705,598 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 	return prometheus.NewConstMetric(d, prometheus.UntypedValue, *f, lv...)
 }
 
-// PMM dashboards looks for this metric so, in compatibility mode, we must expose it.
-// FIXME Add it in both modes, move away from that file: https://jira.percona.com/browse/PMM-6585
-func mongodbUpMetric() prometheus.Metric {
-	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
-	up, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
-	if err != nil {
-		panic(err)
+type specialMetric struct {
+	paths  [][]string
+	labels map[string]string
+	name   string
+	help   string
+}
+
+func specialMetricDefinitions() []specialMetric {
+	return []specialMetric{
+		{
+			name: "mongodb_mongod_locks_time_acquiring_global_microseconds_total",
+			help: "sum of serverStatus.locks.Global.timeAcquiringMicros.[r|w]",
+			paths: [][]string{
+				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "r"},
+				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "w"},
+			},
+		},
 	}
-	return up
+}
+
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Logger) []prometheus.Metric {
+	metrics := make([]prometheus.Metric, 0)
+
+	for _, def := range specialMetricDefinitions() {
+		val, err := sumMetrics(m, def.paths)
+		if err != nil {
+			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
+			continue
+		}
+
+		d := prometheus.NewDesc(def.name, def.help, nil, def.labels)
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
+		if err != nil {
+			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
+			continue
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	metrics = append(metrics, storageEngine(m))
+	metrics = append(metrics, serverVersion(m))
+
+	ms, err := myState(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for my state: %s", err)
+	} else {
+		metrics = append(metrics, ms)
+	}
+
+	if ed := electionDate(m); ed != nil {
+		metrics = append(metrics, ed)
+	}
+
+	if rl := replicationLag(m); rl != nil {
+		metrics = append(metrics, rl)
+	}
+
+	return metrics
+}
+
+func storageEngine(m bson.M) prometheus.Metric {
+	v := walkTo(m, []string{"serverStatus", "storageEngine", "name"})
+	name := "mongodb_mongod_storage_engine"
+	help := "The storage engine used by the MongoDB instance"
+
+	engine, ok := v.(string)
+	if !ok {
+		engine = "Engine is unavailable"
+	}
+	labels := map[string]string{"engine": engine}
+
+	d := prometheus.NewDesc(name, help, nil, labels)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+
+	return metric
+}
+
+func serverVersion(m bson.M) prometheus.Metric {
+	v := walkTo(m, []string{"serverStatus", "version"})
+	name := "mongodb_version_info"
+	help := "The server version"
+
+	serverVersion, ok := v.(string)
+	if !ok {
+		serverVersion = "server version is unavailable"
+	}
+	labels := map[string]string{"mongodb": serverVersion}
+
+	d := prometheus.NewDesc(name, help, nil, labels)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+
+	return metric
+}
+
+func myState(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	state, err := util.MyState(ctx, client)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot get my state")
+	}
+
+	rs, err := util.ReplicasetConfig(ctx, client)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot get replicaset config")
+	}
+
+	name := "mongodb_mongod_replset_my_state"
+	help := "An integer between 0 and 10 that represents the replica state of the current member"
+
+	labels := map[string]string{"set": rs.Config.ID}
+
+	d := prometheus.NewDesc(name, help, nil, labels)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(state))
+
+	return metric, nil
+}
+
+func electionDate(m bson.M) prometheus.Metric {
+	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
+	if !ok {
+		return nil
+	}
+	members, ok := replSetGetStatus["members"].(primitive.A)
+	if !ok {
+		return nil
+	}
+
+	name := "mongodb_mongod_replset_member_election_date"
+	help := "The timestamp the node was elected as replica leader"
+
+	for _, member := range members {
+		if date, ok := member.(bson.M)["electionTime"].(primitive.Timestamp); ok {
+			labels := map[string]string{"name": member.(bson.M)["name"].(string)}
+			d := prometheus.NewDesc(name, help, nil, labels)
+			metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(date.T))
+
+			return metric
+		}
+	}
+
+	return nil
+}
+
+func replicationLag(m bson.M) prometheus.Metric {
+	var primaryTS, selfTS primitive.Timestamp
+	var hasPrimary bool
+	var name, statestr string
+
+	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
+	if !ok {
+		return nil
+	}
+	members, ok := replSetGetStatus["members"].(primitive.A)
+	if !ok {
+		return nil
+	}
+	for _, member := range members {
+		if statestr, ok := member.(bson.M)["stateStr"].(string); ok && statestr == "PRIMARY" {
+			if optime, ok := member.(bson.M)["optime"].(bson.M); ok {
+				if ts, tok := optime["ts"].(primitive.Timestamp); tok {
+					primaryTS = ts
+					hasPrimary = true
+				}
+			}
+		}
+
+		if self, ok := member.(bson.M)["self"].(bool); ok && self {
+			if optime, ok := member.(bson.M)["optime"].(bson.M); ok {
+				if ts, tok := optime["ts"].(primitive.Timestamp); tok {
+					selfTS = ts
+					name, _ = member.(bson.M)["name"].(string)
+					statestr, _ = member.(bson.M)["stateStr"].(string)
+				}
+			}
+		}
+	}
+
+	if !hasPrimary {
+		return nil
+	}
+
+	if statestr == "PRIMARY" {
+		return nil
+	}
+
+	val := float64(primaryTS.T - selfTS.T)
+	set, _ := replSetGetStatus["set"].(string)
+
+	metricName := "mongodb_mongod_replset_member_replication_lag"
+	help := "The replication lag that this member has with the primary."
+
+	labels := map[string]string{
+		"name":  name,
+		"state": statestr,
+		"set":   set,
+	}
+	d := prometheus.NewDesc(metricName, help, nil, labels)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
+
+	return metric
+}
+
+func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+	metrics := make([]prometheus.Metric, 0)
+
+	if metric, err := databasesTotalPartitioned(ctx, client); err != nil {
+		l.Debugf("cannot create metric for database total: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	if metric, err := databasesTotalUnpartitioned(ctx, client); err != nil {
+		l.Debugf("cannot create metric for database total: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	if metric, err := shardedCollectionsTotal(ctx, client); err != nil {
+		l.Debugf("cannot create metric for collections total: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	metrics = append(metrics, balancerEnabled(ctx, client))
+
+	metric, err := chunksTotal(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for chunks total: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	ms, err := chunksTotalPerShard(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for chunks total per shard: %s", err)
+	} else {
+		metrics = append(metrics, ms...)
+	}
+
+	if metric, err := chunksBalanced(ctx, client); err != nil {
+		l.Debugf("cannot create metric for chunks balanced: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	ms, err = changelog10m(ctx, client)
+	if err != nil {
+		l.Errorf("cannot create metric for changelog: %s", err)
+	} else {
+		metrics = append(metrics, ms...)
+	}
+
+	metrics = append(metrics, dbstatsMetrics(ctx, client, l)...)
+
+	if metric, err := shardingShardsTotal(ctx, client); err != nil {
+		l.Debugf("cannot create metric for database total: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	if metric, err := shardingShardsDrainingTotal(ctx, client); err != nil {
+		l.Debugf("cannot create metric for database total: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	return metrics
+}
+
+func databasesTotalPartitioned(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	n, err := client.Database("config").Collection("databases").CountDocuments(ctx, bson.M{"partitioned": true})
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_sharding_databases_total"
+	help := "Total number of sharded databases"
+	labels := map[string]string{"type": "partitioned"}
+
+	d := prometheus.NewDesc(name, help, nil, labels)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+func databasesTotalUnpartitioned(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	n, err := client.Database("config").Collection("databases").CountDocuments(ctx, bson.M{"partitioned": false})
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_sharding_databases_total"
+	help := "Total number of sharded databases"
+	labels := map[string]string{"type": "unpartitioned"}
+
+	d := prometheus.NewDesc(name, help, nil, labels)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+// shardedCollectionsTotal gets total sharded collections.
+func shardedCollectionsTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	collCount, err := client.Database("config").Collection("collections").CountDocuments(ctx, bson.M{"dropped": false})
+	if err != nil {
+		return nil, err
+	}
+	name := "mongodb_mongos_sharding_collections_total"
+	help := "Total # of Collections with Sharding enabled"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(collCount))
+}
+
+func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	var m struct {
+		InBalancerRound bool `bson:"inBalancerRound"`
+	}
+
+	cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
+	res := client.Database("admin").RunCommand(ctx, cmd)
+
+	if err := res.Decode(&m); err != nil {
+		return nil, err
+	}
+
+	value := float64(0)
+	if !m.InBalancerRound {
+		value = 1
+	}
+
+	name := "mongodb_mongos_sharding_chunks_is_balanced"
+	help := "Shards are balanced"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
+}
+
+func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metric {
+	type bss struct {
+		stopped bool `bson:"stopped"`
+	}
+	var bs bss
+	enabled := 0
+
+	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
+	if err != nil {
+		enabled = 1
+	} else if !bs.stopped {
+		enabled = 1
+	}
+
+	name := "mongodb_mongos_sharding_balancer_enabled"
+	help := "Balancer is enabled"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
+
+	return metric
+}
+
+func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	n, err := client.Database("config").Collection("chunks").CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_sharding_chunks_total"
+	help := "Total number of chunks"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+	aggregation := bson.D{
+		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
+	}
+
+	cursor, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
+	if err != nil {
+		return nil, err
+	}
+
+	var shards []bson.M
+	if err = cursor.All(ctx, &shards); err != nil {
+		return nil, err
+	}
+
+	metrics := make([]prometheus.Metric, 0, len(shards))
+
+	for _, shard := range shards {
+		help := "Total number of chunks per shard"
+		labels := map[string]string{"shard": shard["_id"].(string)}
+
+		d := prometheus.NewDesc("mongodb_mongos_sharding_shard_chunks_total", help, nil, labels)
+		val, ok := shard["count"].(int32)
+		if !ok {
+			continue
+		}
+
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(val))
+		if err != nil {
+			continue
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	return metrics, nil
+}
+
+func shardingShardsTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	n, err := client.Database("config").Collection("shards").CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_sharding_shards_total"
+	help := "Total number of shards"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+func shardingShardsDrainingTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	n, err := client.Database("config").Collection("shards").CountDocuments(ctx, bson.M{"draining": true})
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_sharding_shards_draining_total"
+	help := "Total number of drainingshards"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+// ShardingChangelogSummaryID Sharding Changelog Summary ID.
+type ShardingChangelogSummaryID struct {
+	Event string `bson:"event"`
+	Note  string `bson:"note"`
+}
+
+// ShardingChangelogSummary Sharding Changelog Summary.
+type ShardingChangelogSummary struct {
+	ID    *ShardingChangelogSummaryID `bson:"_id"`
+	Count float64                     `bson:"count"`
+}
+
+// ShardingChangelogStats is an array of Sharding changelog stats.
+type ShardingChangelogStats struct {
+	Items *[]ShardingChangelogSummary
+}
+
+func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+	var metrics []prometheus.Metric
+
+	coll := client.Database("config").Collection("changelog")
+	match := bson.M{"time": bson.M{"$gt": time.Now().Add(-10 * time.Minute)}}
+	group := bson.M{"_id": bson.M{"event": "$what", "note": "$details.note"}, "count": bson.M{"$sum": 1}}
+
+	c, err := coll.Aggregate(ctx, []bson.M{{"$match": match}, {"$group": group}})
+	if err != nil {
+		return nil, errors.Wrap(err, ErrCannotAggregateShardingChangelogEvent.Error())
+	}
+
+	defer c.Close(ctx) //nolint:errcheck
+
+	for c.Next(ctx) {
+		s := &ShardingChangelogSummary{}
+		if err := c.Decode(s); err != nil {
+			log.Error(err)
+			continue
+		}
+
+		name := "mongodb_mongos_sharding_changelog_10min_total"
+		help := "mongodb_mongos_sharding_changelog_10min_total"
+
+		labelValue := s.ID.Event
+		if s.ID.Note != "" {
+			labelValue += "." + s.ID.Note
+		}
+
+		d := prometheus.NewDesc(name, help, nil, map[string]string{"event": labelValue})
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s.Count)
+		if err != nil {
+			continue
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	if err := c.Err(); err != nil {
+		return nil, err
+	}
+
+	return metrics, nil
+}
+
+// DatabaseStatList contains stats from all databases.
+type databaseStatList struct {
+	Members []databaseStatus
+}
+
+// DatabaseStatus represents stats about a database (mongod and raw from mongos).
+type databaseStatus struct {
+	rawStatus                       // embed to collect top-level attributes
+	Shards    map[string]*rawStatus `bson:"raw,omitempty"`
+}
+
+// RawStatus represents stats about a database from Mongos side.
+type rawStatus struct {
+	Name        string `bson:"db,omitempty"`
+	IndexSize   int    `bson:"indexSize,omitempty"`
+	DataSize    int    `bson:"dataSize,omitempty"`
+	Collections int    `bson:"collections,omitempty"`
+	Objects     int    `bson:"objects,omitempty"`
+	Indexes     int    `bson:"indexes,omitempty"`
+}
+
+func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Logger) *databaseStatList {
+	dbStatList := &databaseStatList{}
+	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
+	if err != nil {
+		l.Errorf("Failed to get database names: %s.", err)
+		return nil
+	}
+	l.Debugf("getting stats for databases: %v", dbNames)
+	for _, db := range dbNames {
+		dbStatus := databaseStatus{}
+		r := client.Database(db).RunCommand(context.TODO(), bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}})
+		err := r.Decode(&dbStatus)
+		if err != nil {
+			l.Errorf("Failed to get database status: %s.", err)
+			return nil
+		}
+		dbStatList.Members = append(dbStatList.Members, dbStatus)
+	}
+
+	return dbStatList
+}
+
+func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+	var metrics []prometheus.Metric
+
+	dbStatList := getDatabaseStatList(ctx, client, l)
+
+	for _, member := range dbStatList.Members {
+		if len(member.Shards) > 0 {
+			for shard, stats := range member.Shards {
+				labels := prometheus.Labels{
+					"db":    stats.Name,
+					"shard": strings.Split(shard, "/")[0],
+				}
+
+				name := "mongodb_mongos_db_data_size_bytes"
+				help := "The total size in bytes of the uncompressed data held in this database"
+
+				d := prometheus.NewDesc(name, help, nil, labels)
+				metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(stats.DataSize))
+				if err == nil {
+					metrics = append(metrics, metric)
+				}
+
+				name = "mongodb_mongos_db_indexes_total"
+				help = "Contains a count of the total number of indexes across all collections in the database"
+
+				d = prometheus.NewDesc(name, help, nil, labels)
+				metric, err = prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(stats.Indexes))
+				if err == nil {
+					metrics = append(metrics, metric)
+				}
+
+				name = "mongodb_mongos_db_index_size_bytes"
+				help = "The total size in bytes of all indexes created on this database"
+
+				d = prometheus.NewDesc(name, help, nil, labels)
+				metric, err = prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(stats.IndexSize))
+				if err == nil {
+					metrics = append(metrics, metric)
+				}
+
+				name = "mongodb_mongos_db_collections_total"
+				help = "Total number of collections"
+
+				d = prometheus.NewDesc(name, help, nil, labels)
+				metric, err = prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(stats.Collections))
+				if err == nil {
+					metrics = append(metrics, metric)
+				}
+			}
+		}
+	}
+
+	return metrics
 }
 
 func walkTo(m primitive.M, path []string) interface{} {
