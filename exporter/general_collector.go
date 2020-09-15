@@ -51,12 +51,8 @@ func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logg
 	}
 
 	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
-	up, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
-	if err != nil {
-		log.Errorf("cannot get mongo_up metric: %s", err)
-	}
 
-	return up
+	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
 }
 
 var _ prometheus.Collector = (*generalCollector)(nil)
