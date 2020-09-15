@@ -110,7 +110,7 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 //	 	suffixMapping: map[string]string{
 //	 		"bytes_currently_in_the_cache":                           "total",
 //	 		"tracked_dirty_bytes_in_the_cache":                       "dirty",
-//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": " internal_pages",
+//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
 //	 		"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
 //	 	},
 //	 },
@@ -174,19 +174,21 @@ func sumMetrics(m bson.M, paths [][]string) (float64, error) {
 
 // Converts new metric to the old metric style and append it to the response slice.
 func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus.Metric {
-	compatibleMetric := metricRenameAndLabel(rm, conversions())
-	if compatibleMetric == nil {
+	compatibleMetrics := metricRenameAndLabel(rm, conversions())
+	if compatibleMetrics == nil {
 		return res
 	}
 
-	metric, err := rawToPrometheusMetric(compatibleMetric)
-	if err != nil {
-		invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-		res = append(res, invalidMetric)
-		return res
-	}
+	for _, compatibleMetric := range compatibleMetrics {
+		metric, err := rawToPrometheusMetric(compatibleMetric)
+		if err != nil {
+			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			res = append(res, invalidMetric)
+			return res
+		}
 
-	res = append(res, metric)
+		res = append(res, metric)
+	}
 
 	return res
 }
@@ -194,11 +196,6 @@ func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus
 //nolint:funlen
 func conversions() []conversion {
 	return []conversion{
-		{
-			newName:          "mongodb_ss_asserts",
-			oldName:          "mongodb_asserts_total",
-			labelConversions: map[string]string{"assert_type": "type"},
-		},
 		{
 			oldName:          "mongodb_asserts_total",
 			newName:          "mongodb_ss_asserts",
@@ -258,12 +255,25 @@ func conversions() []conversion {
 			newName: "mongodb_ss_uptime",
 		},
 		{
+			oldName: "mongodb_instance_uptime_seconds",
+			newName: "mongodb_ss_uptime",
+		},
+		{
 			oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total",
 			newName: "mongodb_ss_locks_Local_acquireCount_[rw]",
 		},
 		{
 			oldName: "mongodb_memory",
 			newName: "mongodb_ss_mem_[resident|virtual]",
+		},
+		{
+			oldName:     "mongodb_memory",
+			prefix:      "mongodb_ss_mem",
+			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"mapped":            "mapped",
+				"mappedWithJournal": "mapped_with_journal",
+			},
 		},
 		{
 			oldName:          "mongodb_mongod_metrics_cursor_open",
@@ -1223,7 +1233,6 @@ func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Lo
 	for _, db := range dbNames {
 		dbStatus := databaseStatus{}
 		r := client.Database(db).RunCommand(context.TODO(), bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}})
-		debugResult(l, r)
 		err := r.Decode(&dbStatus)
 		if err != nil {
 			l.Errorf("Failed to get database status: %s.", err)
