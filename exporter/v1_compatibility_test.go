@@ -116,12 +116,11 @@ func TestAddLocksMetrics(t *testing.T) {
 	assert.Equal(t, want, desc)
 }
 
-func Test_sumMetrics(t *testing.T) {
+func TestSumMetrics(t *testing.T) {
 	tests := []struct {
-		name    string
-		paths   [][]string
-		want    float64
-		wantErr bool
+		name     string
+		paths    [][]string
+		expected float64
 	}{
 		{
 			name: "timeAcquire",
@@ -129,8 +128,7 @@ func Test_sumMetrics(t *testing.T) {
 				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "W"},
 				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "w"},
 			},
-			want:    42361,
-			wantErr: false,
+			expected: 42361,
 		},
 		{
 			name: "timeAcquire",
@@ -138,8 +136,7 @@ func Test_sumMetrics(t *testing.T) {
 				{"serverStatus", "locks", "Global", "acquireCount", "r"},
 				{"serverStatus", "locks", "Global", "acquireCount", "w"},
 			},
-			want:    158671,
-			wantErr: false,
+			expected: 158671,
 		},
 	}
 	for _, tt := range tests {
@@ -153,14 +150,9 @@ func Test_sumMetrics(t *testing.T) {
 			err = json.Unmarshal(buf, &m)
 			assert.NoError(t, err)
 
-			got, err := sumMetrics(m, testCase.paths)
-			if (err != nil) != testCase.wantErr {
-				t.Errorf("sumMetrics() error = %v, wantErr %v", err, testCase.wantErr)
-				return
-			}
-			if got != testCase.want {
-				t.Errorf("sumMetrics() got = %v, want %v", got, testCase.want)
-			}
+			sum, err := sumMetrics(m, testCase.paths)
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.expected, sum)
 		})
 	}
 }
