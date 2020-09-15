@@ -898,7 +898,7 @@ func replicationLag(m bson.M) prometheus.Metric {
 }
 
 func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
-	metrics := []prometheus.Metric{}
+	metrics := make([]prometheus.Metric, 0)
 
 	if metric, err := databasesTotalPartitioned(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
@@ -912,11 +912,24 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, metric)
 	}
 
+	if metric, err := shardedCollectionsTotal(ctx, client); err != nil {
+		l.Debugf("cannot create metric for collections total: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
 	metrics = append(metrics, balancerEnabled(ctx, client))
 
-	ms, err := chunksTotal(ctx, client)
+	metric, err := chunksTotal(ctx, client)
 	if err != nil {
-		l.Debugf("cannot create metric for collections total: %s", err)
+		l.Debugf("cannot create metric for chunks total: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	ms, err := chunksTotalPerShard(ctx, client)
+	if err != nil {
+		l.Debugf("cannot create metric for chunks total per shard: %s", err)
 	} else {
 		metrics = append(metrics, ms...)
 	}
@@ -934,7 +947,7 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, ms...)
 	}
 
-	metrics = append(metrics, dbstatsMetrics(ctx, client)...)
+	metrics = append(metrics, dbstatsMetrics(ctx, client, l)...)
 
 	if metric, err := shardingShardsTotal(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
@@ -977,6 +990,19 @@ func databasesTotalUnpartitioned(ctx context.Context, client *mongo.Client) (pro
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+// shardedCollectionsTotal gets total sharded collections.
+func shardedCollectionsTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	collCount, err := client.Database("config").Collection("collections").CountDocuments(ctx, bson.M{"dropped": false})
+	if err != nil {
+		return nil, err
+	}
+	name := "mongodb_mongos_sharding_collections_total"
+	help := "Total # of Collections with Sharding enabled"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(collCount))
 }
 
 func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
@@ -1026,7 +1052,20 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metri
 	return metric
 }
 
-func chunksTotal(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	n, err := client.Database("config").Collection("chunks").CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_sharding_chunks_total"
+	help := "Total number of chunks"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
+}
+
+func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
 	aggregation := bson.D{
 		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
 	}
@@ -1044,11 +1083,10 @@ func chunksTotal(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	metrics := make([]prometheus.Metric, 0, len(shards))
 
 	for _, shard := range shards {
-		name := "mongodb_mongos_sharding_shard_chunks_total"
 		help := "Total number of chunks per shard"
 		labels := map[string]string{"shard": shard["_id"].(string)}
 
-		d := prometheus.NewDesc(name, help, nil, labels)
+		d := prometheus.NewDesc("mongodb_mongos_sharding_shard_chunks_total", help, nil, labels)
 		val, ok := shard["count"].(int32)
 		if !ok {
 			continue
@@ -1174,19 +1212,21 @@ type rawStatus struct {
 	Indexes     int    `bson:"indexes,omitempty"`
 }
 
-func getDatabaseStatList(ctx context.Context, client *mongo.Client) *databaseStatList {
+func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Logger) *databaseStatList {
 	dbStatList := &databaseStatList{}
 	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
-		log.Errorf("Failed to get database names: %s.", err)
+		l.Errorf("Failed to get database names: %s.", err)
 		return nil
 	}
+	l.Debugf("getting stats for databases: %v", dbNames)
 	for _, db := range dbNames {
 		dbStatus := databaseStatus{}
 		r := client.Database(db).RunCommand(context.TODO(), bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}})
+		debugResult(l, r)
 		err := r.Decode(&dbStatus)
 		if err != nil {
-			log.Errorf("Failed to get database status: %s.", err)
+			l.Errorf("Failed to get database status: %s.", err)
 			return nil
 		}
 		dbStatList.Members = append(dbStatList.Members, dbStatus)
@@ -1195,10 +1235,10 @@ func getDatabaseStatList(ctx context.Context, client *mongo.Client) *databaseSta
 	return dbStatList
 }
 
-func dbstatsMetrics(ctx context.Context, client *mongo.Client) []prometheus.Metric {
+func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
 	var metrics []prometheus.Metric
 
-	dbStatList := getDatabaseStatList(ctx, client)
+	dbStatList := getDatabaseStatList(ctx, client, l)
 
 	for _, member := range dbStatList.Members {
 		if len(member.Shards) > 0 {
