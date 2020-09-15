@@ -116,12 +116,11 @@ func TestAddLocksMetrics(t *testing.T) {
 	assert.Equal(t, want, desc)
 }
 
-func Test_sumMetrics(t *testing.T) {
+func TestSumMetrics(t *testing.T) {
 	tests := []struct {
-		name    string
-		paths   [][]string
-		want    float64
-		wantErr bool
+		name     string
+		paths    [][]string
+		expected float64
 	}{
 		{
 			name: "timeAcquire",
@@ -129,8 +128,7 @@ func Test_sumMetrics(t *testing.T) {
 				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "W"},
 				{"serverStatus", "locks", "Global", "timeAcquiringMicros", "w"},
 			},
-			want:    42361,
-			wantErr: false,
+			expected: 42361,
 		},
 		{
 			name: "timeAcquire",
@@ -138,8 +136,7 @@ func Test_sumMetrics(t *testing.T) {
 				{"serverStatus", "locks", "Global", "acquireCount", "r"},
 				{"serverStatus", "locks", "Global", "acquireCount", "w"},
 			},
-			want:    158671,
-			wantErr: false,
+			expected: 158671,
 		},
 	}
 	for _, tt := range tests {
@@ -153,14 +150,37 @@ func Test_sumMetrics(t *testing.T) {
 			err = json.Unmarshal(buf, &m)
 			assert.NoError(t, err)
 
-			got, err := sumMetrics(m, testCase.paths)
-			if (err != nil) != testCase.wantErr {
-				t.Errorf("sumMetrics() error = %v, wantErr %v", err, testCase.wantErr)
-				return
-			}
-			if got != testCase.want {
-				t.Errorf("sumMetrics() got = %v, want %v", got, testCase.want)
-			}
+			sum, err := sumMetrics(m, testCase.paths)
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.expected, sum)
 		})
 	}
+}
+
+func TestCreateOldMetricFromNew(t *testing.T) {
+	rm := &rawMetric{
+		// Full Qualified Name
+		fqName: "mongodb_ss_globalLock_activeClients_mmm",
+		help:   "mongodb_ss_globalLock_activeClients_mmm",
+		ln:     []string{},
+		lv:     []string{},
+		val:    1,
+		vt:     prometheus.UntypedValue,
+	}
+	c := conversion{
+		oldName:     "mongodb_mongod_global_lock_client",
+		prefix:      "mongodb_ss_globalLock_activeClients",
+		suffixLabel: "type",
+	}
+
+	want := &rawMetric{
+		fqName: "mongodb_mongod_global_lock_client",
+		help:   "mongodb_mongod_global_lock_client",
+		ln:     []string{"type"},
+		lv:     []string{"mmm"}, // suffix is being converted. no mapping
+		val:    1,
+		vt:     3,
+	}
+	nm := createOldMetricFromNew(rm, &c)
+	assert.Equal(t, want, nm)
 }
