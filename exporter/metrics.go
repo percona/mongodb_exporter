@@ -124,6 +124,7 @@ func prometheusize(s string) string {
 	for _, pair := range prefixes {
 		if strings.HasPrefix(s, pair[0]+".") {
 			s = pair[1] + strings.TrimPrefix(s, pair[0])
+
 			break
 		}
 	}
@@ -265,7 +266,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 				continue
 			}
 
-			if renamedMetric := metricRenameAndLabel(rm, specialConversions()); renamedMetric != nil {
+			if renamedMetric := specialMetricRenameAndLabel(rm); renamedMetric != nil {
 				rm = renamedMetric
 			}
 
@@ -326,10 +327,11 @@ type conversion struct {
 	suffixMapping         map[string]string
 }
 
-func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {
+// func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {
+func metricRenameAndLabel(rm *rawMetric) *rawMetric {
 	// check if the metric exists in the conversions array.
 	// if it exists, it should be converted.
-	for _, cm := range convs {
+	for _, cm := range conversions {
 		switch {
 		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
 			return newToOldMetric(rm, cm)
@@ -353,64 +355,87 @@ func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {
 	return nil
 }
 
-// specialConversions returns a list of special conversions we want to implement.
-// See: https://jira.percona.com/browse/PMM-6506
-func specialConversions() []conversion {
-	return []conversion{
-		{
-			oldName:     "mongodb_ss_opLatencies_ops",
-			prefix:      "mongodb_ss_opLatencies",
-			suffixLabel: "op_type",
-			suffixMapping: map[string]string{
-				"commands_ops":     "commands",
-				"reads_ops":        "reads",
-				"transactions_ops": "transactions",
-				"writes_ops":       "writes",
-			},
-		},
-		{
-			oldName:     "mongodb_ss_opLatencies_latency",
-			prefix:      "mongodb_ss_opLatencies",
-			suffixLabel: "op_type",
-			suffixMapping: map[string]string{
-				"commands_latency":     "commands",
-				"reads_latency":        "reads",
-				"transactions_latency": "transactions",
-				"writes_latency":       "writes",
-			},
-		},
-		// mongodb_ss_wt_concurrentTransactions_read_out
-		// mongodb_ss_wt_concurrentTransactions_write_out
-		{
-			oldName:     "mongodb_ss_wt_concurrentTransactions_out",
-			prefix:      "mongodb_ss_wt_concurrentTransactions",
-			suffixLabel: "txn_rw",
-			suffixMapping: map[string]string{
-				"read_out":  "read",
-				"write_out": "write",
-			},
-		},
-		// mongodb_ss_wt_concurrentTransactions_read_available
-		// mongodb_ss_wt_concurrentTransactions_write_available
-		{
-			oldName:     "mongodb_ss_wt_concurrentTransactions_available",
-			prefix:      "mongodb_ss_wt_concurrentTransactions",
-			suffixLabel: "txn_rw",
-			suffixMapping: map[string]string{
-				"read_available":  "read",
-				"write_available": "write",
-			},
-		},
-		// mongodb_ss_wt_concurrentTransactions_read_totalTickets
-		// mongodb_ss_wt_concurrentTransactions_write_totalTickets
-		{
-			oldName:     "mongodb_ss_wt_concurrentTransactions_totalTickets",
-			prefix:      "mongodb_ss_wt_concurrentTransactions",
-			suffixLabel: "txn_rw",
-			suffixMapping: map[string]string{
-				"read_totalTickets":  "read",
-				"write_totalTickets": "write",
-			},
-		},
+func specialMetricRenameAndLabel(rm *rawMetric) *rawMetric {
+	// check if the metric exists in the conversions array.
+	// if it exists, it should be converted.
+	for _, cm := range specialConversionsList {
+		switch {
+		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
+			return newToOldMetric(rm, cm)
+
+		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
+			conversionSuffix := strings.TrimPrefix(rm.fqName, cm.prefix)
+			conversionSuffix = strings.TrimPrefix(conversionSuffix, "_")
+
+			// Check that also the suffix matches.
+			// In the conversion array, there are metrics with the same prefix but the 'old' name varies
+			// also depending on the metic suffix
+			for suffix := range cm.suffixMapping {
+				if suffix == conversionSuffix {
+					om := createOldMetricFromNew(rm, cm)
+					return om
+				}
+			}
+		}
 	}
+
+	return nil
+}
+
+var specialConversionsList = []*conversion{
+	{
+		oldName:     "mongodb_ss_opLatencies_ops",
+		prefix:      "mongodb_ss_opLatencies",
+		suffixLabel: "op_type",
+		suffixMapping: map[string]string{
+			"commands_ops":     "commands",
+			"reads_ops":        "reads",
+			"transactions_ops": "transactions",
+			"writes_ops":       "writes",
+		},
+	},
+	{
+		oldName:     "mongodb_ss_opLatencies_latency",
+		prefix:      "mongodb_ss_opLatencies",
+		suffixLabel: "op_type",
+		suffixMapping: map[string]string{
+			"commands_latency":     "commands",
+			"reads_latency":        "reads",
+			"transactions_latency": "transactions",
+			"writes_latency":       "writes",
+		},
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_out
+	// mongodb_ss_wt_concurrentTransactions_write_out
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_out",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_out":  "read",
+			"write_out": "write",
+		},
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_available
+	// mongodb_ss_wt_concurrentTransactions_write_available
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_available",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_available":  "read",
+			"write_available": "write",
+		},
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_totalTickets
+	// mongodb_ss_wt_concurrentTransactions_write_totalTickets
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_totalTickets",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_totalTickets":  "read",
+			"write_totalTickets": "write",
+		},
+	},
 }

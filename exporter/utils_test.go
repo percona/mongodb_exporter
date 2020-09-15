@@ -1,6 +1,10 @@
 package exporter
 
 import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -29,18 +33,11 @@ func collect(c helpers.Collector) []prometheus.Metric {
 	return m
 }
 
-func filterMetrics(metrics []*helpers.Metric, filters []string) []*helpers.Metric {
+func filterMetrics(metrics []*helpers.Metric) []*helpers.Metric {
 	res := make([]*helpers.Metric, 0, len(metrics))
 
 	for _, m := range metrics {
 		m.Value = 0
-		for _, filterName := range filters {
-			if m.Name == filterName {
-				res = append(res, m)
-
-				break
-			}
-		}
 	}
 
 	return res
@@ -57,4 +54,29 @@ func getMetricNames(lines []string) map[string]bool {
 	}
 
 	return names
+}
+
+func readTestMetrics(filename string) ([]*helpers.Metric, error) {
+	m := []*helpers.Metric{}
+
+	buf, err := ioutil.ReadFile(filepath.Clean(filename))
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(buf, &m)
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+func writeTestDataJSON(filename string, data interface{}) error {
+	buf, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(filename, buf, os.ModePerm)
 }
