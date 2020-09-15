@@ -258,8 +258,8 @@ github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FI
 github.com/pborman/getopt v0.0.0-20190409184431-ee0cd42419d3/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
 github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtPdI/k=
 github.com/pelletier/go-toml v1.4.0/go.mod h1:PN7xzY2wHTK0K9p34ErDQMlFxa51Fk0OUruD3k1mMwo=
-github.com/percona/exporter_shared v0.7.2 h1:8eNBht83bgFagdiIm3b4HbsOFc5du6OUBCUVenTumdw=
-github.com/percona/exporter_shared v0.7.2/go.mod h1:AWk9lgTPzI7tC5PzpeBGvhhqjSJNxpPNFaF7qLIJqmo=
+github.com/percona/exporter_shared v0.7.3-0.20200915121748-415d485ed1a8 h1:RJTUMe8fJckhShvKpBys9W7pO5eWZ0s8qv8mWUtd4Wk=
+github.com/percona/exporter_shared v0.7.3-0.20200915121748-415d485ed1a8/go.mod h1:AWk9lgTPzI7tC5PzpeBGvhhqjSJNxpPNFaF7qLIJqmo=
 github.com/percona/go-mysql v0.0.0-20190903141930-197f4ad8db8d/go.mod h1:/SGLf9OMxlnK6jq4mkFiImBcJXXk5jwD+lDrwDaGXcw=
 github.com/percona/percona-toolkit v0.0.0-20200908164809-0aac7b4cfc30 h1:9c6TVbuVmKyn4ENhnJ3ltrLITSU1HoYMyLUADmGf0gk=
 github.com/percona/percona-toolkit v0.0.0-20200908164809-0aac7b4cfc30/go.mod h1:M4IxfBHsb3Ylq84vFW+ZvKn9fP35Nsr8+h9zlEFaudo=
