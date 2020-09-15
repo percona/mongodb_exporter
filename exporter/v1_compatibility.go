@@ -174,7 +174,7 @@ func sumMetrics(m bson.M, paths [][]string) (float64, error) {
 
 // Converts new metric to the old metric style and append it to the response slice.
 func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus.Metric {
-	compatibleMetric := metricRenameAndLabel(rm)
+	compatibleMetric := metricRenameAndLabel(rm, conversions)
 	if compatibleMetric == nil {
 		return res
 	}
