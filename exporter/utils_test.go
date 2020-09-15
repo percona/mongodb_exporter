@@ -3,6 +3,7 @@ package exporter
 import (
 	"encoding/json"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -67,4 +68,6 @@ func writeTestDataJSON(filename string, data interface{}) error {
 	if err != nil {
 		return err
 	}
+
+	return ioutil.WriteFile(filename, buf, os.ModePerm)
 }

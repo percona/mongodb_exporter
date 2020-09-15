@@ -18,16 +18,19 @@ package exporter
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/percona/exporter_shared/helpers"
+
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -37,7 +40,6 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
 	ti := labelsGetterMock{}
 
 	c := &diagnosticDataCollector{
@@ -66,8 +68,8 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 		"mongodb_oplog_stats_wt_btree_fixed_record_size",
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
 	}
-	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
-	reg := prometheus.NewRegistry()
+
+	reg := prometheus.NewPedanticRegistry()
 	err := reg.Register(c)
 	require.NoError(t, err)
 	err = testutil.GatherAndCompare(reg, expected, filter...)
@@ -79,20 +81,24 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
+	ti := labelsGetterMock{}
 
 	c := &diagnosticDataCollector{
-		client: client,
-		logger: logrus.New(),
+		client:       client,
+		logger:       logrus.New(),
+		topologyInfo: ti,
 	}
 
 	metrics := collect(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
 	actualMetrics = filterMetrics(actualMetrics)
-	pretty.Println(actualMetrics)
+
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
 
-	//if *golden {
-	//	writeTestDataJSON(t, instanceName, []byte(messages[instance.ResourceID]))
-	//}
-	pretty.Println(actualLines)
+	if os.Getenv("UPDATE_SAMPLES") != "" {
+		err := writeTestDataJSON("testdata/diagnosticDataCollector_all.json", actualLines)
+		assert.NoError(t, err)
+	}
+
+	_ = actualLines // TODO: complete the test
 }

@@ -48,7 +48,7 @@ import (
 
 // For simple metric renaming, only some fields should be updated like the metric name, the help and some
 // labels that have 1 to 1 mapping (1).
-func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
+func newToOldMetric(rm *rawMetric, c *conversion) *rawMetric {
 	oldMetric := &rawMetric{
 		fqName: c.oldName,
 		help:   rm.help,
@@ -92,7 +92,7 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 //	 		"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
 //	 	},
 //	 },
-func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
+func createOldMetricFromNew(rm *rawMetric, c *conversion) *rawMetric {
 	suffix := strings.TrimPrefix(rm.fqName, c.prefix)
 	suffix = strings.TrimPrefix(suffix, "_")
 
@@ -114,7 +114,7 @@ func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 
 // Converts new metric to the old metric style and append it to the response slice.
 func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus.Metric {
-	compatibleMetric := metricRenameAndLabel(rm, conversions())
+	compatibleMetric := metricRenameAndLabel(rm) //, conversions())
 	if compatibleMetric == nil {
 		return res
 	}
@@ -130,322 +130,377 @@ func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus
 	return res
 }
 
-func conversions() []conversion {
-	return []conversion{
-		{
-			newName:          "mongodb_ss_asserts",
-			oldName:          "mongodb_asserts_total",
-			labelConversions: map[string]string{"assert_type": "type"},
+var conversions = []*conversion{
+	{
+		oldName:     "mongodb_ss_opLatencies_ops",
+		prefix:      "mongodb_ss_opLatencies",
+		suffixLabel: "op_type",
+		suffixMapping: map[string]string{
+			"commands_ops":     "commands",
+			"reads_ops":        "reads",
+			"transactions_ops": "transactions",
+			"writes_ops":       "writes",
 		},
-		{
-			oldName:          "mongodb_asserts_total",
-			newName:          "mongodb_ss_asserts",
-			labelConversions: map[string]string{"assert_type": "type"},
+	},
+	{
+		oldName:     "mongodb_ss_opLatencies_latency",
+		prefix:      "mongodb_ss_opLatencies",
+		suffixLabel: "op_type",
+		suffixMapping: map[string]string{
+			"commands_latency":     "commands",
+			"reads_latency":        "reads",
+			"transactions_latency": "transactions",
+			"writes_latency":       "writes",
 		},
-		{
-			oldName:          "mongodb_connections",
-			newName:          "mongodb_ss_connections",
-			labelConversions: map[string]string{"con_type": "state"},
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_out
+	// mongodb_ss_wt_concurrentTransactions_write_out
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_out",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_out":  "read",
+			"write_out": "write",
 		},
-		{
-			oldName: "mongodb_connections_metrics_created_total",
-			newName: "mongodb_ss_connections_totalCreated",
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_available
+	// mongodb_ss_wt_concurrentTransactions_write_available
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_available",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_available":  "read",
+			"write_available": "write",
 		},
-		{
-			oldName: "mongodb_mongod_extra_info_page_faults_total",
-			newName: "mongodb_ss_extra_info_page_faults",
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_totalTickets
+	// mongodb_ss_wt_concurrentTransactions_write_totalTickets
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_totalTickets",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_totalTickets":  "read",
+			"write_totalTickets": "write",
 		},
-		{
-			oldName:     "mongodb_mongod_global_lock_client",   // {type="readers|writers"}
-			prefix:      "mongodb_ss_globalLock_activeClients", // _[readers|writers]
-			suffixLabel: "type",
-		},
-		{
-			oldName:          "mongodb_mongod_global_lock_current_queue",
-			newName:          "mongodb_ss_globalLock_currentQueue",
-			labelConversions: map[string]string{"count_type": "type"},
-		},
-		{
-			oldName: "mongodb_instance_local_time",
-			newName: "mongodb_start",
-		},
+	},
+	// ///////////////////////////////////////////////////////////////////////////////
 
-		{
-			oldName: "mongodb_instance_uptime_seconds",
-			newName: "mongodb_ss_uptime",
+	{
+		newName:          "mongodb_ss_asserts",
+		oldName:          "mongodb_asserts_total",
+		labelConversions: map[string]string{"assert_type": "type"},
+	},
+	{
+		oldName:          "mongodb_asserts_total",
+		newName:          "mongodb_ss_asserts",
+		labelConversions: map[string]string{"assert_type": "type"},
+	},
+	{
+		oldName:          "mongodb_connections",
+		newName:          "mongodb_ss_connections",
+		labelConversions: map[string]string{"con_type": "state"},
+	},
+	{
+		oldName: "mongodb_connections_metrics_created_total",
+		newName: "mongodb_ss_connections_totalCreated",
+	},
+	{
+		oldName: "mongodb_mongod_extra_info_page_faults_total",
+		newName: "mongodb_ss_extra_info_page_faults",
+	},
+	{
+		oldName:     "mongodb_mongod_global_lock_client",   // {type="readers|writers"}
+		prefix:      "mongodb_ss_globalLock_activeClients", // _[readers|writers]
+		suffixLabel: "type",
+	},
+	{
+		oldName:          "mongodb_mongod_global_lock_current_queue",
+		newName:          "mongodb_ss_globalLock_currentQueue",
+		labelConversions: map[string]string{"count_type": "type"},
+	},
+	{
+		oldName: "mongodb_instance_local_time",
+		newName: "mongodb_start",
+	},
+
+	{
+		oldName: "mongodb_instance_uptime_seconds",
+		newName: "mongodb_ss_uptime",
+	},
+	{
+		oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total", //{database=*,lock_type="read|write"}
+		newName: "mongodb_ss_locks_Local_acquireCount_[rw]",
+	},
+	{
+		oldName: "mongodb_memory", //{"resident|virtual|mapped|mapped_with_journal"}
+		newName: "mongodb_ss_mem_[resident|virtual]",
+	},
+	{
+		oldName:          "mongodb_mongod_metrics_cursor_open", //{state="noTimeout|pinned|total"}
+		newName:          "mongodb_ss_metrics_cursor_open",     //{csr_type="noTimeout|pinned|total""}
+		labelConversions: map[string]string{"csr_type": "state"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_cursor_timed_out_total",
+		newName: "mongodb_ss_metrics_cursor_timedOut",
+	},
+	{
+		oldName:          "mongodb_mongod_metrics_document_total",
+		newName:          "mongodb_ss_metric_document",
+		labelConversions: map[string]string{"doc_op_type": "type"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_get_last_error_wtime_num_total",
+		newName: "mongodb_ss_metrics_getLastError_wtime_num",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_get_last_error_wtimeouts_total",
+		newName: "mongodb_ss_metrics_getLastError_wtimeouts",
+	},
+	{
+		oldName:     "mongodb_mongod_metrics_operation_total", //{state="fastmod|idhack|scan_and_order"}
+		prefix:      "mongodb_ss_metrics_operation",           // _[fastmod|idhack|scanAndOrder] (I'm pretty sure fastmod is deprecated; idhack might be deprecated too.
+		suffixLabel: "state",
+	},
+	{
+		oldName:     "mongodb_mongod_metrics_query_executor_total", //{state="scanned|scannedObjects"}
+		prefix:      "mongodb_ss_metrics_query",                    // _[scanned|scannedObjects]
+		suffixLabel: "state",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_record_moves_total",
+		newName: "mongodb_ss_metrics_record_moves",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_apply_batches_num_total",
+		newName: "mongodb_ss_metrics_repl_apply_batches_num",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_apply_batches_total_milliseconds",
+		newName: "mongodb_ss_metrics_repl_apply_batches_totalMillis",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_apply_ops_total",
+		newName: "mongodb_ss_metrics_repl_apply_ops",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_buffer_count",
+		newName: "mongodb_ss_metrics_repl_buffer_count",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_buffer_max_size_bytes",
+		newName: "mongodb_ss_metrics_repl_buffer_maxSizeBytes",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_buffer_size_bytes",
+		newName: "mongodb_ss_metrics_repl_buffer_sizeBytes",
+	},
+	{
+		oldName:     "mongodb_mongod_metrics_repl_executor_queue", //{type=*}
+		prefix:      "mongodb_ss_metrics_repl_executor_queues",    //_[networkInProgress|sleepers]
+		suffixLabel: "type",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_executor_unsignaled_events",
+		newName: "mongodb_ss_metrics_repl_executor_unsignaledEvents",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_bytes_total",
+		newName: "mongodb_ss_metrics_repl_network_bytes",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_getmores_num_total",
+		newName: "mongodb_ss_metrics_repl_network_getmores_num",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_getmores_total_milliseconds",
+		newName: "mongodb_ss_metrics_repl_network_getmores_totalMillis",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_ops_total",
+		newName: "mongodb_ss_metrics_repl_network_ops",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_readers_created_total",
+		newName: "mongodb_ss_metrics_repl_network_readersCreated",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_ttl_deleted_documents_total",
+		newName: "mongodb_ss_metrics_ttl_deletedDocuments",
+	},
+	{
+		oldName: "mongodb_mongod_metrics_ttl_passes_total",
+		newName: "mongodb_ss_metrics_ttl_passes",
+	},
+	{
+		oldName:     "mongodb_network_bytes_total", // {state="in_bytes|out_bytes"}
+		prefix:      "mongodb_ss_network",          //_[bytesIn|bytesOut]
+		suffixLabel: "state",
+	},
+	{
+		oldName: "mongodb_network_metrics_num_requests_total",
+		newName: "mongodb_ss_network_numRequests",
+	},
+	{
+		oldName:          "mongodb_op_counters_repl_total", //{type=*}
+		newName:          "mongodb_ss_opcountersRepl",      //{legacy_op_type=*}
+		labelConversions: map[string]string{"legacy_op_type": "type"},
+	},
+	{
+		oldName:          "mongodb_op_counters_total", // {type=*}
+		newName:          "mongodb_ss_opcounters",     //{legacy_op_type=*}
+		labelConversions: map[string]string{"legacy_op_type": "type"},
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_blockmanager_blocks_total", //{type="read|read_mapped|pre_loaded|written"}
+		prefix:      "mongodb_ss_wt_block_manager",                         //_[blocks_read|mapped_blocks_read|blocks_written|blocks_pre_loaded]
+		suffixLabel: "type",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
+		newName: "mongodb_ss_wt_cache_maximum_bytes_configured",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_cache_overhead_percent",
+		newName: "mongodb_ss_wt_cache_percentage_overhead",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets",
+		newName: "mongodb_ss_wt_concurrentTransactions_available",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets",
+		newName: "mongodb_ss_wt_concurrentTransactions_out",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets",
+		newName: "mongodb_ss_wt_concurrentTransactions_totalTickets",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_log_records_scanned_total",
+		newName: "mongodb_ss_wt_log_records_processed_by_log_scan",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_session_open_cursors_total",
+		newName: "mongodb_ss_wt_session_open_cursor_count",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_session_open_sessions_total",
+		newName: "mongodb_ss_wt_session_open_session_count",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
+		newName: "mongodb_ss_wt_txn_transaction_checkpoint_total_time_msecs",
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
+		newName: "mongodb_ss_wt_txn_transaction_checkpoint_currently_running",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_transactions_total", // {type="begins|checkpoints|committed|rolledback"}
+		prefix:      "mongodb_ss_wt_txn_transactions",               //_[begins|checkpoints|committed|rolled_back]
+		suffixLabel: "type",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_blockmanager_bytes_total", //{type=read|read_mapped|written"}
+		prefix:      "mongodb_ss_wt_block_manager",                        //_[bytes_read|mapped_bytes_read|bytes_written]
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"bytes_read": "read", "mapped_bytes_read": "read_mapped",
+			"bytes_written": "written",
 		},
-		{
-			oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total", //{database=*,lock_type="read|write"}
-			newName: "mongodb_ss_locks_Local_acquireCount_[rw]",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_cache_bytes", //{type="total|dirty|internal_pages|leaf_pages"}
+		prefix:      "mongodb_ss_wt_cache_bytes",             //_[bytes_currently_in_the_cache|tracked_dirty_bytes_in_the_cache|tracked_bytes_belonging_to_internal_pages_in_the_cache|tracked_bytes_belonging_to_leaf_pages_in_the_cache]
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"bytes_currently_in_the_cache":                           "total",
+			"tracked_dirty_bytes_in_the_cache":                       "dirty",
+			"tracked_bytes_belonging_to_internal_pages_in_the_cache": " internal_pages",
+			"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
 		},
-		{
-			oldName: "mongodb_memory", //{"resident|virtual|mapped|mapped_with_journal"}
-			newName: "mongodb_ss_mem_[resident|virtual]",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total", //{type="read", "written"}
+		prefix:      "mongodb_ss_wt_cache",                         //_[bytes read into cache|bytes written from cache]
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"bytes_read_into_cache":    "read",
+			"bytes_written_from_cache": "written",
 		},
-		{
-			oldName:          "mongodb_mongod_metrics_cursor_open", //{state="noTimeout|pinned|total"}
-			newName:          "mongodb_ss_metrics_cursor_open",     //{csr_type="noTimeout|pinned|total""}
-			labelConversions: map[string]string{"csr_type": "state"},
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_cache_evicted_total", //{type="modified|unmodified"}
+		prefix:      "mongodb_ss_wt_cache",                           //_[modified pages evicted|unmodified_pages_evicted]
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"modified_pages_evicted":   "modified",
+			"unmodified_pages_evicted": "unmodified",
 		},
-		{
-			oldName: "mongodb_mongod_metrics_cursor_timed_out_total",
-			newName: "mongodb_ss_metrics_cursor_timedOut",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_cache_pages", //{type="total|dirty"}
+		prefix:      "mongodb_ss_wt_cache",                   //_[pages_currently_held_in_the_cache|tracked_dirty_pages_in_the_cache]
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"pages_currently_held_in_the_cache": "total",
+			"tracked_dirty_pages_in_the_cache":  "dirty",
 		},
-		{
-			oldName:          "mongodb_mongod_metrics_document_total",
-			newName:          "mongodb_ss_metric_document",
-			labelConversions: map[string]string{"doc_op_type": "type"},
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_cache_pages_total", //{type="read|written"}
+		prefix:      "mongodb_ss_wt_cache",                         //_[pages_read_into_cache|pages_written_from_cache]
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"pages_read_into_cache":    "read",
+			"pages_written_from_cache": "written",
 		},
-		{
-			oldName: "mongodb_mongod_metrics_get_last_error_wtime_num_total",
-			newName: "mongodb_ss_metrics_getLastError_wtime_num",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_log_records_total", //{type="compressed|uncompressed"}
+		prefix:      "mongodb_ss_wt_log",                           //_[log records compressed|log_records_not_compressed]
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"log_records_compressed":     "compressed",
+			"log_records_not_compressed": "uncompressed",
 		},
-		{
-			oldName: "mongodb_mongod_metrics_get_last_error_wtimeouts_total",
-			newName: "mongodb_ss_metrics_getLastError_wtimeouts",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_log_bytes_total", //{type="payload|unwritten"}
+		prefix:      "mongodb_ss_wt_log",                         //_[log_bytes_of_payload_data|log_bytes_written
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"log_bytes_of_payload_data": "payload",
+			"log_bytes_written":         "unwritten",
 		},
-		{
-			oldName:     "mongodb_mongod_metrics_operation_total", //{state="fastmod|idhack|scan_and_order"}
-			prefix:      "mongodb_ss_metrics_operation",           // _[fastmod|idhack|scanAndOrder] (I'm pretty sure fastmod is deprecated; idhack might be deprecated too.
-			suffixLabel: "state",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_log_operations_total", //{type="
+		prefix:      "mongodb_ss_wt_log",
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"log_read_operations":                  "read",
+			"log_write_operations":                 "write",
+			"log_scan_operations":                  "scan",
+			"log_scan_records_requiring_two_reads": "scan_double",
+			"log_sync_operations":                  "sync",
+			"log_sync_dir_operations":              "sync_dir",
+			"log_flush_operations":                 "flush",
 		},
-		{
-			oldName:     "mongodb_mongod_metrics_query_executor_total", //{state="scanned|scannedObjects"}
-			prefix:      "mongodb_ss_metrics_query",                    // _[scanned|scannedObjects]
-			suffixLabel: "state",
+	},
+	{
+		oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds", //{type="min|max"}
+		prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",                       //_[min|max]_time_msecs
+		suffixLabel: "type",
+		suffixMapping: map[string]string{
+			"min_time_msecs": "min",
+			"max_time_msecs": "max",
 		},
-		{
-			oldName: "mongodb_mongod_metrics_record_moves_total",
-			newName: "mongodb_ss_metrics_record_moves",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_apply_batches_num_total",
-			newName: "mongodb_ss_metrics_repl_apply_batches_num",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_apply_batches_total_milliseconds",
-			newName: "mongodb_ss_metrics_repl_apply_batches_totalMillis",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_apply_ops_total",
-			newName: "mongodb_ss_metrics_repl_apply_ops",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_buffer_count",
-			newName: "mongodb_ss_metrics_repl_buffer_count",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_buffer_max_size_bytes",
-			newName: "mongodb_ss_metrics_repl_buffer_maxSizeBytes",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_buffer_size_bytes",
-			newName: "mongodb_ss_metrics_repl_buffer_sizeBytes",
-		},
-		{
-			oldName:     "mongodb_mongod_metrics_repl_executor_queue", //{type=*}
-			prefix:      "mongodb_ss_metrics_repl_executor_queues",    //_[networkInProgress|sleepers]
-			suffixLabel: "type",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_executor_unsignaled_events",
-			newName: "mongodb_ss_metrics_repl_executor_unsignaledEvents",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_network_bytes_total",
-			newName: "mongodb_ss_metrics_repl_network_bytes",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_network_getmores_num_total",
-			newName: "mongodb_ss_metrics_repl_network_getmores_num",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_network_getmores_total_milliseconds",
-			newName: "mongodb_ss_metrics_repl_network_getmores_totalMillis",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_network_ops_total",
-			newName: "mongodb_ss_metrics_repl_network_ops",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_repl_network_readers_created_total",
-			newName: "mongodb_ss_metrics_repl_network_readersCreated",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_ttl_deleted_documents_total",
-			newName: "mongodb_ss_metrics_ttl_deletedDocuments",
-		},
-		{
-			oldName: "mongodb_mongod_metrics_ttl_passes_total",
-			newName: "mongodb_ss_metrics_ttl_passes",
-		},
-		{
-			oldName:     "mongodb_network_bytes_total", // {state="in_bytes|out_bytes"}
-			prefix:      "mongodb_ss_network",          //_[bytesIn|bytesOut]
-			suffixLabel: "state",
-		},
-		{
-			oldName: "mongodb_network_metrics_num_requests_total",
-			newName: "mongodb_ss_network_numRequests",
-		},
-		{
-			oldName:          "mongodb_op_counters_repl_total", //{type=*}
-			newName:          "mongodb_ss_opcountersRepl",      //{legacy_op_type=*}
-			labelConversions: map[string]string{"legacy_op_type": "type"},
-		},
-		{
-			oldName:          "mongodb_op_counters_total", // {type=*}
-			newName:          "mongodb_ss_opcounters",     //{legacy_op_type=*}
-			labelConversions: map[string]string{"legacy_op_type": "type"},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_blockmanager_blocks_total", //{type="read|read_mapped|pre_loaded|written"}
-			prefix:      "mongodb_ss_wt_block_manager",                         //_[blocks_read|mapped_blocks_read|blocks_written|blocks_pre_loaded]
-			suffixLabel: "type",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
-			newName: "mongodb_ss_wt_cache_maximum_bytes_configured",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_cache_overhead_percent",
-			newName: "mongodb_ss_wt_cache_percentage_overhead",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets",
-			newName: "mongodb_ss_wt_concurrentTransactions_available",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets",
-			newName: "mongodb_ss_wt_concurrentTransactions_out",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets",
-			newName: "mongodb_ss_wt_concurrentTransactions_totalTickets",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_log_records_scanned_total",
-			newName: "mongodb_ss_wt_log_records_processed_by_log_scan",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_session_open_cursors_total",
-			newName: "mongodb_ss_wt_session_open_cursor_count",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_session_open_sessions_total",
-			newName: "mongodb_ss_wt_session_open_session_count",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
-			newName: "mongodb_ss_wt_txn_transaction_checkpoint_total_time_msecs",
-		},
-		{
-			oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
-			newName: "mongodb_ss_wt_txn_transaction_checkpoint_currently_running",
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_transactions_total", // {type="begins|checkpoints|committed|rolledback"}
-			prefix:      "mongodb_ss_wt_txn_transactions",               //_[begins|checkpoints|committed|rolled_back]
-			suffixLabel: "type",
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_blockmanager_bytes_total", //{type=read|read_mapped|written"}
-			prefix:      "mongodb_ss_wt_block_manager",                        //_[bytes_read|mapped_bytes_read|bytes_written]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"bytes_read": "read", "mapped_bytes_read": "read_mapped",
-				"bytes_written": "written",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_bytes", //{type="total|dirty|internal_pages|leaf_pages"}
-			prefix:      "mongodb_ss_wt_cache_bytes",             //_[bytes_currently_in_the_cache|tracked_dirty_bytes_in_the_cache|tracked_bytes_belonging_to_internal_pages_in_the_cache|tracked_bytes_belonging_to_leaf_pages_in_the_cache]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"bytes_currently_in_the_cache":                           "total",
-				"tracked_dirty_bytes_in_the_cache":                       "dirty",
-				"tracked_bytes_belonging_to_internal_pages_in_the_cache": " internal_pages",
-				"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total", //{type="read", "written"}
-			prefix:      "mongodb_ss_wt_cache",                         //_[bytes read into cache|bytes written from cache]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"bytes_read_into_cache":    "read",
-				"bytes_written_from_cache": "written",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_evicted_total", //{type="modified|unmodified"}
-			prefix:      "mongodb_ss_wt_cache",                           //_[modified pages evicted|unmodified_pages_evicted]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"modified_pages_evicted":   "modified",
-				"unmodified_pages_evicted": "unmodified",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_pages", //{type="total|dirty"}
-			prefix:      "mongodb_ss_wt_cache",                   //_[pages_currently_held_in_the_cache|tracked_dirty_pages_in_the_cache]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"pages_currently_held_in_the_cache": "total",
-				"tracked_dirty_pages_in_the_cache":  "dirty",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_cache_pages_total", //{type="read|written"}
-			prefix:      "mongodb_ss_wt_cache",                         //_[pages_read_into_cache|pages_written_from_cache]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"pages_read_into_cache":    "read",
-				"pages_written_from_cache": "written",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_log_records_total", //{type="compressed|uncompressed"}
-			prefix:      "mongodb_ss_wt_log",                           //_[log records compressed|log_records_not_compressed]
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"log_records_compressed":     "compressed",
-				"log_records_not_compressed": "uncompressed",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_log_bytes_total", //{type="payload|unwritten"}
-			prefix:      "mongodb_ss_wt_log",                         //_[log_bytes_of_payload_data|log_bytes_written
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"log_bytes_of_payload_data": "payload",
-				"log_bytes_written":         "unwritten",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_log_operations_total", //{type="
-			prefix:      "mongodb_ss_wt_log",
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"log_read_operations":                  "read",
-				"log_write_operations":                 "write",
-				"log_scan_operations":                  "scan",
-				"log_scan_records_requiring_two_reads": "scan_double",
-				"log_sync_operations":                  "sync",
-				"log_sync_dir_operations":              "sync_dir",
-				"log_flush_operations":                 "flush",
-			},
-		},
-		{
-			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds", //{type="min|max"}
-			prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",                       //_[min|max]_time_msecs
-			suffixLabel: "type",
-			suffixMapping: map[string]string{
-				"min_time_msecs": "min",
-				"max_time_msecs": "max",
-			},
-		},
-	}
+	},
 }
 
 // Third metric renaming case (3).
