@@ -233,6 +233,11 @@ func conversions() []conversion {
 			oldName:     "mongodb_mongod_global_lock_client",
 			prefix:      "mongodb_ss_globalLock_activeClients",
 			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"readers": "reader",
+				"writers": "writer",
+				"total":   "total",
+			},
 		},
 		{
 			oldName:          "mongodb_mongod_global_lock_current_queue",
@@ -286,6 +291,10 @@ func conversions() []conversion {
 			oldName:     "mongodb_mongod_metrics_operation_total",
 			prefix:      "mongodb_ss_metrics_operation",
 			suffixLabel: "state",
+			suffixMapping: map[string]string{
+				"scanAndOrder":   "scanAndOrder",
+				"writeConflicts": "writeConflicts",
+			},
 		},
 		{
 			oldName:     "mongodb_mongod_metrics_query_executor_total",
@@ -754,7 +763,7 @@ func storageEngine(m bson.M) prometheus.Metric {
 
 	engine, ok := v.(string)
 	if !ok {
-		engine = "Engine not available"
+		engine = "Engine is unavailable"
 	}
 	labels := map[string]string{"engine": engine}
 
@@ -771,7 +780,7 @@ func serverVersion(m bson.M) prometheus.Metric {
 
 	serverVersion, ok := v.(string)
 	if !ok {
-		serverVersion = "server version is not available"
+		serverVersion = "server version is unavailable"
 	}
 	labels := map[string]string{"mongodb": serverVersion}
 
@@ -791,10 +800,6 @@ func myState(ctx context.Context, client *mongo.Client) (prometheus.Metric, erro
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot get replicaset config")
 	}
-
-	// 	HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
-	// # TYPE mongodb_mongod_replset_my_state gauge
-	// mongodb_mongod_replset_my_state{set="s1rs"} 1
 
 	name := "mongodb_mongod_replset_my_state"
 	help := "An integer between 0 and 10 that represents the replica state of the current member"
@@ -816,11 +821,12 @@ func electionDate(m bson.M) prometheus.Metric {
 	if !ok {
 		return nil
 	}
+
+	name := "mongodb_mongod_replset_member_election_date"
+	help := "The timestamp the node was elected as replica leader"
+
 	for _, member := range members {
 		if date, ok := member.(bson.M)["electionTime"].(primitive.Timestamp); ok {
-			name := "mongodb_mongod_replset_member_election_date"
-			help := "The timestamp the node was elected as replica leader"
-
 			labels := map[string]string{"name": member.(bson.M)["name"].(string)}
 			d := prometheus.NewDesc(name, help, nil, labels)
 			metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(date.T))
