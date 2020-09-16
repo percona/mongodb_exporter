@@ -76,6 +76,9 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
+	// The metrics list will  change depending on the sanbox.
+	// Use this test only after changing the code and before running it, update the golden file
+	t.Skip("Only use it locally")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
