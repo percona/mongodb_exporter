@@ -266,26 +266,44 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 				continue
 			}
 
+			// metrics := []*rawMetric{rm}
+
+			// if renamedMetric := metricRenameAndLabel(rm, specialConversionsList); renamedMetric != nil {
+			// 	metrics = append(metrics, renamedMetric)
+			// }
 			if renamedMetric := metricRenameAndLabel(rm, specialConversionsList); renamedMetric != nil {
 				rm = renamedMetric
 			}
 
-			if renamedMetrics := metricRenameAndLabel(rm, specialConversions()); renamedMetrics != nil {
-				metrics = renamedMetrics
+			metric, err := rawToPrometheusMetric(rm)
+			if err != nil {
+				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+				res = append(res, invalidMetric)
+				continue
 			}
 
-			for _, m := range metrics {
-				metric, err := rawToPrometheusMetric(m)
-				if err != nil {
-					invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-					res = append(res, invalidMetric)
-					continue
-				}
+			res = append(res, metric)
 
-				res = append(res, metric)
+			// for _, m := range metrics {
+			// 	metric, err := rawToPrometheusMetric(m)
+			// 	if err != nil {
+			// 		invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			// 		res = append(res, invalidMetric)
+			// 		continue
+			// 	}
 
-				if compatibleMode {
-					res = appendCompatibleMetric(res, m)
+			// 	res = append(res, metric)
+
+			if compatibleMode {
+				compatibleMetric := metricRenameAndLabel(rm, conversions)
+				if compatibleMetric != nil {
+					metric, err := rawToPrometheusMetric(compatibleMetric)
+					if err != nil {
+						invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+						res = append(res, invalidMetric)
+					} else {
+						res = append(res, metric)
+					}
 				}
 			}
 		}
@@ -333,33 +351,31 @@ type conversion struct {
 	suffixMapping         map[string]string
 }
 
-// func metricRenameAndLabel(rm *rawMetric, convs []conversion) *rawMetric {
 func metricRenameAndLabel(rm *rawMetric, convs []*conversion) *rawMetric {
 	// check if the metric exists in the conversions array.
 	// if it exists, it should be converted.
-	var result []*rawMetric
+
 	for _, cm := range convs {
 		switch {
 		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
-			result = append(result, newToOldMetric(rm, cm))
+			return newToOldMetric(rm, cm)
 
 		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
 			conversionSuffix := strings.TrimPrefix(rm.fqName, cm.prefix)
 			conversionSuffix = strings.TrimPrefix(conversionSuffix, "_")
-
 			// Check that also the suffix matches.
 			// In the conversion array, there are metrics with the same prefix but the 'old' name varies
 			// also depending on the metic suffix
 			if _, ok := cm.suffixMapping[conversionSuffix]; ok {
-				om := createOldMetricFromNew(rm, cm)
-				result = append(result, om)
+				return createOldMetricFromNew(rm, cm)
 			}
 		}
 	}
 
-	return result
+	return nil
 }
 
+//nolint:gochecknoglobals
 var specialConversionsList = []*conversion{
 	{
 		oldName:     "mongodb_ss_opLatencies_ops",

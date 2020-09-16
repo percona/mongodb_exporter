@@ -38,6 +38,7 @@ func filterMetrics(metrics []*helpers.Metric) []*helpers.Metric {
 
 	for _, m := range metrics {
 		m.Value = 0
+		res = append(res, m)
 	}
 
 	return res

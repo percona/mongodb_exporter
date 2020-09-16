@@ -17,6 +17,7 @@
 package exporter
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -211,8 +212,8 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		m := metricRenameAndLabel(tc.in, specialConversionsList)
-		assert.Equal(t, m, tc.want)
+		assert.Equal(t, tc.want, m, fmt.Sprintf("test case # %d", i))
 	}
 }

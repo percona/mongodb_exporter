@@ -179,20 +179,14 @@ func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus
 		return res
 	}
 
-	for _, compatibleMetric := range compatibleMetrics {
-		metric, err := rawToPrometheusMetric(compatibleMetric)
-		if err != nil {
-			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-			res = append(res, invalidMetric)
-			return res
-		}
-
-		res = append(res, metric)
+	metric, err := rawToPrometheusMetric(compatibleMetric)
+	if err != nil {
+		invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		res = append(res, invalidMetric)
+		return res
 	}
 
-	res = append(res, metric)
-
-	return res
+	return append(res, metric)
 }
 
 // nolint:gochecknoglobals
@@ -200,11 +194,6 @@ var conversions = []*conversion{
 	{
 		newName:          "mongodb_ss_asserts",
 		oldName:          "mongodb_asserts_total",
-		labelConversions: map[string]string{"assert_type": "type"},
-	},
-	{
-		oldName:          "mongodb_asserts_total",
-		newName:          "mongodb_ss_asserts",
 		labelConversions: map[string]string{"assert_type": "type"},
 	},
 	{

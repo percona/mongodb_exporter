@@ -30,8 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/percona/exporter_shared/helpers"
-
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -96,7 +94,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
 
-	if os.Getenv("UPDATE_SAMPLES") != "" {
+	if os.Getenv("UPDATE_SAMPLES") == "1" {
 		err := writeTestDataJSON("testdata/diagnosticDataCollector_all.json", actualLines)
 		assert.NoError(t, err)
 	}
