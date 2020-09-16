@@ -110,7 +110,7 @@ func newToOldMetric(rm *rawMetric, c *conversion) *rawMetric {
 //	 	suffixMapping: map[string]string{
 //	 		"bytes_currently_in_the_cache":                           "total",
 //	 		"tracked_dirty_bytes_in_the_cache":                       "dirty",
-//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": " internal_pages",
+//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
 //	 		"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
 //	 	},
 //	 },
@@ -179,11 +179,15 @@ func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus
 		return res
 	}
 
-	metric, err := rawToPrometheusMetric(compatibleMetric)
-	if err != nil {
-		invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-		res = append(res, invalidMetric)
-		return res
+	for _, compatibleMetric := range compatibleMetrics {
+		metric, err := rawToPrometheusMetric(compatibleMetric)
+		if err != nil {
+			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			res = append(res, invalidMetric)
+			return res
+		}
+
+		res = append(res, metric)
 	}
 
 	res = append(res, metric)

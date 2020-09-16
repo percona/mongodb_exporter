@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
