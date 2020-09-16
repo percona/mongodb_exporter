@@ -60,12 +60,12 @@ type ReplSetConf struct {
 
 // MemberConf represents an array element of ReplSetConf.Members
 type MemberConf struct {
-	ID           int32  `bson:"_id"`
-	Host         string `bson:"host"`
-	ArbiterOnly  bool   `bson:"arbiterOnly"`
-	BuildIndexes bool   `bson:"buildIndexes"`
-	Hidden       bool   `bson:"hidden"`
-	Priority     int32  `bson:"priority"`
+	ID           int32   `bson:"_id"`
+	Host         string  `bson:"host"`
+	ArbiterOnly  bool    `bson:"arbiterOnly"`
+	BuildIndexes bool    `bson:"buildIndexes"`
+	Hidden       bool    `bson:"hidden"`
+	Priority     float64 `bson:"priority"`
 
 	Tags       map[string]string `bson:"tags"`
 	SlaveDelay float64           `bson:"saveDelay"`
@@ -93,7 +93,7 @@ func (replConf *ReplSetConf) Export(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(memberBuildIndexesDesc, prometheus.GaugeValue, 0, replConf.ID, member.Host)
 		}
 
-		ch <- prometheus.MustNewConstMetric(memberPriorityDesc, prometheus.GaugeValue, float64(member.Priority), replConf.ID, member.Host)
+		ch <- prometheus.MustNewConstMetric(memberPriorityDesc, prometheus.GaugeValue, member.Priority, replConf.ID, member.Host)
 		ch <- prometheus.MustNewConstMetric(memberVotesDesc, prometheus.GaugeValue, float64(member.Votes), replConf.ID, member.Host)
 	}
 }
