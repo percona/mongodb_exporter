@@ -90,14 +90,18 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	metrics := collect(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
-	actualMetrics = filterMetrics(actualMetrics)
+	actualMetrics = zeroMetrics(actualMetrics)
 
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
 
+	goldenFile := "testdata/diagnosticDataCollector_all.json"
 	if os.Getenv("UPDATE_SAMPLES") == "1" {
-		err := writeTestDataJSON("testdata/diagnosticDataCollector_all.json", actualLines)
+		err := writeTestDataJSON(goldenFile, actualLines)
 		assert.NoError(t, err)
 	}
 
-	_ = actualLines // TODO: complete the test
+	var wantLines []string
+	err := readTestData(goldenFile, &wantLines)
+	assert.NoError(t, err)
+	assert.Equal(t, wantLines, actualLines)
 }

@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/percona/exporter_shared/helpers"
@@ -33,7 +32,10 @@ func collect(c helpers.Collector) []prometheus.Metric {
 	return m
 }
 
-func filterMetrics(metrics []*helpers.Metric) []*helpers.Metric {
+// zeroMetrics returns a copy of the input with all values set to 0.
+// The idea is to be able to compare metric names, help and labels but since values
+// are not constant, all of them are being set to 0 to compare all other fields.
+func zeroMetrics(metrics []*helpers.Metric) []*helpers.Metric {
 	res := make([]*helpers.Metric, 0, len(metrics))
 
 	for _, m := range metrics {
@@ -44,33 +46,18 @@ func filterMetrics(metrics []*helpers.Metric) []*helpers.Metric {
 	return res
 }
 
-func getMetricNames(lines []string) map[string]bool {
-	names := map[string]bool{}
-
-	for _, line := range lines {
-		if strings.HasPrefix(line, "# TYPE ") {
-			m := strings.Split(line, " ")
-			names[m[2]] = true
-		}
-	}
-
-	return names
-}
-
-func readTestMetrics(filename string) ([]*helpers.Metric, error) {
-	m := []*helpers.Metric{}
-
+func readTestData(filename string, destination interface{}) error {
 	buf, err := ioutil.ReadFile(filepath.Clean(filename))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = json.Unmarshal(buf, &m)
+	err = json.Unmarshal(buf, &destination)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return m, nil
+	return nil
 }
 
 func writeTestDataJSON(filename string, data interface{}) error {
