@@ -21,23 +21,27 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/percona/exporter_shared"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"gopkg.in/mgo.v2/bson"
 )
 
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
-	path             string
-	client           *mongo.Client
-	logger           *logrus.Logger
-	opts             *Opts
-	webListenAddress string
-	topologyInfo     labelsGetter
+	path                  string
+	client                *mongo.Client
+	logger                *logrus.Logger
+	opts                  *Opts
+	webListenAddress      string
+	topologyInfo          labelsGetter
+	lastConnectionCheckTS time.Time
 }
 
 // Opts holds new exporter options.
@@ -84,7 +88,7 @@ func New(opts *Opts) (*Exporter, error) {
 			return nil, err
 		}
 
-		exp.topologyInfo, err = newTopologyInfo(context.TODO(), exp.client)
+		exp.topologyInfo, err = newTopologyInfo(ctx, exp.client)
 		if err != nil {
 			return nil, err
 		}
@@ -157,7 +161,18 @@ func (e *Exporter) handler() http.Handler {
 		ctx := r.Context()
 
 		client := e.client
-		topologyInfo := e.topologyInfo
+
+		if err := e.loadTopologyInfo(ctx, client); err != nil {
+			e.logger.Errorf("Cannot load topology info: %s", err)
+			http.Error(
+				w,
+				"An error has occurred while loading topology info:\n\n"+err.Error(),
+				http.StatusInternalServerError,
+			)
+
+			return
+		}
+
 		// Use per-request connection.
 		if !e.opts.GlobalConnPool {
 			var err error
@@ -178,21 +193,9 @@ func (e *Exporter) handler() http.Handler {
 					e.logger.Errorf("Cannot disconnect mongo client: %v", err)
 				}
 			}()
-
-			topologyInfo, err = newTopologyInfo(context.TODO(), client)
-			if err != nil {
-				e.logger.Errorf("Cannot get topology info: %v", err)
-				http.Error(
-					w,
-					"An error has occurred while getting topology info:\n\n"+err.Error(),
-					http.StatusInternalServerError,
-				)
-
-				return
-			}
 		}
 
-		registry := e.makeRegistry(ctx, client, topologyInfo)
+		registry := e.makeRegistry(ctx, client, e.topologyInfo)
 
 		gatherers := prometheus.Gatherers{}
 		gatherers = append(gatherers, prometheus.DefaultGatherer)
@@ -229,4 +232,59 @@ func connect(ctx context.Context, dsn string) (*mongo.Client, error) {
 	}
 
 	return client, nil
+}
+
+func (e *Exporter) loadTopologyInfo(ctx context.Context, client *mongo.Client) error {
+	if client == nil {
+		var err error
+		client, err = connect(ctx, e.opts.URI)
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			if err = client.Disconnect(ctx); err != nil {
+				e.logger.Errorf("Cannot disconnect mongo client: %v", err)
+			}
+		}()
+	}
+
+	wasRestarted, err := e.wasRestarted(ctx, client)
+	if err != nil {
+		return errors.Wrap(err, "cannot check if the MongoDB server was restarted")
+	}
+
+	if e.topologyInfo != nil && !wasRestarted {
+		return nil
+	}
+
+	topologyInfo, err := newTopologyInfo(context.TODO(), client)
+	if err != nil {
+		return err
+	}
+	e.topologyInfo = topologyInfo
+
+	return nil
+}
+
+func (e *Exporter) wasRestarted(ctx context.Context, client *mongo.Client) (bool, error) {
+	var ss struct {
+		Uptime int `bson:"uptime"`
+	}
+
+	err := client.Database("admin").RunCommand(ctx, bson.M{"serverStatus": 1}).Decode(&ss)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		e.lastConnectionCheckTS = time.Now()
+	}()
+
+	upSince := time.Now().Add(-1 * time.Duration(ss.Uptime) * time.Second)
+	if upSince.After(e.lastConnectionCheckTS) {
+		return true, nil
+	}
+
+	return false, nil
 }

@@ -191,6 +191,7 @@ func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus
 
 type directConversion struct {
 	oldName string
+	help    string
 	path    []string
 }
 
@@ -198,126 +199,157 @@ var directConversions = []directConversion{
 	{
 		oldName: "mongodb_connections_metrics_created_total",
 		path:    []string{"serverStatus", "connections", "totalCreated"},
+		help:    "serverStatus.connections.totalCreated",
 	},
 	{
 		oldName: "mongodb_extra_info_page_faults_total",
 		path:    []string{"serverStatus", "extra_info", "page_faults"},
+		help:    "serverStatus.extra_info.page_faults",
 	},
 	{
 		oldName: "mongodb_instance_local_time",
 		path:    []string{"start"},
+		help:    "start",
 	},
 	{
 		oldName: "mongodb_mongod_instance_uptime_seconds",
 		path:    []string{"serverStatus", "uptime"},
+		help:    "serverStatus.uptime",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_cursor_timed_out_total",
 		path:    []string{"serverStatus", "metrics", "cursor", "timedOut"},
+		help:    "serverStatus.metrics.cursor.timedOut",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_get_last_error_wtime_num_total",
 		path:    []string{"serverStatus", "metrics", "getLastError", "wtime", "num"},
+		help:    "serverStatus.metrics.getLastError.wtime.num",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_get_last_error_wtimeouts_total",
 		path:    []string{"serverStatus", "metrics", "getLastError", "wtimeouts"},
+		help:    "serverStatus.metrics.getLastError.wtimeouts",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_record_moves_total",
 		path:    []string{"serverStatus", "metrics", "record", "moves"},
+		help:    "serverStatus.metrics.record.moves",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_apply_batches_num_total",
 		path:    []string{"serverStatus", "metrics", "repl", "apply", "batches", "num"},
+		help:    "serverStatus.metrics.repl.apply.batches.num",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_apply_batches_total_milliseconds",
 		path:    []string{"serverStatus", "metrics", "repl", "apply", "batches", "totalMillis"},
+		help:    "serverStatus.metrics.repl.apply.batches.totalMillis",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_apply_ops_total",
 		path:    []string{"serverStatus", "metrics", "repl", "apply", "ops"},
+		help:    "serverStatus.metrics.repl.apply.ops",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_buffer_count",
 		path:    []string{"serverStatus", "metrics", "repl", "buffer", "count"},
+		help:    "serverStatus.metrics.repl.buffer.count",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_buffer_max_size_bytes",
 		path:    []string{"serverStatus", "metrics", "repl", "buffer", "maxSizeBytes"},
+		help:    "serverStatus.metrics.repl.buffer.maxSizeBytes",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_buffer_size_bytes",
 		path:    []string{"serverStatus", "metrics", "repl", "buffer", "sizeBytes"},
+		help:    "serverStatus.metrics.repl.buffer.sizeBytes",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_executor_unsignaled_events",
 		path:    []string{"serverStatus", "metrics", "repl", "executor", "unsignaledEvents"},
+		help:    "serverStatus.metrics.repl.executor.unsignaledEvents",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_network_bytes_total",
 		path:    []string{"serverStatus", "metrics", "repl", "network", "bytes"},
+		help:    "serverStatus.metrics.repl.network.bytes",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_network_getmores_num_total",
 		path:    []string{"serverStatus", "metrics", "repl", "network", "getmores", "num"},
+		help:    "serverStatus.metrics.repl.network.getmores.num",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_network_getmores_total_milliseconds",
 		path:    []string{"serverStatus", "metrics", "repl", "network", "getmores", "totalMillis"},
+		help:    "serverStatus.metrics.repl.network.getmores.totalMillis",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_network_ops_total",
 		path:    []string{"serverStatus", "metrics", "repl", "network", "ops"},
+		help:    "serverStatus.metrics.repl.network.ops",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_network_readers_created_total",
 		path:    []string{"serverStatus", "metrics", "repl", "network", "readersCreated"},
+		help:    "serverStatus.metrics.repl.network.readersCreated",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_ttl_deleted_documents_total",
 		path:    []string{"serverStatus", "metrics", "ttl", "deletedDocuments"},
+		help:    "serverStatus.metrics.ttl.deletedDocuments",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_ttl_passes_total",
 		path:    []string{"serverStatus", "metrics", "ttl", "passes"},
+		help:    "serverStatus.metrics.ttl.passes",
 	},
 	{
 		oldName: "mongodb_network_metrics_num_requests_total",
 		path:    []string{"serverStatus", "network", "numRequests"},
+		help:    "serverStatus.network.numRequests",
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
 		path:    []string{"serverStatus", "wiredTiger", "cache", "maximum bytes configured"},
+		help:    "serverStatus.wiredTiger.cache.maximum bytes configured",
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_cache_overhead_percent",
 		path:    []string{"serverStatus", "wiredTiger", "cache", "percentage overhead"},
+		help:    "serverStatus.wiredTiger.cache.percentage overhead",
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_log_records_scanned_total",
 		path:    []string{"serverStatus", "wiredTiger", "log", "records processed by log scan"},
+		help:    "serverStatus.wiredTiger.log.records processed by log scan",
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_session_open_cursors_total",
 		path:    []string{"serverStatus", "wiredTiger", "session", "open cursor count"},
+		help:    "serverStatus.wiredTiger.session.open cursor count",
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_session_open_sessions_total",
 		path:    []string{"serverStatus", "wiredTiger", "session", "open session count"},
+		help:    "serverStatus.wiredTiger.session.open session count",
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
 		path:    []string{"serverStatus", "wiredTiger", "transaction", "transaction checkpoint total time (msecs)"},
+		help:    "serverStatus.wiredTiger.transaction.transaction checkpoint total time (msecs)",
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
 		path:    []string{"serverStatus", "wiredTiger", "transaction", "transaction checkpoint currently running"},
+		help:    "serverStatus.wiredTiger.transaction.transaction checkpoint currently running",
 	},
 	{
 		oldName: "mongodb_mongod_metrics_get_last_error_wtime_total_milliseconds",
 		path:    []string{"serverStatus", "metrics", "getLastError", "wtime", "totalMillis"},
+		help:    "serverStatus.metrics.getLastError.wtime.totalMillis",
 	},
 }
 
@@ -340,7 +372,7 @@ func directConversionMetrics(m bson.M) []prometheus.Metric {
 			continue
 		}
 
-		d := prometheus.NewDesc(dc.oldName, dc.oldName, nil, nil)
+		d := prometheus.NewDesc(dc.oldName, dc.help, nil, nil)
 
 		metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.UntypedValue, *f))
 	}
@@ -496,27 +528,15 @@ var conversions = []*conversion{
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets",
-		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.read.available", // REVIEW added 'read'
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets",
-		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.write.available", // REVIEW added 'write'
+		newName: "mongodb_ss_wt_concurrentTransactions_available", // REVIEW added 'read'
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets",
-		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.read.out", // REVIEW added 'read'
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets",
-		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.write.out", // REVIEW added 'write'
+		newName: "mongodb_ss_wt_concurrentTransactions_out", // REVIEW added 'read'
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets",
-		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.read.totalTickets", // REVIEW added 'read'
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets",
-		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.write.totalTickets", // REVIEW added 'write'
+		newName: "mongodb_ss_wt_concurrentTransactions_totalTickets", // REVIEW added 'read'
 	},
 	{
 		oldName: "mongodb_serverStatus_wiredTiger_cache_maximum_bytes_configured",
