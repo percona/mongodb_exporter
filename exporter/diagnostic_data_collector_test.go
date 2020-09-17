@@ -18,7 +18,9 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -78,7 +80,6 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	// The metrics list will  change depending on the sanbox.
 	// Use this test only after changing the code and before running it, update the golden file
-	t.Skip("Only use it locally")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -86,12 +87,15 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	ti := labelsGetterMock{}
 
 	c := &diagnosticDataCollector{
-		client:       client,
-		logger:       logrus.New(),
-		topologyInfo: ti,
+		client:         client,
+		compatibleMode: true,
+		logger:         logrus.New(),
+		topologyInfo:   ti,
 	}
 
 	metrics := collect(c)
+	sort.Slice(metrics, func(i, j int) bool { return metrics[i].Desc().String() < metrics[j].Desc().String() })
+
 	actualMetrics := helpers.ReadMetrics(metrics)
 	actualMetrics = zeroMetrics(actualMetrics)
 
@@ -99,6 +103,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	goldenFile := "testdata/diagnosticDataCollector_all.json"
 	if os.Getenv("UPDATE_SAMPLES") == "1" {
+		fmt.Printf("updating golden file %s", goldenFile)
 		err := writeTestDataJSON(goldenFile, actualLines)
 		assert.NoError(t, err)
 	}

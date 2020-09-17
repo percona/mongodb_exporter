@@ -189,8 +189,339 @@ func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus
 	return append(res, metric)
 }
 
+type directConversion struct {
+	oldName string
+	path    []string
+}
+
+var directConversions = []directConversion{
+	{
+		oldName: "mongodb_connections_metrics_created_total",
+		path:    []string{"serverStatus", "connections", "totalCreated"},
+	},
+	{
+		oldName: "mongodb_extra_info_page_faults_total",
+		path:    []string{"serverStatus", "extra_info", "page_faults"},
+	},
+	{
+		oldName: "mongodb_instance_local_time",
+		path:    []string{"start"},
+	},
+	{
+		oldName: "mongodb_mongod_instance_uptime_seconds",
+		path:    []string{"serverStatus", "uptime"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_cursor_timed_out_total",
+		path:    []string{"serverStatus", "metrics", "cursor", "timedOut"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_get_last_error_wtime_num_total",
+		path:    []string{"serverStatus", "metrics", "getLastError", "wtime", "num"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_get_last_error_wtimeouts_total",
+		path:    []string{"serverStatus", "metrics", "getLastError", "wtimeouts"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_record_moves_total",
+		path:    []string{"serverStatus", "metrics", "record", "moves"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_apply_batches_num_total",
+		path:    []string{"serverStatus", "metrics", "repl", "apply", "batches", "num"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_apply_batches_total_milliseconds",
+		path:    []string{"serverStatus", "metrics", "repl", "apply", "batches", "totalMillis"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_apply_ops_total",
+		path:    []string{"serverStatus", "metrics", "repl", "apply", "ops"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_buffer_count",
+		path:    []string{"serverStatus", "metrics", "repl", "buffer", "count"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_buffer_max_size_bytes",
+		path:    []string{"serverStatus", "metrics", "repl", "buffer", "maxSizeBytes"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_buffer_size_bytes",
+		path:    []string{"serverStatus", "metrics", "repl", "buffer", "sizeBytes"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_executor_unsignaled_events",
+		path:    []string{"serverStatus", "metrics", "repl", "executor", "unsignaledEvents"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_bytes_total",
+		path:    []string{"serverStatus", "metrics", "repl", "network", "bytes"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_getmores_num_total",
+		path:    []string{"serverStatus", "metrics", "repl", "network", "getmores", "num"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_getmores_total_milliseconds",
+		path:    []string{"serverStatus", "metrics", "repl", "network", "getmores", "totalMillis"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_ops_total",
+		path:    []string{"serverStatus", "metrics", "repl", "network", "ops"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_repl_network_readers_created_total",
+		path:    []string{"serverStatus", "metrics", "repl", "network", "readersCreated"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_ttl_deleted_documents_total",
+		path:    []string{"serverStatus", "metrics", "ttl", "deletedDocuments"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_ttl_passes_total",
+		path:    []string{"serverStatus", "metrics", "ttl", "passes"},
+	},
+	{
+		oldName: "mongodb_network_metrics_num_requests_total",
+		path:    []string{"serverStatus", "network", "numRequests"},
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
+		path:    []string{"serverStatus", "wiredTiger", "cache", "maximum bytes configured"},
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_cache_overhead_percent",
+		path:    []string{"serverStatus", "wiredTiger", "cache", "percentage overhead"},
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_log_records_scanned_total",
+		path:    []string{"serverStatus", "wiredTiger", "log", "records processed by log scan"},
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_session_open_cursors_total",
+		path:    []string{"serverStatus", "wiredTiger", "session", "open cursor count"},
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_session_open_sessions_total",
+		path:    []string{"serverStatus", "wiredTiger", "session", "open session count"},
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
+		path:    []string{"serverStatus", "wiredTiger", "transaction", "transaction checkpoint total time (msecs)"},
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
+		path:    []string{"serverStatus", "wiredTiger", "transaction", "transaction checkpoint currently running"},
+	},
+	{
+		oldName: "mongodb_mongod_metrics_get_last_error_wtime_total_milliseconds",
+		path:    []string{"serverStatus", "metrics", "getLastError", "wtime", "totalMillis"},
+	},
+}
+
+func directConversionMetrics(m bson.M) []prometheus.Metric {
+	metrics := make([]prometheus.Metric, 0, len(directConversions))
+
+	for _, dc := range directConversions {
+		val := walkTo(m, dc.path)
+		if val == nil {
+			continue
+		}
+
+		f, err := asFloat64(val)
+		if err != nil {
+			metrics = append(metrics, prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err))
+			continue
+		}
+
+		if f == nil {
+			continue
+		}
+
+		d := prometheus.NewDesc(dc.oldName, dc.oldName, nil, nil)
+
+		metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.UntypedValue, *f))
+	}
+
+	return metrics
+}
+
 // nolint:gochecknoglobals
 var conversions = []*conversion{
+	//	{
+	//		oldName: "mongodb_connections_metrics_created_total",
+	//		newName: "mongodb_serverStatus_connections.totalCreated",
+	//	},
+	//	{
+	//		oldName: "mongodb_extra_info_page_faults_total",
+	//		newName: "mongodb_serverStatus.extra_info.page_faults",
+	//	},
+	//	{
+	//		oldName: "mongodb_instance_local_time",
+	//		newName: "mongodb_start",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_instance_uptime_seconds",
+	//		newName: "mongodb_serverStatus.uptime",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_cursor_timed_out_total",
+	//		newName: "mongodb_serverStatus.metrics.cursor.timedOut",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_get_last_error_wtime_num_total",
+	//		newName: "mongodb_serverStatus.metrics.getLastError.wtime.num",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_get_last_error_wtimeouts_total",
+	//		newName: "mongodb_serverStatus.metrics.getLastError.wtimeouts",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_record_moves_total",
+	//		newName: "mongodb_serverStatus.metrics.record.moves",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_apply_batches_num_total",
+	//		newName: "mongodb_serverStatus.metrics.repl.apply.batches.num",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_apply_batches_total_milliseconds",
+	//		newName: "mongodb_serverStatus.metrics.repl.apply.batches.totalMillis",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_apply_ops_total",
+	//		newName: "mongodb_serverStatus.metrics.repl.apply.ops",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_buffer_count",
+	//		newName: "mongodb_serverStatus.metrics.repl.buffer.count",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_buffer_max_size_bytes",
+	//		newName: "mongodb_serverStatus.metrics.repl.buffer.maxSizeBytes",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_buffer_size_bytes",
+	//		newName: "mongodb_serverStatus.metrics.repl.buffer.sizeBytes",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_executor_unsignaled_events",
+	//		newName: "mongodb_serverStatus.metrics.repl.executor.unsignaledEvents",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_network_bytes_total",
+	//		newName: "mongodb_serverStatus.metrics.repl.network.bytes",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_network_getmores_num_total",
+	//		newName: "mongodb_serverStatus.metrics.repl.network.getmores.num",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_network_getmores_total_milliseconds",
+	//		newName: "mongodb_serverStatus.metrics.repl.network.getmores.totalMillis",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_network_ops_total",
+	//		newName: "mongodb_serverStatus.metrics.repl.network.ops",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_repl_network_readers_created_total",
+	//		newName: "mongodb_serverStatus.metrics.repl.network.readersCreated",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_ttl_deleted_documents_total",
+	//		newName: "mongodb_serverStatus.metrics.ttl.deletedDocuments",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_ttl_passes_total",
+	//		newName: "mongodb_serverStatus.metrics.ttl.passes",
+	//	},
+	//	{
+	//		oldName: "mongodb_network_metrics_num_requests_total",
+	//		newName: "mongodb_serverStatus.network.numRequests",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
+	//		newName: "mongodb_serverStatus.wiredTiger.cache.maximum bytes configured",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_wiredtiger_cache_overhead_percent",
+	//		newName: "mongodb_serverStatus.wiredTiger.cache.percentage overhead",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_wiredtiger_log_records_scanned_total",
+	//		newName: "mongodb_serverStatus.wiredTiger.log.records processed by log scan",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_wiredtiger_session_open_cursors_total",
+	//		newName: "mongodb_serverStatus_wiredTiger_session_open cursor count",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_wiredtiger_session_open_sessions_total",
+	//		newName: "mongodb_serverStatus_wiredTiger_session_open session count",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
+	//		newName: "mongodb_serverStatus_wiredTiger_transaction_transaction_checkpoint_total_time_msecs",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
+	//		newName: "mongodb_serverStatus_wiredTiger_transaction_transaction_checkpoint_currently_running",
+	//	},
+	//	{
+	//		oldName: "mongodb_mongod_metrics_get_last_error_wtime_total_milliseconds",
+	//		newName: "mongodb_serverStatus.metrics.getLastError.wtime.totalMillis",
+	//	},
+	{
+		oldName: "mongodb_mongod_durability_journaled_megabytes",
+		newName: "mongodb_serverStatus_dur_journaledMB", // REVIEW
+	},
+	{
+		oldName: "mongodb_mongod_durability_commits",
+		newName: "mongodb_serverStatus_dur_commits", // REVIEW
+	},
+	{
+		oldName: "mongodb_mongod_background_flushing_average_milliseconds",
+		newName: "mongodb_serverStatus_backgroundFlushing_average_ms", // REVIEW
+	},
+	{
+		oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total",
+		newName: "mongodb_serverStatus_locks_Local_acquireCount_[rw]", // REVIEW
+	},
+	{
+		oldName: "mongodb_memory",
+		newName: "mongodb_serverStatus_mem.[resident|virtual]", // REVIEW. TOTAL?
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets",
+		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.read.available", // REVIEW added 'read'
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets",
+		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.write.available", // REVIEW added 'write'
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets",
+		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.read.out", // REVIEW added 'read'
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets",
+		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.write.out", // REVIEW added 'write'
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets",
+		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.read.totalTickets", // REVIEW added 'read'
+	},
+	{
+		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets",
+		newName: "mongodb_serverStatus.wiredTiger.concurrentTransactions.write.totalTickets", // REVIEW added 'write'
+	},
+	{
+		oldName: "mongodb_serverStatus_wiredTiger_cache_maximum_bytes_configured",
+		newName: "mongodb_mongod_wiredtiger_cache_max_bytes", // REVIEW: Not found
+	},
 	{
 		newName:          "mongodb_ss_asserts",
 		oldName:          "mongodb_asserts_total",
@@ -200,26 +531,6 @@ var conversions = []*conversion{
 		oldName:          "mongodb_connections",
 		newName:          "mongodb_ss_connections",
 		labelConversions: map[string]string{"conn_type": "state"},
-	},
-	{
-		oldName: "mongodb_connections_metrics_created_total",
-		newName: "mongodb_ss_connections_totalCreated",
-	},
-	{
-		oldName: "mongodb_extra_info_page_faults_total",
-		newName: "mongodb_ss_extra_info_page_faults",
-	},
-	{
-		oldName: "mongodb_mongod_durability_journaled_megabytes",
-		newName: "mongodb_ss_dur_journaledMB",
-	},
-	{
-		oldName: "mongodb_mongod_durability_commits",
-		newName: "mongodb_ss_dur_commits",
-	},
-	{
-		oldName: "mongodb_mongod_background_flushing_average_milliseconds",
-		newName: "mongodb_ss_backgroundFlushing_average_ms",
 	},
 	{
 		oldName:     "mongodb_mongod_global_lock_client",
@@ -241,43 +552,14 @@ var conversions = []*conversion{
 		},
 	},
 	{
-		oldName: "mongodb_instance_local_time",
-		newName: "mongodb_start",
-	},
-
-	{
-		oldName: "mongodb_mongod_instance_uptime_seconds",
-		newName: "mongodb_ss_uptime",
-	},
-	{
-		oldName: "mongodb_mongod_locks_time_locked_local_microseconds_total",
-		newName: "mongodb_ss_locks_Local_acquireCount_[rw]",
-	},
-	{
-		oldName: "mongodb_memory",
-		newName: "mongodb_ss_mem_[resident|virtual]",
-	},
-	{
 		oldName:          "mongodb_mongod_metrics_cursor_open",
 		newName:          "mongodb_ss_metrics_cursor_open",
 		labelConversions: map[string]string{"csr_type": "state"},
 	},
 	{
-		oldName: "mongodb_mongod_metrics_cursor_timed_out_total",
-		newName: "mongodb_ss_metrics_cursor_timedOut",
-	},
-	{
 		oldName:          "mongodb_mongod_metrics_document_total",
 		newName:          "mongodb_ss_metric_document",
 		labelConversions: map[string]string{"doc_op_type": "type"},
-	},
-	{
-		oldName: "mongodb_mongod_metrics_get_last_error_wtime_num_total",
-		newName: "mongodb_ss_metrics_getLastError_wtime_num",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_get_last_error_wtimeouts_total",
-		newName: "mongodb_ss_metrics_getLastError_wtimeouts",
 	},
 	{
 		oldName:     "mongodb_mongod_metrics_operation_total",
@@ -294,78 +576,14 @@ var conversions = []*conversion{
 		suffixLabel: "state",
 	},
 	{
-		oldName: "mongodb_mongod_metrics_record_moves_total",
-		newName: "mongodb_ss_metrics_record_moves",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_apply_batches_num_total",
-		newName: "mongodb_ss_metrics_repl_apply_batches_num",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_apply_batches_total_milliseconds",
-		newName: "mongodb_ss_metrics_repl_apply_batches_totalMillis",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_apply_ops_total",
-		newName: "mongodb_ss_metrics_repl_apply_ops",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_buffer_count",
-		newName: "mongodb_ss_metrics_repl_buffer_count",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_buffer_max_size_bytes",
-		newName: "mongodb_ss_metrics_repl_buffer_maxSizeBytes",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_buffer_size_bytes",
-		newName: "mongodb_ss_metrics_repl_buffer_sizeBytes",
-	},
-	{
 		oldName:     "mongodb_mongod_metrics_repl_executor_queue",
 		prefix:      "mongodb_ss_metrics_repl_executor_queues",
 		suffixLabel: "type",
 	},
 	{
-		oldName: "mongodb_mongod_metrics_repl_executor_unsignaled_events",
-		newName: "mongodb_ss_metrics_repl_executor_unsignaledEvents",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_network_bytes_total",
-		newName: "mongodb_ss_metrics_repl_network_bytes",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_network_getmores_num_total",
-		newName: "mongodb_ss_metrics_repl_network_getmores_num",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_network_getmores_total_milliseconds",
-		newName: "mongodb_ss_metrics_repl_network_getmores_totalMillis",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_network_ops_total",
-		newName: "mongodb_ss_metrics_repl_network_ops",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_repl_network_readers_created_total",
-		newName: "mongodb_ss_metrics_repl_network_readersCreated",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_ttl_deleted_documents_total",
-		newName: "mongodb_ss_metrics_ttl_deletedDocuments",
-	},
-	{
-		oldName: "mongodb_mongod_metrics_ttl_passes_total",
-		newName: "mongodb_ss_metrics_ttl_passes",
-	},
-	{
 		oldName:     "mongodb_network_bytes_total",
 		prefix:      "mongodb_ss_network",
 		suffixLabel: "state",
-	},
-	{
-		oldName: "mongodb_network_metrics_num_requests_total",
-		newName: "mongodb_ss_network_numRequests",
 	},
 	{
 		oldName:          "mongodb_mongod_op_counters_repl_total",
@@ -381,46 +599,6 @@ var conversions = []*conversion{
 		oldName:     "mongodb_mongod_wiredtiger_blockmanager_blocks_total",
 		prefix:      "mongodb_ss_wt_block_manager",
 		suffixLabel: "type",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
-		newName: "mongodb_ss_wt_cache_maximum_bytes_configured",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_cache_overhead_percent",
-		newName: "mongodb_ss_wt_cache_percentage_overhead",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets",
-		newName: "mongodb_ss_wt_concurrentTransactions_available",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets",
-		newName: "mongodb_ss_wt_concurrentTransactions_out",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets",
-		newName: "mongodb_ss_wt_concurrentTransactions_totalTickets",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_log_records_scanned_total",
-		newName: "mongodb_ss_wt_log_records_processed_by_log_scan",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_session_open_cursors_total",
-		newName: "mongodb_ss_wt_session_open_cursor_count",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_session_open_sessions_total",
-		newName: "mongodb_ss_wt_session_open_session_count",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
-		newName: "mongodb_ss_wt_txn_transaction_checkpoint_total_time_msecs",
-	},
-	{
-		oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
-		newName: "mongodb_ss_wt_txn_transaction_checkpoint_currently_running",
 	},
 	{
 		oldName:     "mongodb_mongod_wiredtiger_transactions_total",
@@ -569,14 +747,6 @@ var conversions = []*conversion{
 			"resident": "resident",
 			"virtual":  "virtual",
 		},
-	},
-	{
-		oldName: "mongodb_mongod_metrics_get_last_error_wtime_total_milliseconds",
-		newName: "mongodb_ss_metrics_getLastError_wtime_totalMillis",
-	},
-	{
-		oldName: "mongodb_ss_wt_cache_maximum_bytes_configured",
-		newName: "mongodb_mongod_wiredtiger_cache_max_bytes",
 	},
 }
 

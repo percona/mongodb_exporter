@@ -78,6 +78,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 		} else if hi.NodeType == util.TypeMongos {
 			metrics = append(metrics, mongosMetrics(d.ctx, d.client, d.logger)...)
 		}
+		metrics = append(metrics, directConversionMetrics(m)...)
 	}
 
 	for _, metric := range metrics {
