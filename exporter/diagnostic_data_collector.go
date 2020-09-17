@@ -72,12 +72,10 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 			metrics = append(metrics, cem)
 		}
 
-		hi, err := util.GetHostInfo(d.ctx, d.client)
-		if err != nil {
-			d.logger.Errorf("cannot get host info: %s", err)
-		} else if hi.NodeType == util.TypeMongos {
+		if nodeType, ok := d.topologyInfo.baseLabels()[labelClusterRole]; ok && nodeType == util.TypeMongos {
 			metrics = append(metrics, mongosMetrics(d.ctx, d.client, d.logger)...)
 		}
+
 		metrics = append(metrics, directConversionMetrics(m)...)
 	}
 
