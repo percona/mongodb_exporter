@@ -18,7 +18,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"runtime/pprof"
 	"strings"
+	"syscall"
 
 	"github.com/alecthomas/kong"
 	"github.com/sirupsen/logrus"
@@ -46,8 +50,9 @@ type GlobalFlags struct {
 	DisableDiagnosticData   bool `name:"disable.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
 	DisableReplicasetStatus bool `name:"disable.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
 
-	CompatibleMode bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
-	Version        bool `name:"version" help:"Show version and exit"`
+	ProfilerOutput string `name:"profiler-output" help:"Enable profiler and write the output to this file" placeholder:"mdb_exporter.pprof"`
+	CompatibleMode bool   `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
+	Version        bool   `name:"version" help:"Show version and exit"`
 }
 
 func main() {
@@ -108,6 +113,24 @@ func main() {
 	e, err := exporter.New(exporterOpts)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if opts.ProfilerOutput != "" {
+		f, err := os.Create(opts.ProfilerOutput)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal(err)
+		}
+
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+		go func() {
+			<-sigs
+			pprof.StopCPUProfile()
+			os.Exit(0)
+		}()
 	}
 
 	e.Run()

@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/percona/percona-toolkit/src/go/mongolib/proto"
 	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -31,6 +33,11 @@ const (
 	labelClusterID       = "cl_id"
 	labelReplicasetName  = "rs_nm"
 	labelReplicasetState = "rs_state"
+
+	typeIsDBGrid    = "isdbgrid"
+	typeMongos      = "mongos"
+	typeMongod      = "mongod"
+	typeShardServer = "shardsvr"
 )
 
 type labelsGetter interface {
@@ -88,11 +95,12 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 
 	t.labels = make(map[string]string)
 
-	hi, err := util.GetHostInfo(ctx, t.client)
+	nodeType, err := getNodeType(ctx, t.client)
 	if err != nil {
-		return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting host info: %s", err)
+		return errors.Wrap(err, "cannot get node type for topology info")
 	}
-	t.labels[labelClusterRole] = hi.NodeType
+
+	t.labels[labelClusterRole] = nodeType
 
 	// Standalone instances or mongos instances won't have a replicaset name
 	if rs, err := util.ReplicasetConfig(ctx, t.client); err == nil {
@@ -112,4 +120,21 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 	t.labels[labelReplicasetState] = fmt.Sprintf("%d", state)
 
 	return nil
+}
+
+func getNodeType(ctx context.Context, client *mongo.Client) (string, error) {
+	md := proto.MasterDoc{}
+	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
+		return "", err
+	}
+
+	if md.SetName != nil || md.Hosts != nil {
+		return typeShardServer, nil
+	} else if md.Msg == typeIsDBGrid {
+		// isdbgrid is always the msg value when calling isMaster on a mongos
+		// see http://docs.mongodb.org/manual/core/sharded-cluster-query-router/
+		return typeMongos, nil
+	}
+
+	return typeMongod, nil
 }
