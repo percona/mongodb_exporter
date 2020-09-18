@@ -16,12 +16,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var (
-	// ErrCannotAggregateShardingChangelogEvent Cannot aggregate a new Sharding Changelog Event.
-	ErrCannotAggregateShardingChangelogEvent = fmt.Errorf("failed to aggregate sharding changelog events")
-	// ErrInvalidMetricValue cannot create a new metric due to an invalid value.
-	ErrInvalidMetricValue = fmt.Errorf("invalid metric value")
-)
+// ErrInvalidMetricValue cannot create a new metric due to an invalid value.
+var errInvalidMetricValue = fmt.Errorf("invalid metric value")
 
 /*
   This is used to convert a new metric like: mongodb_ss_asserts{assert_type=*} (1)
@@ -71,9 +67,6 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 		ln:     make([]string, 0, len(rm.ln)),
 		lv:     make([]string, 0, len(rm.lv)),
 	}
-
-	// Label values remain the same
-	// copy(oldMetric.lv, rm.lv)
 
 	for _, val := range rm.lv {
 		if newLabelVal, ok := c.labelValueConversions[val]; ok {
@@ -163,7 +156,7 @@ func sumMetrics(m bson.M, paths [][]string) (float64, error) {
 
 		f, err := asFloat64(v)
 		if err != nil {
-			return 0, errors.Wrapf(ErrInvalidMetricValue, "%v", v)
+			return 0, errors.Wrapf(errInvalidMetricValue, "%v", v)
 		}
 
 		total += *f
@@ -669,7 +662,7 @@ func locksMetrics(m bson.M) []prometheus.Metric {
 			continue
 		}
 		if err != nil {
-			logrus.Errorf("cannot convert rw metric %s to old style: %s", mm.Desc(), err)
+			logrus.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
 			continue
 		}
 		res = append(res, mm)
@@ -1165,7 +1158,7 @@ func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metri
 
 	c, err := coll.Aggregate(ctx, []bson.M{{"$match": match}, {"$group": group}})
 	if err != nil {
-		return nil, errors.Wrap(err, ErrCannotAggregateShardingChangelogEvent.Error())
+		return nil, errors.Wrap(err, "failed to aggregate sharding changelog events")
 	}
 
 	defer c.Close(ctx) //nolint:errcheck

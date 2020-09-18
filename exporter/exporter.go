@@ -84,7 +84,7 @@ func New(opts *Opts) (*Exporter, error) {
 			return nil, err
 		}
 
-		exp.topologyInfo, err = newTopologyInfo(context.TODO(), exp.client)
+		exp.topologyInfo, err = newTopologyInfo(ctx, exp.client)
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +179,7 @@ func (e *Exporter) handler() http.Handler {
 				}
 			}()
 
-			topologyInfo, err = newTopologyInfo(context.TODO(), client)
+			topologyInfo, err = newTopologyInfo(ctx, client)
 			if err != nil {
 				e.logger.Errorf("Cannot get topology info: %v", err)
 				http.Error(

@@ -2,32 +2,9 @@ package exporter
 
 import (
 	"strings"
-	"sync"
 
 	"github.com/percona/exporter_shared/helpers"
-	"github.com/prometheus/client_golang/prometheus"
 )
-
-func collect(c helpers.Collector) []prometheus.Metric {
-	m := make([]prometheus.Metric, 0)
-	ch := make(chan prometheus.Metric)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		for metric := range ch {
-			m = append(m, metric)
-		}
-		wg.Done()
-	}()
-
-	c.Collect(ch)
-	close(ch)
-
-	wg.Wait()
-
-	return m
-}
 
 func filterMetrics(metrics []*helpers.Metric, filters []string) []*helpers.Metric {
 	res := make([]*helpers.Metric, 0, len(metrics))

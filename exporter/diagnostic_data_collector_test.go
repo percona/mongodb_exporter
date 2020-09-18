@@ -92,7 +92,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 		topologyInfo:   ti,
 	}
 
-	metrics := collect(c)
+	metrics := helpers.CollectMetrics(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
 	filters := []string{
 		"mongodb_mongod_metrics_cursor_open",
