@@ -19,7 +19,6 @@ package exporter
 import (
 	"context"
 
-	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -72,10 +71,10 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 			metrics = append(metrics, cem)
 		}
 
-		hi, err := util.GetHostInfo(d.ctx, d.client)
+		nodeType, err := getNodeType(d.ctx, d.client)
 		if err != nil {
-			d.logger.Errorf("cannot get host info: %s", err)
-		} else if hi.NodeType == util.TypeMongos {
+			d.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
+		} else if nodeType == typeMongos {
 			metrics = append(metrics, mongosMetrics(d.ctx, d.client, d.logger)...)
 		}
 	}
