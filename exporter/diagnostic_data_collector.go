@@ -74,11 +74,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 		nodeType, err := getNodeType(d.ctx, d.client)
 		if err != nil {
 			d.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
-
-			return
-		}
-
-		if nodeType == typeMongos {
+		} else if nodeType == typeMongos {
 			metrics = append(metrics, mongosMetrics(d.ctx, d.client, d.logger)...)
 		}
 	}

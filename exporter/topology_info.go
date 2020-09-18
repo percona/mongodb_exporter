@@ -36,7 +36,7 @@ const (
 	labelReplicasetName  = "rs_nm"
 	labelReplicasetState = "rs_state"
 
-	typeIsDBGrid    mongoDBNodeType = "isdbgrid"
+	typeIsDBGrid                    = "isdbgrid"
 	typeMongos      mongoDBNodeType = "mongos"
 	typeMongod      mongoDBNodeType = "mongod"
 	typeShardServer mongoDBNodeType = "shardsvr"
@@ -132,7 +132,7 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 
 	if md.SetName != nil || md.Hosts != nil {
 		return typeShardServer, nil
-	} else if md.Msg == string(typeIsDBGrid) {
+	} else if md.Msg == typeIsDBGrid {
 		// isdbgrid is always the msg value when calling isMaster on a mongos
 		// see http://docs.mongodb.org/manual/core/sharded-cluster-query-router/
 		return typeMongos, nil
