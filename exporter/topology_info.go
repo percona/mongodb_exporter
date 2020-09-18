@@ -28,16 +28,18 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+type mongoDBNodeType string
+
 const (
 	labelClusterRole     = "cl_role"
 	labelClusterID       = "cl_id"
 	labelReplicasetName  = "rs_nm"
 	labelReplicasetState = "rs_state"
 
-	typeIsDBGrid    = "isdbgrid"
-	typeMongos      = "mongos"
-	typeMongod      = "mongod"
-	typeShardServer = "shardsvr"
+	typeIsDBGrid    mongoDBNodeType = "isdbgrid"
+	typeMongos      mongoDBNodeType = "mongos"
+	typeMongod      mongoDBNodeType = "mongod"
+	typeShardServer mongoDBNodeType = "shardsvr"
 )
 
 type labelsGetter interface {
@@ -100,7 +102,7 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 		return errors.Wrap(err, "cannot get node type for topology info")
 	}
 
-	t.labels[labelClusterRole] = nodeType
+	t.labels[labelClusterRole] = string(nodeType)
 
 	// Standalone instances or mongos instances won't have a replicaset name
 	if rs, err := util.ReplicasetConfig(ctx, t.client); err == nil {
@@ -122,7 +124,7 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 	return nil
 }
 
-func getNodeType(ctx context.Context, client *mongo.Client) (string, error) {
+func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, error) {
 	md := proto.MasterDoc{}
 	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
 		return "", err
@@ -130,7 +132,7 @@ func getNodeType(ctx context.Context, client *mongo.Client) (string, error) {
 
 	if md.SetName != nil || md.Hosts != nil {
 		return typeShardServer, nil
-	} else if md.Msg == typeIsDBGrid {
+	} else if md.Msg == string(typeIsDBGrid) {
 		// isdbgrid is always the msg value when calling isMaster on a mongos
 		// see http://docs.mongodb.org/manual/core/sharded-cluster-query-router/
 		return typeMongos, nil
