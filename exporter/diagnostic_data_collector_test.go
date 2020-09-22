@@ -18,8 +18,8 @@ package exporter
 
 import (
 	"context"
-	"fmt"
-	"sort"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -94,28 +94,10 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	metrics := helpers.CollectMetrics(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
-	filters := []string{
-		"mongodb_mongod_metrics_cursor_open",
-		"mongodb_mongod_metrics_get_last_error_wtimeouts_total",
-		"mongodb_mongod_wiredtiger_cache_bytes",
-		"mongodb_mongod_wiredtiger_transactions_total",
-		"mongodb_mongod_wiredtiger_cache_bytes_total",
-		"mongodb_op_counters_total",
-		"mongodb_ss_mem_resident",
-		"mongodb_ss_mem_virtual",
-		"mongodb_ss_metrics_cursor_open",
-		"mongodb_ss_metrics_getLastError_wtime_totalMillis",
-		"mongodb_ss_opcounters",
-		"mongodb_ss_opcountersRepl",
-		"mongodb_ss_wt_cache_maximum_bytes_configured",
-		"mongodb_ss_wt_cache_modified_pages_evicted",
-	}
-	actualMetrics = filterMetrics(actualMetrics, filters)
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
-	metricNames := getMetricNames(actualLines)
 
-	sort.Strings(filters)
-	for _, want := range filters {
-		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
+	samplesFile := "testdata/get_diagnostic_data.json"
+	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
+		assert.NoError(t, writeJSON(samplesFile, actualLines))
 	}
 }
