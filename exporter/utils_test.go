@@ -39,13 +39,13 @@ func zeroMetrics(metrics []*helpers.Metric) []*helpers.Metric {
 	return res
 }
 
-func getMetricNames(lines []string) map[string]bool {
-	names := map[string]bool{}
+func getMetricNames(lines []string) []string {
+	names := []string{}
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "# TYPE ") {
 			m := strings.Split(line, " ")
-			names[m[2]] = true
+			names = append(names, m[2])
 		}
 	}
 

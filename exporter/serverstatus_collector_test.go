@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -69,7 +70,6 @@ mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
 }
 
 func TestAllServerStatusDataCollector(t *testing.T) {
-	t.Skip("Skip on Github tests. Things like server name or IP are not constant")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -85,14 +85,16 @@ func TestAllServerStatusDataCollector(t *testing.T) {
 	metrics := helpers.CollectMetrics(c)
 	actualMetrics := zeroMetrics(helpers.ReadMetrics(metrics))
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+	metricNames := getMetricNames(actualLines)
+	sort.Strings(metricNames)
 
 	samplesFile := "testdata/all_server_status_data.json"
 	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
-		assert.NoError(t, writeJSON(samplesFile, actualLines))
+		assert.NoError(t, writeJSON(samplesFile, metricNames))
 	}
 
-	var wantLines []string
-	assert.NoError(t, readJSON(samplesFile, &wantLines))
+	var wantNames []string
+	assert.NoError(t, readJSON(samplesFile, &wantNames))
 
-	assert.Equal(t, wantLines, actualLines)
+	assert.Equal(t, wantNames, metricNames)
 }

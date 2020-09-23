@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -77,7 +78,6 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
-	t.Skip("Skip on Github tests. Things like server name or IP are not constant")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -92,16 +92,18 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 
 	metrics := helpers.CollectMetrics(c)
-	actualMetrics := zeroMetrics(helpers.ReadMetrics(metrics))
+	actualMetrics := helpers.ReadMetrics(metrics)
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+	metricNames := getMetricNames(actualLines)
+	sort.Strings(metricNames)
 
 	samplesFile := "testdata/all_get_diagnostic_data.json"
 	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
-		assert.NoError(t, writeJSON(samplesFile, actualLines))
+		assert.NoError(t, writeJSON(samplesFile, metricNames))
 	}
 
-	var wantLines []string
-	assert.NoError(t, readJSON(samplesFile, &wantLines))
+	var wantNames []string
+	assert.NoError(t, readJSON(samplesFile, &wantNames))
 
-	assert.Equal(t, wantLines, actualLines)
+	assert.Equal(t, wantNames, metricNames)
 }
