@@ -39,13 +39,15 @@ func zeroMetrics(metrics []*helpers.Metric) []*helpers.Metric {
 	return res
 }
 
-func getMetricNames(lines []string) []string {
-	names := []string{}
+// getMetricNames returns a map of metric names so it is easier to compare
+// which metrics exists agains a predefined list.
+func getMetricNames(lines []string) map[string]bool {
+	names := map[string]bool{}
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "# TYPE ") {
 			m := strings.Split(line, " ")
-			names = append(names, m[2])
+			names[m[2]] = true
 		}
 	}
 

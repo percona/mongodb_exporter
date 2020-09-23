@@ -19,7 +19,6 @@ package exporter
 import (
 	"context"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -91,19 +90,38 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 		topologyInfo:   ti,
 	}
 
+	samplesFile := "testdata/all_get_diagnostic_data.json"
+	compareMetrics(t, c, samplesFile)
+}
+
+func compareMetrics(t *testing.T, c helpers.Collector, wantFile string) {
 	metrics := helpers.CollectMetrics(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
-	metricNames := getMetricNames(actualLines)
-	sort.Strings(metricNames)
 
-	samplesFile := "testdata/all_get_diagnostic_data.json"
+	metricNames := getMetricNames(actualLines)
+
 	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
-		assert.NoError(t, writeJSON(samplesFile, metricNames))
+		assert.NoError(t, writeJSON(wantFile, metricNames))
 	}
 
-	var wantNames []string
-	assert.NoError(t, readJSON(samplesFile, &wantNames))
+	var wantNames map[string]bool
+	err := readJSON(wantFile, &wantNames)
+	assert.NoError(t, err)
 
-	assert.Equal(t, wantNames, metricNames)
+	// don't use assert.Equal because since metrics are dynamic, we don't always have the same
+	// metric names in all environments so, we should only compare against a list of commonly
+	// available metrics.
+	for name := range wantNames {
+		_, ok := metricNames[name]
+		assert.True(t, ok)
+	}
+
+	// Do the reverse checking but metrics can be different. Just inform about missing metrics
+	for name := range metricNames {
+		_, ok := wantNames[name]
+		if !ok {
+			t.Logf("Metric %s is the collected metrics list but not in the expected list", name)
+		}
+	}
 }

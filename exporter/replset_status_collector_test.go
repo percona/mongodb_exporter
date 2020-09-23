@@ -18,9 +18,6 @@ package exporter
 
 import (
 	"context"
-	"os"
-	"sort"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,8 +25,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/percona/exporter_shared/helpers"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -90,19 +85,6 @@ func TestAllReplsetStatusCollectorMetrics(t *testing.T) {
 		topologyInfo: ti,
 	}
 
-	metrics := helpers.CollectMetrics(c)
-	actualMetrics := zeroMetrics(helpers.ReadMetrics(metrics))
-	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
-	metricNames := getMetricNames(actualLines)
-	sort.Strings(metricNames)
-
 	samplesFile := "testdata/all_replset_status_data.json"
-	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
-		assert.NoError(t, writeJSON(samplesFile, metricNames))
-	}
-
-	var wantNames []string
-	assert.NoError(t, readJSON(samplesFile, &wantNames))
-
-	assert.Equal(t, wantNames, metricNames)
+	compareMetrics(t, c, samplesFile)
 }
