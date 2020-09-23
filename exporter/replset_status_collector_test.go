@@ -77,6 +77,8 @@ mongodb_optimes_durableOpTime_t 1` + "\n")
 }
 
 func TestAllReplsetStatusCollectorMetrics(t *testing.T) {
+	t.Skip("Skip on Github tests. Things like server name or IP are not constant")
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
