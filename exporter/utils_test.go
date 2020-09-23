@@ -28,6 +28,17 @@ func filterMetrics(metrics []*helpers.Metric, filters []string) []*helpers.Metri
 	return res
 }
 
+func zeroMetrics(metrics []*helpers.Metric) []*helpers.Metric {
+	res := make([]*helpers.Metric, 0, len(metrics))
+
+	for _, m := range metrics {
+		m.Value = 0
+		res = append(res, m)
+	}
+
+	return res
+}
+
 func getMetricNames(lines []string) map[string]bool {
 	names := map[string]bool{}
 

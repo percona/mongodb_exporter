@@ -81,9 +81,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
-
-	ti, err := newTopologyInfo(ctx, client)
-	require.NoError(t, err)
+	ti := labelsGetterMock{}
 
 	c := &diagnosticDataCollector{
 		client:         client,
@@ -93,11 +91,16 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 
 	metrics := helpers.CollectMetrics(c)
-	actualMetrics := helpers.ReadMetrics(metrics)
+	actualMetrics := zeroMetrics(helpers.ReadMetrics(metrics))
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
 
-	samplesFile := "testdata/get_diagnostic_data.json"
+	samplesFile := "testdata/all_get_diagnostic_data.json"
 	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
 		assert.NoError(t, writeJSON(samplesFile, actualLines))
 	}
+
+	var wantLines []string
+	assert.NoError(t, readJSON(samplesFile, &wantLines))
+
+	assert.Equal(t, wantLines, actualLines)
 }

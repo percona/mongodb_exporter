@@ -18,6 +18,8 @@ package exporter
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -72,21 +75,30 @@ mongodb_optimes_durableOpTime_t 1` + "\n")
 	assert.NoError(t, err)
 }
 
-func TestReplsetStatusCollectorNoSharding(t *testing.T) {
+func TestAllReplsetStatusCollectorMetrics(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
-
+	client := tu.DefaultTestClient(ctx, t)
 	ti := labelsGetterMock{}
 
 	c := &replSetGetStatusCollector{
-		ctx:          ctx,
 		client:       client,
+		logger:       logrus.New(),
 		topologyInfo: ti,
 	}
 
-	expected := strings.NewReader(``)
-	err := testutil.CollectAndCompare(c, expected)
-	assert.NoError(t, err)
+	metrics := helpers.CollectMetrics(c)
+	actualMetrics := zeroMetrics(helpers.ReadMetrics(metrics))
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+
+	samplesFile := "testdata/all_replset_status_data.json"
+	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
+		assert.NoError(t, writeJSON(samplesFile, actualLines))
+	}
+
+	var wantLines []string
+	assert.NoError(t, readJSON(samplesFile, &wantLines))
+
+	assert.Equal(t, wantLines, actualLines)
 }

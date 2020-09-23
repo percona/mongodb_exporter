@@ -18,14 +18,15 @@ package exporter
 
 import (
 	"context"
-	"strings"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -34,32 +35,25 @@ func TestServerStatusDataCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
-
 	ti := labelsGetterMock{}
 
 	c := &serverStatusCollector{
-		ctx:          ctx,
 		client:       client,
 		logger:       logrus.New(),
 		topologyInfo: ti,
 	}
 
-	// The last \n at the end of this string is important
-	expected := strings.NewReader(`
-# HELP mongodb_mem_bits mem.
-# TYPE mongodb_mem_bits untyped
-mongodb_mem_bits 64
-# HELP mongodb_metrics_commands_connPoolSync_failed metrics.commands.connPoolSync.
-# TYPE mongodb_metrics_commands_connPoolSync_failed untyped
-mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
-	// Filter metrics for 2 reasons:
-	// 1. The result is huge
-	// 2. We need to check against know values. Don't use metrics that return counters like uptime
-	//    or counters like the number of transactions because they won't return a known value to compare
-	filter := []string{
-		"mongodb_mem_bits",
-		"mongodb_metrics_commands_connPoolSync_failed",
+	metrics := helpers.CollectMetrics(c)
+	actualMetrics := zeroMetrics(helpers.ReadMetrics(metrics))
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+
+	samplesFile := "testdata/all_server_status_data.json"
+	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
+		assert.NoError(t, writeJSON(samplesFile, actualLines))
 	}
-	err := testutil.CollectAndCompare(c, expected, filter...)
-	assert.NoError(t, err)
+
+	var wantLines []string
+	assert.NoError(t, readJSON(samplesFile, &wantLines))
+
+	assert.Equal(t, wantLines, actualLines)
 }
