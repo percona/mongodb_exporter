@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1]
+### Fixed
+- [PMM-6361](https://jira.percona.com/browse/PMM-6361) Failed to execute find query on 'config.chunks'. (Thanks @vrazvan-adobe)
+
 ## [0.11.0]
 ### Changed
 - `go.mongodb.org/mongo-driver` was updated to `v1.3.2`.
