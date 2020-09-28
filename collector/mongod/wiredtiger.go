@@ -168,6 +168,15 @@ var (
 	}, []string{"type"})
 )
 
+var (
+	wtConnectionFilesOpen = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: Namespace,
+		Subsystem: "wiredtiger_connection",
+		Name:      "files_open_total",
+		Help:      "The total number of files opened in WiredTiger",
+	})
+)
+
 // blockmanager stats
 type WTBlockManagerStats struct {
 	MappedBytesRead  float64 `bson:"mapped bytes read"`
@@ -359,6 +368,19 @@ func (stats *WTConcurrentTransactionsStats) Describe(ch chan<- *prometheus.Desc)
 	wtConcurrentTransactionsTotalTickets.Describe(ch)
 }
 
+// connection stats
+type WTConnectionStats struct {
+	FilesOpen float64 `bson:"files currently open"`
+}
+
+func (stats *WTConnectionStats) Export(ch chan<- prometheus.Metric) {
+	wtConnectionFilesOpen.Set(stats.FilesOpen)
+}
+
+func (stats *WTConnectionStats) Describe(ch chan<- *prometheus.Desc) {
+	wtConnectionFilesOpen.Describe(ch)
+}
+
 // WiredTiger stats
 type WiredTigerStats struct {
 	BlockManager           *WTBlockManagerStats           `bson:"block-manager"`
@@ -367,6 +389,7 @@ type WiredTigerStats struct {
 	Session                *WTSessionStats                `bson:"session"`
 	Transaction            *WTTransactionStats            `bson:"transaction"`
 	ConcurrentTransactions *WTConcurrentTransactionsStats `bson:"concurrentTransactions"`
+	Connection             *WTConnectionStats             `bson:"connection"`
 }
 
 func (stats *WiredTigerStats) Describe(ch chan<- *prometheus.Desc) {
@@ -387,6 +410,9 @@ func (stats *WiredTigerStats) Describe(ch chan<- *prometheus.Desc) {
 	}
 	if stats.ConcurrentTransactions != nil {
 		stats.ConcurrentTransactions.Describe(ch)
+	}
+	if stats.Connection != nil {
+		stats.Connection.Describe(ch)
 	}
 }
 
@@ -409,6 +435,9 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 	if stats.ConcurrentTransactions != nil {
 		stats.ConcurrentTransactions.Export(ch)
 	}
+	if stats.Connection != nil {
+		stats.Connection.Export(ch)
+	}
 
 	wtCachePages.Collect(ch)
 	wtCacheBytes.Collect(ch)
@@ -424,4 +453,6 @@ func (stats *WiredTigerStats) Export(ch chan<- prometheus.Metric) {
 	wtConcurrentTransactionsOut.Collect(ch)
 	wtConcurrentTransactionsAvailable.Collect(ch)
 	wtConcurrentTransactionsTotalTickets.Collect(ch)
+
+	wtConnectionFilesOpen.Collect(ch)
 }
