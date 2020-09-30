@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/percona/mongodb_exporter/internal/tu"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 type ReplicasetConfig struct {
@@ -52,23 +53,25 @@ type RSConfig struct {
 }
 
 func TestSecondaryLag(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	secondsBehind := 3
+	sleep := 2
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration((secondsBehind*2)+sleep)*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
 
 	var rsConf, rsConfOld ReplicasetConfig
+	var gg interface{}
 
 	res := client.Database("admin").RunCommand(ctx, primitive.M{"replSetGetConfig": 1})
 	require.NoError(t, res.Err())
 
-	err := res.Decode(&rsConfOld) // To restore config after test
+	err := res.Decode(&gg) // To restore config after test
 	assert.NoError(t, err)
 
 	err = res.Decode(&rsConf)
 	assert.NoError(t, err)
 
-	secondsBehind := int(3600)
 	rsConf.Config.Members[1].Priority = 0
 	rsConf.Config.Members[1].Hidden = true
 	rsConf.Config.Members[1].SlaveDelay = secondsBehind
@@ -78,6 +81,23 @@ func TestSecondaryLag(t *testing.T) {
 		OK int `bson:"ok"`
 	}
 	err = client.Database("admin").RunCommand(ctx, primitive.M{"replSetReconfig": rsConf.Config}).Decode(&replSetReconfig)
+	assert.NoError(t, err)
+
+	res = client.Database("admin").RunCommand(ctx, primitive.M{"replSetGetConfig": 1})
+	require.NoError(t, res.Err())
+
+	// Generate documents so oplog is forced to have operations and the lag becomes real, otherwise
+	// primary and secondary oplogs are the same. Generate more than one doc to ensure oplog is updated
+	// quickly for the test.
+	for i := 0; i < 100; i++ {
+		_, err = client.Database("test").Collection("testc1").InsertOne(ctx, bson.M{"s": 1})
+		require.NoError(t, err)
+		time.Sleep(20 * time.Millisecond)
+	}
+	err = client.Database("test").Drop(ctx)
+	assert.NoError(t, err)
+
+	err = res.Decode(&rsConfOld) // To restore config after test
 	assert.NoError(t, err)
 
 	msclient := tu.TestClient(ctx, tu.MongoDBS1Secondary1Port, t)
@@ -95,7 +115,8 @@ func TestSecondaryLag(t *testing.T) {
 	metric := &dto.Metric{}
 	err = lag.Write(metric)
 	assert.NoError(t, err)
-	assert.Equal(t, float64(secondsBehind), *metric.Gauge.Value)
+	// Secondary is not exactly secondsBehind behind master
+	assert.True(t, *metric.Gauge.Value > 0)
 
 	rsConfOld.Config.Version = rsConf.Config.Version + 1
 	err = client.Database("admin").RunCommand(ctx, primitive.M{"replSetReconfig": rsConfOld.Config}).Decode(&replSetReconfig)

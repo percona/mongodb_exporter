@@ -40,6 +40,8 @@ const (
 	MongoDBS1PrimaryPort = "17001"
 	// MongoDBS1Secondary1Port MongoDB Shard 1 Secondary 1 Port.
 	MongoDBS1Secondary1Port = "17002"
+	// MongoDBS1Secondary2Port MongoDB Shard 1 Secondary 2 Port.
+	MongoDBS1Secondary2Port = "17003"
 	// MongoDBStandAlonePort MongoDB stand alone instance Port.
 	MongoDBStandAlonePort = "27017"
 )
@@ -58,6 +60,35 @@ func GetenvDefault(key, defaultValue string) string {
 // connection to the primary server of replicaset 1.
 func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	return TestClient(ctx, MongoDBS1PrimaryPort, t)
+}
+
+// TestClient returns a new MongoDB connection to the specified server port.
+func RemoteTestClient(ctx context.Context, hostname string, port string, t *testing.T) *mongo.Client {
+	if port == "" {
+		port = MongoDBS1PrimaryPort
+	}
+
+	direct := true
+	to := time.Second
+	co := &options.ClientOptions{
+		ConnectTimeout: &to,
+		Hosts:          []string{net.JoinHostPort(hostname, port)},
+		Direct:         &direct,
+	}
+
+	client, err := mongo.Connect(ctx, co)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		// In some tests we manually disconnect the client so, don't check
+		// for errors, the client might be already disconnected.
+		client.Disconnect(ctx) //nolint:errcheck
+	})
+
+	err = client.Ping(ctx, nil)
+	require.NoError(t, err)
+
+	return client
 }
 
 // TestClient returns a new MongoDB connection to the specified server port.

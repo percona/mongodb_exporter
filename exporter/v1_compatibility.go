@@ -854,6 +854,7 @@ func replicationLag(m bson.M) prometheus.Metric {
 	if !ok {
 		return nil
 	}
+
 	for _, member := range members {
 		if statestr, ok := member.(bson.M)["stateStr"].(string); ok && statestr == "PRIMARY" {
 			if optime, ok := member.(bson.M)["optime"].(bson.M); ok {
@@ -883,7 +884,13 @@ func replicationLag(m bson.M) prometheus.Metric {
 		return nil
 	}
 
-	val := float64(primaryTS.T - selfTS.T)
+	var val float64
+	if primaryTS.T > selfTS.T {
+		val = float64(primaryTS.T - selfTS.T)
+	} else {
+		val = float64(selfTS.T - primaryTS.T)
+	}
+
 	set, _ := replSetGetStatus["set"].(string)
 
 	metricName := "mongodb_mongod_replset_member_replication_lag"
