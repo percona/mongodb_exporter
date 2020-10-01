@@ -63,35 +63,6 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 }
 
 // TestClient returns a new MongoDB connection to the specified server port.
-func RemoteTestClient(ctx context.Context, hostname string, port string, t *testing.T) *mongo.Client {
-	if port == "" {
-		port = MongoDBS1PrimaryPort
-	}
-
-	direct := true
-	to := time.Second
-	co := &options.ClientOptions{
-		ConnectTimeout: &to,
-		Hosts:          []string{net.JoinHostPort(hostname, port)},
-		Direct:         &direct,
-	}
-
-	client, err := mongo.Connect(ctx, co)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		// In some tests we manually disconnect the client so, don't check
-		// for errors, the client might be already disconnected.
-		client.Disconnect(ctx) //nolint:errcheck
-	})
-
-	err = client.Ping(ctx, nil)
-	require.NoError(t, err)
-
-	return client
-}
-
-// TestClient returns a new MongoDB connection to the specified server port.
 func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 	if port == "" {
 		port = MongoDBS1PrimaryPort
