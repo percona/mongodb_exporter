@@ -114,7 +114,7 @@ func compareMetrics(t *testing.T, c helpers.Collector, wantFile string) {
 	// available metrics.
 	for name := range wantNames {
 		_, ok := metricNames[name]
-		assert.True(t, ok)
+		assert.True(t, ok, name+" metric is missing")
 	}
 
 	// Do the reverse checking but metrics can be different. Just inform about missing metrics
