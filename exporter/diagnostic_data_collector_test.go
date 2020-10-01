@@ -82,10 +82,12 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 	ti := labelsGetterMock{}
+	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
 
 	c := &diagnosticDataCollector{
 		client:         client,
-		logger:         logrus.New(),
+		logger:         log,
 		compatibleMode: true,
 		topologyInfo:   ti,
 	}
@@ -107,7 +109,7 @@ func compareMetrics(t *testing.T, c helpers.Collector, wantFile string) {
 
 	var wantNames map[string]bool
 	err := readJSON(wantFile, &wantNames)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// don't use assert.Equal because since metrics are dynamic, we don't always have the same
 	// metric names in all environments so, we should only compare against a list of commonly
