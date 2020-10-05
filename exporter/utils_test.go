@@ -70,3 +70,7 @@ func readJSON(filename string, data interface{}) error {
 
 	return json.Unmarshal(buf, data)
 }
+
+func inGithubActions() bool {
+	return os.Getenv("GITHUB_ACTION") != ""
+}

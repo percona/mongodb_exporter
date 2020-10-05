@@ -61,6 +61,14 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	d.logger.Debug("getDiagnosticData result")
 	debugResult(d.logger, m)
 
+	metrics := d.appendAllMetrics(m)
+
+	for _, metric := range metrics {
+		ch <- metric
+	}
+}
+
+func (d *diagnosticDataCollector) appendAllMetrics(m bson.M) []prometheus.Metric {
 	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(m)...)
 
@@ -79,9 +87,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	for _, metric := range metrics {
-		ch <- metric
-	}
+	return metrics
 }
 
 // check interface.
