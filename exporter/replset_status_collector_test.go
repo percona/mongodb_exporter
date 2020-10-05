@@ -73,6 +73,10 @@ mongodb_optimes_durableOpTime_t 1` + "\n")
 }
 
 func TestAllReplsetStatusCollectorMetrics(t *testing.T) {
+	if inGithubActions() {
+		t.Skip("Test not reliable in Gihub Actions")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
