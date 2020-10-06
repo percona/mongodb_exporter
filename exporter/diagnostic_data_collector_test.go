@@ -77,9 +77,9 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
-	if inGithubActions() {
-		t.Skip("Test not reliable in Gihub Actions")
-	}
+	// if inGithubActions() {
+	// 	t.Skip("Test not reliable in Gihub Actions")
+	// }
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -87,6 +87,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	client := tu.DefaultTestClient(ctx, t)
 	ti := labelsGetterMock{}
 	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
 
 	c := &diagnosticDataCollector{
 		client:         client,
