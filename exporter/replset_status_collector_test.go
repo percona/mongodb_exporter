@@ -72,23 +72,23 @@ mongodb_optimes_durableOpTime_t 1` + "\n")
 	assert.NoError(t, err)
 }
 
-func TestAllReplsetStatusCollectorMetrics(t *testing.T) {
-	if inGithubActions() {
-		t.Skip("Test not reliable in Gihub Actions")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	client := tu.DefaultTestClient(ctx, t)
-	ti := labelsGetterMock{}
-
-	c := &replSetGetStatusCollector{
-		client:       client,
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
-
-	samplesFile := "testdata/all_replset_status_data.json"
-	compareMetrics(t, c, samplesFile)
-}
+// func TestAllReplsetStatusCollectorMetrics(t *testing.T) {
+// 	if inGithubActions() {
+// 		t.Skip("Test not reliable in Gihub Actions")
+// 	}
+//
+// 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+// 	defer cancel()
+//
+// 	client := tu.DefaultTestClient(ctx, t)
+// 	ti := labelsGetterMock{}
+//
+// 	c := &replSetGetStatusCollector{
+// 		client:       client,
+// 		logger:       logrus.New(),
+// 		topologyInfo: ti,
+// 	}
+//
+// 	samplesFile := "testdata/all_replset_status_data.json"
+// 	compareMetrics(t, c, samplesFile)
+// }

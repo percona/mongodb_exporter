@@ -24,12 +24,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -84,6 +86,10 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	var m bson.M
+	err := readJSON("testdata/diagnostic_data_3.6.json", &m)
+	assert.NoError(t, err)
+
 	client := tu.DefaultTestClient(ctx, t)
 	ti := labelsGetterMock{}
 	log := logrus.New()
@@ -96,12 +102,14 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 		topologyInfo:   ti,
 	}
 
-	samplesFile := "testdata/all_get_diagnostic_data.json"
-	compareMetrics(t, c, samplesFile)
+	// metrics := c.appendAllMetrics(m)
+	metrics := helpers.CollectMetrics(c)
+	pretty.Println(metrics)
+
+	compareMetrics(t, metrics, "testdata/k4.json")
 }
 
-func compareMetrics(t *testing.T, c helpers.Collector, wantFile string) {
-	metrics := helpers.CollectMetrics(c)
+func compareMetrics(t *testing.T, metrics []prometheus.Metric, wantFile string) {
 	actualMetrics := helpers.ReadMetrics(metrics)
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
 

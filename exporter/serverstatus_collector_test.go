@@ -64,23 +64,23 @@ mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
 	assert.NoError(t, err)
 }
 
-func TestAllServerStatusDataCollector(t *testing.T) {
-	if inGithubActions() {
-		t.Skip("Test not reliable in Gihub Actions")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	client := tu.DefaultTestClient(ctx, t)
-	ti := labelsGetterMock{}
-
-	c := &serverStatusCollector{
-		client:       client,
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
-
-	samplesFile := "testdata/all_server_status_data.json"
-	compareMetrics(t, c, samplesFile)
-}
+// func TestAllServerStatusDataCollector(t *testing.T) {
+// 	if inGithubActions() {
+// 		t.Skip("Test not reliable in Gihub Actions")
+// 	}
+//
+// 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+// 	defer cancel()
+//
+// 	client := tu.DefaultTestClient(ctx, t)
+// 	ti := labelsGetterMock{}
+//
+// 	c := &serverStatusCollector{
+// 		client:       client,
+// 		logger:       logrus.New(),
+// 		topologyInfo: ti,
+// 	}
+//
+// 	samplesFile := "testdata/all_server_status_data.json"
+// 	compareMetrics(t, c, samplesFile)
+// }
