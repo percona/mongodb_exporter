@@ -71,6 +71,7 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 	for _, val := range rm.lv {
 		if newLabelVal, ok := c.labelValueConversions[val]; ok {
 			oldMetric.lv = append(oldMetric.lv, newLabelVal)
+
 			continue
 		}
 		oldMetric.lv = append(oldMetric.lv, val)
@@ -82,6 +83,7 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 		// if it should be converted, append the old-compatible name
 		if oldLabel, ok := c.labelConversions[newLabelName]; ok {
 			oldMetric.ln = append(oldMetric.ln, oldLabel)
+
 			continue
 		}
 		// otherwise, keep the same label name
@@ -177,6 +179,7 @@ func appendCompatibleMetric(res []prometheus.Metric, rm *rawMetric) []prometheus
 		if err != nil {
 			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 			res = append(res, invalidMetric)
+
 			return res
 		}
 
@@ -663,6 +666,7 @@ func locksMetrics(m bson.M) []prometheus.Metric {
 		}
 		if err != nil {
 			logrus.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
+
 			continue
 		}
 		res = append(res, mm)
@@ -725,6 +729,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		val, err := sumMetrics(m, def.paths)
 		if err != nil {
 			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
+
 			continue
 		}
 
@@ -732,6 +737,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
 		if err != nil {
 			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
+
 			continue
 		}
 
@@ -978,6 +984,7 @@ func databasesTotalPartitioned(ctx context.Context, client *mongo.Client) (prome
 	labels := map[string]string{"type": "partitioned"}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
+
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
 }
 
@@ -992,6 +999,7 @@ func databasesTotalUnpartitioned(ctx context.Context, client *mongo.Client) (pro
 	labels := map[string]string{"type": "unpartitioned"}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
+
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
 }
 
@@ -1005,6 +1013,7 @@ func shardedCollectionsTotal(ctx context.Context, client *mongo.Client) (prometh
 	help := "Total # of Collections with Sharding enabled"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
+
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(collCount))
 }
 
@@ -1029,6 +1038,7 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 	help := "Shards are balanced"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
+
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
 }
 
@@ -1065,6 +1075,7 @@ func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, 
 	help := "Total number of chunks"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
+
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
 }
 
@@ -1116,6 +1127,7 @@ func shardingShardsTotal(ctx context.Context, client *mongo.Client) (prometheus.
 	help := "Total number of shards"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
+
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
 }
 
@@ -1129,6 +1141,7 @@ func shardingShardsDrainingTotal(ctx context.Context, client *mongo.Client) (pro
 	help := "Total number of drainingshards"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
+
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
 }
 
@@ -1167,6 +1180,7 @@ func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metri
 		s := &ShardingChangelogSummary{}
 		if err := c.Decode(s); err != nil {
 			log.Error(err)
+
 			continue
 		}
 
@@ -1220,8 +1234,10 @@ func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Lo
 	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
 		l.Errorf("Failed to get database names: %s.", err)
+
 		return nil
 	}
+
 	l.Debugf("getting stats for databases: %v", dbNames)
 	for _, db := range dbNames {
 		dbStatus := databaseStatus{}
@@ -1229,6 +1245,7 @@ func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Lo
 		err := r.Decode(&dbStatus)
 		if err != nil {
 			l.Errorf("Failed to get database status: %s.", err)
+
 			return nil
 		}
 		dbStatList.Members = append(dbStatList.Members, dbStatus)

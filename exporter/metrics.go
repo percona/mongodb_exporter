@@ -124,6 +124,7 @@ func prometheusize(s string) string {
 	for _, pair := range prefixes {
 		if strings.HasPrefix(s, pair[0]+".") {
 			s = pair[1] + strings.TrimPrefix(s, pair[0])
+
 			break
 		}
 	}
@@ -209,11 +210,13 @@ func asFloat64(value interface{}) (*float64, error) {
 	default:
 		return nil, errors.Wrapf(errCannotHandleType, "%T", v)
 	}
+
 	return &f, nil
 }
 
 func rawToPrometheusMetric(rm *rawMetric) (prometheus.Metric, error) {
 	d := prometheus.NewDesc(rm.fqName, rm.help, rm.ln, nil)
+
 	return prometheus.NewConstMetric(d, rm.vt, rm.val, rm.lv...)
 }
 
@@ -256,6 +259,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 			if err != nil {
 				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 				res = append(res, invalidMetric)
+
 				continue
 			}
 
@@ -276,6 +280,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 				if err != nil {
 					invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 					res = append(res, invalidMetric)
+
 					continue
 				}
 

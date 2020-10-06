@@ -87,8 +87,7 @@ func TestAddLocksMetrics(t *testing.T) {
 	err = json.Unmarshal(buf, &m)
 	assert.NoError(t, err)
 
-	var metrics []prometheus.Metric
-	metrics = locksMetrics(m)
+	metrics := locksMetrics(m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {

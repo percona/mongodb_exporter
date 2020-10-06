@@ -83,6 +83,7 @@ format:                     ## Format source code.
 	go mod tidy
 	gofmt -w -s $(FILES)
 	bin/goimports -local github.com/percona/mongodb_exporter -l -w $(FILES)
+	gofumports -local github.com/percona/mongodb_exporter -l -w $(FILES)
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run
