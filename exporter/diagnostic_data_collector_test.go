@@ -24,14 +24,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -86,14 +84,9 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	var m bson.M
-	err := readJSON("testdata/diagnostic_data_3.6.json", &m)
-	assert.NoError(t, err)
-
 	client := tu.DefaultTestClient(ctx, t)
 	ti := labelsGetterMock{}
 	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
 
 	c := &diagnosticDataCollector{
 		client:         client,
@@ -102,11 +95,22 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 		topologyInfo:   ti,
 	}
 
-	// metrics := c.appendAllMetrics(m)
 	metrics := helpers.CollectMetrics(c)
-	pretty.Println(metrics)
 
-	compareMetrics(t, metrics, "testdata/k4.json")
+	/*
+	  How to regenerate this file:
+	  1. Delete it
+	  2. Start the sandbox with the highest available version
+	  3. Run tests updating samples: UPDATE_SAMPLES=1 make test
+	  4. Stop the sandbox and restart it with a lower MongoDB version.
+	  5. Repeat 3 & 4 for all MongoDB versions.
+
+	  First run will save ALL available metrics in newer MongoDB versions
+	  and subsequent runs will remove the metrics not available in previous
+	  versions. At the end you will have the base list of metrics, common
+	  to all MongoDB versions
+	*/
+	compareMetrics(t, metrics, "testdata/diagnostic_data_base.json")
 }
 
 func compareMetrics(t *testing.T, metrics []prometheus.Metric, wantFile string) {
@@ -115,13 +119,11 @@ func compareMetrics(t *testing.T, metrics []prometheus.Metric, wantFile string) 
 
 	metricNames := getMetricNames(actualLines)
 
-	if isTrue, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES")); isTrue {
-		assert.NoError(t, writeJSON(wantFile, metricNames))
-	}
+	updateSamples, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES"))
 
 	var wantNames map[string]bool
-	err := readJSON(wantFile, &wantNames)
-	require.NoError(t, err)
+	// ignore error because when we are regenerating the file, it might not exist
+	readJSON(wantFile, &wantNames) //nolint:errcheck
 
 	// don't use assert.Equal because since metrics are dynamic, we don't always have the same
 	// metric names in all environments so, we should only compare against a list of commonly
@@ -129,5 +131,17 @@ func compareMetrics(t *testing.T, metrics []prometheus.Metric, wantFile string) 
 	for name := range wantNames {
 		_, ok := metricNames[name]
 		assert.True(t, ok, name+" metric is missing")
+		if !ok {
+			delete(wantNames, name)
+		}
+	}
+
+	if updateSamples {
+		if len(wantNames) > 0 {
+			assert.NoError(t, writeJSON(wantFile, wantNames))
+		} else {
+			// if we are regenerating the data we need to write the data we got from MongoDB
+			assert.NoError(t, writeJSON(wantFile, metricNames))
+		}
 	}
 }

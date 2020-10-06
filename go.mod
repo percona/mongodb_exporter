@@ -8,7 +8,6 @@ go 1.14
 require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/alecthomas/kong v0.2.11
-	github.com/kr/pretty v0.1.0
 	github.com/percona/exporter_shared v0.7.2
 	github.com/percona/percona-toolkit v0.0.0-20200908164809-0aac7b4cfc30
 	github.com/pkg/errors v0.9.1
