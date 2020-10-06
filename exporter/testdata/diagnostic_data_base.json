@@ -428,8 +428,6 @@
   "mongodb_ss_metrics_commands_insert_total": true,
   "mongodb_ss_metrics_commands_invalidateUserCache_failed": true,
   "mongodb_ss_metrics_commands_invalidateUserCache_total": true,
-  "mongodb_ss_metrics_commands_isMaster_failed": true,
-  "mongodb_ss_metrics_commands_isMaster_total": true,
   "mongodb_ss_metrics_commands_isSelf_failed": true,
   "mongodb_ss_metrics_commands_isSelf_total": true,
   "mongodb_ss_metrics_commands_killAllSessionsByPattern_failed": true,
