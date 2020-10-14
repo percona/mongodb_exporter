@@ -8,6 +8,7 @@ go 1.14
 require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/alecthomas/kong v0.2.11
+	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/percona/exporter_shared v0.7.2
 	github.com/percona/percona-toolkit v0.0.0-20200908164809-0aac7b4cfc30
 	github.com/pkg/errors v0.9.1
@@ -17,4 +18,6 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.6.1
 	go.mongodb.org/mongo-driver v1.4.1
+	golang.org/x/tools v0.0.0-20201013201025-64a9e34f3752 // indirect
+	mvdan.cc/gofumpt v0.0.0-20200927160801-5bfeb2e70dd6 // indirect
 )
