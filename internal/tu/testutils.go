@@ -38,6 +38,10 @@ const (
 	MongosPort = "17000"
 	// MongoDBS1PrimaryPort MongoDB Shard 1 Primary Port.
 	MongoDBS1PrimaryPort = "17001"
+	// MongoDBS1Secondary1Port MongoDB Shard 1 Secondary 1 Port.
+	MongoDBS1Secondary1Port = "17002"
+	// MongoDBS1Secondary2Port MongoDB Shard 1 Secondary 2 Port.
+	MongoDBS1Secondary2Port = "17003"
 	// MongoDBStandAlonePort MongoDB stand alone instance Port.
 	MongoDBStandAlonePort = "27017"
 )
