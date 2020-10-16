@@ -5,6 +5,7 @@ services:
   - docker
 
 go:
+  - 1.15.x
   - 1.14.x
   - tip
 
@@ -27,7 +28,7 @@ stages:
 env:
   global:
     - TMPDIR=/tmp
-    - secure: "WgxV9gv6R30rGKJDG4TCLjo/K2/Ph85MhutI/jk+dbbaT+OSjQmUmC0YHgaLaHrXn22zymfdi2QR96l3zq1GGteoEFBapJkxgdchCWlhhiVaSfSXf8KE4few7b8+lTfc8ufptpMVbrm8IiYcKd0toi/7jDxSh/DXrVSqyxUjXq1IhaNJ8zTMNtNq/GxAWB7K/Z1hu0JkNyKqzrscmWrkHGEO4GHvoLiekKGLojk+W6nf3/o18cmsSich6XiSLEl+5wtfmDo3Ixhu2xE7e7fUtpyj28NmK458oRdcsWuIYNSVtQuwzCLwjkEZWSZ0SiZbb+Mo9Azu22f3QvUxMRUfY/F6xqsHhOa+fJQslNTBEpLLLsQLCN5hql/pCJAAD3216EWX+lGWp4lu7F655AK4NN6hGgARpzEm9+6LIjqECldKfwoSmZirQ6DgC3434Vm5UFwMzRatR49OK+F+XxyN//PBYs3FQPREswbCVWKZ+KdDX6MCeypgJL3Qwuqe7moQIyBoD/ayDhrVWbTOet2HpIuPd22mqbp3Rv7GbznwxAjLWanMkK/9gMG4443W9Kge4Ec4aWaIBgWKl/XP++Hkn67ZW0Y83AaSBfTQvdS/9nlHTY1YuTbwQDUTUB7M+rbynab2lvNGXFT02dbtg9p/FCFqTLyvqADB2ODnX8QD51Q="
+    - secure: "dGuiSX+RqlapKOLYIFpiUYYyMLg6MH5Zg02GdFTlRfbOCswiDDOdQyCt7ndYDzxh+I6zWRdwSsxD33rTwtA7j1FHh0tuStgob2IuHNt5kOQn6yZNG5LegYItDoKsreuUZRe6e1vU1BBCK09IORRJJr+qIfbvsOdKdJZlbKheHomBpgaUHUhOL7S4FpAxF8B5x+ZdqDSHWqWkO/Cc5FxirH2G0U+Qfdr28obiyz7louw0gS0JMDUhnx5SwTalFLI/IVWi7gZIpBCmbcLmeAoTbSHe/HE43000RYy76mj6VlVPvhtBK6dbsdlOe6zL+1Hjij2K+0AC4w4o9FNg3L7WrloHOwane8cPIYDll3zWJBnO1mSqsbYen+/V9TaMHHAde0k6mfpF3EkhOLMx7198IouXYQ72PiTc6rSKRocqY2oXX889gs5qMiluv6DqMaY0mVH+oThnj00gVXffqIovlekpRGAIw9bfNlbRg5hk2itGrWyhnIkRddpDD3LXprkjXlwa/JCjFDvpxAImAylm1M2R3iSXiBzoXWqu3WlPXk+Sj0RX0gmPmQM+npPZEEN3gaUQ1YgJPQ2nODE0ph5TVlMZ7v3kOoMivUFBgpuBK5xuveFuBbK2xFTou7UbCbRowz80xVnNNJUy4JAdg9Y9bHxKvP7m4XJ+fcm3pFUJowo="
 
   matrix:
     # https://www.mongodb.com/support-policy
