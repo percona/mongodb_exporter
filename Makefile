@@ -64,7 +64,9 @@ env:
 	@echo $(TEST_ENV) | tr ' ' '\n' >.env
 
 init:                       ## Install linters.
-	go build -modfile=tools/go.mod -o bin/goimports golang.org/x/tools/cmd/goimports
+	go build -modfile=tools/go.mod -o bin/go-consistent github.com/quasilyte/go-consistent
+	go build -modfile=tools/go.mod -o bin/gofumpt mvdan.cc/gofumpt/gofumports
+	go build -modfile=tools/go.mod -o bin/gofumports mvdan.cc/gofumpt/gofumports
 	go build -modfile=tools/go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
 	go build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
 
@@ -81,12 +83,12 @@ FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 format:                     ## Format source code.
 	go mod tidy
-	gofmt -w -s $(FILES)
-	bin/goimports -local github.com/percona/mongodb_exporter -l -w $(FILES)
-	gofumports -local github.com/percona/mongodb_exporter -l -w $(FILES)
+	bin/gofumpt -local github.com/percona/mongodb_exporter -l -w $(FILES)
+	bin/gofumports -local github.com/percona/mongodb_exporter -l -w $(FILES)
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run
+	bin/go-consistent -pendantic ./...
 
 check-license:              ## Check license in headers.
 	@go run .github/check-license.go
