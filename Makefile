@@ -87,8 +87,8 @@ format:                     ## Format source code.
 	bin/gofumports -local github.com/percona/mongodb_exporter -l -w $(FILES)
 
 check:                      ## Run checks/linters
+	bin/go-consistent -pedantic ./...
 	bin/golangci-lint run
-	bin/go-consistent -pendantic ./...
 
 check-license:              ## Check license in headers.
 	@go run .github/check-license.go

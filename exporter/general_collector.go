@@ -41,7 +41,7 @@ func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- mongodbUpMetric(d.ctx, d.client, d.logger)
 }
 
-func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {
+func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric { //nolint:interfacer
 	var value float64
 
 	if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {

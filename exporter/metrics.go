@@ -299,8 +299,8 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
 // and each member is represented by a map[string]interface{}.
 func processSlice(prefix, k string, v []interface{}, compatibleMode bool) []prometheus.Metric {
-	metrics := make([]prometheus.Metric, 0)
-	labels := make(map[string]string)
+	metrics := []prometheus.Metric{}
+	labels := map[string]string{}
 
 	for _, item := range v {
 		var s map[string]interface{}

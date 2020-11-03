@@ -64,7 +64,7 @@ var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 func newTopologyInfo(ctx context.Context, client *mongo.Client) (*topologyInfo, error) {
 	ti := &topologyInfo{
 		client: client,
-		labels: make(map[string]string),
+		labels: map[string]string{},
 	}
 
 	err := ti.loadLabels(ctx)
@@ -95,7 +95,7 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 	t.rw.Lock()
 	defer t.rw.Unlock()
 
-	t.labels = make(map[string]string)
+	t.labels = map[string]string{}
 
 	nodeType, err := getNodeType(ctx, t.client)
 	if err != nil {
@@ -127,7 +127,7 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, error) {
 	md := proto.MasterDoc{}
 	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
-		return "", err
+		return "", errors.Wrap(err, "cannot determine node type")
 	}
 
 	if md.SetName != nil || md.Hosts != nil {

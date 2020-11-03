@@ -89,7 +89,7 @@ func TestAddLocksMetrics(t *testing.T) {
 
 	metrics := locksMetrics(m)
 
-	desc := make([]string, 0, len(metrics))
+	desc := []string{}
 	for _, metric := range metrics {
 		// Fix description since labels don't have a specific order because they are stores in a map.
 		ms := metric.Desc().String()

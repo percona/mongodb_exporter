@@ -141,7 +141,7 @@ func cacheEvictedTotalMetric(m bson.M) (prometheus.Metric, error) {
 	d := prometheus.NewDesc("mongodb_mongod_wiredtiger_cache_evicted_total", "wiredtiger cache evicted total", nil, nil)
 	metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot create mongodb_mongod_wiredtiger_cache_evicted_total metric")
 	}
 
 	return metric, nil
@@ -723,7 +723,7 @@ func specialMetricDefinitions() []specialMetric {
 }
 
 func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Logger) []prometheus.Metric {
-	metrics := make([]prometheus.Metric, 0)
+	metrics := []prometheus.Metric{}
 
 	for _, def := range specialMetricDefinitions() {
 		val, err := sumMetrics(m, def.paths)
@@ -847,7 +847,7 @@ func electionDate(m bson.M) prometheus.Metric {
 	return nil
 }
 
-func replicationLag(m bson.M) prometheus.Metric {
+func replicationLag(m bson.M) prometheus.Metric { //nolint:funlen
 	var primaryTS, selfTS primitive.Timestamp
 	var hasPrimary bool
 	var name, statestr string
@@ -856,6 +856,7 @@ func replicationLag(m bson.M) prometheus.Metric {
 	if !ok {
 		return nil
 	}
+
 	members, ok := replSetGetStatus["members"].(primitive.A)
 	if !ok {
 		return nil
@@ -913,8 +914,8 @@ func replicationLag(m bson.M) prometheus.Metric {
 	return metric
 }
 
-func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
-	metrics := make([]prometheus.Metric, 0)
+func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric { //nolint:funlen
+	metrics := []prometheus.Metric{}
 
 	if metric, err := databasesTotalPartitioned(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
@@ -983,7 +984,7 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 func databasesTotalPartitioned(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	n, err := client.Database("config").Collection("databases").CountDocuments(ctx, bson.M{"partitioned": true})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get partitioned databases count")
 	}
 
 	name := "mongodb_mongos_sharding_databases_total"
@@ -998,7 +999,7 @@ func databasesTotalPartitioned(ctx context.Context, client *mongo.Client) (prome
 func databasesTotalUnpartitioned(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	n, err := client.Database("config").Collection("databases").CountDocuments(ctx, bson.M{"partitioned": false})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get unpartitioned databases count")
 	}
 
 	name := "mongodb_mongos_sharding_databases_total"
@@ -1014,7 +1015,7 @@ func databasesTotalUnpartitioned(ctx context.Context, client *mongo.Client) (pro
 func shardedCollectionsTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	collCount, err := client.Database("config").Collection("collections").CountDocuments(ctx, bson.M{"dropped": false})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get sharded collections count")
 	}
 	name := "mongodb_mongos_sharding_collections_total"
 	help := "Total # of Collections with Sharding enabled"
@@ -1033,7 +1034,7 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 	res := client.Database("admin").RunCommand(ctx, cmd)
 
 	if err := res.Decode(&m); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get chunks balanced count")
 	}
 
 	value := float64(0)
@@ -1075,7 +1076,7 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metri
 func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	n, err := client.Database("config").Collection("chunks").CountDocuments(ctx, bson.M{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get total chunks count")
 	}
 
 	name := "mongodb_mongos_sharding_chunks_total"
@@ -1093,12 +1094,12 @@ func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheu
 
 	cursor, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get total chunks per shard")
 	}
 
 	var shards []bson.M
 	if err = cursor.All(ctx, &shards); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot iterate through chunks result")
 	}
 
 	metrics := make([]prometheus.Metric, 0, len(shards))
@@ -1127,7 +1128,7 @@ func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheu
 func shardingShardsTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	n, err := client.Database("config").Collection("shards").CountDocuments(ctx, bson.M{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get total shards count")
 	}
 
 	name := "mongodb_mongos_sharding_shards_total"
@@ -1141,7 +1142,7 @@ func shardingShardsTotal(ctx context.Context, client *mongo.Client) (prometheus.
 func shardingShardsDrainingTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	n, err := client.Database("config").Collection("shards").CountDocuments(ctx, bson.M{"draining": true})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get draining shards count")
 	}
 
 	name := "mongodb_mongos_sharding_shards_draining_total"
@@ -1209,7 +1210,7 @@ func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metri
 	}
 
 	if err := c.Err(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot aggregate changelog in last 10 minutes")
 	}
 
 	return metrics, nil

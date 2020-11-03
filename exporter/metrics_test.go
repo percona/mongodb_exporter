@@ -148,8 +148,8 @@ func TestMakeRawMetric(t *testing.T) {
 		{value: time.Date(2020, 6, 15, 0, 0, 0, 0, time.UTC), wantVal: nil},
 	}
 
-	ln := make([]string, 0) // needs pre-allocation to accomplish pre-allocation for labels
-	lv := make([]string, 0)
+	ln := []string{}
+	lv := []string{}
 
 	fqName := prometheusize(prefix + name)
 	help := metricHelp(prefix, name)
