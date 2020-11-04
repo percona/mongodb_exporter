@@ -66,9 +66,9 @@ mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
 }
 
 func TestAllServerStatusDataCollector(t *testing.T) {
-	if inGithubActions() {
-		t.Skip("Test not reliable in Gihub Actions")
-	}
+	// if inGithubActions() {
+	// 	t.Skip("Test not reliable in Gihub Actions")
+	// }
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
