@@ -24,6 +24,8 @@ Flags:
       --collect.topmetrics     Enable collection of table top metrics
       --collect.indexusage     Enable collection of per index usage stats
       --collect.connpoolstats  Collect MongoDB connpoolstats
+      --suppress.collectshardingstatus  
+                               Suppress the collection of Sharding Status
       --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
                                MongoDB URI, format
       --test                   Check MongoDB connection, print buildInfo()

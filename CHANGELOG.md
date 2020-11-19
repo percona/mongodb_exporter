@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2]
+### Added
+- [PMM-6361](https://jira.percona.com/browse/PMM-6361): New flag `--suppress.collectshardingstatus` can be used to disable the collection of Sharding Status. This flag is not set by default. 
+On a large scale cluster it could help you to disable the mongoS exporters induced load to config tables. [@vrazvan-adobe](https://github.com/vrazvan-adobe)
+
+### Fixed
+- [PMM-6361](https://jira.percona.com/browse/PMM-6361): `runtime error: invalid memory address or nil pointer dereference`, source="sharding_status.go:166" .
+When chunks collection is very big, the aggregate on it can take longer then default default 1000ms SocketTimeout. [@vrazvan-adobe](https://github.com/vrazvan-adobe)                                        
+
+
 ## [0.11.0]
 ### Changed
 - `go.mongodb.org/mongo-driver` was updated to `v1.3.2`.
