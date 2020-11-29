@@ -27,6 +27,7 @@ builds:
 archives:
   -
     name_template: "{{ .ProjectName }}-{{ .Env.APP_VERSION }}.{{ .Os }}-{{ .Arch }}"
+    wrap_in_directory: true
 checksum:
   name_template: '{{ .ProjectName }}-{{ .Env.APP_VERSION }}-checksums.txt'
 snapshot:
