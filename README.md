@@ -17,7 +17,7 @@ Currently, these metric sources are implemented:
 |\-\-compatible-mode|Exposes new metrics in the new and old format at the same time||
 |\-\-mongodb.collstats-colls|List of comma separated databases.collections to get stats|\-\-mongodb.collstats-colls=testdb.testcol1,testdb.testcol2|
 |\-\-mongodb.indexstats-colls|List of comma separated database.collections to get index stats|\-\-mongodb.indexstats-colls=db1.col1,db1.col2|
-|\-\-mongodb.dsn|MongoDB connection URI|\-\-mongodb.dsn=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
+|\-\-mongodb.dsn|MongoDB connection URI. See https://docs.mongodb.com/manual/reference/connection-string/ for details and available options |\-\-mongodb.dsn=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
 |\-\-expose-path|Metrics expose path|\-\-expose-path=/metrics_new|
 |\-\-expose-port|HTTP expose server port|\-\-expose-port=9216|
 |-D, --debug|Enable debug mode||
