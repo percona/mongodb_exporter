@@ -79,7 +79,7 @@ If you are using hidden nodes, connect to them using the `connect=direct` option
 
 #### Kubernetes
 
-You can use the chart [prometheus-mongodb-exporter](https://github.com/helm/charts/tree/master/stable/prometheus-mongodb-exporter) from helm stable repository.
+You can use the chart [prometheus-mongodb-exporter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-mongodb-exporter) from Prometheus community Helm charts.
 
 ### Flags
 
