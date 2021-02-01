@@ -1,3 +1,8 @@
+| :warning: WARNING                                                                                                                                |
+|:-------------------------------------------------------------------------------------------------------------------------------------------------|
+| We switching to the new branch. Please use  https://github.com/percona/mongodb_exporter/tree/exporter_v2 and  read more about the new version of the mongodb_exporter            at https://www.percona.com/blog/2020/09/22/new-mongodb-exporter-released-with-percona-monitoring-and-management-2-10-0/                          |
+
+---------
 # Percona MongoDB Exporter
 
 [![Release](https://img.shields.io/github/release/percona/mongodb_exporter.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
