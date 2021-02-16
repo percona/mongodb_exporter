@@ -47,7 +47,7 @@ jobs:
     steps:
       - name: Set up Go release
         if: matrix.go-version != 'tip'
-        uses: percona-platform/setup-go@v2.1.1
+        uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
 
