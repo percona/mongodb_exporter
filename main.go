@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -72,6 +73,15 @@ func main() {
 		return
 	}
 
+	e, err := buildExporter(opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	e.Run()
+}
+
+func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
 	log := logrus.New()
 
 	levels := map[string]logrus.Level{
@@ -95,7 +105,7 @@ func main() {
 	exporterOpts := &exporter.Opts{
 		CollStatsCollections:    strings.Split(opts.CollStatsCollections, ","),
 		CompatibleMode:          opts.CompatibleMode,
-		IndexStatsCollections:   strings.Split(opts.CollStatsCollections, ","),
+		IndexStatsCollections:   strings.Split(opts.IndexStatsCollections, ","),
 		Logger:                  log,
 		Path:                    opts.WebTelemetryPath,
 		URI:                     opts.URI,
@@ -107,8 +117,8 @@ func main() {
 
 	e, err := exporter.New(exporterOpts)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	e.Run()
+	return e, nil
 }
