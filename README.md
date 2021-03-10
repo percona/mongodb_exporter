@@ -17,7 +17,7 @@ Currently, these metric sources are implemented:
 
 | Old Percona MongoDB exporter                                                  |
 |:------------------------------------------------------------------------------|
-| old 0.1x.y version (ex `master` branch) is moved to the `release_0.1x` branch |
+| old 0.1x.y version (ex `master` branch) is moved to the `release-0.1x` branch |
 
 
 ## Flags
