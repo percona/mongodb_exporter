@@ -1,4 +1,9 @@
 # MongoDB exporter
+[![Release](https://img.shields.io/github/release/percona/mongodb_exporter.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
+[![Build Status](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml?query=branch%3Amain)
+[![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
+[![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
 
 This is the new MongoDB exporter implementation that handles ALL metrics exposed by MongoDB monitoring commands.
 This new implementation loops over all the fields exposed in diagnostic commands and tries to get data from them.
@@ -9,6 +14,11 @@ Currently, these metric sources are implemented:
 - getDiagnosticData
 - replSetGetStatus
 - serverStatus
+
+| Old Percona MongoDB exporter                                                  |
+|:------------------------------------------------------------------------------|
+| old 0.1x.y version (ex `master` branch) is moved to the `release_0.1x` branch |
+
 
 ## Flags
 |Flag|Description|Example|

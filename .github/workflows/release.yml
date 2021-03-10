@@ -4,15 +4,9 @@ on:
   push:
     # run when new tag is pushed
     tags:
-      - v2.*
+      - v0.2*
   # manually trigger the release
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag to release'
-        required: true
-        default: 'main'
-
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
