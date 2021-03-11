@@ -20,6 +20,10 @@ import (
 	"io/ioutil"
 	"runtime"
 	"strconv"
+
+	"github.com/Masterminds/semver"
+	"github.com/prometheus/common/log"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func LoadCaFrom(pemFile string) (*x509.CertPool, error) {
@@ -47,4 +51,26 @@ func GetCallerLocation() string {
 		return ""
 	}
 	return fileName + ":" + strconv.Itoa(lineNum)
+}
+
+func MongoServerVersionLessThan(version string, client *mongo.Client) bool {
+	serverVersion, err := MongoSessionServerVersion(client)
+	if err != nil {
+		log.Errorf("couldn't get mongo server version from server, reason: %v", err)
+		return false
+	}
+
+	srvVersion, err := semver.NewVersion(serverVersion)
+	if err != nil {
+		log.Errorf("couldn't parse mongo server version '%s', reason: %v", serverVersion, err)
+		return false
+	}
+
+	v, err := semver.NewVersion(version)
+	if err != nil {
+		log.Errorf("couldn't parse version '%s', reason: %v", version, err)
+		return false
+	}
+
+	return srvVersion.LessThan(v)
 }

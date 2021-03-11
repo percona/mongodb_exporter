@@ -42,11 +42,12 @@ var (
 	listenAddressF = kingpin.Flag("web.listen-address", "Address to listen on for web interface and telemetry.").Default(":9216").String()
 	metricsPathF   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
-	collectDatabaseF             = kingpin.Flag("collect.database", "Enable collection of Database metrics").Bool()
-	collectCollectionF           = kingpin.Flag("collect.collection", "Enable collection of Collection metrics").Bool()
-	collectTopF                  = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
-	collectIndexUsageF           = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
-	mongodbCollectConnPoolStatsF = kingpin.Flag("collect.connpoolstats", "Collect MongoDB connpoolstats").Bool()
+	collectDatabaseF               = kingpin.Flag("collect.database", "Enable collection of Database metrics").Bool()
+	collectCollectionF             = kingpin.Flag("collect.collection", "Enable collection of Collection metrics").Bool()
+	collectTopF                    = kingpin.Flag("collect.topmetrics", "Enable collection of table top metrics").Bool()
+	collectIndexUsageF             = kingpin.Flag("collect.indexusage", "Enable collection of per index usage stats").Bool()
+	mongodbCollectConnPoolStatsF   = kingpin.Flag("collect.connpoolstats", "Collect MongoDB connpoolstats").Bool()
+	suppressCollectShardingStatusF = kingpin.Flag("suppress.collectshardingstatus", "Suppress the collection of Sharding Status").Default("false").Bool()
 
 	latencyHistogramMinF   = kingpin.Flag("latency.histogram-min", "Minimum value (in microseconds) for latency histogram").Default("65536").Float64()
 	latencyHistogramStepF  = kingpin.Flag("latency.histogram-step", "Step size between bins (in microseconds) for latency histogram").Default("262144").Float64()
@@ -86,15 +87,16 @@ func main() {
 
 	programCollector := version.NewCollector(program)
 	mongodbCollector := collector.NewMongodbCollector(&collector.MongodbCollectorOpts{
-		URI:                      *uriF,
-		CollectDatabaseMetrics:   *collectDatabaseF,
-		CollectCollectionMetrics: *collectCollectionF,
-		CollectTopMetrics:        *collectTopF,
-		CollectIndexUsageStats:   *collectIndexUsageF,
-		CollectConnPoolStats:     *mongodbCollectConnPoolStatsF,
-		LatencyHistogramMin:      *latencyHistogramMinF,
-		LatencyHistogramStep:     *latencyHistogramStepF,
-		LatencyHistogramCount:    *latencyHistogramCountF,
+		URI:                           *uriF,
+		CollectDatabaseMetrics:        *collectDatabaseF,
+		CollectCollectionMetrics:      *collectCollectionF,
+		CollectTopMetrics:             *collectTopF,
+		CollectIndexUsageStats:        *collectIndexUsageF,
+		CollectConnPoolStats:          *mongodbCollectConnPoolStatsF,
+		LatencyHistogramMin:           *latencyHistogramMinF,
+		LatencyHistogramStep:          *latencyHistogramStepF,
+		LatencyHistogramCount:         *latencyHistogramCountF,
+		SuppressCollectShardingStatus: *suppressCollectShardingStatusF,
 	})
 	prometheus.MustRegister(programCollector, mongodbCollector)
 

@@ -5,35 +5,37 @@ exports various MongoDB metrics in Prometheus format.
 Flags:
   -h, --help                   Show context-sensitive help (also try --help-long
                                and --help-man).
-      --web.auth-file=WEB.AUTH-FILE  
+      --web.auth-file=WEB.AUTH-FILE
                                Path to YAML file with server_user,
                                server_password keys for HTTP Basic
                                authentication (overrides HTTP_AUTH environment
                                variable).
-      --web.ssl-cert-file=WEB.SSL-CERT-FILE  
+      --web.ssl-cert-file=WEB.SSL-CERT-FILE
                                Path to SSL certificate file.
-      --web.ssl-key-file=WEB.SSL-KEY-FILE  
+      --web.ssl-key-file=WEB.SSL-KEY-FILE
                                Path to SSL key file.
-      --web.listen-address=":9216"  
+      --web.listen-address=":9216"
                                Address to listen on for web interface and
                                telemetry.
-      --web.telemetry-path="/metrics"  
+      --web.telemetry-path="/metrics"
                                Path under which to expose metrics.
       --collect.database       Enable collection of Database metrics
       --collect.collection     Enable collection of Collection metrics
       --collect.topmetrics     Enable collection of table top metrics
       --collect.indexusage     Enable collection of per index usage stats
       --collect.connpoolstats  Collect MongoDB connpoolstats
-      --latency.histogram-min=65536  
+      --latency.histogram-min=65536
                                Minimum value (in microseconds) for latency
                                histogram
-      --latency.histogram-step=262144  
+      --latency.histogram-step=262144
                                Step size between bins (in microseconds) for
                                latency histogram
-      --latency.histogram-count=10  
+      --latency.histogram-count=10
                                Number of bins (Prometheus recommends keeping
                                number of bins reasonably small)
-      --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]  
+      --suppress.collectshardingstatus
+                               Suppress the collection of Sharding Status
+      --mongodb.uri=[mongodb://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]
                                MongoDB URI, format
       --test                   Check MongoDB connection, print buildInfo()
                                information and exit.
@@ -41,7 +43,7 @@ Flags:
       --log.level="info"       Only log messages with the given severity or
                                above. Valid levels: [debug, info, warn, error,
                                fatal]
-      --log.format="logger:stderr"  
+      --log.format="logger:stderr"
                                Set the log target and format. Example:
                                "logger:syslog?appname=bob&local=7" or
                                "logger:stdout?json=true"
