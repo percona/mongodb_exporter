@@ -26,6 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/percona/exporter_shared/helpers"
+
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -72,21 +74,24 @@ mongodb_optimes_durableOpTime_t 1` + "\n")
 	assert.NoError(t, err)
 }
 
-func TestReplsetStatusCollectorNoSharding(t *testing.T) {
+func TestAllReplsetStatusCollectorMetrics(t *testing.T) {
+	if inGithubActions() {
+		t.Skip("Test not reliable in Gihub Actions")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
-
+	client := tu.DefaultTestClient(ctx, t)
 	ti := labelsGetterMock{}
 
 	c := &replSetGetStatusCollector{
-		ctx:          ctx,
 		client:       client,
+		logger:       logrus.New(),
 		topologyInfo: ti,
 	}
+	metrics := helpers.CollectMetrics(c)
 
-	expected := strings.NewReader(``)
-	err := testutil.CollectAndCompare(c, expected)
-	assert.NoError(t, err)
+	samplesFile := "testdata/all_replset_status_data.json"
+	compareMetrics(t, metrics, samplesFile)
 }

@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	"github.com/percona/exporter_shared"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -42,14 +43,14 @@ type Exporter struct {
 
 // Opts holds new exporter options.
 type Opts struct {
-	CompatibleMode          bool
-	GlobalConnPool          bool
 	URI                     string
 	Path                    string
 	WebListenAddress        string
 	IndexStatsCollections   []string
 	CollStatsCollections    []string
 	Logger                  *logrus.Logger
+	CompatibleMode          bool
+	GlobalConnPool          bool
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
 }
@@ -62,7 +63,7 @@ var (
 // New connects to the database and returns a new Exporter instance.
 func New(opts *Opts) (*Exporter, error) {
 	if opts == nil {
-		opts = new(Opts)
+		opts = &Opts{}
 	}
 
 	if opts.Logger == nil {
@@ -71,7 +72,7 @@ func New(opts *Opts) (*Exporter, error) {
 
 	ctx := context.Background()
 
-	exp := &Exporter{
+	exp := &Exporter{ //nolint:exhaustivestruct
 		path:             opts.Path,
 		logger:           opts.Logger,
 		opts:             opts,
@@ -221,11 +222,11 @@ func connect(ctx context.Context, dsn string) (*mongo.Client, error) {
 
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot connect to the database")
 	}
 
 	if err = client.Ping(ctx, nil); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot connect to the database")
 	}
 
 	return client, nil

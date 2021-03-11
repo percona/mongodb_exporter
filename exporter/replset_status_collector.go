@@ -49,7 +49,7 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
 	if err := res.Decode(&m); err != nil {
-		if e, ok := err.(mongo.CommandError); ok {
+		if e, ok := err.(mongo.CommandError); ok { //nolint:errorlint
 			if e.Code == replicationNotYetInitialized || e.Code == replicationNotEnabled {
 				return
 			}

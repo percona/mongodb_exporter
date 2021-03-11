@@ -56,12 +56,14 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
 		if err != nil {
 			d.logger.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
+
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
 			d.logger.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
+
 			continue
 		}
 

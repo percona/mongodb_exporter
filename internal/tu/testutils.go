@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AlekSi/pointer"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -71,7 +73,8 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 	hostname := "127.0.0.1"
 	direct := true
 	to := time.Second
-	co := &options.ClientOptions{
+	co := &options.ClientOptions{ //nolint:exhaustivestruct
+		AppName:        pointer.ToString("mongodb_exporter"),
 		ConnectTimeout: &to,
 		Hosts:          []string{net.JoinHostPort(hostname, port)},
 		Direct:         &direct,
@@ -96,13 +99,13 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 func LoadJSON(filename string) (bson.M, error) {
 	buf, err := ioutil.ReadFile(filepath.Clean(filename))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot load test json data")
 	}
 
 	var m bson.M
 	err = json.Unmarshal(buf, &m)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot parse input json file")
 	}
 
 	return m, nil

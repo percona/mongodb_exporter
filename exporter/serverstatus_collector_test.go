@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -62,4 +63,27 @@ mongodb_metrics_commands_connPoolSync_failed 0` + "\n")
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
+}
+
+func TestAllServerStatusDataCollector(t *testing.T) {
+	if inGithubActions() {
+		t.Skip("Test not reliable in Gihub Actions")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+	ti := labelsGetterMock{}
+
+	c := &serverStatusCollector{
+		client:       client,
+		logger:       logrus.New(),
+		topologyInfo: ti,
+	}
+
+	metrics := helpers.CollectMetrics(c)
+	samplesFile := "testdata/all_server_status_data.json"
+
+	compareMetrics(t, metrics, samplesFile)
 }

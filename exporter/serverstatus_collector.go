@@ -44,6 +44,7 @@ func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 	if err := res.Decode(&m); err != nil {
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+
 		return
 	}
 

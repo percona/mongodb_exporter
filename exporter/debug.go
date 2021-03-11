@@ -16,6 +16,7 @@ func debugResult(log *logrus.Logger, m interface{}) {
 	debugStr, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		log.Errorf("cannot marshal struct for debug: %s", err)
+
 		return
 	}
 

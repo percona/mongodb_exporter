@@ -36,23 +36,23 @@ type RSConfig struct {
 		Votes      int `bson:"votes"`
 	} `bson:"members"`
 	Settings struct {
-		ChainingAllowed            bool `bson:"chainingAllowed"`
-		HeartbeatIntervalMillis    int  `bson:"heartbeatIntervalMillis"`
-		HeartbeatTimeoutSecs       int  `bson:"heartbeatTimeoutSecs"`
-		ElectionTimeoutMillis      int  `bson:"electionTimeoutMillis"`
-		CatchUpTimeoutMillis       int  `bson:"catchUpTimeoutMillis"`
-		CatchUpTakeoverDelayMillis int  `bson:"catchUpTakeoverDelayMillis"`
+		HeartbeatIntervalMillis    int `bson:"heartbeatIntervalMillis"`
+		HeartbeatTimeoutSecs       int `bson:"heartbeatTimeoutSecs"`
+		ElectionTimeoutMillis      int `bson:"electionTimeoutMillis"`
+		CatchUpTimeoutMillis       int `bson:"catchUpTimeoutMillis"`
+		CatchUpTakeoverDelayMillis int `bson:"catchUpTakeoverDelayMillis"`
 		GetLastErrorModes          struct {
 		} `bson:"getLastErrorModes"`
 		GetLastErrorDefaults struct {
 			W        int `bson:"w"`
 			Wtimeout int `bson:"wtimeout"`
 		} `bson:"getLastErrorDefaults"`
-		ReplicaSetID primitive.ObjectID `bson:"replicaSetId"`
+		ReplicaSetID    primitive.ObjectID `bson:"replicaSetId"`
+		ChainingAllowed bool               `bson:"chainingAllowed"`
 	} `bson:"settings"`
 }
 
-func TestSecondaryLag(t *testing.T) {
+func TestSecondaryLag(t *testing.T) { //nolint:funlen
 	t.Skip("This is failing in GitHub actions. Cannot make secondary to lag behind")
 	secondsBehind := 3
 	sleep := 2

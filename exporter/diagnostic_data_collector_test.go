@@ -18,8 +18,8 @@ package exporter
 
 import (
 	"context"
-	"fmt"
-	"sort"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -77,45 +77,71 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
+	// if inGithubActions() {
+	// 	t.Skip("Test not reliable in Gihub Actions")
+	// }
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
-
-	ti, err := newTopologyInfo(ctx, client)
-	require.NoError(t, err)
+	ti := labelsGetterMock{}
+	log := logrus.New()
 
 	c := &diagnosticDataCollector{
 		client:         client,
-		logger:         logrus.New(),
+		logger:         log,
 		compatibleMode: true,
 		topologyInfo:   ti,
 	}
 
 	metrics := helpers.CollectMetrics(c)
+
+	/*
+	  How to regenerate this file:
+	  1. Delete it
+	  2. Start the sandbox with the highest available version
+	  3. Run tests updating samples: UPDATE_SAMPLES=1 make test
+	  4. Stop the sandbox and restart it with a lower MongoDB version.
+	  5. Repeat 3 & 4 for all MongoDB versions.
+
+	  First run will save ALL available metrics in newer MongoDB versions
+	  and subsequent runs will remove the metrics not available in previous
+	  versions. At the end you will have the base list of metrics, common
+	  to all MongoDB versions
+	*/
+	compareMetrics(t, metrics, "testdata/diagnostic_data_base.json")
+}
+
+func compareMetrics(t *testing.T, metrics []prometheus.Metric, wantFile string) {
 	actualMetrics := helpers.ReadMetrics(metrics)
-	filters := []string{
-		"mongodb_mongod_metrics_cursor_open",
-		"mongodb_mongod_metrics_get_last_error_wtimeouts_total",
-		"mongodb_mongod_wiredtiger_cache_bytes",
-		"mongodb_mongod_wiredtiger_transactions_total",
-		"mongodb_mongod_wiredtiger_cache_bytes_total",
-		"mongodb_op_counters_total",
-		"mongodb_ss_mem_resident",
-		"mongodb_ss_mem_virtual",
-		"mongodb_ss_metrics_cursor_open",
-		"mongodb_ss_metrics_getLastError_wtime_totalMillis",
-		"mongodb_ss_opcounters",
-		"mongodb_ss_opcountersRepl",
-		"mongodb_ss_wt_cache_maximum_bytes_configured",
-		"mongodb_ss_wt_cache_modified_pages_evicted",
-	}
-	actualMetrics = filterMetrics(actualMetrics, filters)
 	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+
 	metricNames := getMetricNames(actualLines)
 
-	sort.Strings(filters)
-	for _, want := range filters {
-		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
+	updateSamples, _ := strconv.ParseBool(os.Getenv("UPDATE_SAMPLES"))
+
+	var wantNames map[string]bool
+	// ignore error because when we are regenerating the file, it might not exist
+	readJSON(wantFile, &wantNames) //nolint:errcheck
+
+	// don't use assert.Equal because since metrics are dynamic, we don't always have the same
+	// metric names in all environments so, we should only compare against a list of commonly
+	// available metrics.
+	for name := range wantNames {
+		_, ok := metricNames[name]
+		assert.True(t, ok, name+" metric is missing")
+		if !ok {
+			delete(wantNames, name)
+		}
+	}
+
+	if updateSamples {
+		if len(wantNames) > 0 {
+			assert.NoError(t, writeJSON(wantFile, wantNames))
+		} else {
+			// if we are regenerating the data we need to write the data we got from MongoDB
+			assert.NoError(t, writeJSON(wantFile, metricNames))
+		}
 	}
 }
