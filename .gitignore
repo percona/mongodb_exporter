@@ -5,4 +5,3 @@ bin
 build
 dist
 mongodb_exporter
-me
