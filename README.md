@@ -47,22 +47,6 @@ Just run `make build` and the new binaries will be generated under the build dir
 │ └── mongodb_exporter_linux_amd64
 │ └── mongodb_exporter <--- Linux binary
 ```
-
-### Build the exporter
-The build process uses the dockerized version of goreleaser so you don't need to install Go.
-Just run `make build` and the new binaries will be generated under the build directory.
-```
-├── build
-│ ├── config.yaml
-│ ├── mongodb_exporter_7c73946_checksums.txt
-│ ├── mongodb_exporter-7c73946.darwin-amd64.tar.gz
-│ ├── mongodb_exporter-7c73946.linux-amd64.tar.gz
-│ ├── mongodb_exporter_darwin_amd64
-│ │ └── mongodb_exporter <--- MacOS binary
-│ └── mongodb_exporter_linux_amd64
-│ └── mongodb_exporter <--- Linux binary
-```
-
 ### Running the exporter
 If you built the exporter using the method mentioned in the previous section, the generated binaries are in `mongodb_exporter_linux_amd64/mongodb_exporter` or `mongodb_exporter_darwin_amd64/mongodb_exporter`
 
