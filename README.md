@@ -28,7 +28,7 @@ Currently, these metric sources are implemented:
 |\-\-mongodb.collstats-colls|List of comma separated databases.collections to get stats|\-\-mongodb.collstats-colls=testdb.testcol1,testdb.testcol2|
 |\-\-mongodb.indexstats-colls|List of comma separated database.collections to get index stats|\-\-mongodb.indexstats-colls=db1.col1,db1.col2|
 |\-\-mongodb.uri|MongoDB connection URI ($MONGODB_URI)|\-\-mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
-|\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new pool for each http request.||
+|\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new connection for each http request.||
 |\-\-web.listen-address|Address to listen on for web interface and telemetry|\-\-web.listen-address=":9216"|
 |\-\-web.telemetry-path|Metrics expose path|\-\-web.telemetry-path="/metrics"|
 |\-\-log.level|Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]|\-\-log.level="error"|
