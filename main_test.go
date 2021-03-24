@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/percona/mongodb_exporter/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +22,23 @@ func TestBuildExporter(t *testing.T) {
 
 		CompatibleMode: true,
 	}
+	MongoInstances := []*config.MongoInstance{
+		{
+			Name:    "",
+			Host:    "",
+			Port:    "",
+			Account: []*config.Account{
+				{
+					Username: "",
+					Password: "",
+				},
+			},
+		},
+	}
+	conf := &config.Config{
+		MongoInstance: MongoInstances,
+	}
 
-	_, err := buildExporter(opts)
+	_, err := buildExporter(opts, conf)
 	assert.NoError(t, err)
 }

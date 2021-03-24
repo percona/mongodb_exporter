@@ -1,80 +1,47 @@
 # MongoDB exporter
-[![Release](https://img.shields.io/github/release/percona/mongodb_exporter.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
-[![Build Status](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml?query=branch%3Amain)
-[![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
-[![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
 
-This is the new MongoDB exporter implementation that handles ALL metrics exposed by MongoDB monitoring commands.
-This new implementation loops over all the fields exposed in diagnostic commands and tries to get data from them.
-
-Currently, these metric sources are implemented:
-- $collStats
-- $indexStats
-- getDiagnosticData
-- replSetGetStatus
-- serverStatus
-
-| Old Percona MongoDB exporter                                                  |
-|:------------------------------------------------------------------------------|
-| old 0.1x.y version (ex `master` branch) is moved to the `release-0.1x` branch |
+## 声明
+基于开源项目mongodb_exporter
+https://github.com/percona/mongodb_exporter
+该exporter只能采集一个目标，不能动态指定采集目标
+要想更改采集目标需要重新启动
+启动形式
+```
+exporter --mongodb.uri=mongodb://127.0.0.1:27017
+```
 
 
-## Flags
-|Flag|Description|Example|
-|-----|-----|-----|
-|-h, \-\-help|Show context-sensitive help||
-|\-\-compatible-mode|Exposes new metrics in the new and old format at the same time||
-|\-\-mongodb.collstats-colls|List of comma separated databases.collections to get stats|\-\-mongodb.collstats-colls=testdb.testcol1,testdb.testcol2|
-|\-\-mongodb.indexstats-colls|List of comma separated database.collections to get index stats|\-\-mongodb.indexstats-colls=db1.col1,db1.col2|
-|\-\-mongodb.dsn|MongoDB connection URI|\-\-mongodb.dsn=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
-|\-\-expose-path|Metrics expose path|\-\-expose-path=/metrics_new|
-|\-\-expose-port|HTTP expose server port|\-\-expose-port=9216|
-|-D, --debug|Enable debug mode||
-|--version|Show version and exit|
+## 目的：
+保留原有功能情况下，将exporter改造成可以动态指定采集目标，做到多目标采集
 
- ### Build the exporter
-The build process uses the dockerized version of goreleaser so you don't need to install Go.
-Just run `make build` and the new binaries will be generated under the build directory.
+## 用法：
+在项目根路径下的conf.yml配置文件中配置mongodb的信息
 ```
-├── build
-│ ├── config.yaml
-│ ├── mongodb_exporter_7c73946_checksums.txt
-│ ├── mongodb_exporter-7c73946.darwin-amd64.tar.gz
-│ ├── mongodb_exporter-7c73946.linux-amd64.tar.gz
-│ ├── mongodb_exporter_darwin_amd64
-│ │ └── mongodb_exporter <--- MacOS binary
-│ └── mongodb_exporter_linux_amd64
-│ └── mongodb_exporter <--- Linux binary
+mongo-list:
+  - name: mongo-1
+    host: 127.0.0.1
+    port: 27017
+    account:
+      - username: root
+        password: root
+      - username: root-1
+        password: root-1
 ```
-### Running the exporter
-If you built the exporter using the method mentioned in the previous section, the generated binaries are in `mongodb_exporter_linux_amd64/mongodb_exporter` or `mongodb_exporter_darwin_amd64/mongodb_exporter`
+原有启动形式启动
+```
+exporter --mongodb.uri=mongodb://127.0.0.1:27017
+```
+可以通过url动态指定采集目标
+```
+http://127.0.0.1:9216/metrics?target={{usr}}:{{psw}}@{{ip}}:{{port}}
 
-#### Example
-```
-mongodb_exporter_linux_amd64/mongodb_exporter --mongodbdsn=mongodb://127.0.0.1:17001
-```
-#### Enabling collstats metrics gathering
-`--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.
-Usage example: `--mongodb.collstats-colls=database1.collection1,database2.collection2`
-```
-mongodb_exporter_linux_amd64/mongodb_exporter --mongodbdsn=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
-```
-#### Enabling compatibility mode.
-When compatibility mode is enabled by the `--compatible-mode`, the exporter will expose all new metrics with the new naming and labeling schema and at the same time will expose metrics in the version 1 compatible way.
-For example, if compatibility mode is enabled, the metric `mongodb_ss_wt_log_log_bytes_written` (new format)
-```
-# HELP mongodb_ss_wt_log_log_bytes_written serverStatus.wiredTiger.log.
-# TYPE mongodb_ss_wt_log_log_bytes_written untyped
-mongodb_ss_wt_log_log_bytes_written 2.6208e+06
-```
-will be also exposed as `mongodb_mongod_wiredtiger_log_bytes_total`  with the `unwritten` label.
-```
-HELP mongodb_mongod_wiredtiger_log_bytes_total mongodb_mongod_wiredtiger_log_bytes_total
-# TYPE mongodb_mongod_wiredtiger_log_bytes_total untyped
-mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
+#其中，如果想不在url中嵌入password，可以不传password，会在conf.yml文件中获取password
+http://127.0.0.1:9216/metrics?target={{usr}}@{{ip}}:{{port}}
+
+#当不指定usr时，以不指定账号密码形式采集
+http://127.0.0.1:9216/metrics?target=@{{ip}}:{{port}}
+
+#当不指定target时，以程序启动时所指定的目标作为采集目标
+http://127.0.0.1:9216/metrics
 ```
 
-## Submitting Bug Reports and adding new functionality
-
-please see [Contribution Guide](CONTRIBUTING.md)

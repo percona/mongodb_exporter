@@ -18,11 +18,17 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/percona/mongodb_exporter/config"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 
 	"github.com/percona/mongodb_exporter/exporter"
 )
@@ -51,6 +57,22 @@ type GlobalFlags struct {
 	Version        bool `name:"version" help:"Show version and exit"`
 }
 
+func loadConfig() (*config.Config, error) {
+	path, _ := os.Getwd()
+	path = filepath.Join(path, "/conf.yml")
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, errors.New("read conf.yml fail")
+	}
+	conf := new(config.Config)
+	err = yaml.Unmarshal(data, conf)
+	if err != nil {
+		return nil, errors.New("unmarshal conf.yml fail")
+	}
+	return conf, nil
+}
+
+
 func main() {
 	var opts GlobalFlags
 	_ = kong.Parse(&opts,
@@ -64,6 +86,8 @@ func main() {
 			"version": version,
 		})
 
+
+
 	if opts.Version {
 		fmt.Println("mongodb_exporter - MongoDB Prometheus exporter")
 		fmt.Printf("Version: %s\n", version)
@@ -72,8 +96,12 @@ func main() {
 
 		return
 	}
-
-	e, err := buildExporter(opts)
+	conf, err := loadConfig()
+	if err != nil {
+		log.Fatal(err.Error())
+		return
+	}
+	e, err := buildExporter(opts, conf)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,7 +109,7 @@ func main() {
 	e.Run()
 }
 
-func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
+func buildExporter(opts GlobalFlags, config *config.Config) (*exporter.Exporter, error) {
 	log := logrus.New()
 
 	levels := map[string]logrus.Level{
@@ -113,6 +141,7 @@ func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
 		WebListenAddress:        opts.WebListenAddress,
 		DisableDiagnosticData:   opts.DisableDiagnosticData,
 		DisableReplicasetStatus: opts.DisableReplicasetStatus,
+		Config: config,
 	}
 
 	e, err := exporter.New(exporterOpts)

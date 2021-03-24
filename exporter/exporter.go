@@ -21,8 +21,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/percona/exporter_shared"
+	"github.com/percona/mongodb_exporter/config"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -52,6 +55,7 @@ type Opts struct {
 	Logger                  *logrus.Logger
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
+	Config                  *config.Config
 }
 
 var (
@@ -151,17 +155,67 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	return registry
 }
+func getTarget(target string, mongoList []*config.MongoInstance) (string, error) {
+	targetValue := ""
+	if !strings.Contains(target, "@") {
+		return "", errors.New("uri must contain @")
+	}
+	arr := strings.Split(target, "@")
+	if len(arr[0])==0 || strings.Contains(arr[0], ":"){
+		return target, nil
+	}
+	tmp := strings.Split(arr[1], ":")
+	ip := tmp[0]
+	port := tmp[1]
+	username := arr[0]
+	var password string
+	for i:=0; i< len(mongoList); i++ {
+		if ip==mongoList[i].Host && port==mongoList[i].Port {
+			for j:=0; j< len(mongoList[i].Account); j++ {
+				if username==mongoList[i].Account[j].Username {
+					password = mongoList[i].Account[j].Password
+					break
+				}
+			}
+		}
+		if len(password)!=0 {
+			break
+		}
+	}
+	if len(password)==0 {
+		return "", errors.New("not found host or account in conf.yml")
+	}
+	targetValue = username + ":" + password + "@" + ip + ":" + port
+	return targetValue, nil
+}
 
 func (e *Exporter) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-
+		targetUri := e.opts.URI
+		target := r.URL.Query().Get("target")
+		if target != "" {
+			targetValue, err := getTarget(target, e.opts.Config.MongoInstance)
+			if err != nil {
+				e.logger.Errorf("get target fail: %v", err.Error())
+				http.Error(
+					w,
+					"get target fail: "+err.Error(),
+					http.StatusInternalServerError,
+				)
+				return
+			}
+			if !strings.HasPrefix(targetValue, "mongodb") {
+				targetValue = "mongodb://" + targetValue
+			}
+			targetUri = targetValue
+		}
 		client := e.client
 		topologyInfo := e.topologyInfo
 		// Use per-request connection.
 		if !e.opts.GlobalConnPool {
 			var err error
-			client, err = connect(ctx, e.opts.URI)
+			client, err = connect(ctx, targetUri)
 			if err != nil {
 				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
 				http.Error(
