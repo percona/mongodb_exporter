@@ -11,5 +11,5 @@ jobs:
       uses: percona-platform/auto-assign-review-teams@p1.0.1
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-        teams: "pmm-review-exporters"
+        teams: "@percona/pmm-review-exporters"
         skip-with-manual-reviewers: 2
