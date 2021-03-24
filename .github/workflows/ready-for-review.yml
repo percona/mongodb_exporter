@@ -8,8 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: "Assign Team for the review"
-      uses: percona-platform/auto-assign-review-teams@p1.0.1
+      uses: percona-platform/auto-assign-review-teams@v1.0.1
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-        teams: "@percona/pmm-review-exporters"
+        teams: "teams:@percona/pmm-review-exporters"
         skip-with-manual-reviewers: 2
