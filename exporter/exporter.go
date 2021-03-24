@@ -161,7 +161,7 @@ func getTarget(target string, mongoList []*config.MongoInstance) (string, error)
 		return "", errors.New("uri must contain @")
 	}
 	arr := strings.Split(target, "@")
-	if len(arr[0])==0 || strings.Contains(arr[0], ":"){
+	if len(arr[0]) == 0 || strings.Contains(arr[0], ":") {
 		return target, nil
 	}
 	tmp := strings.Split(arr[1], ":")
@@ -169,20 +169,20 @@ func getTarget(target string, mongoList []*config.MongoInstance) (string, error)
 	port := tmp[1]
 	username := arr[0]
 	var password string
-	for i:=0; i< len(mongoList); i++ {
-		if ip==mongoList[i].Host && port==mongoList[i].Port {
-			for j:=0; j< len(mongoList[i].Account); j++ {
-				if username==mongoList[i].Account[j].Username {
+	for i := 0; i < len(mongoList); i++ {
+		if ip == mongoList[i].Host && port == mongoList[i].Port {
+			for j := 0; j < len(mongoList[i].Account); j++ {
+				if username == mongoList[i].Account[j].Username {
 					password = mongoList[i].Account[j].Password
 					break
 				}
 			}
 		}
-		if len(password)!=0 {
+		if len(password) != 0 {
 			break
 		}
 	}
-	if len(password)==0 {
+	if len(password) == 0 {
 		return "", errors.New("not found host or account in conf.yml")
 	}
 	targetValue = username + ":" + password + "@" + ip + ":" + port
