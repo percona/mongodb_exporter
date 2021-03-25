@@ -44,6 +44,7 @@ type Exporter struct {
 type Opts struct {
 	CompatibleMode          bool
 	GlobalConnPool          bool
+	DirectConnect           bool
 	URI                     string
 	Path                    string
 	WebListenAddress        string
@@ -79,7 +80,7 @@ func New(opts *Opts) (*Exporter, error) {
 	}
 	if opts.GlobalConnPool {
 		var err error
-		exp.client, err = connect(ctx, opts.URI)
+		exp.client, err = connect(ctx, opts.URI, opts.DirectConnect)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +162,7 @@ func (e *Exporter) handler() http.Handler {
 		// Use per-request connection.
 		if !e.opts.GlobalConnPool {
 			var err error
-			client, err = connect(ctx, e.opts.URI)
+			client, err = connect(ctx, e.opts.URI, e.opts.DirectConnect)
 			if err != nil {
 				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
 				http.Error(
@@ -214,9 +215,9 @@ func (e *Exporter) Run() {
 	exporter_shared.RunServer("MongoDB", e.webListenAddress, e.path, handler)
 }
 
-func connect(ctx context.Context, dsn string) (*mongo.Client, error) {
+func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client, error) {
 	clientOpts := options.Client().ApplyURI(dsn)
-	clientOpts.SetDirect(true)
+	clientOpts.SetDirect(directConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
 	client, err := mongo.Connect(ctx, clientOpts)
