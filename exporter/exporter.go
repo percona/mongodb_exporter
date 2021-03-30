@@ -43,6 +43,7 @@ type Exporter struct {
 // Opts holds new exporter options.
 type Opts struct {
 	CompatibleMode          bool
+	DiscoveringMode         bool
 	GlobalConnPool          bool
 	DirectConnect           bool
 	URI                     string
@@ -107,23 +108,25 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if len(e.opts.CollStatsCollections) > 0 {
 		cc := collstatsCollector{
-			ctx:            ctx,
-			client:         client,
-			collections:    e.opts.CollStatsCollections,
-			compatibleMode: e.opts.CompatibleMode,
-			logger:         e.opts.Logger,
-			topologyInfo:   topologyInfo,
+			ctx:             ctx,
+			client:          client,
+			collections:     e.opts.CollStatsCollections,
+			compatibleMode:  e.opts.CompatibleMode,
+			discoveringMode: e.opts.DiscoveringMode,
+			logger:          e.opts.Logger,
+			topologyInfo:    topologyInfo,
 		}
 		registry.MustRegister(&cc)
 	}
 
 	if len(e.opts.IndexStatsCollections) > 0 {
 		ic := indexstatsCollector{
-			ctx:          ctx,
-			client:       client,
-			collections:  e.opts.IndexStatsCollections,
-			logger:       e.opts.Logger,
-			topologyInfo: topologyInfo,
+			ctx:             ctx,
+			client:          client,
+			collections:     e.opts.IndexStatsCollections,
+			discoveringMode: e.opts.DiscoveringMode,
+			logger:          e.opts.Logger,
+			topologyInfo:    topologyInfo,
 		}
 		registry.MustRegister(&ic)
 	}
