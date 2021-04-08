@@ -27,6 +27,7 @@ Currently, these metric sources are implemented:
 |\-\-compatible-mode|Exposes new metrics in the new and old format at the same time||
 |\-\-discovering-mode|Enable autodiscover collections from databases which set in collstats-colls and indexstats-colls||
 |\-\-mongodb.collstats-colls|List of comma separated databases.collections to get stats|\-\-mongodb.collstats-colls=testdb.testcol1,testdb.testcol2|
+|\-\-mongodb.direct-connect|Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used|\-\-mongodb.direct-connect=false|
 |\-\-mongodb.indexstats-colls|List of comma separated database.collections to get index stats|\-\-mongodb.indexstats-colls=db1.col1,db1.col2|
 |\-\-mongodb.uri|MongoDB connection URI ($MONGODB_URI)|\-\-mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
 |\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new connection for each http request.||
