@@ -48,8 +48,9 @@ type GlobalFlags struct {
 	DisableDiagnosticData   bool `name:"disable.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
 	DisableReplicasetStatus bool `name:"disable.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
 
-	CompatibleMode bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
-	Version        bool `name:"version" help:"Show version and exit"`
+	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections"`
+	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
+	Version         bool `name:"version" help:"Show version and exit"`
 }
 
 func main() {
@@ -106,6 +107,7 @@ func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
 	exporterOpts := &exporter.Opts{
 		CollStatsCollections:    strings.Split(opts.CollStatsCollections, ","),
 		CompatibleMode:          opts.CompatibleMode,
+		DiscoveringMode:         opts.DiscoveringMode,
 		IndexStatsCollections:   strings.Split(opts.IndexStatsCollections, ","),
 		Logger:                  log,
 		Path:                    opts.WebTelemetryPath,
