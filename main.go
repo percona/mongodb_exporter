@@ -41,6 +41,7 @@ type GlobalFlags struct {
 	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
 	GlobalConnPool        bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request."`
 	DirectConnect         bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"false"`
+	AuthMechanism         string `name:"mongodb.auth-mechanism" help:"Authentication mechanism. Example: MONGODB-X509."`
 	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
@@ -115,6 +116,7 @@ func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
 		DisableDiagnosticData:   opts.DisableDiagnosticData,
 		DisableReplicasetStatus: opts.DisableReplicasetStatus,
 		DirectConnect:           opts.DirectConnect,
+		AuthMechanism:           opts.AuthMechanism,
 	}
 
 	e, err := exporter.New(exporterOpts)
