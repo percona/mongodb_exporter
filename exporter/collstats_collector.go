@@ -27,12 +27,13 @@ import (
 )
 
 type collstatsCollector struct {
-	ctx            context.Context
-	client         *mongo.Client
-	collections    []string
-	compatibleMode bool
-	logger         *logrus.Logger
-	topologyInfo   labelsGetter
+	ctx             context.Context
+	client          *mongo.Client
+	collections     []string
+	compatibleMode  bool
+	discoveringMode bool
+	logger          *logrus.Logger
+	topologyInfo    labelsGetter
 }
 
 func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -40,6 +41,18 @@ func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
+	if d.discoveringMode {
+		databases := map[string][]string{}
+		for _, dbCollection := range d.collections {
+			parts := strings.Split(dbCollection, ".")
+			if _, ok := databases[parts[0]]; !ok {
+				db := parts[0]
+				databases[db], _ = d.client.Database(parts[0]).ListCollectionNames(d.ctx, bson.D{})
+			}
+		}
+
+		d.collections = fromMapToSlice(databases)
+	}
 	for _, dbCollection := range d.collections {
 		parts := strings.Split(dbCollection, ".")
 		if len(parts) != 2 { //nolint:gomnd
@@ -83,6 +96,17 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
+}
+
+func fromMapToSlice(databases map[string][]string) []string {
+	var collections []string
+	for db, cols := range databases {
+		for _, value := range cols {
+			collections = append(collections, db+"."+value)
+		}
+	}
+
+	return collections
 }
 
 var _ prometheus.Collector = (*collstatsCollector)(nil)
