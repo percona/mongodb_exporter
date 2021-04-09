@@ -63,7 +63,7 @@ func TestConnect(t *testing.T) {
 	t.Run("Connect without SSL", func(t *testing.T) {
 		for name, port := range ports {
 			dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, port)
-			client, err := connect(ctx, dsn)
+			client, err := connect(ctx, dsn, true)
 			assert.NoError(t, err, name)
 			err = client.Disconnect(ctx)
 			assert.NoError(t, err, name)

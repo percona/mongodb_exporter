@@ -25,12 +25,17 @@ Currently, these metric sources are implemented:
 |-----|-----|-----|
 |-h, \-\-help|Show context-sensitive help||
 |\-\-compatible-mode|Exposes new metrics in the new and old format at the same time||
+|\-\-discovering-mode|Enable autodiscover collections from databases which set in collstats-colls and indexstats-colls||
 |\-\-mongodb.collstats-colls|List of comma separated databases.collections to get stats|\-\-mongodb.collstats-colls=testdb.testcol1,testdb.testcol2|
+|\-\-mongodb.direct-connect|Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used|\-\-mongodb.direct-connect=false|
 |\-\-mongodb.indexstats-colls|List of comma separated database.collections to get index stats|\-\-mongodb.indexstats-colls=db1.col1,db1.col2|
-|\-\-mongodb.dsn|MongoDB connection URI|\-\-mongodb.dsn=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
-|\-\-expose-path|Metrics expose path|\-\-expose-path=/metrics_new|
-|\-\-expose-port|HTTP expose server port|\-\-expose-port=9216|
-|-D, --debug|Enable debug mode||
+|\-\-mongodb.uri|MongoDB connection URI ($MONGODB_URI)|\-\-mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
+|\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new connection for each http request.||
+|\-\-web.listen-address|Address to listen on for web interface and telemetry|\-\-web.listen-address=":9216"|
+|\-\-web.telemetry-path|Metrics expose path|\-\-web.telemetry-path="/metrics"|
+|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level="error"|
+|\-\-disable.diagnosticdata|Disable collecting metrics from getDiagnosticData||
+|\-\-disable.replicasetstatus|Disable collecting metrics from replSetGetStatus||
 |--version|Show version and exit|
 
  ### Build the exporter
