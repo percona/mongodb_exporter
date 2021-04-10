@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/percona/mongodb_exporter/exporter"
@@ -42,6 +43,7 @@ type GlobalFlags struct {
 	GlobalConnPool        bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request."`
 	DirectConnect         bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"false"`
 	AuthMechanism         string `name:"mongodb.auth-mechanism" help:"Authentication mechanism. Example: MONGODB-X509."`
+	InsecureSkipVerify    bool   `name:"insercure-skip-verify" help:"Skip X509 certs" default:"true"`
 	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
@@ -105,23 +107,25 @@ func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
 	log.Debugf("Connection URI: %s", opts.URI)
 
 	exporterOpts := &exporter.Opts{
-		CollStatsCollections:    strings.Split(opts.CollStatsCollections, ","),
-		CompatibleMode:          opts.CompatibleMode,
-		IndexStatsCollections:   strings.Split(opts.IndexStatsCollections, ","),
-		Logger:                  log,
-		Path:                    opts.WebTelemetryPath,
-		URI:                     opts.URI,
-		GlobalConnPool:          opts.GlobalConnPool,
+		CollStatsCollections:  strings.Split(opts.CollStatsCollections, ","),
+		CompatibleMode:        opts.CompatibleMode,
+		IndexStatsCollections: strings.Split(opts.IndexStatsCollections, ","),
+		Logger:                log,
+		Path:                  opts.WebTelemetryPath,
+		ConnectionParams: exporter.ConnectionParams{
+			URI:            opts.URI,
+			GlobalConnPool: opts.GlobalConnPool,
+			DirectConnect:  opts.DirectConnect,
+			AuthMechanism:  opts.AuthMechanism,
+		},
 		WebListenAddress:        opts.WebListenAddress,
 		DisableDiagnosticData:   opts.DisableDiagnosticData,
 		DisableReplicasetStatus: opts.DisableReplicasetStatus,
-		DirectConnect:           opts.DirectConnect,
-		AuthMechanism:           opts.AuthMechanism,
 	}
 
 	e, err := exporter.New(exporterOpts)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot create an exporter instance")
 	}
 
 	return e, nil

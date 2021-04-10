@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
@@ -40,13 +41,20 @@ type Exporter struct {
 	topologyInfo     labelsGetter
 }
 
+// ConnectionParams holds MongoDB connection parameters.
+type ConnectionParams struct {
+	URI                string
+	AuthMechanism      string
+	ConnectTimeout     time.Duration
+	DirectConnect      bool
+	GlobalConnPool     bool
+	InsecureSkipVerify bool
+}
+
 // Opts holds new exporter options.
 type Opts struct {
+	ConnectionParams        ConnectionParams
 	CompatibleMode          bool
-	GlobalConnPool          bool
-	DirectConnect           bool
-	URI                     string
-	AuthMechanism           string
 	Path                    string
 	WebListenAddress        string
 	IndexStatsCollections   []string
@@ -55,6 +63,15 @@ type Opts struct {
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
 }
+
+const (
+	// AuthMechanismDefault holds the default AuthMechanism which is empty unless you use X509 certs.
+	AuthMechanismDefault = ""
+	// AuthMechanismX509 Use X509 certs.
+	AuthMechanismX509 = "MONGODB-X509"
+	// UseDirecConnection to the db.
+	UseDirecConnection = true
+)
 
 var (
 	errCannotHandleType   = fmt.Errorf("don't know how to handle data type")
@@ -79,9 +96,9 @@ func New(opts *Opts) (*Exporter, error) {
 		opts:             opts,
 		webListenAddress: opts.WebListenAddress,
 	}
-	if opts.GlobalConnPool {
+	if opts.ConnectionParams.GlobalConnPool {
 		var err error
-		exp.client, err = connect(ctx, opts.URI, opts.AuthMechanism, opts.DirectConnect)
+		exp.client, err = connect(ctx, opts.ConnectionParams)
 		if err != nil {
 			return nil, err
 		}
@@ -161,9 +178,9 @@ func (e *Exporter) handler() http.Handler {
 		client := e.client
 		topologyInfo := e.topologyInfo
 		// Use per-request connection.
-		if !e.opts.GlobalConnPool {
+		if !e.opts.ConnectionParams.GlobalConnPool {
 			var err error
-			client, err = connect(ctx, e.opts.URI, e.opts.AuthMechanism, e.opts.DirectConnect)
+			client, err = connect(ctx, e.opts.ConnectionParams)
 			if err != nil {
 				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
 				http.Error(
@@ -216,13 +233,22 @@ func (e *Exporter) Run() {
 	exporter_shared.RunServer("MongoDB", e.webListenAddress, e.path, handler)
 }
 
-func connect(ctx context.Context, dsn string, authMechanism string, directConnect bool) (*mongo.Client, error) {
-	clientOpts := options.Client().ApplyURI(dsn)
-	clientOpts.SetDirect(directConnect)
+func connect(ctx context.Context, opts ConnectionParams) (*mongo.Client, error) {
+	clientOpts := options.Client().ApplyURI(opts.URI)
+	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
-	if authMechanism != "" {
-		clientOpts.Auth.AuthMechanism = authMechanism
+	// There is no external flag to set this. Currently, it is only used for testing.
+	if opts.ConnectTimeout > 0 {
+		clientOpts.SetConnectTimeout(opts.ConnectTimeout)
+	}
+
+	if opts.AuthMechanism != "" {
+		credential := options.Credential{
+			AuthMechanism: opts.AuthMechanism,
+		}
+		clientOpts.SetAuth(credential)
+		clientOpts.TLSConfig.InsecureSkipVerify = opts.InsecureSkipVerify
 	}
 
 	client, err := mongo.Connect(ctx, clientOpts)

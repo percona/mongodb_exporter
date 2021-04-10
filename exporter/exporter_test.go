@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +64,12 @@ func TestConnect(t *testing.T) {
 	t.Run("Connect without SSL", func(t *testing.T) {
 		for name, port := range ports {
 			dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, port)
-			client, err := connect(ctx, dsn, true)
+			cnxOpts := ConnectionParams{
+				URI:           dsn,
+				AuthMechanism: AuthMechanismDefault,
+				DirectConnect: UseDirecConnection,
+			}
+			client, err := connect(ctx, cnxOpts)
 			assert.NoError(t, err, name)
 			err = client.Disconnect(ctx)
 			assert.NoError(t, err, name)
@@ -75,9 +81,11 @@ func TestConnect(t *testing.T) {
 		log := logrus.New()
 
 		exporterOpts := &Opts{
-			Logger:         log,
-			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
-			GlobalConnPool: false,
+			Logger: log,
+			ConnectionParams: ConnectionParams{
+				URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
+				GlobalConnPool: false,
+			},
 		}
 
 		e, err := New(exporterOpts)
@@ -111,9 +119,11 @@ func TestConnect(t *testing.T) {
 		log := logrus.New()
 
 		exporterOpts := &Opts{
-			Logger:         log,
-			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
-			GlobalConnPool: true,
+			Logger: log,
+			ConnectionParams: ConnectionParams{
+				URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
+				GlobalConnPool: true,
+			},
 		}
 
 		e, err := New(exporterOpts)
@@ -140,5 +150,42 @@ func TestConnect(t *testing.T) {
 		}
 
 		wg.Wait()
+	})
+}
+
+func TestSSL(t *testing.T) {
+	// See https://hub.docker.com/r/rzhilkibaev/mongo-x509-auth-ssl/ for an example container with SSL enabled
+	t.Skip("This test requires an special environment")
+
+	t.Run("Connect SSL fail when verifying self signed certs", func(t *testing.T) {
+		ctx := context.TODO()
+
+		dsn := fmt.Sprintf("mongodb://127.0.0.1:27017/?tlsCAFile=%s&tlsCertificateKeyFile=%s&", "/tmp/mongodb-CA.pem", "/tmp/mongodb-client.pem")
+		opts := ConnectionParams{
+			AuthMechanism:      AuthMechanismX509,
+			URI:                dsn,
+			DirectConnect:      UseDirecConnection,
+			InsecureSkipVerify: false,
+			ConnectTimeout:     1 * time.Second,
+		}
+		_, err := connect(ctx, opts)
+		assert.Error(t, err)
+	})
+
+	t.Run("Connect SSL", func(t *testing.T) {
+		ctx := context.TODO()
+
+		dsn := fmt.Sprintf("mongodb://127.0.0.1:27017/?tlsCAFile=%s&tlsCertificateKeyFile=%s&", "/tmp/mongodb-CA.pem", "/tmp/mongodb-client.pem")
+		opts := ConnectionParams{
+			AuthMechanism:      AuthMechanismX509,
+			URI:                dsn,
+			DirectConnect:      UseDirecConnection,
+			InsecureSkipVerify: true,
+			ConnectTimeout:     1 * time.Second,
+		}
+		client, err := connect(ctx, opts)
+		assert.NoError(t, err)
+		err = client.Disconnect(ctx)
+		assert.NoError(t, err)
 	})
 }

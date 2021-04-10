@@ -24,27 +24,25 @@ type RSConfig struct {
 	ProtocolVersion                    int    `bson:"protocolVersion"`
 	WriteConcernMajorityJournalDefault bool   `bson:"writeConcernMajorityJournalDefault"`
 	Members                            []struct {
-		ID           int    `bson:"_id"`
-		Host         string `bson:"host"`
-		ArbiterOnly  bool   `bson:"arbiterOnly"`
-		BuildIndexes bool   `bson:"buildIndexes"`
-		Hidden       bool   `bson:"hidden"`
-		Priority     int    `bson:"priority"`
-		Tags         struct {
-		} `bson:"tags"`
-		SlaveDelay int `bson:"slaveDelay"`
-		Votes      int `bson:"votes"`
+		ID           int      `bson:"_id"`
+		Host         string   `bson:"host"`
+		ArbiterOnly  bool     `bson:"arbiterOnly"`
+		BuildIndexes bool     `bson:"buildIndexes"`
+		Hidden       bool     `bson:"hidden"`
+		Priority     int      `bson:"priority"`
+		Tags         struct{} `bson:"tags"`
+		SlaveDelay   int      `bson:"slaveDelay"`
+		Votes        int      `bson:"votes"`
 	} `bson:"members"`
 	Settings struct {
-		ChainingAllowed            bool `bson:"chainingAllowed"`
-		HeartbeatIntervalMillis    int  `bson:"heartbeatIntervalMillis"`
-		HeartbeatTimeoutSecs       int  `bson:"heartbeatTimeoutSecs"`
-		ElectionTimeoutMillis      int  `bson:"electionTimeoutMillis"`
-		CatchUpTimeoutMillis       int  `bson:"catchUpTimeoutMillis"`
-		CatchUpTakeoverDelayMillis int  `bson:"catchUpTakeoverDelayMillis"`
-		GetLastErrorModes          struct {
-		} `bson:"getLastErrorModes"`
-		GetLastErrorDefaults struct {
+		ChainingAllowed            bool     `bson:"chainingAllowed"`
+		HeartbeatIntervalMillis    int      `bson:"heartbeatIntervalMillis"`
+		HeartbeatTimeoutSecs       int      `bson:"heartbeatTimeoutSecs"`
+		ElectionTimeoutMillis      int      `bson:"electionTimeoutMillis"`
+		CatchUpTimeoutMillis       int      `bson:"catchUpTimeoutMillis"`
+		CatchUpTakeoverDelayMillis int      `bson:"catchUpTakeoverDelayMillis"`
+		GetLastErrorModes          struct{} `bson:"getLastErrorModes"`
+		GetLastErrorDefaults       struct {
 			W        int `bson:"w"`
 			Wtimeout int `bson:"wtimeout"`
 		} `bson:"getLastErrorDefaults"`
