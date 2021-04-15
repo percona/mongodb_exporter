@@ -248,7 +248,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
 		case primitive.A:
 			v = []interface{}(v)
-			res = append(res, processSlice(prefix, k, v, compatibleMode)...)
+			res = append(res, processSlice(prefix, k, v, labels, compatibleMode)...)
 		case []interface{}:
 			continue
 		default:
@@ -293,9 +293,12 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
 // and each member is represented by a map[string]interface{}.
-func processSlice(prefix, k string, v []interface{}, compatibleMode bool) []prometheus.Metric {
+func processSlice(prefix, k string, v []interface{}, common_labels map[string]string, compatibleMode bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 	labels := make(map[string]string)
+	for name, value := range common_labels {
+		labels[name] = value
+	}
 
 	for _, item := range v {
 		var s map[string]interface{}
