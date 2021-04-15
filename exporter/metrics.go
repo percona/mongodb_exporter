@@ -293,10 +293,10 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
 // and each member is represented by a map[string]interface{}.
-func processSlice(prefix, k string, v []interface{}, common_labels map[string]string, compatibleMode bool) []prometheus.Metric {
+func processSlice(prefix, k string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 	labels := make(map[string]string)
-	for name, value := range common_labels {
+	for name, value := range commonLabels {
 		labels[name] = value
 	}
 
@@ -315,6 +315,9 @@ func processSlice(prefix, k string, v []interface{}, common_labels map[string]st
 		// use the replicaset or server name as a label
 		if name, ok := s["name"].(string); ok {
 			labels["member_idx"] = name
+		}
+		if state, ok := s["stateStr"].(string); ok {
+			labels["member_state"] = state
 		}
 
 		metrics = append(metrics, makeMetrics(prefix+k, s, labels, compatibleMode)...)
