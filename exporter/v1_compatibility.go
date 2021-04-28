@@ -3,6 +3,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"strings"
 	"time"
 
@@ -756,6 +757,12 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metrics = append(metrics, rl)
 	}
 
+	if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
+		l.Warnf("cannot create metrics for oplog: %s", err)
+	} else {
+		metrics = append(metrics, opLogMetrics...)
+	}
+
 	return metrics
 }
 
@@ -815,6 +822,44 @@ func myState(ctx context.Context, client *mongo.Client) (prometheus.Metric, erro
 	return metric, nil
 }
 
+func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+	oplogRS := client.Database("local").Collection("oplog.rs")
+	type oplogRSResult struct {
+		Timestamp primitive.Timestamp `bson:"ts"`
+	}
+	var head, tail oplogRSResult
+	headRes := oplogRS.FindOne(ctx, bson.M{}, options.FindOne().SetSort(bson.M{
+		"$natural": -1,
+	}))
+	if headRes.Err() != nil {
+		return nil, headRes.Err()
+	}
+
+	if err := headRes.Decode(&head); err != nil {
+		return nil, err
+	}
+	tailRes := oplogRS.FindOne(ctx, bson.M{}, options.FindOne().SetSort(bson.M{
+		"$natural": 1,
+	}))
+	if tailRes.Err() != nil {
+		return nil, tailRes.Err()
+	}
+
+	if err := tailRes.Decode(&tail); err != nil {
+		return nil, err
+	}
+
+	headDesc := prometheus.NewDesc("mongodb_mongod_replset_oplog_head_timestamp",
+		"The timestamp of the newest change in the oplog", nil, nil)
+	headMetric := prometheus.MustNewConstMetric(headDesc, prometheus.GaugeValue, float64(head.Timestamp.T))
+
+	tailDesc := prometheus.NewDesc("mongodb_mongod_replset_oplog_tail_timestamp",
+		"The timestamp of the oldest change in the oplog", nil, nil)
+	tailMetric := prometheus.MustNewConstMetric(tailDesc, prometheus.GaugeValue, float64(tail.Timestamp.T))
+
+	return []prometheus.Metric{headMetric, tailMetric}, nil
+
+}
 func electionDate(m bson.M) prometheus.Metric {
 	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
 	if !ok {
