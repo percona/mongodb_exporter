@@ -3,7 +3,7 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"math"
 	"strings"
 	"time"
 
@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ErrInvalidMetricValue cannot create a new metric due to an invalid value.
@@ -749,12 +750,8 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metrics = append(metrics, ms)
 	}
 
-	if ed := electionDate(m); ed != nil {
-		metrics = append(metrics, ed)
-	}
-
-	if rl := replicationLag(m); rl != nil {
-		metrics = append(metrics, rl)
+	if mm := replSetMetrics(m); mm != nil {
+		metrics = append(metrics, mm...)
 	}
 
 	if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
@@ -860,96 +857,123 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return []prometheus.Metric{headMetric, tailMetric}, nil
 
 }
-func electionDate(m bson.M) prometheus.Metric {
-	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
-	if !ok {
-		return nil
-	}
-	members, ok := replSetGetStatus["members"].(primitive.A)
-	if !ok {
-		return nil
-	}
 
-	name := "mongodb_mongod_replset_member_election_date"
-	help := "The timestamp the node was elected as replica leader"
-
-	for _, member := range members {
-		if date, ok := member.(bson.M)["electionTime"].(primitive.Timestamp); ok {
-			labels := map[string]string{"name": member.(bson.M)["name"].(string)}
-			d := prometheus.NewDesc(name, help, nil, labels)
-			metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(date.T))
-
-			return metric
-		}
-	}
-
-	return nil
+// replSetStatus keeps the data returned by the GetReplSetStatus method
+type replSetStatus struct {
+	Set                     string    `bson:"set"`
+	Date                    time.Time `bson:"date"`
+	MyState                 int32     `bson:"myState"`
+	Term                    *int32    `bson:"term,omitempty"`
+	HeartbeatIntervalMillis *float64  `bson:"heartbeatIntervalMillis,omitempty"`
+	Members                 []member  `bson:"members"`
 }
 
-func replicationLag(m bson.M) prometheus.Metric {
-	var primaryTS, selfTS primitive.Timestamp
-	var hasPrimary bool
-	var name, statestr string
+// member represents an array element of ReplSetStatus.Members
+type member struct {
+	ID                   int         `bson:"_id"`
+	Name                 string      `bson:"name"`
+	Self                 *bool       `bson:"self,omitempty"`
+	Health               *int32      `bson:"health,omitempty"`
+	State                int32       `bson:"state"`
+	StateStr             string      `bson:"stateStr"`
+	Uptime               float64     `bson:"uptime"`
+	Optime               interface{} `bson:"optime"`
+	OptimeDate           time.Time   `bson:"optimeDate"`
+	ElectionTime         *time.Time  `bson:"electionTime,omitempty"`
+	ElectionDate         *time.Time  `bson:"electionDate,omitempty"`
+	LastHeartbeat        *time.Time  `bson:"lastHeartbeat,omitempty"`
+	LastHeartbeatRecv    *time.Time  `bson:"lastHeartbeatRecv,omitempty"`
+	LastHeartbeatMessage *string     `bson:"lastHeartbeatMessage,omitempty"`
+	PingMs               *float64    `bson:"pingMs,omitempty"`
+	SyncingTo            *string     `bson:"syncingTo,omitempty"`
+	ConfigVersion        *int32      `bson:"configVersion,omitempty"`
+}
 
+func replSetMetrics(m bson.M) []prometheus.Metric {
 	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
 	if !ok {
 		return nil
 	}
-	members, ok := replSetGetStatus["members"].(primitive.A)
-	if !ok {
+	var repl replSetStatus
+	b, err := bson.Marshal(replSetGetStatus)
+	if err != nil {
+		return nil
+	}
+	if err := bson.Unmarshal(b, &repl); err != nil {
 		return nil
 	}
 
-	for _, member := range members {
-		if statestr, ok := member.(bson.M)["stateStr"].(string); ok && statestr == "PRIMARY" {
-			if optime, ok := member.(bson.M)["optime"].(bson.M); ok {
-				if ts, tok := optime["ts"].(primitive.Timestamp); tok {
-					primaryTS = ts
-					hasPrimary = true
-				}
-			}
-		}
+	var primaryOpTime time.Time
+	gotPrimary := false
 
-		if self, ok := member.(bson.M)["self"].(bool); ok && self {
-			if optime, ok := member.(bson.M)["optime"].(bson.M); ok {
-				if ts, tok := optime["ts"].(primitive.Timestamp); tok {
-					selfTS = ts
-					name, _ = member.(bson.M)["name"].(string)
-					statestr, _ = member.(bson.M)["stateStr"].(string)
-				}
-			}
+	var metrics []prometheus.Metric
+	// Find primary
+	for _, m := range repl.Members {
+		if m.StateStr == "PRIMARY" {
+			primaryOpTime = m.OptimeDate
+			gotPrimary = true
+			break
 		}
 	}
 
-	if !hasPrimary {
-		return nil
+	createMetric := func(name, help string, value float64, labels map[string]string) {
+		const prefix = "mongodb_mongod_replset_"
+		d := prometheus.NewDesc(prefix+name, help, nil, labels)
+		metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value))
 	}
 
-	if statestr == "PRIMARY" {
-		return nil
+	createMetric("number_of_members",
+		"The number of replica set members.",
+		float64(len(repl.Members)), map[string]string{
+			"set": repl.Set,
+		})
+
+	for _, m := range repl.Members {
+		labels := map[string]string{
+			"name":  m.Name,
+			"state": m.StateStr,
+			"set":   repl.Set,
+		}
+		if m.Self != nil {
+			createMetric("my_name", "The replica state name of the current member.", 1, map[string]string{
+				"name": m.Name,
+				"set":  repl.Set,
+			})
+		}
+
+		if m.ElectionTime != nil {
+			createMetric("member_election_date",
+				"The timestamp the node was elected as replica leader",
+				float64(m.ElectionTime.Unix()), labels)
+		}
+		if gotPrimary && !m.OptimeDate.IsZero() && m.StateStr != "PRIMARY" {
+			val := math.Abs(float64(m.OptimeDate.Unix() - primaryOpTime.Unix()))
+			createMetric("member_replication_lag",
+				"The replication lag that this member has with the primary.",
+				val, labels)
+		}
+		if m.PingMs != nil {
+			createMetric("member_ping_ms",
+				"The pingMs represents the number of milliseconds (ms) that a round-trip packet takes to travel between the remote member and the local instance.",
+				*m.PingMs, labels)
+		}
+		if m.LastHeartbeat != nil {
+			createMetric("member_last_heartbeat",
+				"The lastHeartbeat value provides an ISODate formatted date and time of the transmission time of last heartbeat received from this member.",
+				float64(m.LastHeartbeat.Unix()), labels)
+		}
+		if m.LastHeartbeatRecv != nil {
+			createMetric("member_last_heartbeat_recv",
+				"The lastHeartbeatRecv value provides an ISODate formatted date and time that the last heartbeat was received from this member.",
+				float64(m.LastHeartbeatRecv.Unix()), labels)
+		}
+		if m.ConfigVersion != nil {
+			createMetric("member_config_version",
+				"The configVersion value is the replica set configuration version.",
+				float64(*m.ConfigVersion), labels)
+		}
 	}
-
-	var val float64
-	if primaryTS.T > selfTS.T {
-		val = float64(primaryTS.T - selfTS.T)
-	} else {
-		val = float64(selfTS.T - primaryTS.T)
-	}
-
-	set, _ := replSetGetStatus["set"].(string)
-
-	metricName := "mongodb_mongod_replset_member_replication_lag"
-	help := "The replication lag that this member has with the primary."
-
-	labels := map[string]string{
-		"name":  name,
-		"state": statestr,
-		"set":   set,
-	}
-	d := prometheus.NewDesc(metricName, help, nil, labels)
-	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
-
-	return metric
+	return metrics
 }
 
 func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {

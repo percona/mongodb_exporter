@@ -2,9 +2,11 @@ package exporter
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -111,7 +113,14 @@ func TestSecondaryLag(t *testing.T) {
 	assert.NoError(t, err)
 
 	m, _ = m["data"].(bson.M)
-	lag := replicationLag(m)
+	metrics := replSetMetrics(m)
+	var lag prometheus.Metric
+	for _, m := range metrics {
+		if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_member_replication_lag"`) {
+			lag = m
+			break
+		}
+	}
 
 	metric := &dto.Metric{}
 	err = lag.Write(metric)
