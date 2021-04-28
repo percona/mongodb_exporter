@@ -858,7 +858,7 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 
 }
 
-// replSetStatus keeps the data returned by the GetReplSetStatus method
+// replSetStatus keeps the data returned by the GetReplSetStatus command.
 type replSetStatus struct {
 	Set                     string    `bson:"set"`
 	Date                    time.Time `bson:"date"`
@@ -868,7 +868,7 @@ type replSetStatus struct {
 	Members                 []member  `bson:"members"`
 }
 
-// member represents an array element of ReplSetStatus.Members
+// member represents an array element of replSetStatus.Members.
 type member struct {
 	ID                   int         `bson:"_id"`
 	Name                 string      `bson:"name"`
@@ -912,6 +912,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 		if m.StateStr == "PRIMARY" {
 			primaryOpTime = m.OptimeDate
 			gotPrimary = true
+
 			break
 		}
 	}

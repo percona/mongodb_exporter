@@ -118,6 +118,7 @@ func TestSecondaryLag(t *testing.T) {
 	for _, m := range metrics {
 		if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_member_replication_lag"`) {
 			lag = m
+
 			break
 		}
 	}
