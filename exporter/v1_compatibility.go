@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/percona/percona-toolkit/src/go/mongolib/proto"
 	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -858,43 +859,12 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 
 }
 
-// replSetStatus keeps the data returned by the GetReplSetStatus command.
-type replSetStatus struct {
-	Set                     string    `bson:"set"`
-	Date                    time.Time `bson:"date"`
-	MyState                 int32     `bson:"myState"`
-	Term                    *int32    `bson:"term,omitempty"`
-	HeartbeatIntervalMillis *float64  `bson:"heartbeatIntervalMillis,omitempty"`
-	Members                 []member  `bson:"members"`
-}
-
-// member represents an array element of replSetStatus.Members.
-type member struct {
-	ID                   int         `bson:"_id"`
-	Name                 string      `bson:"name"`
-	Self                 *bool       `bson:"self,omitempty"`
-	Health               *int32      `bson:"health,omitempty"`
-	State                int32       `bson:"state"`
-	StateStr             string      `bson:"stateStr"`
-	Uptime               float64     `bson:"uptime"`
-	Optime               interface{} `bson:"optime"`
-	OptimeDate           time.Time   `bson:"optimeDate"`
-	ElectionTime         *time.Time  `bson:"electionTime,omitempty"`
-	ElectionDate         *time.Time  `bson:"electionDate,omitempty"`
-	LastHeartbeat        *time.Time  `bson:"lastHeartbeat,omitempty"`
-	LastHeartbeatRecv    *time.Time  `bson:"lastHeartbeatRecv,omitempty"`
-	LastHeartbeatMessage *string     `bson:"lastHeartbeatMessage,omitempty"`
-	PingMs               *float64    `bson:"pingMs,omitempty"`
-	SyncingTo            *string     `bson:"syncingTo,omitempty"`
-	ConfigVersion        *int32      `bson:"configVersion,omitempty"`
-}
-
 func replSetMetrics(m bson.M) []prometheus.Metric {
 	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
 	if !ok {
 		return nil
 	}
-	var repl replSetStatus
+	var repl proto.ReplicaSetStatus
 	b, err := bson.Marshal(replSetGetStatus)
 	if err != nil {
 		return nil
@@ -910,7 +880,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 	// Find primary
 	for _, m := range repl.Members {
 		if m.StateStr == "PRIMARY" {
-			primaryOpTime = m.OptimeDate
+			primaryOpTime = m.OptimeDate.Time()
 			gotPrimary = true
 
 			break
@@ -935,20 +905,20 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 			"state": m.StateStr,
 			"set":   repl.Set,
 		}
-		if m.Self != nil {
+		if m.Self {
 			createMetric("my_name", "The replica state name of the current member.", 1, map[string]string{
 				"name": m.Name,
 				"set":  repl.Set,
 			})
 		}
 
-		if m.ElectionTime != nil {
+		if !m.ElectionTime.IsZero() {
 			createMetric("member_election_date",
 				"The timestamp the node was elected as replica leader",
-				float64(m.ElectionTime.Unix()), labels)
+				float64(m.ElectionTime.T), labels)
 		}
-		if gotPrimary && !m.OptimeDate.IsZero() && m.StateStr != "PRIMARY" {
-			val := math.Abs(float64(m.OptimeDate.Unix() - primaryOpTime.Unix()))
+		if t := m.OptimeDate.Time(); gotPrimary && !t.IsZero() && m.StateStr != "PRIMARY" {
+			val := math.Abs(float64(t.Unix() - primaryOpTime.Unix()))
 			createMetric("member_replication_lag",
 				"The replication lag that this member has with the primary.",
 				val, labels)
@@ -958,20 +928,20 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 				"The pingMs represents the number of milliseconds (ms) that a round-trip packet takes to travel between the remote member and the local instance.",
 				*m.PingMs, labels)
 		}
-		if m.LastHeartbeat != nil {
+		if t := m.LastHeartbeat.Time(); !t.IsZero() {
 			createMetric("member_last_heartbeat",
 				"The lastHeartbeat value provides an ISODate formatted date and time of the transmission time of last heartbeat received from this member.",
-				float64(m.LastHeartbeat.Unix()), labels)
+				float64(t.Unix()), labels)
 		}
-		if m.LastHeartbeatRecv != nil {
+		if t := m.LastHeartbeatRecv.Time(); !t.IsZero() {
 			createMetric("member_last_heartbeat_recv",
 				"The lastHeartbeatRecv value provides an ISODate formatted date and time that the last heartbeat was received from this member.",
-				float64(m.LastHeartbeatRecv.Unix()), labels)
+				float64(t.Unix()), labels)
 		}
-		if m.ConfigVersion != nil {
+		if m.ConfigVersion > 0 {
 			createMetric("member_config_version",
 				"The configVersion value is the replica set configuration version.",
-				float64(*m.ConfigVersion), labels)
+				m.ConfigVersion, labels)
 		}
 	}
 	return metrics
