@@ -1,6 +1,7 @@
 .dist
 .env
 .vscode/
+.idea
 bin
 build
 dist
