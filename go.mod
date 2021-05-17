@@ -1,6 +1,6 @@
 module github.com/percona/mongodb_exporter
 
-go 1.14
+go 1.15
 
 // Update percona-toolkit with `go get -v github.com/percona/percona-toolkit@3.0; go mod tidy` (without `-u`)
 // until we have everything we need in a tagged release.
