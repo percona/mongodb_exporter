@@ -20,8 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         go-version:
-          - 1.14.x
           - 1.15.x
+          - 1.16.x
         image:
           - mongo:3.6
           - mongo:4.0
