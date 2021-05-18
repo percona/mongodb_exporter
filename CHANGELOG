@@ -1,0 +1,7 @@
+Release 0.20.5
+
+Fixed bug PMM-7941: Wrong replication status value
+Improvement \#272 : Bump github.com/golangci/golangci-lint from 1.39.0 to 1.40.1 in /tools
+Improvement \#271 : Bump golang.org/x/tools from 0.1.0 to 0.1.1 in /tools
+Improvement \#269 : Bump go.mongodb.org/mongo-driver from 1.4.1 to 1.5.2
+Improvement \#268 : Bump github.com/prometheus/common from 0.20.0 to 0.24.0
