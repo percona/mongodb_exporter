@@ -1,4 +1,4 @@
-Release 0.20.6
+Release 0.20.5
 
 Fixed bug PMM-7941: Wrong replication status value
 Improvement \#272 : Bump github.com/golangci/golangci-lint from 1.39.0 to 1.40.1 in /tools
