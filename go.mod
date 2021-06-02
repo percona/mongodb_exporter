@@ -9,7 +9,7 @@ require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/alecthomas/kong v0.2.16
 	github.com/percona/exporter_shared v0.7.2
-	github.com/percona/percona-toolkit v0.0.0-20210504134948-4dd72d96b10d
+	github.com/percona/percona-toolkit v0.0.0-20210422154412-6917c5dd8594
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/client_model v0.2.0

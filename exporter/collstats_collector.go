@@ -63,7 +63,10 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		collection := parts[1]
 
 		aggregation := bson.D{
-			{Key: "$collStats", Value: bson.M{"latencyStats": bson.E{Key: "histograms", Value: true}}},
+			{Key: "$collStats", Value: bson.M{
+				"latencyStats": bson.E{Key: "histograms", Value: true},
+				"storageStats": bson.E{Key: "scale", Value: 1},
+			}},
 		}
 
 		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
