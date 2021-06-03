@@ -63,10 +63,23 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		collection := parts[1]
 
 		aggregation := bson.D{
-			{Key: "$collStats", Value: bson.M{"latencyStats": bson.E{Key: "histograms", Value: true}}},
+			{
+				Key: "$collStats", Value: bson.M{
+					"latencyStats": bson.E{Key: "histograms", Value: true},
+					"storageStats": bson.E{Key: "scale", Value: 1},
+				},
+			},
+		}
+		project := bson.D{
+			{
+				Key: "$project", Value: bson.M{
+					"storageStats.wiredTiger":   0,
+					"storageStats.indexDetails": 0,
+				},
+			},
 		}
 
-		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
+		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation, project})
 		if err != nil {
 			d.logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
 			continue
