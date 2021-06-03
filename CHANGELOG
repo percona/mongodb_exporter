@@ -1,3 +1,8 @@
+Release 0.20.6 (unreleased)
+
+Improvement \#283 : Add storage stats to collection metrics (Thanks Masaru Hoshi @qlik-trial)
+
+
 Release 0.20.5
 
 Fixed bug PMM-7941: Wrong replication status value
