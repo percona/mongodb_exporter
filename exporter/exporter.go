@@ -153,6 +153,15 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&rsgsc)
 	}
 
+	rsgcc := replSetGetConfigCollector{
+		ctx:            ctx,
+		client:         client,
+		compatibleMode: e.opts.CompatibleMode,
+		logger:         e.opts.Logger,
+		topologyInfo:   topologyInfo,
+	}
+	registry.MustRegister(&rsgcc)
+
 	return registry
 }
 
