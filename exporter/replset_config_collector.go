@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -58,6 +59,15 @@ func (d *replSetGetConfigCollector) Collect(ch chan<- prometheus.Metric) {
 
 		return
 	}
+
+	config, ok := m["config"].(bson.M)
+	if !ok {
+		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["config"])
+		d.logger.Errorf("cannot decode getDiagnosticData: %s", err)
+
+		return
+	}
+	m = config
 
 	d.logger.Debug("replSetGetConfig result:")
 	debugResult(d.logger, m)
