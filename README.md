@@ -44,7 +44,7 @@ Currently, these metric sources are implemented:
 
  ### Build the exporter
 The build process uses the dockerized version of goreleaser so you don't need to install Go.
-Just run `make build` and the new binaries will be generated under the build directory.
+Just run `make release` and the new binaries will be generated under the build directory.
 ```
 ├── build
 │ ├── config.yaml
