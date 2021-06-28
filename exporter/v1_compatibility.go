@@ -856,7 +856,6 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	tailMetric := prometheus.MustNewConstMetric(tailDesc, prometheus.GaugeValue, float64(tail.Timestamp.T))
 
 	return []prometheus.Metric{headMetric, tailMetric}, nil
-
 }
 
 func replSetMetrics(m bson.M) []prometheus.Metric {
