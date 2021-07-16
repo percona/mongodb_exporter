@@ -77,7 +77,10 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 		Direct:         &direct,
 	}
 
-	client, err := mongo.Connect(ctx, co)
+	client, err := mongo.NewClient(co.ApplyURI(co.GetURI()))
+	require.NoError(t, err)
+
+	err = client.Connect(ctx)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {

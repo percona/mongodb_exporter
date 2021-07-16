@@ -229,10 +229,16 @@ func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client
 	clientOpts.SetDirect(directConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
-	client, err := mongo.Connect(ctx, clientOpts)
+	client, err := mongo.NewClient(clientOpts.ApplyURI(clientOpts.GetURI()))
 	if err != nil {
 		return nil, err
 	}
+
+	err = client.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Disconnect(ctx)
 
 	if err = client.Ping(ctx, nil); err != nil {
 		return nil, err
