@@ -144,7 +144,44 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 			logger:         e.opts.Logger,
 			topologyInfo:   topologyInfo,
 		}
-		registry.MustRegister(&ddc)
+
+		if ddc.IsAvailable() {
+			registry.MustRegister(&ddc)
+		} else {
+			// If there is no getDiagnosticData command, maybe we are running against AWS's documentDB.
+			// Currently there is no getDiagnosticData in documentDB but from MongoDB test suite we know
+			// getDiagnosticData is made of 3 commands:
+			// {
+			//   testname: "getDiagnosticData",
+			//   command: {getDiagnosticData: 1},
+			//   skipSharded: true,
+			//   testcases: [
+			//       {
+			//         runOnDb: adminDbName,
+			//         roles: roles_monitoring,
+			//         privileges: [
+			//             {resource: {cluster: true}, actions: ["serverStatus"]},
+			//             {resource: {cluster: true}, actions: ["replSetGetStatus"]},
+			//             {resource: {db: "local", collection: "oplog.rs"}, actions: ["collStats"]},
+			//         ]
+			//       },
+			//       {runOnDb: firstDbName, roles: {}},
+			//       {runOnDb: secondDbName, roles: {}}
+			//   ]
+			// },
+			//
+			// See: https://github.com/mongodb/mongo/commit/61fc1d72075430bd58c65b1644b8eaa1ca290377
+
+			ddbc := documentdbDataCollector{
+				ctx:             ctx,
+				client:          client,
+				compatibleMode:  e.opts.CompatibleMode,
+				logger:          e.opts.Logger,
+				topologyInfo:    topologyInfo,
+				notInReplicaset: false,
+			}
+			registry.MustRegister(&ddbc)
+		}
 	}
 
 	// replSetGetStatus is not supported through mongos

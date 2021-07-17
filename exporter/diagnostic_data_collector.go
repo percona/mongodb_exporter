@@ -34,6 +34,21 @@ type diagnosticDataCollector struct {
 	topologyInfo   labelsGetter
 }
 
+func (d *diagnosticDataCollector) IsAvailable() bool {
+	var m bson.M
+	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
+	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
+
+	if err := res.Decode(&m); err != nil {
+		return false
+	}
+
+	// The 'data' key must exists and be bson.M otherwise, we cannot decode getDiagnosticData.
+	_, ok := m["data"].(bson.M)
+
+	return ok
+}
+
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
 	prometheus.DescribeByCollect(d, ch)
 }
