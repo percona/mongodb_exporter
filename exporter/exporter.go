@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	"github.com/percona/exporter_shared"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -231,7 +232,7 @@ func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client
 
 	client, err := mongo.NewClient(clientOpts)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot create client")
 	}
 
 	err = client.Connect(ctx)
