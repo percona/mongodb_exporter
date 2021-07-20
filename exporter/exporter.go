@@ -238,7 +238,6 @@ func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client
 	if err != nil {
 		return nil, err
 	}
-	defer client.Disconnect(ctx)
 
 	if err = client.Ping(ctx, nil); err != nil {
 		return nil, err
