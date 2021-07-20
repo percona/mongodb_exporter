@@ -77,7 +77,7 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 		Direct:         &direct,
 	}
 
-	client, err := mongo.NewClient(co.ApplyURI(co.GetURI()))
+	client, err := mongo.NewClient(co)
 	require.NoError(t, err)
 
 	err = client.Connect(ctx)
