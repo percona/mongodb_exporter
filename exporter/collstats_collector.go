@@ -26,7 +26,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type collstatsCollector struct {
+type CollstatsCollector struct {
 	ctx             context.Context
 	client          *mongo.Client
 	collections     []string

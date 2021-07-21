@@ -25,7 +25,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type serverStatusCollector struct {
+type ServerStatusCollector struct {
 	ctx            context.Context
 	client         *mongo.Client
 	compatibleMode bool

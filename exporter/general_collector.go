@@ -27,7 +27,7 @@ import (
 
 // This collector is always enabled and it is not directly related to any particular MongoDB
 // command to gather stats.
-type generalCollector struct {
+type GeneralCollector struct {
 	ctx    context.Context
 	client *mongo.Client
 	logger *logrus.Logger

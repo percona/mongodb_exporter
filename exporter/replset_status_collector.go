@@ -30,7 +30,7 @@ const (
 	replicationNotYetInitialized = 94
 )
 
-type replSetGetStatusCollector struct {
+type ReplSetGetStatusCollector struct {
 	ctx            context.Context
 	client         *mongo.Client
 	compatibleMode bool
