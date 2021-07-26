@@ -107,6 +107,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 	registry.MustRegister(&gc)
 
+	nodeType, err := getNodeType(ctx, client)
+	if err != nil {
+		e.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
+	}
+
 	if len(e.opts.CollStatsCollections) > 0 {
 		cc := collstatsCollector{
 			ctx:             ctx,
@@ -143,7 +148,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&ddc)
 	}
 
-	if !e.opts.DisableReplicasetStatus {
+	// replSetGetStatus is not supported through mongos
+	if !e.opts.DisableReplicasetStatus && nodeType != typeMongos {
 		rsgsc := replSetGetStatusCollector{
 			ctx:            ctx,
 			client:         client,

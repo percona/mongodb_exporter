@@ -51,13 +51,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 mongodb_myState 1
 # HELP mongodb_ok ok
 # TYPE mongodb_ok untyped
-mongodb_ok 1
-# HELP mongodb_optimes_appliedOpTime_t optimes.appliedOpTime.
-# TYPE mongodb_optimes_appliedOpTime_t untyped
-mongodb_optimes_appliedOpTime_t 1
-# HELP mongodb_optimes_durableOpTime_t optimes.durableOpTime.
-# TYPE mongodb_optimes_durableOpTime_t untyped
-mongodb_optimes_durableOpTime_t 1` + "\n")
+mongodb_ok 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
@@ -65,8 +59,6 @@ mongodb_optimes_durableOpTime_t 1` + "\n")
 	filter := []string{
 		"mongodb_myState",
 		"mongodb_ok",
-		"mongodb_optimes_appliedOpTime_t",
-		"mongodb_optimes_durableOpTime_t",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -141,4 +142,65 @@ func TestConnect(t *testing.T) {
 
 		wg.Wait()
 	})
+}
+
+// How this test works?
+// When connected to a MongoS instance, the makeRegistry method should skip
+// adding replSetGetStatusCollector. To test that, we try to unregister a
+// replSetGetStatusCollector and it should return false since it wasn't registered.
+// Note: Two Collectors are considered equal if their Describe method yields the
+// same set of descriptors.
+// unregister will try to Describe to get the descriptors set and we are using
+// DescribeByCollect so, in the logs, you will see an error:
+// msg="cannot get replSetGetStatus: replSetGetStatus is not supported through mongos"
+// This is correct. Collect is being executed to Describe and Unregister.
+func TestMongoS(t *testing.T) {
+	hostname := "127.0.0.1"
+	ctx := context.Background()
+
+	tests := []struct {
+		port string
+		want bool
+	}{
+		{
+			port: tu.GetenvDefault("TEST_MONGODB_MONGOS_PORT", "17000"),
+			want: false,
+		},
+		{
+			port: tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"),
+			want: true,
+		},
+	}
+
+	for _, test := range tests {
+		dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, test.port)
+		client, err := connect(ctx, dsn, true)
+		assert.NoError(t, err)
+
+		exporterOpts := &Opts{
+			Logger:         logrus.New(),
+			URI:            dsn,
+			GlobalConnPool: false,
+		}
+
+		e, err := New(exporterOpts)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		rsgsc := replSetGetStatusCollector{
+			ctx:            ctx,
+			client:         client,
+			compatibleMode: e.opts.CompatibleMode,
+			logger:         e.opts.Logger,
+			topologyInfo:   new(labelsGetterMock),
+		}
+
+		r := e.makeRegistry(ctx, client, new(labelsGetterMock))
+
+		res := r.Unregister(&rsgsc)
+		assert.Equal(t, test.want, res)
+		err = client.Disconnect(ctx)
+		assert.NoError(t, err)
+	}
 }
