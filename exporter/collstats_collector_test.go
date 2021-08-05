@@ -85,3 +85,45 @@ mongodb_testdb_testcol_02_latencyStats_commands_latency{collection="testcol_02",
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
+
+func TestDropDatabase(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Use MongoS because we need to write to the DB and primary porst might not be
+	// the primary anymore.
+	client := tu.DefaultTestClient(ctx, t)
+
+	db := client.Database("testdb")
+	db.Drop(ctx) //nolint
+
+	// Ensure the DB and collection have been created.
+	for i := 0; i < 10000; i++ {
+		db.Collection("test_coll").InsertOne(ctx, bson.M{"field1": i})
+	}
+
+	ti := labelsGetterMock{}
+
+	c := &collstatsCollector{
+		client:       client,
+		collections:  []string{"testdb.test_coll"},
+		logger:       logrus.New(),
+		topologyInfo: ti,
+	}
+
+	filter := []string{}
+	expected := strings.NewReader(`
+# HELP mongodb_testdb_test_coll_localTime mongodb_testdb_test_coll_localTime 
+# TYPE mongodb_testdb_test_coll_localTime untyped
+mongodb_testdb_test_coll_localTime {collection="test_col",database="testdb"} 0
+`)
+	err := testutil.CollectAndCompare(c, expected, filter...)
+	assert.NoError(t, err)
+
+	err = db.Drop(ctx)
+	assert.NoError(t, err)
+
+	expected = strings.NewReader("")
+	err = testutil.CollectAndCompare(c, expected, filter...)
+	assert.Error(t, err)
+}
