@@ -111,19 +111,16 @@ func TestDropDatabase(t *testing.T) {
 		topologyInfo: ti,
 	}
 
-	filter := []string{}
-	expected := strings.NewReader(`
-# HELP mongodb_testdb_test_coll_localTime mongodb_testdb_test_coll_localTime 
-# TYPE mongodb_testdb_test_coll_localTime untyped
-mongodb_testdb_test_coll_localTime {collection="test_col",database="testdb"} 0
-`)
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	filter := []string{
+		"mongodb_testdb_test_coll_localTime",
+	}
+
+	cnt := testutil.CollectAndCount(c, filter...)
+	assert.Equal(t, len(filter), cnt)
+
+	err := db.Drop(ctx)
 	assert.NoError(t, err)
 
-	err = db.Drop(ctx)
-	assert.NoError(t, err)
-
-	expected = strings.NewReader("")
-	err = testutil.CollectAndCompare(c, expected, filter...)
-	assert.NoError(t, err)
+	cnt = testutil.CollectAndCount(c, filter...)
+	assert.Equal(t, 0, cnt)
 }
