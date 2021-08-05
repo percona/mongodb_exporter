@@ -125,5 +125,5 @@ mongodb_testdb_test_coll_localTime {collection="test_col",database="testdb"} 0
 
 	expected = strings.NewReader("")
 	err = testutil.CollectAndCompare(c, expected, filter...)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
