@@ -42,3 +42,19 @@ func TestTopologyLabels(t *testing.T) {
 	assert.Equal(t, "shardsvr", bl[labelClusterRole])
 	assert.NotEmpty(t, bl[labelClusterID]) // this is variable inside a container
 }
+
+func TestMongosTopologyLabels(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
+
+	ti, err := newTopologyInfo(ctx, client)
+	require.NoError(t, err)
+	bl := ti.baseLabels()
+
+	assert.Equal(t, "", bl[labelReplicasetName])
+	assert.Equal(t, "0", bl[labelReplicasetState])
+	assert.Equal(t, "mongod", bl[labelClusterRole])
+	assert.Empty(t, bl[labelClusterID]) // this is variable inside a container
+}
