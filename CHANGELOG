@@ -1,6 +1,5 @@
 Release 0.20.6 (unreleased)
 
-Fixed bug PMM-8489: Failed to get topology labels when the target server is mongos
 Improvement \#283 : Add storage stats to collection metrics (Thanks Masaru Hoshi @qlik-trial)
 
 
