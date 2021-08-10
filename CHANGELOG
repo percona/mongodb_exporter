@@ -1,7 +1,12 @@
-Release 0.20.6 (unreleased)
+Release 0.20.7 released 2021-08-10
 
-Fixed bug PMM-8489: Failed to get topology labels when the target server is mongos
-Improvement \#283 : Add storage stats to collection metrics (Thanks Masaru Hoshi @qlik-trial)
+Improvement         : Upgraded dependencies
+Fixed error PMM-6877: replsetGetStatus error on mongos
+
+Release 0.20.6 released 2021-06-26
+
+Improvement PMM-7789: Remove weak ciphers from exporter_shared
+Improvement    \#283 : Add storage stats to collection metrics (Thanks Masaru Hoshi @qlik-trial)
 
 
 Release 0.20.5
