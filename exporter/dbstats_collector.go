@@ -38,7 +38,6 @@ func (d *dbstatsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
-
 	// List all databases names
 	dbNames, err := d.client.ListDatabaseNames(d.ctx, bson.M{})
 	if err != nil {
