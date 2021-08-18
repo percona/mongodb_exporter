@@ -128,6 +128,8 @@ github.com/percona/exporter_shared v0.7.3 h1:TX4LisZ08jo8KIlekBTwPX13JlM6gOOKgmw
 github.com/percona/exporter_shared v0.7.3/go.mod h1:AWk9lgTPzI7tC5PzpeBGvhhqjSJNxpPNFaF7qLIJqmo=
 github.com/percona/percona-toolkit v3.3.1-0.20210817121844-8df30404056a+incompatible h1:pj474L6cXWqiWUohU4zVQiDGQDWw/ahlTx1fDrP52f4=
 github.com/percona/percona-toolkit v3.3.1-0.20210817121844-8df30404056a+incompatible/go.mod h1:netQWdWMaF1cnmwiIS+i5uyaqNXz46yNeM6HKkR6yeI=
+github.com/percona/percona-toolkit v3.3.1-0.20210818142247-4b8ae0563f5b+incompatible h1:7Iyn41bPVHmWK2GP9+amYPwjxpQWons61L73Lrq6iK8=
+github.com/percona/percona-toolkit v3.3.1-0.20210818142247-4b8ae0563f5b+incompatible/go.mod h1:netQWdWMaF1cnmwiIS+i5uyaqNXz46yNeM6HKkR6yeI=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

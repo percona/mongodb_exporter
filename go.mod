@@ -14,7 +14,7 @@ require (
 	github.com/klauspost/compress v1.10.10 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/percona/exporter_shared v0.7.3
-	github.com/percona/percona-toolkit v3.3.1-0.20210817121844-8df30404056a+incompatible
+	github.com/percona/percona-toolkit v3.3.1-0.20210818142247-4b8ae0563f5b+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
