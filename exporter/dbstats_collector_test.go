@@ -63,33 +63,33 @@ func TestDBStatsCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_testdb_avgObjSize testdb.
-# TYPE mongodb_testdb_avgObjSize untyped
-mongodb_testdb_avgObjSize 40
-# HELP mongodb_testdb_collections testdb.
-# TYPE mongodb_testdb_collections untyped
-mongodb_testdb_collections 3
-# HELP mongodb_testdb_dataSize testdb.
-# TYPE mongodb_testdb_dataSize untyped
-mongodb_testdb_dataSize 1200
-# HELP mongodb_testdb_indexSize testdb.
-# TYPE mongodb_testdb_indexSize untyped
-mongodb_testdb_indexSize 12288
-# HELP mongodb_testdb_indexes testdb.
-# TYPE mongodb_testdb_indexes untyped
-mongodb_testdb_indexes 3
-# HELP mongodb_testdb_objects testdb.
-# TYPE mongodb_testdb_objects untyped
-mongodb_testdb_objects 30
-# HELP mongodb_testdb_ok testdb.
-# TYPE mongodb_testdb_ok untyped
-mongodb_testdb_ok 1
-# HELP mongodb_testdb_storageSize testdb.
-# TYPE mongodb_testdb_storageSize untyped
-mongodb_testdb_storageSize 12288
-# HELP mongodb_testdb_views testdb.
-# TYPE mongodb_testdb_views untyped
-mongodb_testdb_views 0` +
+# HELP mongodb_dbstats_testdb_avgObjSize dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_avgObjSize untyped
+mongodb_dbstats_testdb_avgObjSize 40
+# HELP mongodb_dbstats_testdb_collections dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_collections untyped
+mongodb_dbstats_testdb_collections 3
+# HELP mongodb_dbstats_testdb_dataSize dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_dataSize untyped
+mongodb_dbstats_testdb_dataSize 1200
+# HELP mongodb_dbstats_testdb_indexSize dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_indexSize untyped
+mongodb_dbstats_testdb_indexSize 12288
+# HELP mongodb_dbstats_testdb_indexes dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_indexes untyped
+mongodb_dbstats_testdb_indexes 3
+# HELP mongodb_dbstats_testdb_objects dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_objects untyped
+mongodb_dbstats_testdb_objects 30
+# HELP mongodb_dbstats_testdb_ok dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_ok untyped
+mongodb_dbstats_testdb_ok 1
+# HELP mongodb_dbstats_testdb_storageSize dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_storageSize untyped
+mongodb_dbstats_testdb_storageSize 12288
+# HELP mongodb_dbstats_testdb_views dbstats_testdb.
+# TYPE mongodb_dbstats_testdb_views untyped
+mongodb_dbstats_testdb_views 0` +
 		"\n")
 
 	// Filter metrics for 2 reasons:
@@ -97,15 +97,15 @@ mongodb_testdb_views 0` +
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_testdb_avgObjSize",
-		"mongodb_testdb_collections",
-		"mongodb_testdb_dataSize",
-		"mongodb_testdb_indexSize",
-		"mongodb_testdb_indexes",
-		"mongodb_testdb_objects",
-		"mongodb_testdb_views",
-		"mongodb_testdb_storageSize",
-		"mongodb_testdb_ok",
+		"mongodb_dbstats_testdb_avgObjSize",
+		"mongodb_dbstats_testdb_collections",
+		"mongodb_dbstats_testdb_dataSize",
+		"mongodb_dbstats_testdb_indexSize",
+		"mongodb_dbstats_testdb_indexes",
+		"mongodb_dbstats_testdb_objects",
+		"mongodb_dbstats_testdb_views",
+		"mongodb_dbstats_testdb_storageSize",
+		"mongodb_dbstats_testdb_ok",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
