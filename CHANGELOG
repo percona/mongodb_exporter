@@ -2,6 +2,7 @@ Release 0.20.7 released 2021-08-10
 
 Improvement         : Upgraded dependencies
 Fixed error PMM-6877: replsetGetStatus error on mongos
+Improvement PMM-7424: Add dbStats metric
 
 Release 0.20.6 released 2021-06-26
 

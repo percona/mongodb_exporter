@@ -54,6 +54,7 @@ type Opts struct {
 	Logger                  *logrus.Logger
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
+	DisableDBStats          bool
 }
 
 var (
@@ -145,6 +146,17 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 			topologyInfo:   topologyInfo,
 		}
 		registry.MustRegister(&ddc)
+	}
+
+	if !e.opts.DisableDBStats {
+		cc := dbstatsCollector{
+			ctx:            ctx,
+			client:         client,
+			compatibleMode: e.opts.CompatibleMode,
+			logger:         e.opts.Logger,
+			topologyInfo:   topologyInfo,
+		}
+		registry.MustRegister(&cc)
 	}
 
 	// replSetGetStatus is not supported through mongos
