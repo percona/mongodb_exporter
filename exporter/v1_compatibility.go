@@ -592,6 +592,26 @@ func conversions() []conversion {
 			oldName: "mongodb_ss_wt_cache_maximum_bytes_configured",
 			newName: "mongodb_mongod_wiredtiger_cache_max_bytes",
 		},
+		{
+			oldName: "mongodb_mongod_db_collections_total",
+			newName: "mongodb_dbstats_collections",
+		},
+		{
+			oldName: "mongodb_mongod_db_data_size_bytes",
+			newName: "mongodb_dbstats_dataSize",
+		},
+		{
+			oldName: "mongodb_mongod_db_index_size_bytes",
+			newName: "mongodb_dbstats_indexSize",
+		},
+		{
+			oldName: "mongodb_mongod_db_indexes_total",
+			newName: "mongodb_dbstats_indexes",
+		},
+		{
+			oldName: "mongodb_mongod_db_objects_total",
+			newName: "mongodb_dbstats_objects",
+		},
 	}
 }
 
