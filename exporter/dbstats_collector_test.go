@@ -19,11 +19,11 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"strings"
+	"sort"
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
@@ -61,52 +61,41 @@ func TestDBStatsCollector(t *testing.T) {
 		topologyInfo: ti,
 	}
 
-	// The last \n at the end of this string is important
-	expected := strings.NewReader(`
-# HELP mongodb_dbstats_testdb_avgObjSize dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_avgObjSize untyped
-mongodb_dbstats_testdb_avgObjSize 40
-# HELP mongodb_dbstats_testdb_collections dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_collections untyped
-mongodb_dbstats_testdb_collections 3
-# HELP mongodb_dbstats_testdb_dataSize dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_dataSize untyped
-mongodb_dbstats_testdb_dataSize 1200
-# HELP mongodb_dbstats_testdb_indexSize dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_indexSize untyped
-mongodb_dbstats_testdb_indexSize 12288
-# HELP mongodb_dbstats_testdb_indexes dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_indexes untyped
-mongodb_dbstats_testdb_indexes 3
-# HELP mongodb_dbstats_testdb_objects dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_objects untyped
-mongodb_dbstats_testdb_objects 30
-# HELP mongodb_dbstats_testdb_ok dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_ok untyped
-mongodb_dbstats_testdb_ok 1
-# HELP mongodb_dbstats_testdb_storageSize dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_storageSize untyped
-mongodb_dbstats_testdb_storageSize 12288
-# HELP mongodb_dbstats_testdb_views dbstats_testdb.
-# TYPE mongodb_dbstats_testdb_views untyped
-mongodb_dbstats_testdb_views 0` +
-		"\n")
-
-	// Filter metrics for 2 reasons:
-	// 1. The result is huge
-	// 2. We need to check against know values. Don't use metrics that return counters like uptime
-	//    or counters like the number of transactions because they won't return a known value to compare
-	filter := []string{
-		"mongodb_dbstats_testdb_avgObjSize",
-		"mongodb_dbstats_testdb_collections",
-		"mongodb_dbstats_testdb_dataSize",
-		"mongodb_dbstats_testdb_indexSize",
-		"mongodb_dbstats_testdb_indexes",
-		"mongodb_dbstats_testdb_objects",
-		"mongodb_dbstats_testdb_views",
-		"mongodb_dbstats_testdb_storageSize",
-		"mongodb_dbstats_testdb_ok",
+	expected := []string{
+		"# HELP mongodb_dbstats_collections dbstats.",
+		"# TYPE mongodb_dbstats_collections untyped",
+		"mongodb_dbstats_collections{database=\"testdb\"} 3",
+		"# HELP mongodb_dbstats_dataSize dbstats.",
+		"# TYPE mongodb_dbstats_dataSize untyped",
+		"mongodb_dbstats_dataSize{database=\"testdb\"} 1200",
+		"# HELP mongodb_dbstats_indexSize dbstats.",
+		"# TYPE mongodb_dbstats_indexSize untyped",
+		"mongodb_dbstats_indexSize{database=\"testdb\"} 12288",
+		"# HELP mongodb_dbstats_indexes dbstats.",
+		"# TYPE mongodb_dbstats_indexes untyped",
+		"mongodb_dbstats_indexes{database=\"testdb\"} 3",
+		"# HELP mongodb_dbstats_objects dbstats.",
+		"# TYPE mongodb_dbstats_objects untyped",
+		"mongodb_dbstats_objects{database=\"testdb\"} 30",
 	}
-	err := testutil.CollectAndCompare(c, expected, filter...)
-	assert.NoError(t, err)
+
+	metrics := helpers.CollectMetrics(c)
+	actualMetrics := helpers.ReadMetrics(metrics)
+	filters := []string{
+		"mongodb_dbstats_collections",
+		"mongodb_dbstats_dataSize",
+		"mongodb_dbstats_indexSize",
+		"mongodb_dbstats_indexes",
+		"mongodb_dbstats_objects",
+	}
+	labels := map[string]string{
+		"database": "testdb",
+	}
+	actualMetrics = filterMetricsWithLabels(actualMetrics,
+		filters,
+		labels)
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+	sort.Strings(actualLines)
+	sort.Strings(expected)
+	assert.Equal(t, expected, actualLines)
 }

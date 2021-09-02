@@ -58,12 +58,12 @@ func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		d.logger.Debugf("$dbStats metrics for %s", db)
 		debugResult(d.logger, dbStats)
 
-		// Since all dbstats will have the same fields, we need to use a metric prefix (db)
-		// to differentiate metrics between different databases. Labels are being set only to make it easier
-		// to filter
 		prefix := "dbstats"
 
 		labels := d.topologyInfo.baseLabels()
+
+		// Since all dbstats will have the same fields, we need to use a label
+		// to differentiate metrics between different databases.
 		labels["database"] = db
 
 		for _, metric := range makeMetrics(prefix, dbStats, labels, d.compatibleMode) {
