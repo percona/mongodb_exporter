@@ -58,12 +58,12 @@ func GetenvDefault(key, defaultValue string) string {
 
 // DefaultTestClient returns the default MongoDB connection used for tests. It is a direct
 // connection to the primary server of replicaset 1.
-func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
+func DefaultTestClient(ctx context.Context, t testing.TB) *mongo.Client {
 	return TestClient(ctx, MongoDBS1PrimaryPort, t)
 }
 
 // TestClient returns a new MongoDB connection to the specified server port.
-func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
+func TestClient(ctx context.Context, port string, t testing.TB) *mongo.Client {
 	if port == "" {
 		port = MongoDBS1PrimaryPort
 	}
