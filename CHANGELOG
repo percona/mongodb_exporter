@@ -1,3 +1,7 @@
+Release 0.20.8
+Improvement PMM-7424: Add dbStats metric
+Improvement         : Add support for compatible mode for dbStats metric to provide old metrics
+
 Release 0.20.7 released 2021-08-10
 
 Improvement         : Upgraded dependencies
