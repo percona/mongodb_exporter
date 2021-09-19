@@ -35,3 +35,27 @@ func getMetricNames(lines []string) map[string]bool {
 
 	return names
 }
+
+func filterMetricsWithLabels(metrics []*helpers.Metric, filters []string, labels map[string]string) []*helpers.Metric {
+	res := make([]*helpers.Metric, 0, len(metrics))
+	for _, m := range metrics {
+		for _, filterName := range filters {
+			if m.Name == filterName {
+				validMetric := true
+				for labelKey, labelValue := range labels {
+					if m.Labels[labelKey] != labelValue {
+						validMetric = false
+
+						break
+					}
+				}
+				if validMetric {
+					res = append(res, m)
+				}
+
+				break
+			}
+		}
+	}
+	return res
+}

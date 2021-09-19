@@ -41,6 +41,7 @@ Currently, these metric sources are implemented:
 |\-\-disable.diagnosticdata|Disable collecting metrics from getDiagnosticData||
 |\-\-disable.replicasetstatus|Disable collecting metrics from replSetGetStatus||
 |\-\-disable.replicasetconfig|Disable collecting metrics from replSetGetConfig||
+|\-\-disable.dbstats|Disable collecting metrics from dbStats||
 |--version|Show version and exit|
 
  ### Build the exporter
