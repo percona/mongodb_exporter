@@ -50,7 +50,8 @@ func (d *replSetGetConfigCollector) Collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
 	if err := res.Decode(&m); err != nil {
-		if e, ok := err.(mongo.CommandError); ok {
+		var e *mongo.CommandError
+		if errors.As(err, &e) {
 			if e.Code == replicationNotYetInitialized || e.Code == replicationNotEnabled {
 				return
 			}
