@@ -50,7 +50,7 @@ func (d *replSetGetConfigCollector) Collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
 	if err := res.Decode(&m); err != nil {
-		if e, ok := err.(mongo.CommandError); ok {
+		if e, ok := err.(mongo.CommandError); ok { //nolint // https://github.com/percona/mongodb_exporter/pull/295#issuecomment-922874632
 			if e.Code == replicationNotYetInitialized || e.Code == replicationNotEnabled {
 				return
 			}
