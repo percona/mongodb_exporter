@@ -54,7 +54,7 @@ type Opts struct {
 	Logger                  *logrus.Logger
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
-	DisableDBStats          bool
+	EnableDBStats           bool
 }
 
 var (
@@ -97,7 +97,6 @@ func New(opts *Opts) (*Exporter, error) {
 }
 
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter) *prometheus.Registry {
-	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
 	registry := prometheus.NewRegistry()
 
 	gc := generalCollector{
@@ -148,7 +147,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&ddc)
 	}
 
-	if !e.opts.DisableDBStats {
+	if e.opts.EnableDBStats {
 		cc := dbstatsCollector{
 			ctx:            ctx,
 			client:         client,
