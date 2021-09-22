@@ -1,15 +1,19 @@
 package exporter
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -183,4 +187,28 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 	}
 	nm := createOldMetricFromNew(rm, c)
 	assert.Equal(t, want, nm)
+}
+
+// myState should always return a metric. If there is no connection, the value
+// should be the MongoDB unknown state = 6
+func TestMyState(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	var m io_prometheus_client.Metric
+
+	metric := myState(ctx, client)
+	err := metric.Write(&m)
+	assert.NoError(t, err)
+	assert.NotEqual(t, float64(UnknownState), *m.Gauge.Value)
+
+	err = client.Disconnect(ctx)
+	assert.NoError(t, err)
+
+	metric = myState(ctx, client)
+	err = metric.Write(&m)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
 }
