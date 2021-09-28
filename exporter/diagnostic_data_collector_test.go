@@ -124,12 +124,9 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 }
 
 func TestContextTimeout(t *testing.T) {
-	t.Skip("fails on GitHub Actions")
+	ctx := context.Background()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	client := tu.DefaultTestClient(context.Background(), t)
+	client := tu.DefaultTestClient(ctx, t)
 
 	ti, err := newTopologyInfo(ctx, client)
 	require.NoError(t, err)
@@ -139,9 +136,9 @@ func TestContextTimeout(t *testing.T) {
 	err = addTestData(ctx, client, dbCount)
 	assert.NoError(t, err)
 
-	defer cleanTestData(context.Background(), client, dbCount) //nolint:errcheck
+	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
 
-	cctx, ccancel := context.WithTimeout(context.Background(), 3*time.Millisecond)
+	cctx, ccancel := context.WithTimeout(ctx, 3*time.Millisecond)
 	defer ccancel()
 
 	c := &diagnosticDataCollector{
