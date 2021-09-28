@@ -138,8 +138,8 @@ func TestContextTimeout(t *testing.T) {
 
 	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
 
-	cctx, ccancel := context.WithTimeout(ctx, time.Millisecond)
-	defer ccancel()
+	cctx, ccancel := context.WithCancel(context.Background())
+	ccancel()
 
 	c := &diagnosticDataCollector{
 		client:         client,
@@ -148,8 +148,8 @@ func TestContextTimeout(t *testing.T) {
 		topologyInfo:   ti,
 		ctx:            cctx,
 	}
-	metrics := helpers.CollectMetrics(c)
-	assert.True(t, len(metrics) > 0)
+	// it should not panic
+	helpers.CollectMetrics(c)
 }
 
 func addTestData(ctx context.Context, client *mongo.Client, count int) error {
