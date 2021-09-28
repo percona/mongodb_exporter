@@ -138,7 +138,7 @@ func TestContextTimeout(t *testing.T) {
 
 	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
 
-	cctx, ccancel := context.WithTimeout(ctx, 3*time.Millisecond)
+	cctx, ccancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer ccancel()
 
 	c := &diagnosticDataCollector{
