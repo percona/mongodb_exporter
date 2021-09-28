@@ -131,14 +131,14 @@ func TestContextTimeout(t *testing.T) {
 	ti, err := newTopologyInfo(ctx, client)
 	require.NoError(t, err)
 
-	dbCount := 1000
+	dbCount := 100
 
 	err = addTestData(ctx, client, dbCount)
 	assert.NoError(t, err)
 
 	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
 
-	cctx, ccancel := context.WithTimeout(ctx, 3*time.Minute)
+	cctx, ccancel := context.WithTimeout(ctx, time.Millisecond)
 	defer ccancel()
 
 	c := &diagnosticDataCollector{
