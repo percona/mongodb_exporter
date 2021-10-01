@@ -60,6 +60,22 @@ Just run `make release` and the new binaries will be generated under the build d
 ### Running the exporter
 If you built the exporter using the method mentioned in the previous section, the generated binaries are in `mongodb_exporter_linux_amd64/mongodb_exporter` or `mongodb_exporter_darwin_amd64/mongodb_exporter`
 
+#### Permissions
+Connecting user should have sufficient rights to query needed stats:
+
+```
+      {
+         "role":"clusterMonitor",
+         "db":"admin"
+      },
+      {
+         "role":"read",
+         "db":"local"
+      }
+```
+
+More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
+
 #### Example
 ```
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001
