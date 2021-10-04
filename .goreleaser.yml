@@ -25,3 +25,11 @@ release:
     name: mongodb_exporter
   draft: true
   prerelease: auto
+dockers:
+- goos: linux
+  goarch: amd64
+  image_templates:
+  - "percona/mongodb_exporter:{{.Major}}.{{.Minor}}"
+  - "percona/mongodb_exporter:{{.Version}}"
+  dockerfile: Dockerfile
+  use: buildx
