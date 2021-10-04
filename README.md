@@ -60,6 +60,9 @@ Just run `make release` and the new binaries will be generated under the build d
 ### Running the exporter
 If you built the exporter using the method mentioned in the previous section, the generated binaries are in `mongodb_exporter_linux_amd64/mongodb_exporter` or `mongodb_exporter_darwin_amd64/mongodb_exporter`
 
+#### Docker
+A docker image is available on the [bitnami repository](https://github.com/bitnami/bitnami-docker-mongodb-exporter). 
+
 #### Permissions
 Connecting user should have sufficient rights to query needed stats:
 
