@@ -1,6 +1,12 @@
 Release 0.20.8
-Improvement PMM-7424: Add dbStats metric
-Improvement         : Add support for compatible mode for dbStats metric to provide old metrics
+
+Fixed bug   PMM-8849: Fixed panic on nil data
+Improvement PMM-8772: DBStats are disabled by default. Adde 'enable' parameter
+Fixed bug   PMM-8539: cl_role is always "shardsvr" even for configsvr
+Fixed bug   PMM-8489: Fixed topology labels on mongos
+Improvement PMM-7424: Add support for compatible mode for dbStats metric to provide old metrics
+Improvemebt PMM-7116: myState metric always has a value
+Improvement PR  #344: Documented minimum permissions needed to collect data
 
 Release 0.20.7 released 2021-08-10
 
