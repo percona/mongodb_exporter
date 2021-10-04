@@ -19,18 +19,20 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/percona/exporter_shared/helpers"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -121,51 +123,95 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 }
 
-func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+func TestContextTimeout(t *testing.T) {
+	ctx := context.Background()
 
 	client := tu.DefaultTestClient(ctx, t)
-	err := client.Disconnect(ctx)
+
+	ti, err := newTopologyInfo(ctx, client)
+	require.NoError(t, err)
+
+	dbCount := 100
+
+	err = addTestData(ctx, client, dbCount)
 	assert.NoError(t, err)
 
-	logger := logrus.New()
-	logger.Out = ioutil.Discard // diable logs in tests
+	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
 
-	ti := labelsGetterMock{}
+	cctx, ccancel := context.WithCancel(context.Background())
+	ccancel()
 
 	c := &diagnosticDataCollector{
 		client:         client,
-		logger:         logger,
-		topologyInfo:   ti,
+		logger:         logrus.New(),
 		compatibleMode: true,
+		topologyInfo:   ti,
+		ctx:            cctx,
+	}
+	// it should not panic
+	helpers.CollectMetrics(c)
+}
+
+func addTestData(ctx context.Context, client *mongo.Client, count int) error {
+	session, err := client.StartSession()
+	if err != nil {
+		return errors.Wrap(err, "cannot create session to add test data")
 	}
 
-	// The last \n at the end of this string is important
-	expected := strings.NewReader(`
-# HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
-# TYPE mongodb_mongod_replset_my_state gauge
-mongodb_mongod_replset_my_state{set=""} 6
-# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
-# TYPE mongodb_mongod_storage_engine gauge
-mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
-# HELP mongodb_version_info The server version
-# TYPE mongodb_version_info gauge
-mongodb_version_info{mongodb="server version is unavailable"} 1
-` + "\n")
-	// Filter metrics for 2 reasons:
-	// 1. The result is huge
-	// 2. We need to check against know values. Don't use metrics that return counters like uptime
-	//    or counters like the number of transactions because they won't return a known value to compare
-	filter := []string{
-		"mongodb_mongod_replset_my_state",
-		"mongodb_mongod_storage_engine",
-		"mongodb_version_info",
+	if err := session.StartTransaction(); err != nil {
+		return errors.Wrap(err, "cannot start session to add test data")
 	}
 
-	reg := prometheus.NewRegistry()
-	err = reg.Register(c)
-	require.NoError(t, err)
-	err = testutil.GatherAndCompare(reg, expected, filter...)
-	assert.NoError(t, err)
+	if err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		for i := 0; i < count; i++ {
+			dbName := fmt.Sprintf("testdb_%06d", i)
+			doc := bson.D{{Key: "field1", Value: "value 1"}}
+			_, err := client.Database(dbName).Collection("test_col").InsertOne(ctx, doc)
+			if err != nil {
+				return errors.Wrap(err, "cannot add test data")
+			}
+		}
+
+		if err = session.CommitTransaction(sc); err != nil {
+			return errors.Wrap(err, "cannot commit add test data transaction")
+		}
+
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "cannot add data inside a session")
+	}
+
+	session.EndSession(ctx)
+
+	return nil
+}
+
+func cleanTestData(ctx context.Context, client *mongo.Client, count int) error {
+	session, err := client.StartSession()
+	if err != nil {
+		return errors.Wrap(err, "cannot create session to add test data")
+	}
+
+	if err := session.StartTransaction(); err != nil {
+		return errors.Wrap(err, "cannot start session to add test data")
+	}
+
+	if err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		for i := 0; i < count; i++ {
+			dbName := fmt.Sprintf("testdb_%06d", i)
+			client.Database(dbName).Drop(ctx) //nolint:errcheck
+		}
+
+		if err = session.CommitTransaction(sc); err != nil {
+			return errors.Wrap(err, "cannot commit add test data transaction")
+		}
+
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "cannot add data inside a session")
+	}
+
+	session.EndSession(ctx)
+
+	return nil
 }
