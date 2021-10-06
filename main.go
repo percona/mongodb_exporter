@@ -48,6 +48,7 @@ type GlobalFlags struct {
 	DisableDiagnosticData   bool `name:"disable.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
 	DisableReplicasetStatus bool `name:"disable.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
 	EnableDBStats           bool `name:"enable.dbstats" help:"Enable collecting metrics from dbStats"`
+	EnableTop               bool `name:"enable.top" help:"Enable collecting metrics from top admin command"`
 
 	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections"`
 	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
@@ -119,6 +120,7 @@ func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
 		DisableReplicasetStatus: opts.DisableReplicasetStatus,
 		DirectConnect:           opts.DirectConnect,
 		EnableDBStats:           opts.EnableDBStats,
+		EnableTop:               opts.EnableTop,
 	}
 
 	e, err := exporter.New(exporterOpts)
