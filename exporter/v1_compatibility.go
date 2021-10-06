@@ -18,6 +18,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	// UnknownState is the values for an unknown rs state.
+	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
+	UnknownState = 6
+)
+
 // ErrInvalidMetricValue cannot create a new metric due to an invalid value.
 var errInvalidMetricValue = fmt.Errorf("invalid metric value")
 
@@ -762,13 +768,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 
 	metrics = append(metrics, storageEngine(m))
 	metrics = append(metrics, serverVersion(m))
-
-	ms, err := myState(ctx, client)
-	if err != nil {
-		l.Debugf("cannot create metric for my state: %s", err)
-	} else {
-		metrics = append(metrics, ms)
-	}
+	metrics = append(metrics, myState(ctx, client))
 
 	if mm := replSetMetrics(m); mm != nil {
 		metrics = append(metrics, mm...)
@@ -817,26 +817,27 @@ func serverVersion(m bson.M) prometheus.Metric {
 	return metric
 }
 
-func myState(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	state, err := util.MyState(ctx, client)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot get my state")
+		state = UnknownState
 	}
 
+	var id string
 	rs, err := util.ReplicasetConfig(ctx, client)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot get replicaset config")
+	if err == nil {
+		id = rs.Config.ID
 	}
 
 	name := "mongodb_mongod_replset_my_state"
 	help := "An integer between 0 and 10 that represents the replica state of the current member"
 
-	labels := map[string]string{"set": rs.Config.ID}
+	labels := map[string]string{"set": id}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(state))
 
-	return metric, nil
+	return metric
 }
 
 func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
