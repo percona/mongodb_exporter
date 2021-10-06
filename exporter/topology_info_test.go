@@ -84,3 +84,19 @@ func TestGetClusterRole(t *testing.T) {
 		assert.Equal(t, tc.want, nodeType, fmt.Sprintf("container name: %s, port: %s", tc.containerName, port))
 	}
 }
+
+func TestMongosTopologyLabels(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
+
+	ti, err := newTopologyInfo(ctx, client)
+	require.NoError(t, err)
+	bl := ti.baseLabels()
+
+	assert.Equal(t, "", bl[labelReplicasetName])
+	assert.Equal(t, "0", bl[labelReplicasetState])
+	assert.Equal(t, "", bl[labelClusterRole])
+	assert.Empty(t, bl[labelClusterID]) // this is variable inside a container
+}

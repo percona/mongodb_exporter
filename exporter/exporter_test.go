@@ -86,7 +86,7 @@ func TestConnect(t *testing.T) {
 			log.Fatal(err)
 		}
 
-		ts := httptest.NewServer(e.handler())
+		ts := httptest.NewServer(e.Handler())
 		defer ts.Close()
 
 		var wg sync.WaitGroup
@@ -122,7 +122,7 @@ func TestConnect(t *testing.T) {
 			log.Fatal(err)
 		}
 
-		ts := httptest.NewServer(e.handler())
+		ts := httptest.NewServer(e.Handler())
 		defer ts.Close()
 
 		var wg sync.WaitGroup

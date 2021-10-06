@@ -11,7 +11,6 @@ import (
 	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -100,16 +99,16 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 // should be converted to mongodb_mongod_wiredtiger_cache_bytes with label "type": "total".
 // For this conversion, we have the suffixMapping field that holds the mapping for all suffixes.
 // Example definition:
-//	 	oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
-//	 	prefix:      "mongodb_ss_wt_cache_bytes",
-//	 	suffixLabel: "type",
-//	 	suffixMapping: map[string]string{
-//	 		"bytes_currently_in_the_cache":                           "total",
-//	 		"tracked_dirty_bytes_in_the_cache":                       "dirty",
-//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
-//	 		"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
-//	 	},
-//	 },
+//    oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
+//    prefix:      "mongodb_ss_wt_cache_bytes",
+//    suffixLabel: "type",
+//    suffixMapping: map[string]string{
+//      "bytes_currently_in_the_cache":                           "total",
+//      "tracked_dirty_bytes_in_the_cache":                       "dirty",
+//      "tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
+//      "tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
+//    },
+//   },
 func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 	suffix := strings.TrimPrefix(rm.fqName, c.prefix)
 	suffix = strings.TrimPrefix(suffix, "_")
@@ -592,6 +591,26 @@ func conversions() []conversion {
 			oldName: "mongodb_ss_wt_cache_maximum_bytes_configured",
 			newName: "mongodb_mongod_wiredtiger_cache_max_bytes",
 		},
+		{
+			oldName: "mongodb_mongod_db_collections_total",
+			newName: "mongodb_dbstats_collections",
+		},
+		{
+			oldName: "mongodb_mongod_db_data_size_bytes",
+			newName: "mongodb_dbstats_dataSize",
+		},
+		{
+			oldName: "mongodb_mongod_db_index_size_bytes",
+			newName: "mongodb_dbstats_indexSize",
+		},
+		{
+			oldName: "mongodb_mongod_db_indexes_total",
+			newName: "mongodb_dbstats_indexes",
+		},
+		{
+			oldName: "mongodb_mongod_db_objects_total",
+			newName: "mongodb_dbstats_objects",
+		},
 	}
 }
 
@@ -989,7 +1008,7 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, metric)
 	}
 
-	ms, err = changelog10m(ctx, client)
+	ms, err = changelog10m(ctx, client, l)
 	if err != nil {
 		l.Errorf("cannot create metric for changelog: %s", err)
 	} else {
@@ -1195,7 +1214,7 @@ type ShardingChangelogStats struct {
 	Items *[]ShardingChangelogSummary
 }
 
-func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Logger) ([]prometheus.Metric, error) {
 	var metrics []prometheus.Metric
 
 	coll := client.Database("config").Collection("changelog")
@@ -1212,7 +1231,7 @@ func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metri
 	for c.Next(ctx) {
 		s := &ShardingChangelogSummary{}
 		if err := c.Decode(s); err != nil {
-			log.Error(err)
+			l.Error(err)
 			continue
 		}
 
