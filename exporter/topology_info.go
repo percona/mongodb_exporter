@@ -100,7 +100,7 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 
 	role, err := getClusterRole(ctx, t.client)
 	if err != nil {
-		return errors.Wrap(err, "cannot get node type for topology info")
+		return errors.Wrap(err, "cannot get cluster role for topology info")
 	}
 
 	t.labels[labelClusterRole] = role
