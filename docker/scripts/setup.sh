@@ -3,7 +3,6 @@
 mongodb1=`getent hosts ${MONGO1} | awk '{ print $1 }'`
 mongodb2=`getent hosts ${MONGO2} | awk '{ print $1 }'`
 mongodb3=`getent hosts ${MONGO3} | awk '{ print $1 }'`
-arbiter=`getent hosts ${ARBITER} | awk '{ print $1 }'`
 
 port=${PORT:-27017}
 
@@ -37,7 +36,5 @@ mongo --host ${mongodb1}:${port} <<EOF
     };
     rs.initiate(cfg, { force: true });
     rs.reconfig(cfg, { force: true });
-
-    rs.addArb("${arbiter}:${port}")
 EOF
 

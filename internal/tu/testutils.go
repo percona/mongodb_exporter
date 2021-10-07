@@ -23,12 +23,10 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -46,8 +44,6 @@ const (
 	MongoDBS1Secondary2Port = "17003"
 	// MongoDBStandAlonePort MongoDB stand alone instance Port.
 	MongoDBStandAlonePort = "27017"
-	// MongoDBConfigServer1Port MongoDB config server primary Port.
-	MongoDBConfigServer1Port = "17009"
 )
 
 // GetenvDefault gets a variable from the environment and returns its value or the
@@ -63,9 +59,7 @@ func GetenvDefault(key, defaultValue string) string {
 // DefaultTestClient returns the default MongoDB connection used for tests. It is a direct
 // connection to the primary server of replicaset 1.
 func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
-	port, err := PortForContainer("mongo-1-1")
-	require.NoError(t, err)
-	return TestClient(ctx, port, t)
+	return TestClient(ctx, MongoDBS1PrimaryPort, t)
 }
 
 // TestClient returns a new MongoDB connection to the specified server port.
@@ -112,37 +106,4 @@ func LoadJSON(filename string) (bson.M, error) {
 	}
 
 	return m, nil
-}
-
-func InspectContainer(name string) (DockerInspectOutput, error) {
-	var di DockerInspectOutput
-
-	out, err := exec.Command("docker", "inspect", name).Output() //nolint:gosec
-	if err != nil {
-		return di, errors.Wrap(err, "cannot inspect docker container")
-	}
-
-	if err := json.Unmarshal(out, &di); err != nil {
-		return di, errors.Wrap(err, "cannot inspect docker container")
-	}
-
-	return di, nil
-}
-
-func PortForContainer(name string) (string, error) {
-	di, err := InspectContainer(name)
-	if err != nil {
-		return "", errors.Wrapf(err, "cannot get error for container %q", name)
-	}
-
-	if len(di) == 0 {
-		return "", errors.Wrapf(err, "cannot get error for container %q (empty array)", name)
-	}
-
-	ports := di[0].NetworkSettings.Ports["27017/tcp"]
-	if len(ports) == 0 {
-		return "", errors.Wrapf(err, "cannot get error for container %q (empty ports list)", name)
-	}
-
-	return ports[0].HostPort, nil
 }
