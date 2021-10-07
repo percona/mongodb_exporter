@@ -46,16 +46,12 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 
 	if err := res.Decode(&m); err != nil {
 		d.logger.Errorf("cannot run getDiagnosticData: %s", err)
-
-		return
 	}
 
 	m, ok := m["data"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
 		d.logger.Errorf("cannot decode getDiagnosticData: %s", err)
-
-		return
 	}
 
 	d.logger.Debug("getDiagnosticData result")

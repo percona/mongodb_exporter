@@ -54,6 +54,7 @@ type Opts struct {
 	Logger                  *logrus.Logger
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
+	DisableDefaultRegistry  bool
 	EnableDBStats           bool
 }
 
@@ -173,7 +174,9 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	return registry
 }
 
-func (e *Exporter) handler() http.Handler {
+// Handler returns an http.Handler that serves metrics. Can be used instead of
+// Run for hooking up custom HTTP servers.
+func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -215,8 +218,11 @@ func (e *Exporter) handler() http.Handler {
 
 		registry := e.makeRegistry(ctx, client, topologyInfo)
 
-		gatherers := prometheus.Gatherers{}
-		gatherers = append(gatherers, prometheus.DefaultGatherer)
+		var gatherers prometheus.Gatherers
+
+		if !e.opts.DisableDefaultRegistry {
+			gatherers = append(gatherers, prometheus.DefaultGatherer)
+		}
 		gatherers = append(gatherers, registry)
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
@@ -231,7 +237,7 @@ func (e *Exporter) handler() http.Handler {
 
 // Run starts the exporter.
 func (e *Exporter) Run() {
-	handler := e.handler()
+	handler := e.Handler()
 	exporter_shared.RunServer("MongoDB", e.webListenAddress, e.path, handler)
 }
 

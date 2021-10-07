@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
@@ -121,6 +122,55 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	for _, want := range filters {
 		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
 	}
+}
+
+func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+	err := client.Disconnect(ctx)
+	assert.NoError(t, err)
+
+	logger := logrus.New()
+	logger.Out = ioutil.Discard // diable logs in tests
+
+	ti := labelsGetterMock{}
+
+	c := &diagnosticDataCollector{
+		client:         client,
+		logger:         logger,
+		topologyInfo:   ti,
+		compatibleMode: true,
+	}
+
+	// The last \n at the end of this string is important
+	expected := strings.NewReader(`
+# HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
+# TYPE mongodb_mongod_replset_my_state gauge
+mongodb_mongod_replset_my_state{set=""} 6
+# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
+# TYPE mongodb_mongod_storage_engine gauge
+mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
+# HELP mongodb_version_info The server version
+# TYPE mongodb_version_info gauge
+mongodb_version_info{mongodb="server version is unavailable"} 1
+` + "\n")
+	// Filter metrics for 2 reasons:
+	// 1. The result is huge
+	// 2. We need to check against know values. Don't use metrics that return counters like uptime
+	//    or counters like the number of transactions because they won't return a known value to compare
+	filter := []string{
+		"mongodb_mongod_replset_my_state",
+		"mongodb_mongod_storage_engine",
+		"mongodb_version_info",
+	}
+
+	reg := prometheus.NewRegistry()
+	err = reg.Register(c)
+	require.NoError(t, err)
+	err = testutil.GatherAndCompare(reg, expected, filter...)
+	assert.NoError(t, err)
 }
 
 func TestContextTimeout(t *testing.T) {
