@@ -11,12 +11,17 @@ import (
 	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+const (
+	// UnknownState is the values for an unknown rs state.
+	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
+	UnknownState = 6
 )
 
 // ErrInvalidMetricValue cannot create a new metric due to an invalid value.
@@ -100,16 +105,16 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 // should be converted to mongodb_mongod_wiredtiger_cache_bytes with label "type": "total".
 // For this conversion, we have the suffixMapping field that holds the mapping for all suffixes.
 // Example definition:
-//	 	oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
-//	 	prefix:      "mongodb_ss_wt_cache_bytes",
-//	 	suffixLabel: "type",
-//	 	suffixMapping: map[string]string{
-//	 		"bytes_currently_in_the_cache":                           "total",
-//	 		"tracked_dirty_bytes_in_the_cache":                       "dirty",
-//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
-//	 		"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
-//	 	},
-//	 },
+//    oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
+//    prefix:      "mongodb_ss_wt_cache_bytes",
+//    suffixLabel: "type",
+//    suffixMapping: map[string]string{
+//      "bytes_currently_in_the_cache":                           "total",
+//      "tracked_dirty_bytes_in_the_cache":                       "dirty",
+//      "tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
+//      "tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
+//    },
+//   },
 func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 	suffix := strings.TrimPrefix(rm.fqName, c.prefix)
 	suffix = strings.TrimPrefix(suffix, "_")
@@ -763,13 +768,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 
 	metrics = append(metrics, storageEngine(m))
 	metrics = append(metrics, serverVersion(m))
-
-	ms, err := myState(ctx, client)
-	if err != nil {
-		l.Debugf("cannot create metric for my state: %s", err)
-	} else {
-		metrics = append(metrics, ms)
-	}
+	metrics = append(metrics, myState(ctx, client))
 
 	if mm := replSetMetrics(m); mm != nil {
 		metrics = append(metrics, mm...)
@@ -818,26 +817,27 @@ func serverVersion(m bson.M) prometheus.Metric {
 	return metric
 }
 
-func myState(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	state, err := util.MyState(ctx, client)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot get my state")
+		state = UnknownState
 	}
 
+	var id string
 	rs, err := util.ReplicasetConfig(ctx, client)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot get replicaset config")
+	if err == nil {
+		id = rs.Config.ID
 	}
 
 	name := "mongodb_mongod_replset_my_state"
 	help := "An integer between 0 and 10 that represents the replica state of the current member"
 
-	labels := map[string]string{"set": rs.Config.ID}
+	labels := map[string]string{"set": id}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(state))
 
-	return metric, nil
+	return metric
 }
 
 func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
@@ -1009,7 +1009,7 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, metric)
 	}
 
-	ms, err = changelog10m(ctx, client)
+	ms, err = changelog10m(ctx, client, l)
 	if err != nil {
 		l.Errorf("cannot create metric for changelog: %s", err)
 	} else {
@@ -1215,7 +1215,7 @@ type ShardingChangelogStats struct {
 	Items *[]ShardingChangelogSummary
 }
 
-func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Logger) ([]prometheus.Metric, error) {
 	var metrics []prometheus.Metric
 
 	coll := client.Database("config").Collection("changelog")
@@ -1232,7 +1232,7 @@ func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metri
 	for c.Next(ctx) {
 		s := &ShardingChangelogSummary{}
 		if err := c.Decode(s); err != nil {
-			log.Error(err)
+			l.Error(err)
 			continue
 		}
 
