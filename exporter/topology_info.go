@@ -40,7 +40,6 @@ const (
 	typeMongos      mongoDBNodeType = "mongos"
 	typeMongod      mongoDBNodeType = "mongod"
 	typeShardServer mongoDBNodeType = "shardsvr"
-	typeOther       mongoDBNodeType = ""
 )
 
 type labelsGetter interface {
@@ -98,12 +97,12 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 
 	t.labels = make(map[string]string)
 
-	role, err := getClusterRole(ctx, t.client)
+	nodeType, err := getNodeType(ctx, t.client)
 	if err != nil {
-		return errors.Wrap(err, "cannot get cluster role for topology info")
+		return errors.Wrap(err, "cannot get node type for topology info")
 	}
 
-	t.labels[labelClusterRole] = role
+	t.labels[labelClusterRole] = string(nodeType)
 
 	// Standalone instances or mongos instances won't have a replicaset name
 	if rs, err := util.ReplicasetConfig(ctx, t.client); err == nil {
@@ -140,38 +139,4 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 	}
 
 	return typeMongod, nil
-}
-
-func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
-	cmdOpts := primitive.M{}
-	// Not always we can get this info. For example, we cannot get this for hidden hosts so
-	// if there is an error, just ignore it
-	res := client.Database("admin").RunCommand(ctx, primitive.D{
-		{Key: "getCmdLineOpts", Value: 1},
-		{Key: "recordStats", Value: 1},
-	})
-
-	if res.Err() != nil {
-		return "", nil
-	}
-
-	if err := res.Decode(&cmdOpts); err != nil {
-		return "", errors.Wrap(err, "cannot decode getCmdLineOpts response")
-	}
-
-	if walkTo(cmdOpts, []string{"parsed", "sharding", "configDB"}) != nil {
-		return "mongos", nil
-	}
-
-	// standalone
-	if walkTo(cmdOpts, []string{"parsed", "replication", "replSet"}) == nil {
-		return "", nil
-	}
-
-	clusterRole := ""
-	if cr := walkTo(cmdOpts, []string{"parsed", "sharding", "clusterRole"}); cr != nil {
-		clusterRole, _ = cr.(string)
-	}
-
-	return clusterRole, nil
 }
