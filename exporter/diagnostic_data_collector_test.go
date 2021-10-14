@@ -26,11 +26,14 @@ import (
 	"time"
 
 	"github.com/percona/exporter_shared/helpers"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -119,6 +122,99 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	for _, want := range filters {
 		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
 	}
+}
+
+func TestContextTimeout(t *testing.T) {
+	ctx := context.Background()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	ti, err := newTopologyInfo(ctx, client)
+	require.NoError(t, err)
+
+	dbCount := 100
+
+	err = addTestData(ctx, client, dbCount)
+	assert.NoError(t, err)
+
+	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
+
+	cctx, ccancel := context.WithCancel(context.Background())
+	ccancel()
+
+	c := &diagnosticDataCollector{
+		client:         client,
+		logger:         logrus.New(),
+		compatibleMode: true,
+		topologyInfo:   ti,
+		ctx:            cctx,
+	}
+	// it should not panic
+	helpers.CollectMetrics(c)
+}
+
+func addTestData(ctx context.Context, client *mongo.Client, count int) error {
+	session, err := client.StartSession()
+	if err != nil {
+		return errors.Wrap(err, "cannot create session to add test data")
+	}
+
+	if err := session.StartTransaction(); err != nil {
+		return errors.Wrap(err, "cannot start session to add test data")
+	}
+
+	if err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		for i := 0; i < count; i++ {
+			dbName := fmt.Sprintf("testdb_%06d", i)
+			doc := bson.D{{Key: "field1", Value: "value 1"}}
+			_, err := client.Database(dbName).Collection("test_col").InsertOne(ctx, doc)
+			if err != nil {
+				return errors.Wrap(err, "cannot add test data")
+			}
+		}
+
+		if err = session.CommitTransaction(sc); err != nil {
+			return errors.Wrap(err, "cannot commit add test data transaction")
+		}
+
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "cannot add data inside a session")
+	}
+
+	session.EndSession(ctx)
+
+	return nil
+}
+
+func cleanTestData(ctx context.Context, client *mongo.Client, count int) error {
+	session, err := client.StartSession()
+	if err != nil {
+		return errors.Wrap(err, "cannot create session to add test data")
+	}
+
+	if err := session.StartTransaction(); err != nil {
+		return errors.Wrap(err, "cannot start session to add test data")
+	}
+
+	if err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		for i := 0; i < count; i++ {
+			dbName := fmt.Sprintf("testdb_%06d", i)
+			client.Database(dbName).Drop(ctx) //nolint:errcheck
+		}
+
+		if err = session.CommitTransaction(sc); err != nil {
+			return errors.Wrap(err, "cannot commit add test data transaction")
+		}
+
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "cannot add data inside a session")
+	}
+
+	session.EndSession(ctx)
+
+	return nil
 }
 
 func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
