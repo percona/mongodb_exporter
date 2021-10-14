@@ -106,7 +106,10 @@ mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
 ```
 
 #### Cluster role labels
-The exporter sets the cl_role label according to this table:
+The exporter sets some topology labels in all metrics.
+The labels are:
+
+- cl_role: Cluster role according to this table:
 
 |Server type|Label|
 |-----|-----|
@@ -114,6 +117,11 @@ The exporter sets the cl_role label according to this table:
 |regular instance (primary or secondary)|shardsvr|
 |arbiter|shardsvr|
 |standalone|(empty string)|
+
+- cl_id: Cluster ID
+- rs_nm: Replicaset name
+- rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`. 
+Check [the official documentation](https://docs.mongodb.com/manual/reference/replica-states/) for details on replicaset status values.
 
 ## Submitting Bug Reports and adding new functionality
 
