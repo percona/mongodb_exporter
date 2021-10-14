@@ -1307,6 +1307,9 @@ func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger)
 	var metrics []prometheus.Metric
 
 	dbStatList := getDatabaseStatList(ctx, client, l)
+	if dbStatList == nil {
+		return metrics
+	}
 
 	for _, member := range dbStatList.Members {
 		if len(member.Shards) > 0 {
