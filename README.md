@@ -105,6 +105,16 @@ HELP mongodb_mongod_wiredtiger_log_bytes_total mongodb_mongod_wiredtiger_log_byt
 mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
 ```
 
+#### Cluster role labels
+The exporter sets the cl_role label according to this table:
+
+|Server type|Label|
+|-----|-----|
+|mongos|mongos|
+|regular instance (primary or secondary)|shardsvr|
+|arbiter|shardsvr|
+|standalone|(empty string)|
+
 ## Submitting Bug Reports and adding new functionality
 
 please see [Contribution Guide](CONTRIBUTING.md)
