@@ -188,7 +188,6 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 		e.client = client
 
 		return client, nil
-
 	}
 
 	// !e.opts.GlobalConnPool: create new client for every scrape
