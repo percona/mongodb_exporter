@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -76,15 +75,11 @@ func main() {
 		return
 	}
 
-	e, err := buildExporter(opts)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	e := buildExporter(opts)
 	e.Run()
 }
 
-func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
+func buildExporter(opts GlobalFlags) *exporter.Exporter {
 	log := logrus.New()
 
 	levels := map[string]logrus.Level{
@@ -121,10 +116,6 @@ func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
 		EnableDBStats:           opts.EnableDBStats,
 	}
 
-	e, err := exporter.New(exporterOpts)
-	if err != nil {
-		return nil, err
-	}
-
-	return e, nil
+	e := exporter.New(exporterOpts)
+	return e
 }

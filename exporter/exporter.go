@@ -65,7 +65,7 @@ var (
 )
 
 // New connects to the database and returns a new Exporter instance.
-func New(opts *Opts) (*Exporter, error) {
+func New(opts *Opts) *Exporter {
 	if opts == nil {
 		opts = new(Opts)
 	}
@@ -82,16 +82,14 @@ func New(opts *Opts) (*Exporter, error) {
 		opts:             opts,
 		webListenAddress: opts.WebListenAddress,
 	}
-	// Try to connect. Connection will be retried with every scrape.
+	// Try initial connect. Connection will be retried with every scrape.
 	go func() {
-		_, close, err := exp.getMongoClient(ctx)
-		if err != nil {
+		if _, err := exp.getClient(ctx); err != nil {
 			exp.logger.Errorf("Cannot connect to MongoDB: %v", err)
-			return
 		}
-		close()
 	}()
-	return exp, nil
+
+	return exp
 }
 
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter) *prometheus.Registry {
@@ -171,46 +169,45 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	return registry
 }
 
-func (e *Exporter) getMongoClient(ctx context.Context) (*mongo.Client, func(), error) {
-	// Use per-request connection.
-	if !e.opts.GlobalConnPool {
+func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
+	if e.opts.GlobalConnPool {
+		// get global client. Maybe it must be initialized first.
+		// Initialization is retried with every scrape until it succeeds once.
+		e.clientMu.Lock()
+		defer e.clientMu.Unlock()
+
+		// if client is already initialized, return it
+		if e.client != nil {
+			return e.client, nil
+		}
+
 		client, err := connect(ctx, e.opts.URI, e.opts.DirectConnect)
 		if err != nil {
-			return nil, func() {}, err
+			return nil, err
 		}
-		closer := func() {
-			if err = client.Disconnect(ctx); err != nil {
-				e.logger.Errorf("Cannot disconnect mongo client: %v", err)
-			}
-		}
-		return client, closer, nil
+		e.client = client
+
+		return client, nil
+
 	}
 
-	// get global client. Maybe it must be initialized first.
-	// Initialization is retried with every scrape until it succeeds once.
-	e.clientMu.Lock()
-	defer e.clientMu.Unlock()
-	closer := func() {}
-
-	if e.client != nil {
-		return e.client, closer, nil
-	}
-
+	// !e.opts.GlobalConnPool: create new client for every scrape
 	client, err := connect(ctx, e.opts.URI, e.opts.DirectConnect)
 	if err != nil {
-		return nil, closer, err
+		return nil, err
 	}
-	e.client = client
-	return client, closer, nil
+
+	return client, nil
 }
 
 // Handler returns an http.Handler that serves metrics. Can be used instead of
 // Run for hooking up custom HTTP servers.
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var client *mongo.Client
 		ctx := r.Context()
 
-		client, closer, err := e.getMongoClient(ctx)
+		client, err := e.getClient(ctx)
 		if err != nil {
 			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
 			http.Error(
@@ -221,7 +218,15 @@ func (e *Exporter) Handler() http.Handler {
 
 			return
 		}
-		defer closer()
+		// Close client after usage
+		if !e.opts.GlobalConnPool {
+			defer func() {
+				err := client.Disconnect(ctx)
+				if err != nil {
+					e.logger.Errorf("Cannot disconnect client: %v", err)
+				}
+			}()
+		}
 
 		// topology can change between requests, so we need to get it every time
 		topologyInfo, err := newTopologyInfo(ctx, client)
