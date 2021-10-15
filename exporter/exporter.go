@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
@@ -34,10 +35,10 @@ import (
 type Exporter struct {
 	path             string
 	client           *mongo.Client
+	clientMu         sync.Mutex
 	logger           *logrus.Logger
 	opts             *Opts
 	webListenAddress string
-	topologyInfo     labelsGetter
 }
 
 // Opts holds new exporter options.
@@ -81,19 +82,15 @@ func New(opts *Opts) (*Exporter, error) {
 		opts:             opts,
 		webListenAddress: opts.WebListenAddress,
 	}
-	if opts.GlobalConnPool {
-		var err error
-		exp.client, err = connect(ctx, opts.URI, opts.DirectConnect)
+	// Try to connect. Connection will be retried with every scrape.
+	go func() {
+		_, close, err := exp.getMongoClient(ctx)
 		if err != nil {
-			return nil, err
+			exp.logger.Errorf("Cannot connect to MongoDB: %v", err)
+			return
 		}
-
-		exp.topologyInfo, err = newTopologyInfo(ctx, exp.client)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+		close()
+	}()
 	return exp, nil
 }
 
@@ -174,46 +171,69 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	return registry
 }
 
+func (e *Exporter) getMongoClient(ctx context.Context) (*mongo.Client, func(), error) {
+	// Use per-request connection.
+	if !e.opts.GlobalConnPool {
+		client, err := connect(ctx, e.opts.URI, e.opts.DirectConnect)
+		if err != nil {
+			return nil, func() {}, err
+		}
+		closer := func() {
+			if err = client.Disconnect(ctx); err != nil {
+				e.logger.Errorf("Cannot disconnect mongo client: %v", err)
+			}
+		}
+		return client, closer, nil
+	}
+
+	// get global client. Maybe it must be initialized first.
+	// Initialization is retried with every scrape until it succeeds once.
+	e.clientMu.Lock()
+	defer e.clientMu.Unlock()
+	closer := func() {}
+
+	if e.client != nil {
+		return e.client, closer, nil
+	}
+
+	client, err := connect(ctx, e.opts.URI, e.opts.DirectConnect)
+	if err != nil {
+		return nil, closer, err
+	}
+	e.client = client
+	return client, closer, nil
+}
+
 // Handler returns an http.Handler that serves metrics. Can be used instead of
 // Run for hooking up custom HTTP servers.
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		client := e.client
-		topologyInfo := e.topologyInfo
-		// Use per-request connection.
-		if !e.opts.GlobalConnPool {
-			var err error
-			client, err = connect(ctx, e.opts.URI, e.opts.DirectConnect)
-			if err != nil {
-				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
-				http.Error(
-					w,
-					"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
-					http.StatusInternalServerError,
-				)
+		client, closer, err := e.getMongoClient(ctx)
+		if err != nil {
+			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
+			http.Error(
+				w,
+				"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
+				http.StatusInternalServerError,
+			)
 
-				return
-			}
+			return
+		}
+		defer closer()
 
-			defer func() {
-				if err = client.Disconnect(ctx); err != nil {
-					e.logger.Errorf("Cannot disconnect mongo client: %v", err)
-				}
-			}()
+		// topology can change between requests, so we need to get it every time
+		topologyInfo, err := newTopologyInfo(ctx, client)
+		if err != nil {
+			e.logger.Errorf("Cannot get topology info: %v", err)
+			http.Error(
+				w,
+				"An error has occurred while getting topology info:\n\n"+err.Error(),
+				http.StatusInternalServerError,
+			)
 
-			topologyInfo, err = newTopologyInfo(ctx, client)
-			if err != nil {
-				e.logger.Errorf("Cannot get topology info: %v", err)
-				http.Error(
-					w,
-					"An error has occurred while getting topology info:\n\n"+err.Error(),
-					http.StatusInternalServerError,
-				)
-
-				return
-			}
+			return
 		}
 
 		registry := e.makeRegistry(ctx, client, topologyInfo)
