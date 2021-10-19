@@ -248,11 +248,14 @@ func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client
 
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid MongoDB options: %w", err)
 	}
 
 	if err = client.Ping(ctx, nil); err != nil {
-		return nil, err
+		// Ping failed. Close background connections. Error is ignored since the ping error is more relevant.
+		_ = client.Disconnect(ctx)
+
+		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
 	}
 
 	return client, nil
