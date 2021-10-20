@@ -37,13 +37,13 @@ Currently, these metric sources are implemented:
 |\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new connection for each http request.||
 |\-\-web.listen-address|Address to listen on for web interface and telemetry|\-\-web.listen-address=":9216"|
 |\-\-web.telemetry-path|Metrics expose path|\-\-web.telemetry-path="/metrics"|
-|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level="error"|
-|\-\-disable.diagnosticdata|Disable collecting metrics from getDiagnosticData||
-|\-\-disable.replicasetstatus|Disable collecting metrics from replSetGetStatus||
-|\-\-enable.dbstats|Enable collecting metrics from dbStats||
+|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level=error|
+|\-\-no-collector.diagnosticdata|Disable collecting metrics from getDiagnosticData||
+|\-\-no-collector.replicasetstatus|Disable collecting metrics from replSetGetStatus||
+|\-\-collector.dbstats|Enable collecting metrics from dbStats||
 |--version|Show version and exit|
 
- ### Build the exporter
+### Build the exporter
 The build process uses the dockerized version of goreleaser so you don't need to install Go.
 Just run `make release` and the new binaries will be generated under the build directory.
 ```

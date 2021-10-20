@@ -44,9 +44,9 @@ type GlobalFlags struct {
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
-	DisableDiagnosticData   bool `name:"disable.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
-	DisableReplicasetStatus bool `name:"disable.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
-	EnableDBStats           bool `name:"enable.dbstats" help:"Enable collecting metrics from dbStats"`
+	DisableDiagnosticData   bool `name:"no-collector.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
+	DisableReplicasetStatus bool `name:"no-collector.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
+	EnableDBStats           bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
 
 	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections"`
 	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
