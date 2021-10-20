@@ -81,7 +81,6 @@ More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual
 
 #### Example
 ```
-# with binary
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001
 ```
 
