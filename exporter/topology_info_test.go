@@ -44,18 +44,43 @@ func TestTopologyLabels(t *testing.T) {
 	assert.NotEmpty(t, bl[labelClusterID]) // this is variable inside a container
 }
 
-func TestMongosTopologyLabels(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+func TestGetClusterRole(t *testing.T) {
+	tests := []struct {
+		containerName string
+		want          string
+	}{
+		{
+			containerName: "mongos",
+			want:          string(typeMongos),
+		},
+		{
+			containerName: "mongo-1-1",
+			want:          string(typeShardServer),
+		},
+		{
+			containerName: "mongo-cnf-1",
+			want:          "configsvr",
+		},
+		{
+			containerName: "mongo-1-arbiter",
+			want:          string(typeShardServer),
+		},
+		{
+			containerName: "standalone",
+			want:          "",
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
+	for _, tc := range tests {
+		port, err := tu.PortForContainer(tc.containerName)
+		require.NoError(t, err)
 
-	ti, err := newTopologyInfo(ctx, client)
-	require.NoError(t, err)
-	bl := ti.baseLabels()
-
-	assert.Equal(t, "", bl[labelReplicasetName])
-	assert.Equal(t, "0", bl[labelReplicasetState])
-	assert.Equal(t, "mongod", bl[labelClusterRole])
-	assert.Empty(t, bl[labelClusterID]) // this is variable inside a container
+		client := tu.TestClient(ctx, port, t)
+		nodeType, err := getClusterRole(ctx, client)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.want, nodeType, fmt.Sprintf("container name: %s, port: %s", tc.containerName, port))
+	}
 }
