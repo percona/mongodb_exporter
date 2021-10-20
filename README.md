@@ -37,7 +37,7 @@ Currently, these metric sources are implemented:
 |\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new connection for each http request.||
 |\-\-web.listen-address|Address to listen on for web interface and telemetry|\-\-web.listen-address=":9216"|
 |\-\-web.telemetry-path|Metrics expose path|\-\-web.telemetry-path="/metrics"|
-|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level="error"|
+|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level=error|
 |\-\-no-collector.diagnosticdata|Disable collecting metrics from getDiagnosticData||
 |\-\-no-collector.replicasetstatus|Disable collecting metrics from replSetGetStatus||
 |\-\-collector.dbstats|Enable collecting metrics from dbStats||
