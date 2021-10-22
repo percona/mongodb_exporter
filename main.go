@@ -35,22 +35,21 @@ var (
 
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
-	CollStatsCollections  string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1.col1,db2.col2"`
-	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
-	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
-	GlobalConnPool        bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request."`
-	DirectConnect         bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true"`
-	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
-	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
-	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
-
-	DisableDiagnosticData   bool `name:"no-collector.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
-	DisableReplicasetStatus bool `name:"no-collector.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
-	EnableDBStats           bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
-
-	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections"`
-	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
-	Version         bool `name:"version" help:"Show version and exit"`
+	CollStatsCollections    string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1.col1,db2.col2"`
+	IndexStatsCollections   string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
+	URI                     string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	GlobalConnPool          bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request."`
+	DirectConnect           bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true"`
+	WebListenAddress        string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
+	WebTelemetryPath        string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
+	LogLevel                string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
+	DisableDiagnosticData   bool   `name:"no-collector.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
+	DisableReplicasetStatus bool   `name:"no-collector.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
+	EnableDBStats           bool   `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
+	EnableTop               bool   `name:"enable.top" help:"Enable collecting metrics from top admin command"`
+	DiscoveringMode         bool   `name:"discovering-mode" help:"Enable autodiscover collections"`
+	CompatibleMode          bool   `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
+	Version                 bool   `name:"version" help:"Show version and exit"`
 }
 
 func main() {
@@ -114,6 +113,7 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		DisableReplicasetStatus: opts.DisableReplicasetStatus,
 		DirectConnect:           opts.DirectConnect,
 		EnableDBStats:           opts.EnableDBStats,
+		EnableTop:               opts.EnableTop,
 	}
 
 	e := exporter.New(exporterOpts)

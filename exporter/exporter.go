@@ -57,6 +57,7 @@ type Opts struct {
 	DisableReplicasetStatus bool
 	DisableDefaultRegistry  bool
 	EnableDBStats           bool
+	EnableTop               bool
 }
 
 var (
@@ -152,6 +153,17 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 			topologyInfo:   topologyInfo,
 		}
 		registry.MustRegister(&cc)
+	}
+
+	if e.opts.EnableTop {
+		tc := topCollector{
+			ctx:            ctx,
+			client:         client,
+			compatibleMode: e.opts.CompatibleMode,
+			logger:         e.opts.Logger,
+			topologyInfo:   topologyInfo,
+		}
+		registry.MustRegister(&tc)
 	}
 
 	// replSetGetStatus is not supported through mongos
