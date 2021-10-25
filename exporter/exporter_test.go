@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -81,12 +80,9 @@ func TestConnect(t *testing.T) {
 			GlobalConnPool: false,
 		}
 
-		e, err := New(exporterOpts)
-		if err != nil {
-			log.Fatal(err)
-		}
+		e := New(exporterOpts)
 
-		ts := httptest.NewServer(e.handler())
+		ts := httptest.NewServer(e.Handler())
 		defer ts.Close()
 
 		var wg sync.WaitGroup
@@ -117,12 +113,9 @@ func TestConnect(t *testing.T) {
 			GlobalConnPool: true,
 		}
 
-		e, err := New(exporterOpts)
-		if err != nil {
-			log.Fatal(err)
-		}
+		e := New(exporterOpts)
 
-		ts := httptest.NewServer(e.handler())
+		ts := httptest.NewServer(e.Handler())
 		defer ts.Close()
 
 		var wg sync.WaitGroup
@@ -183,10 +176,7 @@ func TestMongoS(t *testing.T) {
 			GlobalConnPool: false,
 		}
 
-		e, err := New(exporterOpts)
-		if err != nil {
-			log.Fatal(err)
-		}
+		e := New(exporterOpts)
 
 		rsgsc := replSetGetStatusCollector{
 			ctx:            ctx,

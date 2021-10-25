@@ -37,13 +37,14 @@ Currently, these metric sources are implemented:
 |\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new connection for each http request.||
 |\-\-web.listen-address|Address to listen on for web interface and telemetry|\-\-web.listen-address=":9216"|
 |\-\-web.telemetry-path|Metrics expose path|\-\-web.telemetry-path="/metrics"|
-|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level="error"|
-|\-\-disable.diagnosticdata|Disable collecting metrics from getDiagnosticData||
-|\-\-disable.replicasetstatus|Disable collecting metrics from replSetGetStatus||
-|\-\-disable.dbstats|Disable collecting metrics from dbStats||
+|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level=error|
+|\-\-no-collector.diagnosticdata|Disable collecting metrics from getDiagnosticData||
+|\-\-no-collector.replicasetstatus|Disable collecting metrics from replSetGetStatus||
+|\-\-collector.dbstats|Enable collecting metrics from dbStats||
+|\-\-enable.top|Enable collecting metrics from top admin command||
 |--version|Show version and exit|
 
- ### Build the exporter
+### Build the exporter
 The build process uses the dockerized version of goreleaser so you don't need to install Go.
 Just run `make release` and the new binaries will be generated under the build directory.
 ```
@@ -59,6 +60,10 @@ Just run `make release` and the new binaries will be generated under the build d
 ```
 ### Running the exporter
 If you built the exporter using the method mentioned in the previous section, the generated binaries are in `mongodb_exporter_linux_amd64/mongodb_exporter` or `mongodb_exporter_darwin_amd64/mongodb_exporter`
+
+#### Docker
+
+A docker image is available on [docker hub](https://hub.docker.com/repository/docker/percona/mongodb_exporter).
 
 #### Permissions
 Connecting user should have sufficient rights to query needed stats:
@@ -100,6 +105,24 @@ HELP mongodb_mongod_wiredtiger_log_bytes_total mongodb_mongod_wiredtiger_log_byt
 # TYPE mongodb_mongod_wiredtiger_log_bytes_total untyped
 mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
 ```
+
+#### Cluster role labels
+The exporter sets some topology labels in all metrics.
+The labels are:
+
+- cl_role: Cluster role according to this table:
+
+|Server type|Label|
+|-----|-----|
+|mongos|mongos|
+|regular instance (primary or secondary)|shardsvr|
+|arbiter|shardsvr|
+|standalone|(empty string)|
+
+- cl_id: Cluster ID
+- rs_nm: Replicaset name
+- rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`. 
+Check [the official documentation](https://docs.mongodb.com/manual/reference/replica-states/) for details on replicaset status values.
 
 ## Submitting Bug Reports and adding new functionality
 
