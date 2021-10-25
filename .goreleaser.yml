@@ -8,10 +8,17 @@ builds:
       - darwin
     goarch:
       - amd64
+      - arm
+      - arm64
+    goarm:
+      - 7
+    ignore:
+      - goos: darwin
+        goarch: arm
     flags:
       - -v
     ldflags:
-        - -s -w -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
+        - -s -w -X main.version=v{{.Version}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
     wrap_in_directory: true
