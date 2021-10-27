@@ -18,7 +18,7 @@ Please make sure to read and agree to our [Code of Conduct](./CODE_OF_CONDUCT.md
 
 ## Submitting a Bug
 
-If you find a bug in Percona MongoDB Exporter and it is not related to PMM, please open issue in [GitHub new issue](https://github.com/percona/mongodb_exporter/issues/new/choose), if you use PMM you should submit a report to that project's [JIRA](https://jira.percona.com/projects/PMM/issues) issue tracker.
+If you find a bug in Percona MongoDB Exporter and it is not related to PMM, please open issue in [GitHub new issue](https://github.com/percona/mongodb_exporter/issues/new/choose), if you use PMM, please submit a report to that project's [JIRA](https://jira.percona.com/projects/PMM/issues) issue tracker.
 
 Your first step should be to search [GH issues](https://github.com/percona/mongodb_exporter/issues) and [JIRA PMM issues](https://jira.percona.com/issues/?jql=project=PMM%20AND%20component=MongoDB_Exporter) for the existing set of open tickets for a similar report. If you find that someone else has already reported your problem, then you can upvote that report to increase its visibility.
 
