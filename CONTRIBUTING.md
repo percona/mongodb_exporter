@@ -48,7 +48,7 @@ MongoDB exporter uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 `main` is a main branch where all the changes are merged **first**.
 
-`release-x.y.z` are the release branches and are forked from `main` to prepare and test the release. Release branch stays open to get critical patches and to release another _patch_ release. Release branch closes (no merges happens) just after new minor release is created.
+`release-x.y` are the release branches and are forked from `main` to prepare and test the release. Release branch stays open to get critical patches and to release another _patch_ release. Release branch closes (no merges happens) just after new minor release is created.
 
 Each release is tagged with `vx.y.z` tag.
 
