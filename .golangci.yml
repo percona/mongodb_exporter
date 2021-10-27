@@ -30,6 +30,7 @@ linters:
       - testpackage
       - wsl
       - exhaustivestruct
+      - forbidigo
 issues:
   exclude-use-default: false
   exclude:

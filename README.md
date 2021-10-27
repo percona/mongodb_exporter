@@ -38,13 +38,10 @@ Currently, these metric sources are implemented:
 |\-\-web.listen-address|Address to listen on for web interface and telemetry|\-\-web.listen-address=":9216"|
 |\-\-web.telemetry-path|Metrics expose path|\-\-web.telemetry-path="/metrics"|
 |\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level=error|
-|\-\-no-collector.diagnosticdata|Disable collecting metrics from getDiagnosticData||
-|\-\-no-collector.replicasetstatus|Disable collecting metrics from replSetGetStatus||
-|\-\-collector.dbstats|Enable collecting metrics from dbStats||
 |\-\-enable.top|Enable collecting metrics from top admin command||
-|--version|Show version and exit|
+|\-\-version|Show version and exit|
 
-### Build the exporter
+ ### Build the exporter
 The build process uses the dockerized version of goreleaser so you don't need to install Go.
 Just run `make release` and the new binaries will be generated under the build directory.
 ```
