@@ -2,21 +2,19 @@
 name: Bug report
 about: Create a report to help us improve
 title: ''
-labels: community
+labels: ["community", "bug", "triage"]
 assignees: ''
 
 ---
 
 **Describe the bug**
 A clear and concise description of what the bug is. 
-If the issue relates to PMM, please open [PMM-XXXX](https://jira.percona.com/projects/PMM/issues) issue instead of GH issue.
+If the issue relates to PMM, please open [JIRA PMM](https://jira.percona.com/projects/PMM/issues) issue instead of GH issue.
 
 **To Reproduce**
 Steps to reproduce the behavior:
-1. 
-2. what parameters passed to `mongodb_exporter`
-3. triggers to reproduce the issue
-4. attach/provide logs
+1. what parameters passed to `mongodb_exporter`
+2. describe triggers to reproduce the issue
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.

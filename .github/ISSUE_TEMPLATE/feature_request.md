@@ -2,14 +2,14 @@
 name: Feature request
 about: Suggest an idea for this project
 title: ''
-labels: community
+labels: ["community", "enhancement", "triage"]
 assignees: ''
 
 ---
 
 **Is your feature request related to a problem? Please describe.**
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
-If the improvement is related to PMM, please open [PMM-XXXX](https://jira.percona.com/projects/PMM/issues) feature instead of GH feature.
+If the improvement is related to PMM, please open [PMM project](https://jira.percona.com/projects/PMM/issues) feature instead of GH feature request.
 
 **Describe the solution you'd like**
 A clear and concise description of what you want to happen.
