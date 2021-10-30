@@ -20,7 +20,7 @@ Steps to reproduce the behavior:
 A clear and concise description of what you expected to happen.
 
 **Logs**
-Please provide logs when issue occurs
+Please provide logs relevant to the issue
 
 **Environment**
  - OS,
