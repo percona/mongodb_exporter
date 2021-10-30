@@ -13,7 +13,7 @@ If the issue relates to PMM, please open [JIRA PMM](https://jira.percona.com/pro
 
 **To Reproduce**
 Steps to reproduce the behavior:
-1. what parameters passed to `mongodb_exporter`
+1. what parameters are being passed to `mongodb_exporter`
 2. describe triggers to reproduce the issue
 
 **Expected behavior**
