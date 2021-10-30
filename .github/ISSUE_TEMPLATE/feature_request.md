@@ -12,7 +12,7 @@ A clear and concise description of what the problem is. Ex. I'm always frustrate
 If the improvement is related to PMM, please open [PMM project](https://jira.percona.com/projects/PMM/issues) feature instead of GH feature request.
 
 **Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+A clear and concise description of what you expect to happen.
 
 **Describe alternatives you've considered**
 A clear and concise description of any alternative solutions or features you've considered.
