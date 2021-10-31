@@ -63,6 +63,16 @@ If you built the exporter using the method mentioned in the previous section, th
 #### Docker
 A docker image is available on the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter).
 
+##### examples
+
+```sh
+# with podman
+podman run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+
+# with docker
+docker run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+```
+
 #### Permissions
 Connecting user should have sufficient rights to query needed stats:
 
