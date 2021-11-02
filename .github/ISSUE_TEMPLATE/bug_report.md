@@ -14,7 +14,7 @@ If the issue relates to PMM, please open [JIRA PMM](https://jira.percona.com/pro
 **To Reproduce**
 Steps to reproduce the behavior:
 1. what parameters are being passed to `mongodb_exporter`
-2. describe triggers to reproduce the issue
+2. describe steps to reproduce the issue
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
