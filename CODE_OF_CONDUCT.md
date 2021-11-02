@@ -10,7 +10,7 @@ Percona Community is a community around developing, installing, running, optimiz
 
 ## Rules
 
-We respect all members of the Percona Community - that involves everyone’s contributions in code, text, visuals, and chat. Your contributions might take place in one of our GitHub organizations, on Jira, on the forums, Slack, or elsewhere.
+We respect all members of the Percona Community - that involves everyone’s contributions in code, text, visuals, and chat. Your contributions might take place in one of our GitHub organizations, on [Jira](https://jira.percona.com/projects/PMM/issues) or on the [forum](https://forums.percona.com/c/percona-monitoring-and-management-pmm/percona-monitoring-and-management-pmm-v2).
 
 We all are committed to participating in a community where abuse and harrassment is neither tolerated nor accepted. If you want to give feedback, remember to criticize the code or other type of contribution, not the person.
 
