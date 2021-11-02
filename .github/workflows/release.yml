@@ -4,7 +4,7 @@ on:
   push:
     # run when new tag is pushed
     tags:
-      - v0.2*
+      - v*
   # manually trigger the release
   workflow_dispatch:
 jobs:
