@@ -68,6 +68,7 @@ jobs:
           make init
 
       - name: Diff
+        if: startsWith( ${{ matrix.go-version }}, '1.17')
         run: |
           make format
           git diff --exit-code
