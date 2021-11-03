@@ -16,13 +16,14 @@ Currently, these metric sources are implemented:
 - replSetGetStatus
 - serverStatus
 
-| Old Percona MongoDB exporter                                                  |
-|:------------------------------------------------------------------------------|
-| old 0.1x.y version (ex `master` branch) is moved to the `release-0.1x` branch.|
-| If you considering migrating from the old version of the exporter  - you can  |
-| use flag `--compatible-mode` to expose metrics in the old metric names. This  |
-| will simplify migration to the new version for you.                           |
+## Info on Percona MongoDB exporter versions
 
+The old 0.1x.y version (ex `master` branch) has been moved to the
+`release-0.1x` branch.
+
+A flag, `--compatible-mode`, which exposes metrics with 0.1x compatible metric
+names has been implemented which simplifies migration from the old version to
+the current version.
 
 ## Flags
 |Flag|Description|Example|
@@ -62,8 +63,17 @@ Just run `make release` and the new binaries will be generated under the build d
 If you built the exporter using the method mentioned in the previous section, the generated binaries are in `mongodb_exporter_linux_amd64/mongodb_exporter` or `mongodb_exporter_darwin_amd64/mongodb_exporter`
 
 #### Docker
+A docker image is available on the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter).
 
-A docker image is available on [docker hub](https://hub.docker.com/repository/docker/percona/mongodb_exporter).
+##### examples
+
+```sh
+# with podman
+podman run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+
+# with docker
+docker run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+```
 
 #### Permissions
 Connecting user should have sufficient rights to query needed stats:
@@ -85,6 +95,7 @@ More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual
 ```
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001
 ```
+
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.
 Usage example: `--mongodb.collstats-colls=database1.collection1,database2.collection2`
