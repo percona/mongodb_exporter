@@ -14,15 +14,18 @@ Before you can contribute, we kindly ask you to sign our [Contributor License Ag
 
 ### 2. Code of Conduct
 
-Please make sure to read and agree to our [Code of Conduct](https://github.com/percona/community/blob/main/content/contribute/coc.md).
+Please make sure to read and agree to our [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## Submitting a Bug
 
-If you find a bug in Percona MongoDB Exporter or one of the related projects, you should submit a report to that project's [JIRA](https://jira.percona.com) issue tracker.
+If you find a bug in Percona MongoDB Exporter and it is not related to PMM, please open issue in [GitHub new issue](https://github.com/percona/mongodb_exporter/issues/new/choose), if you use PMM, please submit a report to that project's [JIRA](https://jira.percona.com/projects/PMM/issues) issue tracker.
 
-Your first step should be [to search](https://jira.percona.com/issues/?jql=project=PMM%20AND%20component=MongoDB_Exporter) the existing set of open tickets for a similar report. If you find that someone else has already reported your problem, then you can upvote that report to increase its visibility.
+Your first step should be to search [GH issues](https://github.com/percona/mongodb_exporter/issues) and [JIRA PMM issues](https://jira.percona.com/issues/?jql=project=PMM%20AND%20component=MongoDB_Exporter) for the existing set of open tickets for a similar report. If you find that someone else has already reported your problem, then you can upvote that report to increase its visibility.
 
-If there is no existing report, submit a report following these steps:
+
+### Submitting PMM Bug
+
+If there is no existing PMM report for the issue that relates to PMM, submit a report following these steps:
 
 1. [Sign in to Percona JIRA.](https://jira.percona.com/login.jsp) You will need to create an account if you do not have one.
 2. [Go to the Create Issue screen and select the relevant project.](https://jira.percona.com/secure/CreateIssueDetails!init.jspa?pid=11600&issuetype=1&priority=3&components=11603)
@@ -36,6 +39,21 @@ As a general rule of thumb, please try to create bug reports that are:
 - *Specific.* Include as much detail as possible: which version, what environment, etc.
 - *Unique.* Do not duplicate existing tickets.
 - *Scoped to a Single Bug.* One bug per report.
+
+## Branching workflow
+MongoDB exporter uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) `[major].[minor].[patch]`:
+- major version when you make incompatible changes
+- minor version when you add functionality in a backwards compatible manner
+- patch version when you make backwards compatible bug fixes
+
+`main` is a main branch where all the changes are merged **first**.
+
+`release-x.y` are the release branches and are forked from `main` to prepare and test the release. Release branch stays open to get critical patches and to release another _patch_ release. Release branch closes (no merges happens) just after new minor release is created.
+
+Each release is tagged with `vx.y.z` tag.
+
+
+Please submit your changes against `main` branch, if the fix is needed for the patch or minor release - please ask maintainers to cherry pick it into the release branch.
 
 ## Setup your local development environment
 
