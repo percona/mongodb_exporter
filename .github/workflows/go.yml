@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version:
-          - 1.16.x
+          - 1.17.x
         image:
           - mongo:3.6
           - mongo:4.0
@@ -67,6 +67,7 @@ jobs:
           make init
 
       - name: Diff
+        if: startsWith( ${{ matrix.go-version }}, '1.17')
         run: |
           make format
           git diff --exit-code
