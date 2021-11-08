@@ -37,6 +37,7 @@ require (
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/prometheus/common v0.26.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/tklauser/numcpus v0.3.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
