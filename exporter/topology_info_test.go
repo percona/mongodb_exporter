@@ -109,7 +109,6 @@ func TestGetClusterRole(t *testing.T) {
 			containerName: "mongos",
 			want:          string(typeMongos),
 		},
-
 		{
 			containerName: "mongo-1-1",
 			want:          string(typeShardServer),
