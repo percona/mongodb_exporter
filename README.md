@@ -1,7 +1,7 @@
 # MongoDB exporter
 [![Release](https://img.shields.io/github/release/percona/mongodb_exporter.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
 [![Build Status](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml?query=branch%3Amain)
-[![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=master)
+[![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
 [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
 [![Discord](https://img.shields.io/discord/808660945513611334?style=flat)](http://per.co.na/discord)
@@ -18,8 +18,7 @@ Currently, these metric sources are implemented:
 
 ## Info on Percona MongoDB exporter versions
 
-The old 0.1x.y version (ex `master` branch) has been moved to the
-`release-0.1x` branch.
+The old 0.1x.y version (ex `master` branch) has been moved to the `release-0.1x` branch.
 
 A flag, `--compatible-mode`, which exposes metrics with 0.1x compatible metric
 names has been implemented which simplifies migration from the old version to
@@ -65,7 +64,7 @@ If you built the exporter using the method mentioned in the previous section, th
 #### Docker
 A docker image is available on the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter).
 
-##### examples
+##### Examples
 
 ```sh
 # with podman
