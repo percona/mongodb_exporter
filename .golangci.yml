@@ -30,6 +30,7 @@ linters:
       - testpackage
       - wsl
       - exhaustivestruct
+      - varnamelen
 issues:
   exclude-use-default: false
   exclude:
