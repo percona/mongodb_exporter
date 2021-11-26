@@ -41,26 +41,27 @@ func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
+	collections := d.collections
+
 	if d.discoveringMode {
-		databases := map[string][]string{}
-		for _, dbCollection := range d.collections {
-			parts := strings.Split(dbCollection, ".")
-			if _, ok := databases[parts[0]]; !ok {
-				db := parts[0]
-				databases[db], _ = d.client.Database(parts[0]).ListCollectionNames(d.ctx, bson.D{})
-			}
+		namespaces, err := listAllCollections(d.ctx, d.client, d.collections)
+		if err != nil {
+			d.logger.Errorf("cannot auto discover databases and collections")
+
+			return
 		}
 
-		d.collections = fromMapToSlice(databases)
+		collections = fromMapToSlice(namespaces)
 	}
-	for _, dbCollection := range d.collections {
+
+	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
-		if len(parts) != 2 { //nolint:gomnd
+		if len(parts) < 2 { //nolint:gomnd
 			continue
 		}
 
 		database := parts[0]
-		collection := parts[1]
+		collection := strings.Join(parts[1:], ".") // support collections having a .
 
 		aggregation := bson.D{
 			{
@@ -82,12 +83,14 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation, project})
 		if err != nil {
 			d.logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
+
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
 			d.logger.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
+
 			continue
 		}
 

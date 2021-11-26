@@ -33,12 +33,14 @@ import (
 
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
-	path             string
-	client           *mongo.Client
-	clientMu         sync.Mutex
-	logger           *logrus.Logger
-	opts             *Opts
-	webListenAddress string
+	path                  string
+	client                *mongo.Client
+	clientMu              sync.Mutex
+	logger                *logrus.Logger
+	opts                  *Opts
+	webListenAddress      string
+	lock                  *sync.Mutex
+	totalCollectionsCount int
 }
 
 // Opts holds new exporter options.
@@ -47,17 +49,18 @@ type Opts struct {
 	DiscoveringMode         bool
 	GlobalConnPool          bool
 	DirectConnect           bool
+	DisableDiagnosticData   bool
+	DisableReplicasetStatus bool
+	DisableDefaultRegistry  bool
+	EnableDBStats           bool
+	CollStatsLimit          int
+	EnableTop               bool
 	URI                     string
 	Path                    string
 	WebListenAddress        string
 	IndexStatsCollections   []string
 	CollStatsCollections    []string
 	Logger                  *logrus.Logger
-	DisableDiagnosticData   bool
-	DisableReplicasetStatus bool
-	DisableDefaultRegistry  bool
-	EnableDBStats           bool
-	EnableTop               bool
 }
 
 var (
@@ -78,19 +81,31 @@ func New(opts *Opts) *Exporter {
 	ctx := context.Background()
 
 	exp := &Exporter{
-		path:             opts.Path,
-		logger:           opts.Logger,
-		opts:             opts,
-		webListenAddress: opts.WebListenAddress,
+		path:                  opts.Path,
+		logger:                opts.Logger,
+		opts:                  opts,
+		webListenAddress:      opts.WebListenAddress,
+		lock:                  &sync.Mutex{},
+		totalCollectionsCount: -1, // not calculated yet. waiting the db connection.
 	}
 	// Try initial connect. Connection will be retried with every scrape.
 	go func() {
-		if _, err := exp.getClient(ctx); err != nil {
+		_, err := exp.getClient(ctx)
+		if err != nil {
 			exp.logger.Errorf("Cannot connect to MongoDB: %v", err)
+
+			return
 		}
 	}()
 
 	return exp
+}
+
+func (e *Exporter) getTotalCollectionsCount() int {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	return e.totalCollectionsCount
 }
 
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter) *prometheus.Registry {
@@ -108,7 +123,17 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
 	}
 
-	if len(e.opts.CollStatsCollections) > 0 {
+	// enable collection dependant collectors like collstats and indexstats
+	enableCollStats := false
+	if e.opts.CollStatsLimit == 0 {
+		enableCollStats = true
+	}
+	if e.getTotalCollectionsCount() > 0 && e.getTotalCollectionsCount() < e.opts.CollStatsLimit {
+		enableCollStats = true
+	}
+
+	// if we manually set the collection names we want or auto discovery is set
+	if (len(e.opts.CollStatsCollections) > 0 || e.opts.DiscoveringMode) && enableCollStats {
 		cc := collstatsCollector{
 			ctx:             ctx,
 			client:          client,
@@ -121,7 +146,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	if len(e.opts.IndexStatsCollections) > 0 {
+	// if we manually set the collection names we want or auto discovery is set
+	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && enableCollStats {
 		ic := indexstatsCollector{
 			ctx:             ctx,
 			client:          client,
@@ -229,6 +255,16 @@ func (e *Exporter) Handler() http.Handler {
 
 			return
 		}
+
+		if e.totalCollectionsCount < 0 {
+			count, err := allCollectionsCount(ctx, client, nil)
+			if err == nil {
+				e.lock.Lock()
+				e.totalCollectionsCount = count
+				e.lock.Unlock()
+			}
+		}
+
 		// Close client after usage
 		if !e.opts.GlobalConnPool {
 			defer func() {
