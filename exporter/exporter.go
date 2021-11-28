@@ -45,22 +45,23 @@ type Exporter struct {
 
 // Opts holds new exporter options.
 type Opts struct {
+	CollStatsCollections    []string
+	CollStatsLimit          int
+	CollectorTopMetrics     bool
 	CompatibleMode          bool
-	DiscoveringMode         bool
-	GlobalConnPool          bool
 	DirectConnect           bool
+	DisableDefaultRegistry  bool
 	DisableDiagnosticData   bool
 	DisableReplicasetStatus bool
-	DisableDefaultRegistry  bool
+	DiscoveringMode         bool
 	EnableDBStats           bool
-	CollStatsLimit          int
 	EnableTop               bool
-	URI                     string
-	Path                    string
-	WebListenAddress        string
+	GlobalConnPool          bool
 	IndexStatsCollections   []string
-	CollStatsCollections    []string
 	Logger                  *logrus.Logger
+	Path                    string
+	URI                     string
+	WebListenAddress        string
 }
 
 var (
@@ -181,7 +182,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	if e.opts.EnableTop {
+	if e.opts.CollectorTopMetrics {
 		tc := topCollector{
 			ctx:            ctx,
 			client:         client,
