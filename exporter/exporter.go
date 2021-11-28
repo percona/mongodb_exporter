@@ -57,7 +57,7 @@ type Opts struct {
 	DisableReplicasetStatus bool
 	DisableDefaultRegistry  bool
 	EnableDBStats           bool
-	EnableTop               bool
+	CollectorTopMetrics     bool
 }
 
 var (
@@ -155,7 +155,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	if e.opts.EnableTop {
+	if e.opts.CollectorTopMetrics {
 		tc := topCollector{
 			ctx:            ctx,
 			client:         client,
