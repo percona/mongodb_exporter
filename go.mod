@@ -7,11 +7,11 @@ go 1.17
 
 require (
 	github.com/AlekSi/pointer v1.1.0
-	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
+	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alecthomas/kong v0.2.17
-	github.com/go-ole/go-ole v1.2.4 // indirect
-	github.com/golang/snappy v0.0.2-0.20190904063534-ff6b7dc882cf // indirect
-	github.com/klauspost/compress v1.10.10 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/golang/snappy v0.0.3 // indirect
+	github.com/klauspost/compress v1.13.5 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/percona/exporter_shared v0.7.3
 	github.com/percona/percona-toolkit v3.3.1-0.20210818142247-4b8ae0563f5b+incompatible
@@ -34,7 +34,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
-	github.com/golang/protobuf v1.4.3 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golangci/golangci-lint v1.43.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/common v0.26.0 // indirect
@@ -44,12 +45,12 @@ require (
 	github.com/xdg-go/scram v1.0.2 // indirect
 	github.com/xdg-go/stringprep v1.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
-	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a // indirect
-	golang.org/x/sys v0.0.0-20210816074244-15123e1e1f71 // indirect
-	golang.org/x/text v0.3.5 // indirect
-	google.golang.org/protobuf v1.26.0-rc.1 // indirect
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
+	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
+	golang.org/x/text v0.3.7 // indirect
+	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
-	gopkg.in/yaml.v2 v2.3.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
