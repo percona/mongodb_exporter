@@ -110,9 +110,16 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 		t.labels[labelReplicasetName] = rs.Config.ID
 	}
 
+	isArbiter, err := isArbiter(ctx, t.client)
+	if err != nil {
+		return err
+	}
+
 	cid, err := util.ClusterID(ctx, t.client)
 	if err != nil {
-		return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting cluster ID: %s", err)
+		if !isArbiter { // arbiters don't have a cluster ID
+			return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting cluster ID: %s", err)
+		}
 	}
 	t.labels[labelClusterID] = cid
 
@@ -123,6 +130,18 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func isArbiter(ctx context.Context, client *mongo.Client) (bool, error) {
+	doc := struct {
+		ArbiterOnly bool `bson:"arbiterOnly"`
+	}{}
+
+	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&doc); err != nil {
+		return false, errors.Wrap(err, "cannot check if the instance is an arbiter")
+	}
+
+	return doc.ArbiterOnly, nil
 }
 
 func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, error) {
