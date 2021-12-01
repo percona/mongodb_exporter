@@ -257,7 +257,7 @@ func (e *Exporter) Handler() http.Handler {
 			return
 		}
 
-		if e.totalCollectionsCount < 0 {
+		if e.getTotalCollectionsCount() < 0 {
 			count, err := allCollectionsCount(ctx, client, nil)
 			if err == nil {
 				e.lock.Lock()
