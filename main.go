@@ -47,7 +47,7 @@ type GlobalFlags struct {
 	DisableReplicasetStatus bool   `name:"no-collector.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
 	EnableDBStats           bool   `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
 	CollStatsLimit          int    `name:"collector.collstats-limit" help:"Enable collstats and indexstats collector only if there are less than <n> collections. -1=No limit" default:"0"`
-	CollectorTopMetrics     bool   `name:"collector-topmetrics" help:"Enable collecting metrics from top admin command"`
+	CollectorTopMetrics     bool   `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
 	DiscoveringMode         bool   `name:"discovering-mode" help:"Enable autodiscover collections"`
 	CompatibleMode          bool   `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
 	Version                 bool   `name:"version" help:"Show version and exit"`
