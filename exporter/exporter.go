@@ -94,8 +94,6 @@ func New(opts *Opts) *Exporter {
 		_, err := exp.getClient(ctx)
 		if err != nil {
 			exp.logger.Errorf("Cannot connect to MongoDB: %v", err)
-
-			return
 		}
 	}()
 
