@@ -12,7 +12,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -198,7 +197,7 @@ func TestMyState(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	var m io_prometheus_client.Metric
+	var m dto.Metric
 
 	metric := myState(ctx, client)
 	err := metric.Write(&m)
