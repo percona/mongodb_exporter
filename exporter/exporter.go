@@ -182,7 +182,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	if e.opts.CollectorTopMetrics {
+	if e.opts.CollectorTopMetrics && nodeType != typeMongos {
 		tc := topCollector{
 			ctx:            ctx,
 			client:         client,
