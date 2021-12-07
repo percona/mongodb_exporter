@@ -40,3 +40,23 @@ dockers:
   - "percona/mongodb_exporter:{{.Version}}"
   dockerfile: Dockerfile
   use: buildx
+nfpms:
+  - file_name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
+    homepage:  https://www.percona.com/
+    description: MongoDB exporter for Prometheus
+    maintainer: Percona
+    vendor: Percona
+    license: Apache 2.0
+    formats:
+    - deb
+    - rpm
+    bindir: /usr/bin
+    replacements:
+      amd64: 64-bit
+      darwin: macOS
+    scripts:
+      postinstall: ".scripts/postinst"
+    contents:
+      - src: .scripts/systemd/mongodb_exporter.service
+        dst: /etc/systemd/system/mongodb_exporter.service
+        type: "config|noreplace"

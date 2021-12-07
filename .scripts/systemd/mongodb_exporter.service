@@ -1,0 +1,20 @@
+[Unit]
+Description=Prometheus MongoDB Exporter
+Documentation=https://github.com/percona/mongodb_exporter
+After=network.target
+
+[Service]
+Type=simple
+
+User=pmm
+Group=pmm
+
+ExecStart=/usr/bin/mongodb_exporter \
+  --mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true \
+  --web.listen-address=:9216
+SyslogIdentifier=mongodb_exporter
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
