@@ -53,7 +53,6 @@ nfpms:
     bindir: /usr/bin
     replacements:
       amd64: 64-bit
-      darwin: macOS
     scripts:
       postinstall: ".scripts/postinst"
     contents:
