@@ -28,8 +28,6 @@ USERNAME="pmm"
 getent group "$GROUPNAME" >/dev/null || groupadd -r "$GROUPNAME"
 getent passwd "$USERNAME" >/dev/null || useradd -r -g "$GROUPNAME" -M -s /sbin/nologin -c "pmm service user" "$USERNAME"
 
-systemctl daemon-reload > dev/null
-systemctl enable mongodb_exporter > dev/null
-systemctl start mongodb_exporter || exit $?
+systemctl daemon-reload > dev/null || exit $?
 
 exit 0

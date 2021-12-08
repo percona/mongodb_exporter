@@ -9,9 +9,8 @@ Type=simple
 User=pmm
 Group=pmm
 
-ExecStart=/usr/bin/mongodb_exporter \
-  --mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true \
-  --web.listen-address=:9216
+EnvironmentFile=-/etc/default/mongodb_exporter
+ExecStart=/usr/bin/mongodb_exporter $OPTIONS
 SyslogIdentifier=mongodb_exporter
 
 Restart=always

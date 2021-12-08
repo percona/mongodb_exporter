@@ -1,0 +1,4 @@
+# Full list of options you can see https://github.com/percona/mongodb_exporter
+
+OPTIONS="--mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true \
+         --web.listen-address=:9216"

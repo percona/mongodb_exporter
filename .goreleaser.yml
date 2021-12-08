@@ -60,3 +60,5 @@ nfpms:
       - src: .scripts/systemd/mongodb_exporter.service
         dst: /etc/systemd/system/mongodb_exporter.service
         type: "config|noreplace"
+      - src: .scripts/default/mongodb_exporter.example
+        dst: /etc/default/mongodb_exporter.example
