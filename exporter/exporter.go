@@ -21,11 +21,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 
-	"github.com/percona/exporter_shared"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -308,8 +311,19 @@ func (e *Exporter) Handler() http.Handler {
 
 // Run starts the exporter.
 func (e *Exporter) Run() {
-	handler := e.Handler()
-	exporter_shared.RunServer("MongoDB", e.webListenAddress, e.path, handler)
+	server := &http.Server{
+		Addr:    e.webListenAddress,
+		Handler: e.Handler(),
+	}
+
+	// set up go-kit logger
+	logger := promlog.New(&promlog.Config{})
+
+	// TODO: tls, basic auth support, etc.
+	if err := web.ListenAndServe(server, "", logger); err != nil {
+		level.Error(logger).Log("err", err)
+		os.Exit(1)
+	}
 }
 
 func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client, error) {
