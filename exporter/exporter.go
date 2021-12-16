@@ -24,7 +24,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
@@ -316,12 +315,9 @@ func (e *Exporter) Run() {
 		Handler: e.Handler(),
 	}
 
-	// set up go-kit logger
-	logger := promlog.New(&promlog.Config{})
-
 	// TODO: tls, basic auth support, etc.
-	if err := web.ListenAndServe(server, "", logger); err != nil {
-		level.Error(logger).Log("err", err)
+	if err := web.ListenAndServe(server, "", promlog.New(&promlog.Config{})); err != nil {
+		e.logger.Errorf("error starting server: %v", err)
 		os.Exit(1)
 	}
 }
