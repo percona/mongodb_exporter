@@ -110,4 +110,4 @@ test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MON
 	docker-compose up -d
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
-	docker-compose down
+	docker-compose down --remove-orphans

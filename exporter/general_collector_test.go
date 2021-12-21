@@ -58,9 +58,9 @@ mongodb_up 1` + "\n")
 	assert.NoError(t, client.Disconnect(ctx))
 
 	expected = strings.NewReader(`
-# HELP mongodb_up Whether MongoDB is up.
-# TYPE mongodb_up gauge
-mongodb_up 0` + "\n")
+	 # HELP mongodb_up Whether MongoDB is up.
+	 # TYPE mongodb_up gauge
+	 mongodb_up 0` + "\n")
 	err = testutil.GatherAndCompare(reg, expected)
 	assert.NoError(t, err)
 }
