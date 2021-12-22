@@ -44,11 +44,14 @@ type GlobalFlags struct {
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
-	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData" negatable:""`
-	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus" negatable:""`
-	EnableDBStats          bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats" negatable:""`
-	EnableTopMetrics       bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command" negatable:""`
-	CollectAll             bool `name:"collect-all" help:"Enable all collectors. Same as specifying all --collector.<name>"`
+	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
+	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
+	EnableDBStats          bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
+	EnableTopMetrics       bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
+	EnableIndexStats       bool `name:"collector.indexstats" help:"Enablle collecting metrics from $indexStats"`
+	EnableCollStats        bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
+
+	CollectAll bool `name:"collect-all" help:"Enable all collectors. Same as specifying all --collector.<name>"`
 
 	CollStatsLimit int `name:"collector.collstats-limit" help:"Enable collstats and indexstats collector only if there are less than <n> collections. -1=No limit" default:"0"`
 
@@ -120,6 +123,8 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		EnableReplicasetStatus: opts.EnableReplicasetStatus,
 		EnableTopMetrics:       opts.EnableTopMetrics,
 		EnableDBStats:          opts.EnableDBStats,
+		EnableIndexStats:       opts.EnableIndexStats,
+		EnableCollStats:        opts.EnableCollStats,
 
 		CollStatsLimit: opts.CollStatsLimit,
 	}

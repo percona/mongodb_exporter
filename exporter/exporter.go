@@ -62,6 +62,8 @@ type Opts struct {
 	EnableDiagnosticData   bool
 	EnableReplicasetStatus bool
 	EnableTopMetrics       bool
+	EnableIndexStats       bool
+	EnableCollStats        bool
 
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
@@ -153,7 +155,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	// if we manually set the collection names we want or auto discovery is set
-	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && limitsOk {
+	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk {
 		cc := collstatsCollector{
 			ctx:             ctx,
 			client:          client,
@@ -167,7 +169,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	// if we manually set the collection names we want or auto discovery is set
-	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && limitsOk {
+	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk {
 		ic := indexstatsCollector{
 			ctx:             ctx,
 			client:          client,
