@@ -45,7 +45,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 // - filterInNamespaces: Include only the database names matching the any of the regular expressions in this list.
 //                       Case will be ignored because the function will automatically add the ignore case
 //                       flag to the regular expression.
-// - exclude: List of databases to be excluded. Usefull to ignore system databases.
+// - exclude: List of databases to be excluded. Useful to ignore system databases.
 func databases(ctx context.Context, client *mongo.Client, filterInNamespaces []string, exclude []string) ([]string, error) {
 	opts := &options.ListDatabasesOptions{NameOnly: pointer.ToBool(true), AuthorizedDatabases: pointer.ToBool(true)}
 
@@ -85,8 +85,7 @@ func makeExcludeFilter(exclude []string) *primitive.E {
 // makeDBsFilter creates a filter to list all databases or only the ones in the specified
 // namespaces list. Namespaces have the form of <db>.<collection> and the collection name
 // can have a dot. Example: db1.collection.one -> db: db1, collection: collection.one
-// db1, db2.col2, db3.col.one will produce [db1, db2, db3]
-//
+// db1, db2.col2, db3.col.one will produce [db1, db2, db3].
 func makeDBsFilter(filterInNamespaces []string) *primitive.E {
 	dbs := []string{}
 
@@ -107,7 +106,7 @@ func makeDBsFilter(filterInNamespaces []string) *primitive.E {
 func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
 	namespaces := make(map[string][]string)
 	// exclude system databases
-	dbnames, err := databases(ctx, client, filterInNamespaces, systemDBs)
+	dbnames, err := databases(ctx, client, filterInNamespaces, excludeDBs)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot get the list of all collections in the server")
 	}

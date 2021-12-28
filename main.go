@@ -44,8 +44,8 @@ type GlobalFlags struct {
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
-	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
-	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
+	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
+	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
 	EnableDBStats          bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
 	EnableTopMetrics       bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
 	EnableIndexStats       bool `name:"collector.indexstats" help:"Enablle collecting metrics from $indexStats"`
