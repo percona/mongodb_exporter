@@ -48,7 +48,7 @@ type GlobalFlags struct {
 	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
 	EnableDBStats          bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
 	EnableTopMetrics       bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
-	EnableIndexStats       bool `name:"collector.indexstats" help:"Enablle collecting metrics from $indexStats"`
+	EnableIndexStats       bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
 	EnableCollStats        bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 
 	CollectAll bool `name:"collect-all" help:"Enable all collectors. Same as specifying all --collector.<name>"`
