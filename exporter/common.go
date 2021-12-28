@@ -88,16 +88,13 @@ func makeExcludeFilter(exclude []string) *primitive.E {
 // db1, db2.col2, db3.col.one will produce [db1, db2, db3].
 func makeDBsFilter(filterInNamespaces []string) *primitive.E {
 	dbs := []string{}
+	if len(dbs) == 0 {
+		return nil
+	}
 
 	for _, namespace := range filterInNamespaces {
 		parts := strings.Split(namespace, ".")
-		if len(parts) > 0 {
-			dbs = append(dbs, parts[0])
-		}
-	}
-
-	if len(dbs) == 0 {
-		return nil
+		dbs = append(dbs, parts[0])
 	}
 
 	return &primitive.E{Key: "name", Value: primitive.E{Key: "$in", Value: dbs}}
