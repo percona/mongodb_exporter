@@ -50,7 +50,6 @@ type Opts struct {
 	// Example: db1.col1,db.col1
 	CollStatsNamespaces    []string
 	CollStatsLimit         int
-	CollectorTopMetrics    bool
 	CompatibleMode         bool
 	DirectConnect          bool
 	DisableDefaultRegistry bool
@@ -148,7 +147,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		}
 		e.opts.EnableDiagnosticData = true
 		e.opts.EnableDBStats = true
-		e.opts.CollectorTopMetrics = true
+		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
 	}
 
@@ -201,7 +200,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	if e.opts.CollectorTopMetrics && nodeType != typeMongos {
+	if e.opts.EnableTopMetrics && nodeType != typeMongos {
 		tc := topCollector{
 			ctx:            ctx,
 			client:         client,
