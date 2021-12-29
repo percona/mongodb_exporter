@@ -14,7 +14,7 @@ import (
 
 var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
 
-func listCollections(ctx context.Context, client *mongo.Client, database string, filterInCollections []string) ([]string, error) {
+func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string) ([]string, error) {
 	filter := bson.D{} // Default=empty -> list all collections
 
 	// if there is a filter with the list of collections we want, create a filter like
@@ -22,15 +22,23 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 	//     {"$regex": "collection1"},
 	//     {"$regex": "collection2"},
 	// }
-	if len(filterInCollections) > 0 {
+	if len(filterInNamespaces) > 0 {
 		matchExpressions := []bson.D{}
 
-		for _, collection := range filterInCollections {
-			matchExpressions = append(matchExpressions,
-				bson.D{{Key: "name", Value: primitive.Regex{Pattern: collection, Options: "i"}}})
+		for _, namespace := range filterInNamespaces {
+			parts := strings.Split(namespace, ".") // db.collection.name.with.dots
+			if len(parts) > 1 {
+				// The part before the first dot is the database name.
+				// The rest is the collection name and it can have dots. We need to rebuild it.
+				collection := strings.Join(parts[1:], ".")
+				matchExpressions = append(matchExpressions,
+					bson.D{{Key: "name", Value: primitive.Regex{Pattern: collection, Options: "i"}}})
+			}
 		}
 
-		filter = bson.D{{Key: "$or", Value: matchExpressions}}
+		if len(matchExpressions) > 0 {
+			filter = bson.D{{Key: "$or", Value: matchExpressions}}
+		}
 	}
 
 	collections, err := client.Database(database).ListCollectionNames(ctx, filter)

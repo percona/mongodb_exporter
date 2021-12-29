@@ -43,7 +43,8 @@ func TestListCollections(t *testing.T) {
 	assert.Equal(t, want, allDBs)
 
 	want = []string{"col01", "col02", "colxx"}
-	colls, err := listCollections(ctx, client, inDBs[0], []string{"col0", "colx"})
+	inNameSpaces := []string{inDBs[0] + ".col0", inDBs[0] + ".colx"}
+	colls, err := listCollections(ctx, client, inDBs[0], inNameSpaces)
 	sort.Strings(colls)
 
 	assert.NoError(t, err)
@@ -53,7 +54,7 @@ func TestListCollections(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, count == 8)
 
-	count, err = nonSystemCollectionsCount(ctx, client, nil, []string{"col0", "colx"})
+	count, err = nonSystemCollectionsCount(ctx, client, nil, []string{inDBs[0] + ".col0", inDBs[0] + ".colx"})
 	assert.NoError(t, err)
 	assert.Equal(t, 6, count)
 }
