@@ -50,6 +50,18 @@ func TestListCollections(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, want, colls)
 
+	// Advanced filtering test
+	wantNS := map[string][]string{
+		"testdb01": {"col01", "col02", "colxx", "colyy"},
+		"testdb02": {"col01", "col02"},
+	}
+
+	// List all collections in testdb01 (inDBs[0]) but only col01 and col02 from testdb02.
+	filterInNameSpaces := []string{inDBs[0], inDBs[1] + ".col01", inDBs[1] + ".col02"}
+	namespaces, err := listAllCollections(ctx, client, filterInNameSpaces, systemDBs)
+	assert.NoError(t, err)
+	assert.Equal(t, wantNS, namespaces)
+
 	count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 	assert.NoError(t, err)
 	assert.True(t, count == 8)
