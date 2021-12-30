@@ -164,6 +164,9 @@ func addTestData(ctx context.Context, client *mongo.Client, count int) error {
 	}
 
 	if err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
 		for i := 0; i < count; i++ {
 			dbName := fmt.Sprintf("testdb_%06d", i)
 			doc := bson.D{{Key: "field1", Value: "value 1"}}
@@ -173,7 +176,7 @@ func addTestData(ctx context.Context, client *mongo.Client, count int) error {
 			}
 		}
 
-		if err = session.CommitTransaction(sc); err != nil {
+		if err = session.CommitTransaction(ctx); err != nil {
 			return errors.Wrap(err, "cannot commit add test data transaction")
 		}
 

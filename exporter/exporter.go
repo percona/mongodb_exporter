@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,23 +46,29 @@ type Exporter struct {
 
 // Opts holds new exporter options.
 type Opts struct {
-	CollStatsCollections    []string
-	CollStatsLimit          int
-	CollectorTopMetrics     bool
-	CompatibleMode          bool
-	DirectConnect           bool
-	DisableDefaultRegistry  bool
-	DisableDiagnosticData   bool
-	DisableReplicasetStatus bool
-	DiscoveringMode         bool
-	EnableDBStats           bool
-	EnableTop               bool
-	GlobalConnPool          bool
-	IndexStatsCollections   []string
-	Logger                  *logrus.Logger
-	Path                    string
-	URI                     string
-	WebListenAddress        string
+	// Only get stats for the collections matching this list of namespaces.
+	// Example: db1.col1,db.col1
+	CollStatsNamespaces    []string
+	CollStatsLimit         int
+	CompatibleMode         bool
+	DirectConnect          bool
+	DisableDefaultRegistry bool
+	DiscoveringMode        bool
+	GlobalConnPool         bool
+
+	CollectAll             bool
+	EnableDBStats          bool
+	EnableDiagnosticData   bool
+	EnableReplicasetStatus bool
+	EnableTopMetrics       bool
+	EnableIndexStats       bool
+	EnableCollStats        bool
+
+	IndexStatsCollections []string
+	Logger                *logrus.Logger
+	Path                  string
+	URI                   string
+	WebListenAddress      string
 }
 
 var (
@@ -117,26 +124,39 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 	registry.MustRegister(&gc)
 
+	if client == nil {
+		return registry
+	}
+
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
 		e.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
 	}
 
-	// enable collection dependant collectors like collstats and indexstats
-	enableCollStats := false
-	if e.opts.CollStatsLimit == -1 {
-		enableCollStats = true
+	// enable collectors like collstats and indexstats depending on the number of collections
+	// present in the database.
+	limitsOk := false
+	if e.opts.CollStatsLimit == 0 || // Unlimited
+		(e.getTotalCollectionsCount() > 0 && e.getTotalCollectionsCount() < e.opts.CollStatsLimit) {
+		limitsOk = true
 	}
-	if e.getTotalCollectionsCount() > 0 && e.getTotalCollectionsCount() < e.opts.CollStatsLimit {
-		enableCollStats = true
+
+	if e.opts.CollectAll {
+		if len(e.opts.CollStatsNamespaces) == 0 {
+			e.opts.DiscoveringMode = true
+		}
+		e.opts.EnableDiagnosticData = true
+		e.opts.EnableDBStats = true
+		e.opts.EnableTopMetrics = true
+		e.opts.EnableReplicasetStatus = true
 	}
 
 	// if we manually set the collection names we want or auto discovery is set
-	if (len(e.opts.CollStatsCollections) > 0 || e.opts.DiscoveringMode) && enableCollStats {
+	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk {
 		cc := collstatsCollector{
 			ctx:             ctx,
 			client:          client,
-			collections:     e.opts.CollStatsCollections,
+			collections:     e.opts.CollStatsNamespaces,
 			compatibleMode:  e.opts.CompatibleMode,
 			discoveringMode: e.opts.DiscoveringMode,
 			logger:          e.opts.Logger,
@@ -146,7 +166,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	// if we manually set the collection names we want or auto discovery is set
-	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && enableCollStats {
+	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk {
 		ic := indexstatsCollector{
 			ctx:             ctx,
 			client:          client,
@@ -158,7 +178,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&ic)
 	}
 
-	if !e.opts.DisableDiagnosticData {
+	if e.opts.EnableDiagnosticData {
 		ddc := diagnosticDataCollector{
 			ctx:            ctx,
 			client:         client,
@@ -180,7 +200,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	if e.opts.CollectorTopMetrics && nodeType != typeMongos {
+	if e.opts.EnableTopMetrics && nodeType != typeMongos {
 		tc := topCollector{
 			ctx:            ctx,
 			client:         client,
@@ -192,7 +212,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	// replSetGetStatus is not supported through mongos
-	if !e.opts.DisableReplicasetStatus && nodeType != typeMongos {
+	if e.opts.EnableReplicasetStatus && nodeType != typeMongos {
 		rsgsc := replSetGetStatusCollector{
 			ctx:            ctx,
 			client:         client,
@@ -241,22 +261,16 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var client *mongo.Client
-		ctx := r.Context()
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+		defer cancel()
 
 		client, err := e.getClient(ctx)
 		if err != nil {
 			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
-			http.Error(
-				w,
-				"An error has occurred while connecting to MongoDB:\n\n"+err.Error(),
-				http.StatusInternalServerError,
-			)
-
-			return
 		}
 
-		if e.getTotalCollectionsCount() < 0 {
-			count, err := allCollectionsCount(ctx, client, nil)
+		if client != nil && e.getTotalCollectionsCount() < 0 {
+			count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 			if err == nil {
 				e.lock.Lock()
 				e.totalCollectionsCount = count
@@ -267,27 +281,30 @@ func (e *Exporter) Handler() http.Handler {
 		// Close client after usage
 		if !e.opts.GlobalConnPool {
 			defer func() {
-				err := client.Disconnect(ctx)
-				if err != nil {
-					e.logger.Errorf("Cannot disconnect client: %v", err)
+				if client != nil {
+					err := client.Disconnect(ctx)
+					if err != nil {
+						e.logger.Errorf("Cannot disconnect client: %v", err)
+					}
 				}
 			}()
 		}
 
 		// topology can change between requests, so we need to get it every time
-		topologyInfo, err := newTopologyInfo(ctx, client)
-		if err != nil {
-			e.logger.Errorf("Cannot get topology info: %v", err)
-			http.Error(
-				w,
-				"An error has occurred while getting topology info:\n\n"+err.Error(),
-				http.StatusInternalServerError,
-			)
-
-			return
+		var ti *topologyInfo
+		if client != nil {
+			ti, err = newTopologyInfo(ctx, client)
+			if err != nil {
+				e.logger.Errorf("Cannot get topology info: %v", err)
+				http.Error(
+					w,
+					"An error has occurred while getting topology info:\n\n"+err.Error(),
+					http.StatusInternalServerError,
+				)
+			}
 		}
 
-		registry := e.makeRegistry(ctx, client, topologyInfo)
+		registry := e.makeRegistry(ctx, client, ti)
 
 		var gatherers prometheus.Gatherers
 
