@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	"github.com/AlekSi/pointer"
@@ -110,18 +111,22 @@ func makeDBsFilter(filterInNamespaces []string) *primitive.E {
 
 func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
 	namespaces := make(map[string][]string)
-	// exclude system databases
-	dbnames, err := databases(ctx, client, filterInNamespaces, excludeDBs)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot get the list of all collections in the server")
-	}
 
-	for _, dbname := range dbnames {
-		colls, err := listCollections(ctx, client, dbname, filterInNamespaces)
+	for _, namespace := range filterInNamespaces {
+		parts := strings.Split(namespace, ".")
+		dbname := parts[0]
+
+		colls, err := listCollections(ctx, client, dbname, []string{namespace})
 		if err != nil {
 			return nil, errors.Wrapf(err, "cannot list the collections for %q", dbname)
 		}
-		namespaces[dbname] = colls
+
+		if _, ok := namespaces[dbname]; !ok {
+			namespaces[dbname] = colls
+		} else {
+			namespaces[dbname] = append(namespaces[dbname], colls...)
+		}
+		sort.Strings(namespaces[dbname]) // make it testeable.
 	}
 
 	return namespaces, nil
