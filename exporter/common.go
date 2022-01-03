@@ -91,42 +91,72 @@ func makeExcludeFilter(exclude []string) *primitive.E {
 	return &primitive.E{Key: "$and", Value: filterExpressions}
 }
 
-// makeDBsFilter creates a filter to list all databases or only the ones in the specified
-// namespaces list. Namespaces have the form of <db>.<collection> and the collection name
-// can have a dot. Example: db1.collection.one -> db: db1, collection: collection.one
-// db1, db2.col2, db3.col.one will produce [db1, db2, db3].
 func makeDBsFilter(filterInNamespaces []string) *primitive.E {
-	dbs := []string{}
-	if len(dbs) == 0 {
+	filterExpressions := []bson.D{}
+
+	nss := cleanupNamespaces(filterInNamespaces)
+	for _, namespace := range nss {
+		parts := strings.Split(namespace, ".")
+		filterExpressions = append(filterExpressions,
+			bson.D{{Key: "name", Value: bson.D{{Key: "$eq", Value: parts[0]}}}},
+		)
+	}
+
+	if len(filterExpressions) == 0 {
 		return nil
 	}
 
-	for _, namespace := range filterInNamespaces {
-		parts := strings.Split(namespace, ".")
-		dbs = append(dbs, parts[0])
+	return &primitive.E{Key: "$or", Value: filterExpressions}
+}
+
+func cleanupNamespaces(namespaces []string) []string {
+	cleanNSs := []string{}
+
+	for _, ns := range namespaces {
+		if ns == "" {
+			continue
+		}
+		cleanNSs = append(cleanNSs, ns)
 	}
 
-	return &primitive.E{Key: "name", Value: primitive.E{Key: "$in", Value: dbs}}
+	return cleanNSs
 }
 
 func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
 	namespaces := make(map[string][]string)
 
-	for _, namespace := range filterInNamespaces {
-		parts := strings.Split(namespace, ".")
-		dbname := parts[0]
+	dbs, err := databases(ctx, client, filterInNamespaces, excludeDBs)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot make the list of databases to list all collections")
+	}
 
-		colls, err := listCollections(ctx, client, dbname, []string{namespace})
-		if err != nil {
-			return nil, errors.Wrapf(err, "cannot list the collections for %q", dbname)
-		}
+	filterNS := cleanupNamespaces(filterInNamespaces)
 
-		if _, ok := namespaces[dbname]; !ok {
-			namespaces[dbname] = colls
-		} else {
-			namespaces[dbname] = append(namespaces[dbname], colls...)
+	if len(filterNS) == 0 {
+		filterNS = append(filterNS, dbs...)
+	}
+
+	for _, db := range dbs {
+		for _, namespace := range filterNS {
+			parts := strings.Split(namespace, ".")
+			dbname := strings.TrimSpace(parts[0])
+
+			if dbname == "" || (dbname != "" && dbname != db) {
+				continue
+			}
+
+			colls, err := listCollections(ctx, client, db, []string{namespace})
+			if err != nil {
+				return nil, errors.Wrapf(err, "cannot list the collections for %q", db)
+			}
+
+			if _, ok := namespaces[db]; !ok {
+				namespaces[db] = colls
+			} else {
+				namespaces[db] = append(namespaces[db], colls...)
+			}
+			sort.Strings(namespaces[db]) // make it testeable.
 		}
-		sort.Strings(namespaces[dbname]) // make it testeable.
 	}
 
 	return namespaces, nil
