@@ -132,6 +132,7 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 
 	filterNS := cleanupNamespaces(filterInNamespaces)
 
+	// If there are no specified namespaces to search for collections, it means all dbs should be included.
 	if len(filterNS) == 0 {
 		filterNS = append(filterNS, dbs...)
 	}
