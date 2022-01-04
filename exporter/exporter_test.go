@@ -171,9 +171,10 @@ func TestMongoS(t *testing.T) {
 		assert.NoError(t, err)
 
 		exporterOpts := &Opts{
-			Logger:         logrus.New(),
-			URI:            dsn,
-			GlobalConnPool: false,
+			Logger:                 logrus.New(),
+			URI:                    dsn,
+			GlobalConnPool:         false,
+			EnableReplicasetStatus: true,
 		}
 
 		e := New(exporterOpts)
@@ -189,8 +190,36 @@ func TestMongoS(t *testing.T) {
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock))
 
 		res := r.Unregister(&rsgsc)
-		assert.Equal(t, test.want, res)
+		assert.Equal(t, test.want, res, fmt.Sprintf("Port: %v", test.port))
 		err = client.Disconnect(ctx)
 		assert.NoError(t, err)
 	}
+}
+
+func TestMongoUp(t *testing.T) {
+	ctx := context.Background()
+
+	dsn := "mongodb://127.0.0.1:123456/admin"
+	client, err := connect(ctx, dsn, true)
+	assert.Error(t, err)
+
+	exporterOpts := &Opts{
+		Logger:         logrus.New(),
+		URI:            dsn,
+		GlobalConnPool: false,
+		CollectAll:     true,
+	}
+
+	e := New(exporterOpts)
+
+	gc := generalCollector{
+		ctx:    ctx,
+		client: client,
+		logger: e.opts.Logger,
+	}
+
+	r := e.makeRegistry(ctx, client, new(labelsGetterMock))
+
+	res := r.Unregister(&gc)
+	assert.Equal(t, true, res)
 }

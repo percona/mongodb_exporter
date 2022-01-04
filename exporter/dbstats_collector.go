@@ -42,8 +42,10 @@ func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
 	dbNames, err := d.client.ListDatabaseNames(d.ctx, bson.M{})
 	if err != nil {
 		d.logger.Errorf("Failed to get database names: %s", err)
+
 		return
 	}
+
 	d.logger.Debugf("getting stats for databases: %v", dbNames)
 	for _, db := range dbNames {
 		var dbStats bson.M
@@ -52,6 +54,7 @@ func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		err := r.Decode(&dbStats)
 		if err != nil {
 			d.logger.Errorf("Failed to get $dbstats for database %s: %s", db, err)
+
 			continue
 		}
 

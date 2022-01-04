@@ -44,7 +44,9 @@ func TestIndexStatsCollector(t *testing.T) {
 	ti := labelsGetterMock{}
 
 	database := client.Database("testdb")
-	database.Drop(ctx) //nolint
+	database.Drop(ctx)       //nolint:errcheck
+	defer database.Drop(ctx) //nolint:errcheck
+
 	for i := 0; i < 3; i++ {
 		collection := fmt.Sprintf("testcol_%02d", i)
 		for j := 0; j < 10; j++ {

@@ -19,17 +19,17 @@ func TestListCollections(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	databases := []string{"testdb01", "testdb02"}
-	collections := []string{"col01", "col02", "colxx", "colyy"}
+	inDBs := []string{"testdb01", "testdb02"}
+	inColls := []string{"col01", "col02", "colxx", "colyy"}
 
 	defer func() {
-		for _, dbname := range databases {
+		for _, dbname := range inDBs {
 			client.Database(dbname).Drop(ctx) //nolint:errcheck
 		}
 	}()
 
-	for _, dbname := range databases {
-		for _, coll := range collections {
+	for _, dbname := range inDBs {
+		for _, coll := range inColls {
 			for j := 0; j < 10; j++ {
 				_, err := client.Database(dbname).Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
 				assert.NoError(t, err)
@@ -37,18 +37,36 @@ func TestListCollections(t *testing.T) {
 		}
 	}
 
-	want := []string{"col01", "col02", "colxx"}
-	collections, err := listCollections(ctx, client, []string{"col0", "colx"}, databases[0])
-	sort.Strings(collections)
+	want := []string{"admin", "config", "local", "testdb01", "testdb02"}
+	allDBs, err := databases(ctx, client, nil, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, want, allDBs)
+
+	want = []string{"col01", "col02", "colxx"}
+	inNameSpaces := []string{inDBs[0] + ".col0", inDBs[0] + ".colx"}
+	colls, err := listCollections(ctx, client, inDBs[0], inNameSpaces)
+	sort.Strings(colls)
 
 	assert.NoError(t, err)
-	assert.Equal(t, want, collections)
+	assert.Equal(t, want, colls)
 
-	count, err := allCollectionsCount(ctx, client, nil)
+	// Advanced filtering test
+	wantNS := map[string][]string{
+		"testdb01": {"col01", "col02", "colxx", "colyy"},
+		"testdb02": {"col01", "col02"},
+	}
+
+	// List all collections in testdb01 (inDBs[0]) but only col01 and col02 from testdb02.
+	filterInNameSpaces := []string{inDBs[0], inDBs[1] + ".col01", inDBs[1] + ".col02"}
+	namespaces, err := listAllCollections(ctx, client, filterInNameSpaces, systemDBs)
 	assert.NoError(t, err)
-	assert.True(t, count > 8)
+	assert.Equal(t, wantNS, namespaces)
 
-	count, err = allCollectionsCount(ctx, client, []string{"col0", "colx"})
+	count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+	assert.NoError(t, err)
+	assert.True(t, count == 8)
+
+	count, err = nonSystemCollectionsCount(ctx, client, nil, []string{inDBs[0] + ".col0", inDBs[0] + ".colx"})
 	assert.NoError(t, err)
 	assert.Equal(t, 6, count)
 }
