@@ -94,7 +94,7 @@ func makeExcludeFilter(exclude []string) *primitive.E {
 func makeDBsFilter(filterInNamespaces []string) *primitive.E {
 	filterExpressions := []bson.D{}
 
-	nss := cleanupNamespaces(filterInNamespaces)
+	nss := removeEmptyStrings(filterInNamespaces)
 	for _, namespace := range nss {
 		parts := strings.Split(namespace, ".")
 		filterExpressions = append(filterExpressions,
@@ -109,17 +109,17 @@ func makeDBsFilter(filterInNamespaces []string) *primitive.E {
 	return &primitive.E{Key: "$or", Value: filterExpressions}
 }
 
-func cleanupNamespaces(namespaces []string) []string {
-	cleanNSs := []string{}
+func removeEmptyStrings(items []string) []string {
+	cleanList := []string{}
 
-	for _, ns := range namespaces {
-		if ns == "" {
+	for _, item := range items {
+		if item == "" {
 			continue
 		}
-		cleanNSs = append(cleanNSs, ns)
+		cleanList = append(cleanList, item)
 	}
 
-	return cleanNSs
+	return cleanList
 }
 
 func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
@@ -130,7 +130,7 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 		return nil, errors.Wrap(err, "cannot make the list of databases to list all collections")
 	}
 
-	filterNS := cleanupNamespaces(filterInNamespaces)
+	filterNS := removeEmptyStrings(filterInNamespaces)
 
 	// If there are no specified namespaces to search for collections, it means all dbs should be included.
 	if len(filterNS) == 0 {
