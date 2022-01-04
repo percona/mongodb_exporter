@@ -142,7 +142,7 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 			parts := strings.Split(namespace, ".")
 			dbname := strings.TrimSpace(parts[0])
 
-			if dbname == "" || (dbname != "" && dbname != db) {
+			if dbname == "" || dbname != db {
 				continue
 			}
 
