@@ -127,7 +127,7 @@ func unique(slice []string) []string {
 	list := []string{}
 
 	for _, entry := range slice {
-		if _, value := keys[entry]; !value {
+		if _, ok := keys[entry]; !ok {
 			keys[entry] = true
 			list = append(list, entry)
 		}
@@ -166,10 +166,10 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 			}
 
 			if _, ok := namespaces[db]; !ok {
-				namespaces[db] = colls
-			} else {
-				namespaces[db] = append(namespaces[db], colls...)
+				namespaces[db] = []string{}
 			}
+
+			namespaces[db] = append(namespaces[db], colls...)
 		}
 	}
 
