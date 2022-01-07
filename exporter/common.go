@@ -122,6 +122,20 @@ func removeEmptyStrings(items []string) []string {
 	return cleanList
 }
 
+func unique(slice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+
+	for _, entry := range slice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+
+	return list
+}
+
 func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
 	namespaces := make(map[string][]string)
 
@@ -156,8 +170,14 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 			} else {
 				namespaces[db] = append(namespaces[db], colls...)
 			}
-			sort.Strings(namespaces[db]) // make it testeable.
 		}
+	}
+
+	// Make it testable.
+	for db, colls := range namespaces {
+		uc := unique(colls)
+		sort.Strings(uc)
+		namespaces[db] = uc
 	}
 
 	return namespaces, nil
