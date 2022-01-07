@@ -123,7 +123,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("Count basic", func(t *testing.T) {
 		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		assert.NoError(t, err)
-		assert.True(t, count == 8)
+		assert.Equal(t, 8, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {
