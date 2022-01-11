@@ -71,6 +71,7 @@ type Opts struct {
 	Path                  string
 	URI                   string
 	WebListenAddress      string
+	TLSConfigPath         string
 }
 
 var (
@@ -332,8 +333,8 @@ func (e *Exporter) Run() {
 		Handler: e.Handler(),
 	}
 
-	// TODO: tls, basic auth support, etc.
-	if err := web.ListenAndServe(server, "", promlog.New(&promlog.Config{})); err != nil {
+	// TODO: tls, etc.
+	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
 		e.logger.Errorf("error starting server: %v", err)
 		os.Exit(1)
 	}
