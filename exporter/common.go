@@ -91,42 +91,93 @@ func makeExcludeFilter(exclude []string) *primitive.E {
 	return &primitive.E{Key: "$and", Value: filterExpressions}
 }
 
-// makeDBsFilter creates a filter to list all databases or only the ones in the specified
-// namespaces list. Namespaces have the form of <db>.<collection> and the collection name
-// can have a dot. Example: db1.collection.one -> db: db1, collection: collection.one
-// db1, db2.col2, db3.col.one will produce [db1, db2, db3].
 func makeDBsFilter(filterInNamespaces []string) *primitive.E {
-	dbs := []string{}
-	if len(dbs) == 0 {
+	filterExpressions := []bson.D{}
+
+	nss := removeEmptyStrings(filterInNamespaces)
+	for _, namespace := range nss {
+		parts := strings.Split(namespace, ".")
+		filterExpressions = append(filterExpressions,
+			bson.D{{Key: "name", Value: bson.D{{Key: "$eq", Value: parts[0]}}}},
+		)
+	}
+
+	if len(filterExpressions) == 0 {
 		return nil
 	}
 
-	for _, namespace := range filterInNamespaces {
-		parts := strings.Split(namespace, ".")
-		dbs = append(dbs, parts[0])
+	return &primitive.E{Key: "$or", Value: filterExpressions}
+}
+
+func removeEmptyStrings(items []string) []string {
+	cleanList := []string{}
+
+	for _, item := range items {
+		if item == "" {
+			continue
+		}
+		cleanList = append(cleanList, item)
 	}
 
-	return &primitive.E{Key: "name", Value: primitive.E{Key: "$in", Value: dbs}}
+	return cleanList
+}
+
+func unique(slice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+
+	for _, entry := range slice {
+		if _, ok := keys[entry]; !ok {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+
+	return list
 }
 
 func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
 	namespaces := make(map[string][]string)
 
-	for _, namespace := range filterInNamespaces {
-		parts := strings.Split(namespace, ".")
-		dbname := parts[0]
+	dbs, err := databases(ctx, client, filterInNamespaces, excludeDBs)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot make the list of databases to list all collections")
+	}
 
-		colls, err := listCollections(ctx, client, dbname, []string{namespace})
-		if err != nil {
-			return nil, errors.Wrapf(err, "cannot list the collections for %q", dbname)
-		}
+	filterNS := removeEmptyStrings(filterInNamespaces)
 
-		if _, ok := namespaces[dbname]; !ok {
-			namespaces[dbname] = colls
-		} else {
-			namespaces[dbname] = append(namespaces[dbname], colls...)
+	// If there are no specified namespaces to search for collections, it means all dbs should be included.
+	if len(filterNS) == 0 {
+		filterNS = append(filterNS, dbs...)
+	}
+
+	for _, db := range dbs {
+		for _, namespace := range filterNS {
+			parts := strings.Split(namespace, ".")
+			dbname := strings.TrimSpace(parts[0])
+
+			if dbname == "" || dbname != db {
+				continue
+			}
+
+			colls, err := listCollections(ctx, client, db, []string{namespace})
+			if err != nil {
+				return nil, errors.Wrapf(err, "cannot list the collections for %q", db)
+			}
+
+			if _, ok := namespaces[db]; !ok {
+				namespaces[db] = []string{}
+			}
+
+			namespaces[db] = append(namespaces[db], colls...)
 		}
-		sort.Strings(namespaces[dbname]) // make it testeable.
+	}
+
+	// Make it testable.
+	for db, colls := range namespaces {
+		uc := unique(colls)
+		sort.Strings(uc)
+		namespaces[db] = uc
 	}
 
 	return namespaces, nil
