@@ -21,7 +21,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -29,45 +28,42 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
+	"time"
 )
 
-func getHeader() string {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("runtime.Caller(0) failed")
-	}
-	f, err := os.Open(file)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	var header string
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		if s.Text() == "" {
-			break
-		}
-		header += s.Text() + "\n"
-	}
-	header += "\n"
-	if err := s.Err(); err != nil {
-		log.Fatal(err)
-	}
+func getHeader(startYear int) string {
+	header := fmt.Sprintf(`// mongodb_exporter
+// Copyright (C) %d Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+`, startYear)
 	return header
 }
 
 var generatedHeader = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.`)
 
-func checkHeader(path string, header string) bool {
+// startYear represents the oldest copyright year present in the project
+var startYear = 2017
+
+func checkHeader(path string, startYear int) bool {
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 
-	actual := make([]byte, len(header))
+	actual := make([]byte, len(getHeader(startYear)))
 	_, err = io.ReadFull(f, actual)
 	if err == io.ErrUnexpectedEOF {
 		err = nil // some files are shorter than license header
@@ -81,11 +77,13 @@ func checkHeader(path string, header string) bool {
 		return true
 	}
 
-	if header != string(actual) {
-		log.Print(path)
-		return false
+	for year := startYear; year <= time.Now().Year(); year++ {
+		if string(actual) == getHeader(year) {
+			return true
+		}
 	}
-	return true
+	log.Println(path)
+	return false
 }
 
 func main() {
@@ -95,8 +93,6 @@ func main() {
 		flag.CommandLine.PrintDefaults()
 	}
 	flag.Parse()
-
-	header := getHeader()
 
 	ok := true
 	filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
@@ -113,7 +109,7 @@ func main() {
 		}
 
 		if filepath.Ext(info.Name()) == ".go" {
-			if !checkHeader(path, header) {
+			if !checkHeader(path, startYear) {
 				ok = false
 			}
 		}
