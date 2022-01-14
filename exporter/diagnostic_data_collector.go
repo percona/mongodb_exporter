@@ -18,6 +18,8 @@ package exporter
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,19 +28,66 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type diagnosticDataCollector struct {
+// DiagnosticDataCollector implements the prometheus.Collector interface for getDiagnosticData.
+type DiagnosticDataCollector struct {
 	ctx            context.Context
 	client         *mongo.Client
 	compatibleMode bool
 	logger         *logrus.Logger
 	topologyInfo   labelsGetter
+
+	lock         *sync.Mutex
+	metricsCache []prometheus.Metric
 }
 
-func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+// NewDiagnosticDataCollector returns a new DiagnosticDataCollector instance.
+func NewDiagnosticDataCollector(ctx context.Context, client *mongo.Client, compatibleMode bool,
+	logger *logrus.Logger, ti labelsGetter) *DiagnosticDataCollector {
+	ddc := &DiagnosticDataCollector{
+		ctx:            ctx,
+		client:         client,
+		compatibleMode: compatibleMode,
+		logger:         logger,
+		topologyInfo:   ti,
+		lock:           &sync.Mutex{},
+		metricsCache:   nil,
+	}
+
+	return ddc
 }
 
-func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
+func (d *DiagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
+
+	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
+	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
+	// after it will call Collect, it is safe to populate the cache here.
+	metrics := make(chan prometheus.Metric)
+	go func() {
+		d.collect(metrics)
+		close(metrics)
+	}()
+
+	for m := range metrics {
+		d.metricsCache = append(d.metricsCache, m) // populate the cache
+		ch <- m.Desc()
+	}
+}
+
+func (d *DiagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	for _, metric := range d.metricsCache {
+		ch <- metric
+	}
+}
+
+func (d *DiagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
+	t1 := time.Now()
 	var m bson.M
 
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
@@ -83,7 +132,10 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, metric := range metrics {
 		ch <- metric
 	}
+
+	t2 := time.Now()
+	d.logger.Debugf("DiagnosticDataCollector took: %v", t2.Sub(t1))
 }
 
 // check interface.
-var _ prometheus.Collector = (*diagnosticDataCollector)(nil)
+var _ prometheus.Collector = (*DiagnosticDataCollector)(nil)

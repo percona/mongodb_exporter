@@ -34,6 +34,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	defaultCacheSize = 1000
+)
+
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
 	path                  string
@@ -181,14 +185,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	if e.opts.EnableDiagnosticData {
-		ddc := diagnosticDataCollector{
-			ctx:            ctx,
-			client:         client,
-			compatibleMode: e.opts.CompatibleMode,
-			logger:         e.opts.Logger,
-			topologyInfo:   topologyInfo,
-		}
-		registry.MustRegister(&ddc)
+		ddc := NewDiagnosticDataCollector(ctx, client, e.opts.CompatibleMode, e.opts.Logger, topologyInfo)
+		registry.MustRegister(ddc)
 	}
 
 	if e.opts.EnableDBStats {
