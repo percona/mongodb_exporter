@@ -28,13 +28,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"time"
 )
 
-func getHeader(startYear int) string {
-	header := fmt.Sprintf(`// mongodb_exporter
-// Copyright (C) %d Percona LLC
-//
+var (
+	generatedHeader = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.`)
+
+	projectInfo = `// mongodb_exporter
+// Copyright (C) 2022 Percona LLC
+`
+	copyrightText = `//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -47,23 +49,23 @@ func getHeader(startYear int) string {
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
-`, startYear)
-	return header
-}
+`
+)
 
-var generatedHeader = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.`)
-
-// startYear represents the oldest copyright year present in the project
-var startYear = 2017
-
-func checkHeader(path string, startYear int) bool {
+func checkHeader(path string, header string) bool {
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 
-	actual := make([]byte, len(getHeader(startYear)))
+	// skip the lines containing the project name and copyright year
+	_, err = f.Seek(int64(len(projectInfo)), io.SeekStart)
+	if err != nil {
+		return false
+	}
+
+	actual := make([]byte, len(header))
 	_, err = io.ReadFull(f, actual)
 	if err == io.ErrUnexpectedEOF {
 		err = nil // some files are shorter than license header
@@ -77,13 +79,11 @@ func checkHeader(path string, startYear int) bool {
 		return true
 	}
 
-	for year := startYear; year <= time.Now().Year(); year++ {
-		if string(actual) == getHeader(year) {
-			return true
-		}
+	if header != string(actual) {
+		log.Print(path)
+		return false
 	}
-	log.Println(path)
-	return false
+	return true
 }
 
 func main() {
@@ -109,7 +109,7 @@ func main() {
 		}
 
 		if filepath.Ext(info.Name()) == ".go" {
-			if !checkHeader(path, startYear) {
+			if !checkHeader(path, copyrightText) {
 				ok = false
 			}
 		}
