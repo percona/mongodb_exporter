@@ -9,7 +9,7 @@ require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/alecthomas/kong v0.3.0
 	github.com/golang/snappy v0.0.3 // indirect
-	github.com/klauspost/compress v1.13.5 // indirect
+	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/percona/exporter_shared v0.7.4-0.20211108113423-8555cdbac68b
 	github.com/percona/percona-toolkit v0.0.0-20211210121818-b2860eee3152
 	github.com/pkg/errors v0.9.1
@@ -19,7 +19,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.7.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	go.mongodb.org/mongo-driver v1.7.2
+	go.mongodb.org/mongo-driver v1.8.2
 )
 
 require (
