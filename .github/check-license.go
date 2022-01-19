@@ -33,10 +33,9 @@ import (
 var (
 	generatedHeader = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.`)
 
-	projectInfo = `// mongodb_exporter
+	copyrightText = `// mongodb_exporter
 // Copyright (C) 2022 Percona LLC
-`
-	copyrightText = `//
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -50,22 +49,33 @@ var (
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 `
+
+	copyrightPattern = regexp.MustCompile(`^// mongodb_exporter
+// Copyright \(C\) \d{4} Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// \(at your option\) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+`)
 )
 
-func checkHeader(path string, header string) bool {
+func checkHeader(path string) bool {
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 
-	// skip the lines containing the project name and copyright year
-	_, err = f.Seek(int64(len(projectInfo)), io.SeekStart)
-	if err != nil {
-		return false
-	}
-
-	actual := make([]byte, len(header))
+	actual := make([]byte, len(copyrightText))
 	_, err = io.ReadFull(f, actual)
 	if err == io.ErrUnexpectedEOF {
 		err = nil // some files are shorter than license header
@@ -79,7 +89,7 @@ func checkHeader(path string, header string) bool {
 		return true
 	}
 
-	if header != string(actual) {
+	if !copyrightPattern.Match(actual) {
 		log.Print(path)
 		return false
 	}
@@ -109,7 +119,7 @@ func main() {
 		}
 
 		if filepath.Ext(info.Name()) == ".go" {
-			if !checkHeader(path, copyrightText) {
+			if !checkHeader(path) {
 				ok = false
 			}
 		}
