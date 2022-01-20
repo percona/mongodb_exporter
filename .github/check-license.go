@@ -51,7 +51,7 @@ var (
 `
 
 	copyrightPattern = regexp.MustCompile(`^// mongodb_exporter
-// Copyright \(C\) \d{4} Percona LLC
+// Copyright \(C\) 20\d{2} Percona LLC
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
