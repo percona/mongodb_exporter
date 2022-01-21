@@ -138,7 +138,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	// enable collectors like collstats and indexstats depending on the number of collections
 	// present in the database.
 	limitsOk := false
-	if e.opts.CollStatsLimit == 0 || // Unlimited
+	if e.opts.CollStatsLimit <= 0 || // Unlimited
 		(e.getTotalCollectionsCount() > 0 && e.getTotalCollectionsCount() < e.opts.CollStatsLimit) {
 		limitsOk = true
 	}
