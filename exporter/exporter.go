@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -262,11 +263,17 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 // run for hooking up custom HTTP servers.
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
+		// To support also older ones vmagents.
+		if err != nil {
+			seconds = 1
+		}
+
 		var client *mongo.Client
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
 		defer cancel()
 
-		client, err := e.getClient(ctx)
+		client, err = e.getClient(ctx)
 		if err != nil {
 			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
 		}
