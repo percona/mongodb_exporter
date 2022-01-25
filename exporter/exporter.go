@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -96,7 +97,7 @@ func New(opts *Opts) *Exporter {
 		opts:                  opts,
 		webListenAddress:      opts.WebListenAddress,
 		lock:                  &sync.Mutex{},
-		totalCollectionsCount: -1, // not calculated yet. waiting the db connection.
+		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
 	}
 	// Try initial connect. Connection will be retried with every scrape.
 	go func() {
@@ -135,11 +136,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
 	}
 
-	// enable collectors like collstats and indexstats depending on the number of collections
+	// Enable collectors like collstats and indexstats depending on the number of collections
 	// present in the database.
 	limitsOk := false
 	if e.opts.CollStatsLimit <= 0 || // Unlimited
-		(e.getTotalCollectionsCount() > 0 && e.getTotalCollectionsCount() < e.opts.CollStatsLimit) {
+		e.getTotalCollectionsCount() <= e.opts.CollStatsLimit {
 		limitsOk = true
 	}
 
@@ -153,7 +154,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableReplicasetStatus = true
 	}
 
-	// if we manually set the collection names we want or auto discovery is set
+	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk {
 		cc := collstatsCollector{
 			ctx:             ctx,
@@ -167,7 +168,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	// if we manually set the collection names we want or auto discovery is set
+	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk {
 		ic := indexstatsCollector{
 			ctx:             ctx,
@@ -213,7 +214,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&tc)
 	}
 
-	// replSetGetStatus is not supported through mongos
+	// replSetGetStatus is not supported through mongos.
 	if e.opts.EnableReplicasetStatus && nodeType != typeMongos {
 		rsgsc := replSetGetStatusCollector{
 			ctx:            ctx,
@@ -230,12 +231,12 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	if e.opts.GlobalConnPool {
-		// get global client. Maybe it must be initialized first.
+		// Get global client. Maybe it must be initialized first.
 		// Initialization is retried with every scrape until it succeeds once.
 		e.clientMu.Lock()
 		defer e.clientMu.Unlock()
 
-		// if client is already initialized, return it
+		// If client is already initialized, return it.
 		if e.client != nil {
 			return e.client, nil
 		}
@@ -249,7 +250,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 		return client, nil
 	}
 
-	// !e.opts.GlobalConnPool: create new client for every scrape
+	// !e.opts.GlobalConnPool: create new client for every scrape.
 	client, err := connect(ctx, e.opts.URI, e.opts.DirectConnect)
 	if err != nil {
 		return nil, err
@@ -259,19 +260,25 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 }
 
 // Handler returns an http.Handler that serves metrics. Can be used instead of
-// Run for hooking up custom HTTP servers.
+// run for hooking up custom HTTP servers.
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
+		// To support also older ones vmagents.
+		if err != nil {
+			seconds = 1
+		}
+
 		var client *mongo.Client
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
 		defer cancel()
 
-		client, err := e.getClient(ctx)
+		client, err = e.getClient(ctx)
 		if err != nil {
 			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
 		}
 
-		if client != nil && e.getTotalCollectionsCount() < 0 {
+		if client != nil && e.getTotalCollectionsCount() <= 0 {
 			count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 			if err == nil {
 				e.lock.Lock()
@@ -280,7 +287,7 @@ func (e *Exporter) Handler() http.Handler {
 			}
 		}
 
-		// Close client after usage
+		// Close client after usage.
 		if !e.opts.GlobalConnPool {
 			defer func() {
 				if client != nil {
@@ -292,7 +299,7 @@ func (e *Exporter) Handler() http.Handler {
 			}()
 		}
 
-		// topology can change between requests, so we need to get it every time
+		// Topology can change between requests, so we need to get it every time.
 		var ti *topologyInfo
 		if client != nil {
 			ti, err = newTopologyInfo(ctx, client)
