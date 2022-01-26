@@ -117,7 +117,7 @@ func (e *Exporter) getTotalCollectionsCount() int {
 	return e.totalCollectionsCount
 }
 
-func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter) *prometheus.Registry {
+func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
 	gc := generalCollector{
@@ -150,12 +150,14 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		}
 		e.opts.EnableDiagnosticData = true
 		e.opts.EnableDBStats = true
+		e.opts.EnableCollStats = true
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
+		e.opts.EnableIndexStats = true
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
-	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk {
+	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk && requestOpts.EnableCollStats {
 		cc := collstatsCollector{
 			ctx:             ctx,
 			client:          client,
@@ -169,7 +171,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
-	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk {
+	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk && requestOpts.EnableIndexStats {
 		ic := indexstatsCollector{
 			ctx:             ctx,
 			client:          client,
@@ -181,7 +183,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&ic)
 	}
 
-	if e.opts.EnableDiagnosticData {
+	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
 		ddc := diagnosticDataCollector{
 			ctx:            ctx,
 			client:         client,
@@ -192,7 +194,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&ddc)
 	}
 
-	if e.opts.EnableDBStats {
+	if e.opts.EnableDBStats && requestOpts.EnableDBStats {
 		cc := dbstatsCollector{
 			ctx:            ctx,
 			client:         client,
@@ -203,7 +205,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	if e.opts.EnableTopMetrics && nodeType != typeMongos {
+	if e.opts.EnableTopMetrics && nodeType != typeMongos && requestOpts.EnableTopMetrics {
 		tc := topCollector{
 			ctx:            ctx,
 			client:         client,
@@ -215,7 +217,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	// replSetGetStatus is not supported through mongos.
-	if e.opts.EnableReplicasetStatus && nodeType != typeMongos {
+	if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
 		rsgsc := replSetGetStatusCollector{
 			ctx:            ctx,
 			client:         client,
@@ -269,6 +271,31 @@ func (e *Exporter) Handler() http.Handler {
 			seconds = 10
 		}
 
+		filters := r.URL.Query()["collect[]"]
+
+		requestOpts := Opts{}
+
+		if len(filters) == 0 {
+			requestOpts = *e.opts
+		}
+
+		for _, filter := range filters {
+			switch filter {
+			case "diagnosticdata":
+				requestOpts.EnableDiagnosticData = true
+			case "replicasetstatus":
+				requestOpts.EnableReplicasetStatus = true
+			case "dbstats":
+				requestOpts.EnableDBStats = true
+			case "topmetrics":
+				requestOpts.EnableTopMetrics = true
+			case "indexstats":
+				requestOpts.EnableIndexStats = true
+			case "collstats":
+				requestOpts.EnableCollStats = true
+			}
+		}
+
 		var client *mongo.Client
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
 		defer cancel()
@@ -313,7 +340,7 @@ func (e *Exporter) Handler() http.Handler {
 			}
 		}
 
-		registry := e.makeRegistry(ctx, client, ti)
+		registry := e.makeRegistry(ctx, client, ti, requestOpts)
 
 		var gatherers prometheus.Gatherers
 
