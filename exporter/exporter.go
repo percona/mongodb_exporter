@@ -266,7 +266,7 @@ func (e *Exporter) Handler() http.Handler {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
 		// To support also older ones vmagents.
 		if err != nil {
-			seconds = 1
+			seconds = 10
 		}
 
 		var client *mongo.Client
