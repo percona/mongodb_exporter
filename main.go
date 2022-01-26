@@ -127,6 +127,7 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		EnableCollStats:        opts.EnableCollStats,
 
 		CollStatsLimit: opts.CollStatsLimit,
+		CollectAll:     opts.CollectAll,
 	}
 
 	e := exporter.New(exporterOpts)
