@@ -243,7 +243,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 			return e.client, nil
 		}
 
-		client, err := connect(ctx, e.opts.URI, e.opts.DirectConnect)
+		client, err := connect(context.Background(), e.opts.URI, e.opts.DirectConnect)
 		if err != nil {
 			return nil, err
 		}
@@ -271,6 +271,10 @@ func (e *Exporter) Handler() http.Handler {
 			seconds = 10
 		}
 
+		var client *mongo.Client
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
+		defer cancel()
+
 		filters := r.URL.Query()["collect[]"]
 
 		requestOpts := Opts{}
@@ -295,10 +299,6 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableCollStats = true
 			}
 		}
-
-		var client *mongo.Client
-		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
-		defer cancel()
 
 		client, err = e.getClient(ctx)
 		if err != nil {
