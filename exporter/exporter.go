@@ -192,7 +192,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&ddc)
 	}
 
-	if e.opts.EnableDBStats && requestOpts.EnableDBStats {
+	if e.opts.EnableDBStats && limitsOk && requestOpts.EnableDBStats {
 		cc := dbstatsCollector{
 			ctx:            ctx,
 			client:         client,
@@ -203,7 +203,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(&cc)
 	}
 
-	if e.opts.EnableTopMetrics && nodeType != typeMongos && requestOpts.EnableTopMetrics {
+	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
 		tc := topCollector{
 			ctx:            ctx,
 			client:         client,
