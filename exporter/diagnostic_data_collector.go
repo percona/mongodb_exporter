@@ -53,6 +53,10 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 		d.logger.Errorf("cannot run getDiagnosticData: %s", err)
 	}
 
+	if m == nil || m["data"] == nil {
+		d.logger.Error("cannot run getDiagnosticData: response is empty")
+	}
+
 	m, ok := m["data"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
