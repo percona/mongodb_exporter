@@ -66,8 +66,8 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		aggregation := bson.D{
 			{
 				Key: "$collStats", Value: bson.M{
-					"latencyStats": bson.E{Key: "histograms", Value: true},
-					"storageStats": bson.E{Key: "scale", Value: 1},
+					"latencyStats": bson.M{"histograms": true},
+					"storageStats": bson.M{"scale": 1},
 				},
 			},
 		}
