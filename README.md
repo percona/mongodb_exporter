@@ -42,6 +42,7 @@ the current version.
 |\-\-no-collector.replicasetstatus|Disable collecting metrics from replSetGetStatus||
 |\-\-collector.dbstats|Enable collecting metrics from dbStats||
 |\-\-enable.top|Enable collecting metrics from top admin command||
+|\-\-collector.overridedescendingindex| Enable descending index name override to replace -1 with _DESC ||
 |--version|Show version and exit|
 
 ### Build the exporter

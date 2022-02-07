@@ -28,12 +28,13 @@ import (
 )
 
 type indexstatsCollector struct {
-	ctx             context.Context
-	client          *mongo.Client
-	collections     []string
-	discoveringMode bool
-	logger          *logrus.Logger
-	topologyInfo    labelsGetter
+	ctx                     context.Context
+	client                  *mongo.Client
+	collections             []string
+	discoveringMode         bool
+	logger                  *logrus.Logger
+	topologyInfo            labelsGetter
+	overrideDescendingIndex bool
 }
 
 func (d *indexstatsCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -85,12 +86,17 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		debugResult(d.logger, stats)
 
 		for _, metric := range stats {
+			indexName := fmt.Sprintf("%s", metric["name"])
+			// Override the indexes Metrics and labels name
+			if d.overrideDescendingIndex {
+				indexName = strings.Replace(fmt.Sprintf("%s", metric["name"]), "-1", "_DESC", -1)
+			}
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the
 			// same, for different collections.
-			prefix := fmt.Sprintf("%s_%s_%s", database, collection, metric["name"])
+			prefix := fmt.Sprintf("%s_%s_%s", database, collection, indexName)
 			labels := d.topologyInfo.baseLabels()
 			labels["namespace"] = database + "." + collection
-			labels["key_name"] = fmt.Sprintf("%s", metric["name"])
+			labels["key_name"] = fmt.Sprintf("%s", indexName)
 
 			metrics := sanitizeMetrics(metric)
 			for _, metric := range makeMetrics(prefix, metrics, labels, false) {

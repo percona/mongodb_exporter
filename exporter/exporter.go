@@ -59,13 +59,14 @@ type Opts struct {
 	DiscoveringMode        bool
 	GlobalConnPool         bool
 
-	CollectAll             bool
-	EnableDBStats          bool
-	EnableDiagnosticData   bool
-	EnableReplicasetStatus bool
-	EnableTopMetrics       bool
-	EnableIndexStats       bool
-	EnableCollStats        bool
+	CollectAll                    bool
+	EnableDBStats                 bool
+	EnableDiagnosticData          bool
+	EnableReplicasetStatus        bool
+	EnableTopMetrics              bool
+	EnableIndexStats              bool
+	EnableCollStats               bool
+	EnableOverrideDescendingIndex bool
 
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
@@ -173,12 +174,13 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk && requestOpts.EnableIndexStats {
 		ic := indexstatsCollector{
-			ctx:             ctx,
-			client:          client,
-			collections:     e.opts.IndexStatsCollections,
-			discoveringMode: e.opts.DiscoveringMode,
-			logger:          e.opts.Logger,
-			topologyInfo:    topologyInfo,
+			ctx:                     ctx,
+			client:                  client,
+			collections:             e.opts.IndexStatsCollections,
+			discoveringMode:         e.opts.DiscoveringMode,
+			logger:                  e.opts.Logger,
+			topologyInfo:            topologyInfo,
+			overrideDescendingIndex: e.opts.EnableOverrideDescendingIndex,
 		}
 		registry.MustRegister(&ic)
 	}
