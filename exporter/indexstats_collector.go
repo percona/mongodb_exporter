@@ -89,7 +89,7 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			indexName := fmt.Sprintf("%s", metric["name"])
 			// Override the indexes Metrics and labels name
 			if d.overrideDescendingIndex {
-				indexName = strings.Replace(fmt.Sprintf("%s", metric["name"]), "-1", "_DESC", -1)
+				indexName = strings.ReplaceAll(fmt.Sprintf("%s", metric["name"]), "-1", "_DESC")
 			}
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the
 			// same, for different collections.
