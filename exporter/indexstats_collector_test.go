@@ -65,10 +65,11 @@ func TestIndexStatsCollector(t *testing.T) {
 	}
 
 	c := &indexstatsCollector{
-		client:       client,
-		collections:  []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
-		logger:       logrus.New(),
-		topologyInfo: ti,
+		client:                  client,
+		collections:             []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
+		logger:                  logrus.New(),
+		topologyInfo:            ti,
+		overrideDescendingIndex: false,
 	}
 
 	// The last \n at the end of this string is important
@@ -91,6 +92,84 @@ mongodb_testdb_testcol_02_id_accesses_ops{key_name="_id_",namespace="testdb.test
 # HELP mongodb_testdb_testcol_02_idx_01_accesses_ops testdb_testcol_02_idx_01.accesses.
 # TYPE mongodb_testdb_testcol_02_idx_01_accesses_ops untyped
 mongodb_testdb_testcol_02_idx_01_accesses_ops{key_name="idx_01",namespace="testdb.testcol_02"} 0` + "\n")
+
+	err := testutil.CollectAndCompare(c, expected)
+	assert.NoError(t, err)
+}
+
+func TestDescendingIndexOverride(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	ti := labelsGetterMock{}
+
+	database := client.Database("testdb")
+	database.Drop(ctx)       //nolint:errcheck
+	defer database.Drop(ctx) //nolint:errcheck
+
+	for i := 0; i < 3; i++ {
+		collection := fmt.Sprintf("testcol_%02d", i)
+		for j := 0; j < 10; j++ {
+			_, err := database.Collection(collection).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
+			assert.NoError(t, err)
+		}
+
+		descendingMod := mongo.IndexModel{
+			Keys: bson.M{
+				"f1": -1,
+			},
+		}
+		_, err := database.Collection(collection).Indexes().CreateOne(ctx, descendingMod)
+		assert.NoError(t, err)
+
+		ascendingMod := mongo.IndexModel{
+			Keys: bson.M{
+				"f1": 1,
+			},
+		}
+		_, err = database.Collection(collection).Indexes().CreateOne(ctx, ascendingMod)
+		assert.NoError(t, err)
+	}
+
+	c := &indexstatsCollector{
+		client:                  client,
+		collections:             []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
+		logger:                  logrus.New(),
+		topologyInfo:            ti,
+		overrideDescendingIndex: true,
+	}
+
+	// The last \n at the end of this string is important
+	expected := strings.NewReader(`
+	# HELP mongodb_testdb_testcol_00_f1_1_accesses_ops testdb_testcol_00_f1_1.accesses.
+	# TYPE mongodb_testdb_testcol_00_f1_1_accesses_ops untyped
+	mongodb_testdb_testcol_00_f1_1_accesses_ops{key_name="f1_1",namespace="testdb.testcol_00"} 0
+	# HELP mongodb_testdb_testcol_00_f1_DESC_accesses_ops testdb_testcol_00_f1__DESC.accesses.
+	# TYPE mongodb_testdb_testcol_00_f1_DESC_accesses_ops untyped
+	mongodb_testdb_testcol_00_f1_DESC_accesses_ops{key_name="f1__DESC",namespace="testdb.testcol_00"} 0
+	# HELP mongodb_testdb_testcol_00_id_accesses_ops testdb_testcol_00__id_.accesses.
+	# TYPE mongodb_testdb_testcol_00_id_accesses_ops untyped
+	mongodb_testdb_testcol_00_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_00"} 0
+	# HELP mongodb_testdb_testcol_01_f1_1_accesses_ops testdb_testcol_01_f1_1.accesses.
+	# TYPE mongodb_testdb_testcol_01_f1_1_accesses_ops untyped
+	mongodb_testdb_testcol_01_f1_1_accesses_ops{key_name="f1_1",namespace="testdb.testcol_01"} 0
+	# HELP mongodb_testdb_testcol_01_f1_DESC_accesses_ops testdb_testcol_01_f1__DESC.accesses.
+	# TYPE mongodb_testdb_testcol_01_f1_DESC_accesses_ops untyped
+	mongodb_testdb_testcol_01_f1_DESC_accesses_ops{key_name="f1__DESC",namespace="testdb.testcol_01"} 0
+	# HELP mongodb_testdb_testcol_01_id_accesses_ops testdb_testcol_01__id_.accesses.
+	# TYPE mongodb_testdb_testcol_01_id_accesses_ops untyped
+	mongodb_testdb_testcol_01_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_01"} 0
+	# HELP mongodb_testdb_testcol_02_f1_1_accesses_ops testdb_testcol_02_f1_1.accesses.
+	# TYPE mongodb_testdb_testcol_02_f1_1_accesses_ops untyped
+	mongodb_testdb_testcol_02_f1_1_accesses_ops{key_name="f1_1",namespace="testdb.testcol_02"} 0
+	# HELP mongodb_testdb_testcol_02_f1_DESC_accesses_ops testdb_testcol_02_f1__DESC.accesses.
+	# TYPE mongodb_testdb_testcol_02_f1_DESC_accesses_ops untyped
+	mongodb_testdb_testcol_02_f1_DESC_accesses_ops{key_name="f1__DESC",namespace="testdb.testcol_02"} 0
+	# HELP mongodb_testdb_testcol_02_id_accesses_ops testdb_testcol_02__id_.accesses.
+	# TYPE mongodb_testdb_testcol_02_id_accesses_ops untyped
+	mongodb_testdb_testcol_02_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_02"} 0` + "\n")
 
 	err := testutil.CollectAndCompare(c, expected)
 	assert.NoError(t, err)
