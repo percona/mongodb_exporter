@@ -96,7 +96,7 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			prefix := fmt.Sprintf("%s_%s_%s", database, collection, indexName)
 			labels := d.topologyInfo.baseLabels()
 			labels["namespace"] = database + "." + collection
-			labels["key_name"] = fmt.Sprintf("%s", indexName)
+			labels["key_name"] = indexName
 
 			metrics := sanitizeMetrics(metric)
 			for _, metric := range makeMetrics(prefix, metrics, labels, false) {
