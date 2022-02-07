@@ -111,10 +111,10 @@ func TestDescendingIndexOverride(t *testing.T) {
 			_, err := database.Collection(collection).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
 			assert.NoError(t, err)
 		}
-		descendingMod := mongo.IndexModel{ Keys: bson.M{ "f1": -1 } }
+		descendingMod := mongo.IndexModel{ Keys: bson.M{ "f1": -1, }, }
 		_, err := database.Collection(collection).Indexes().CreateOne(ctx, descendingMod)
 		assert.NoError(t, err)
-		ascendingMod := mongo.IndexModel{ Keys: bson.M{ "f1": 1 } }
+		ascendingMod := mongo.IndexModel{ Keys: bson.M{ "f1": 1, }, }
 		_, err = database.Collection(collection).Indexes().CreateOne(ctx, ascendingMod)
 		assert.NoError(t, err)
 	}
