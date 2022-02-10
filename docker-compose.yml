@@ -151,7 +151,7 @@ services:
             - MONGO3=mongo-cnf-3
             - RS=cnf-serv
             - PORT=27017
-        entrypoint: [ "/scripts/setup_cnf.sh" ]
+        entrypoint: [ "/scripts/setup.sh" ]
 
     mongos:
         container_name: "mongos"
