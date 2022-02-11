@@ -66,8 +66,9 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		aggregation := bson.D{
 			{
 				Key: "$collStats", Value: bson.M{
-					"latencyStats": bson.E{Key: "histograms", Value: true},
-					"storageStats": bson.E{Key: "scale", Value: 1},
+					// TODO: PMM-9568 : Add support to handle histogram metrics
+					"latencyStats": bson.M{"histograms": false},
+					"storageStats": bson.M{"scale": 1},
 				},
 			},
 		}
