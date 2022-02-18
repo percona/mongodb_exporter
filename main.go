@@ -53,7 +53,7 @@ type GlobalFlags struct {
 
 	CollectAll bool `name:"collect-all" help:"Enable all collectors. Same as specifying all --collector.<name>"`
 
-	CollStatsLimit int `name:"collector.collstats-limit" help:"Disable collstats and indexstats collector if there are more than <n> collections. 0=No limit" default:"0"`
+	CollStatsLimit int `name:"collector.collstats-limit" help:"Disable collstats, dbstats, topmetrics and indexstats collector if there are more than <n> collections. 0=No limit" default:"0"`
 
 	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections" negatable:""`
 	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" negatable:""`
@@ -127,6 +127,7 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		EnableCollStats:        opts.EnableCollStats,
 
 		CollStatsLimit: opts.CollStatsLimit,
+		CollectAll:     opts.CollectAll,
 	}
 
 	e := exporter.New(exporterOpts)

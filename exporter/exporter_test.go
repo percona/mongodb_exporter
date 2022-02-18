@@ -187,7 +187,7 @@ func TestMongoS(t *testing.T) {
 			topologyInfo:   new(labelsGetterMock),
 		}
 
-		r := e.makeRegistry(ctx, client, new(labelsGetterMock))
+		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
 		res := r.Unregister(&rsgsc)
 		assert.Equal(t, test.want, res, fmt.Sprintf("Port: %v", test.port))
@@ -218,7 +218,7 @@ func TestMongoUp(t *testing.T) {
 		logger: e.opts.Logger,
 	}
 
-	r := e.makeRegistry(ctx, client, new(labelsGetterMock))
+	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
 	res := r.Unregister(&gc)
 	assert.Equal(t, true, res)
