@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/golangci/golangci-lint v1.43.0
 	github.com/reviewdog/reviewdog v0.13.1
-	golang.org/x/tools v0.1.8
+	golang.org/x/tools v0.1.9
 )
 
 require (
