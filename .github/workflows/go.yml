@@ -22,13 +22,13 @@ jobs:
         go-version:
           - 1.17.x
         image:
-          - mongo:3.6
           - mongo:4.0
           - mongo:4.2
           - mongo:4.4
-          - percona/percona-server-mongodb:3.6
+          - mongo:5.0
           - percona/percona-server-mongodb:4.0
           - percona/percona-server-mongodb:4.2
+          - percona/percona-server-mongodb:4.4
         os: [ubuntu-latest]
         may-fail: [false]
 
