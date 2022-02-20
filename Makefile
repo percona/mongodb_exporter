@@ -83,8 +83,8 @@ FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 format:                     ## Format source code.
 	go mod tidy
-	bin/gofumpt -w -s $(FILES)
-	bin/gofumports -local github.com/percona/mongodb_exporter -l -w $(FILES)
+	bin/gofumpt -l -w -s $(FILES)
+	bin/goimports -local github.com/percona/mongodb_exporter -l -w $(FILES)
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run
