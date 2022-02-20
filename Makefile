@@ -68,10 +68,7 @@ env:
 	@echo $(TEST_ENV) | tr ' ' '\n' >.env
 
 init:                       ## Install linters.
-	go build -modfile=tools/go.mod -o bin/gofumports mvdan.cc/gofumpt/gofumports
-	go build -modfile=tools/go.mod -o bin/gofumpt mvdan.cc/gofumpt
-	go build -modfile=tools/go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
-	go build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
+	cd tools && go generate -x -tags=tools
 
 build:                      ## Compile using plain go build
 	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
