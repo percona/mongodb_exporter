@@ -79,6 +79,10 @@ var (
 	errUnexpectedDataType = fmt.Errorf("unexpected data type")
 )
 
+const (
+	defaultCacheSize = 1000
+)
+
 // New connects to the database and returns a new Exporter instance.
 func New(opts *Opts) *Exporter {
 	if opts == nil {
@@ -120,12 +124,8 @@ func (e *Exporter) getTotalCollectionsCount() int {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	gc := generalCollector{
-		ctx:    ctx,
-		client: client,
-		logger: e.opts.Logger,
-	}
-	registry.MustRegister(&gc)
+	gc := NewGeneralCollector(ctx, client, e.opts.Logger)
+	registry.MustRegister(gc)
 
 	if client == nil {
 		return registry
@@ -158,74 +158,42 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk && requestOpts.EnableCollStats {
-		cc := collstatsCollector{
-			ctx:             ctx,
-			client:          client,
-			collections:     e.opts.CollStatsNamespaces,
-			compatibleMode:  e.opts.CompatibleMode,
-			discoveringMode: e.opts.DiscoveringMode,
-			logger:          e.opts.Logger,
-			topologyInfo:    topologyInfo,
-		}
-		registry.MustRegister(&cc)
+		cc := NewCollectionStatsCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, e.opts.DiscoveringMode,
+			topologyInfo, e.opts.CollStatsNamespaces)
+		registry.MustRegister(cc)
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk && requestOpts.EnableIndexStats {
-		ic := indexstatsCollector{
-			ctx:             ctx,
-			client:          client,
-			collections:     e.opts.IndexStatsCollections,
-			discoveringMode: e.opts.DiscoveringMode,
-			logger:          e.opts.Logger,
-			topologyInfo:    topologyInfo,
-		}
-		registry.MustRegister(&ic)
+		ic := NewIndexStatsCollector(ctx, client, e.opts.Logger,
+			e.opts.DiscoveringMode, topologyInfo, e.opts.IndexStatsCollections)
+		registry.MustRegister(ic)
 	}
 
 	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
-		ddc := diagnosticDataCollector{
-			ctx:            ctx,
-			client:         client,
-			compatibleMode: e.opts.CompatibleMode,
-			logger:         e.opts.Logger,
-			topologyInfo:   topologyInfo,
-		}
-		registry.MustRegister(&ddc)
+		ddc := NewDiagnosticDataCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(ddc)
 	}
 
 	if e.opts.EnableDBStats && limitsOk && requestOpts.EnableDBStats {
-		cc := dbstatsCollector{
-			ctx:            ctx,
-			client:         client,
-			compatibleMode: e.opts.CompatibleMode,
-			logger:         e.opts.Logger,
-			topologyInfo:   topologyInfo,
-		}
-		registry.MustRegister(&cc)
+		cc := NewDBStatsCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(cc)
 	}
 
 	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
-		tc := topCollector{
-			ctx:            ctx,
-			client:         client,
-			compatibleMode: e.opts.CompatibleMode,
-			logger:         e.opts.Logger,
-			topologyInfo:   topologyInfo,
-		}
-		registry.MustRegister(&tc)
+		tc := NewTopCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(tc)
 	}
 
 	// replSetGetStatus is not supported through mongos.
 	if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
-		rsgsc := replSetGetStatusCollector{
-			ctx:            ctx,
-			client:         client,
-			compatibleMode: e.opts.CompatibleMode,
-			logger:         e.opts.Logger,
-			topologyInfo:   topologyInfo,
-		}
-		registry.MustRegister(&rsgsc)
+		rsgsc := NewReplicationSetStatusCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(rsgsc)
 	}
 
 	return registry

@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -27,20 +28,63 @@ import (
 )
 
 type collstatsCollector struct {
-	ctx             context.Context
-	client          *mongo.Client
-	collections     []string
+	ctx    context.Context
+	client *mongo.Client
+	logger *logrus.Logger
+
+	lock         sync.Mutex
+	metricsCache []prometheus.Metric
+
 	compatibleMode  bool
 	discoveringMode bool
-	logger          *logrus.Logger
 	topologyInfo    labelsGetter
+
+	collections []string
+}
+
+func NewCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible, discovery bool, topology labelsGetter, collections []string) *collstatsCollector {
+	return &collstatsCollector{
+		ctx:             ctx,
+		client:          client,
+		logger:          logger,
+		compatibleMode:  compatible,
+		discoveringMode: discovery,
+		topologyInfo:    topology,
+		collections:     collections,
+	}
 }
 
 func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
+
+	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
+	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
+	// after it will call Collect, it is safe to populate the cache here.
+	metrics := make(chan prometheus.Metric)
+	go func() {
+		d.collect(metrics)
+		close(metrics)
+	}()
+
+	for m := range metrics {
+		d.metricsCache = append(d.metricsCache, m) // populate the cache
+		ch <- m.Desc()
+	}
 }
 
 func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	for _, metric := range d.metricsCache {
+		ch <- metric
+	}
+}
+
+func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	collections := d.collections
 
 	if d.discoveringMode {

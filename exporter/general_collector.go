@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -31,13 +32,50 @@ type generalCollector struct {
 	ctx    context.Context
 	client *mongo.Client
 	logger *logrus.Logger
+
+	lock         sync.Mutex
+	metricsCache []prometheus.Metric
+}
+
+func NewGeneralCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *generalCollector {
+	return &generalCollector{
+		ctx:    ctx,
+		client: client,
+		logger: logger,
+	}
 }
 
 func (d *generalCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
+
+	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
+	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
+	// after it will call Collect, it is safe to populate the cache here.
+	metrics := make(chan prometheus.Metric)
+	go func() {
+		d.collect(metrics)
+		close(metrics)
+	}()
+
+	for m := range metrics {
+		d.metricsCache = append(d.metricsCache, m) // populate the cache
+		ch <- m.Desc()
+	}
 }
 
 func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	for _, metric := range d.metricsCache {
+		ch <- metric
+	}
+}
+
+func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
 	ch <- mongodbUpMetric(d.ctx, d.client, d.logger)
 }
 

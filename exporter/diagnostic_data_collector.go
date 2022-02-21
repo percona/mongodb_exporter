@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,18 +28,58 @@ import (
 )
 
 type diagnosticDataCollector struct {
-	ctx            context.Context
-	client         *mongo.Client
+	ctx    context.Context
+	client *mongo.Client
+	logger *logrus.Logger
+
+	lock         sync.Mutex
+	metricsCache []prometheus.Metric
+
 	compatibleMode bool
-	logger         *logrus.Logger
 	topologyInfo   labelsGetter
 }
 
+func NewDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *diagnosticDataCollector {
+	return &diagnosticDataCollector{
+		ctx:            ctx,
+		client:         client,
+		logger:         logger,
+		compatibleMode: compatible,
+		topologyInfo:   topology,
+	}
+}
+
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
+
+	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
+	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
+	// after it will call Collect, it is safe to populate the cache here.
+	metrics := make(chan prometheus.Metric)
+	go func() {
+		d.collect(metrics)
+		close(metrics)
+	}()
+
+	for m := range metrics {
+		d.metricsCache = append(d.metricsCache, m) // populate the cache
+		ch <- m.Desc()
+	}
 }
 
 func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	for _, metric := range d.metricsCache {
+		ch <- metric
+	}
+}
+
+func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
