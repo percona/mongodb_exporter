@@ -68,6 +68,7 @@ func (d *serverStatusCollector) Describe(ch chan<- *prometheus.Desc) {
 		ch <- m.Desc()
 	}
 }
+
 func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
