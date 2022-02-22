@@ -66,6 +66,7 @@ type Opts struct {
 	EnableTopMetrics              bool
 	EnableIndexStats              bool
 	EnableCollStats               bool
+
 	EnableOverrideDescendingIndex bool
 
 	IndexStatsCollections []string

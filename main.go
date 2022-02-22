@@ -50,7 +50,8 @@ type GlobalFlags struct {
 	EnableTopMetrics              bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
 	EnableIndexStats              bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
 	EnableCollStats               bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
-	EnableOverrideDescendingIndex bool `name:"collector.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
+
+	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
 	CollectAll bool `name:"collect-all" help:"Enable all collectors. Same as specifying all --collector.<name>"`
 
@@ -126,6 +127,7 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		EnableDBStats:                 opts.EnableDBStats,
 		EnableIndexStats:              opts.EnableIndexStats,
 		EnableCollStats:               opts.EnableCollStats,
+
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 
 		CollStatsLimit: opts.CollStatsLimit,
