@@ -18,7 +18,6 @@ package exporter
 
 import (
 	"context"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -29,54 +28,30 @@ import (
 // This collector is always enabled and it is not directly related to any particular MongoDB
 // command to gather stats.
 type generalCollector struct {
-	ctx    context.Context
-	client *mongo.Client
-	logger *logrus.Logger
-
-	lock         sync.Mutex
-	metricsCache []prometheus.Metric
+	ctx  context.Context
+	base *baseCollector
 }
 
-func NewGeneralCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *generalCollector {
+func NewGeneralCollector(ctx context.Context, base *baseCollector) *generalCollector {
 	return &generalCollector{
-		ctx:    ctx,
-		client: client,
-		logger: logger,
+		ctx:  ctx,
+		base: base,
 	}
 }
 
 func (d *generalCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
-
-	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
-	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
-	// after it will call Collect, it is safe to populate the cache here.
-	metrics := make(chan prometheus.Metric)
-	go func() {
-		d.collect(metrics)
-		close(metrics)
-	}()
-
-	for m := range metrics {
-		d.metricsCache = append(d.metricsCache, m) // populate the cache
-		ch <- m.Desc()
-	}
+	d.base.Describe(ch, d.collect)
 }
 
 func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	for _, metric := range d.metricsCache {
-		ch <- metric
-	}
+	d.base.Collect(ch)
 }
 
 func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
-	ch <- mongodbUpMetric(d.ctx, d.client, d.logger)
+	if d.base == nil {
+		return
+	}
+	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
 }
 
 func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {

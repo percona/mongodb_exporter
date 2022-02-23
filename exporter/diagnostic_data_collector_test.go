@@ -46,11 +46,8 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	logger := logrus.New()
 	ti := labelsGetterMock{}
 
-	c := &diagnosticDataCollector{
-		client:       client,
-		logger:       logger,
-		topologyInfo: ti,
-	}
+	base := NewBaseCollector(client, logger)
+	c := NewDiagnosticDataCollector(ctx, base, false, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -87,12 +84,8 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	ti, err := newTopologyInfo(ctx, client)
 	require.NoError(t, err)
 
-	c := &diagnosticDataCollector{
-		client:         client,
-		logger:         logrus.New(),
-		compatibleMode: true,
-		topologyInfo:   ti,
-	}
+	base := NewBaseCollector(client, logrus.New())
+	c := NewDiagnosticDataCollector(ctx, base, true, ti)
 
 	reg := prometheus.NewRegistry()
 	err = reg.Register(c)
@@ -143,13 +136,8 @@ func TestContextTimeout(t *testing.T) {
 	cctx, ccancel := context.WithCancel(context.Background())
 	ccancel()
 
-	c := &diagnosticDataCollector{
-		client:         client,
-		logger:         logrus.New(),
-		compatibleMode: true,
-		topologyInfo:   ti,
-		ctx:            cctx,
-	}
+	base := NewBaseCollector(client, logrus.New())
+	c := NewDiagnosticDataCollector(cctx, base, true, ti)
 	// it should not panic
 	helpers.CollectMetrics(c)
 }
@@ -234,12 +222,8 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := &diagnosticDataCollector{
-		client:         client,
-		logger:         logger,
-		topologyInfo:   ti,
-		compatibleMode: true,
-	}
+	base := NewBaseCollector(client, logger)
+	c := NewDiagnosticDataCollector(ctx, base, true, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`

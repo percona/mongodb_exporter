@@ -18,21 +18,14 @@ package exporter
 
 import (
 	"context"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type dbstatsCollector struct {
-	ctx    context.Context
-	client *mongo.Client
-	logger *logrus.Logger
-
-	lock         sync.Mutex
-	metricsCache []prometheus.Metric
+	ctx  context.Context
+	base *baseCollector
 
 	compatibleMode bool
 	topologyInfo   labelsGetter
@@ -40,69 +33,55 @@ type dbstatsCollector struct {
 	databaseFilter []string
 }
 
-func NewDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string) *dbstatsCollector {
+func NewDBStatsCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter, databaseRegex []string) *dbstatsCollector {
 	return &dbstatsCollector{
-		ctx:            ctx,
-		client:         client,
-		logger:         logger,
+		ctx:  ctx,
+		base: base,
+
 		compatibleMode: compatible,
 		topologyInfo:   topology,
+
 		databaseFilter: databaseRegex,
 	}
 }
 
 func (d *dbstatsCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
-
-	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
-	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
-	// after it will call Collect, it is safe to populate the cache here.
-	metrics := make(chan prometheus.Metric)
-	go func() {
-		d.collect(metrics)
-		close(metrics)
-	}()
-
-	for m := range metrics {
-		d.metricsCache = append(d.metricsCache, m) // populate the cache
-		ch <- m.Desc()
-	}
+	d.base.Describe(ch, d.collect)
 }
 
 func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	for _, metric := range d.metricsCache {
-		ch <- metric
-	}
+	d.base.Collect(ch)
 }
 
 func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
-	dbNames, err := databases(d.ctx, d.client, d.databaseFilter, nil)
+	if d.base == nil {
+		return
+	}
+
+	log := d.base.logger
+	client := d.base.client
+
+	dbNames, err := databases(d.ctx, client, d.databaseFilter, nil)
 	if err != nil {
-		d.logger.Errorf("Failed to get database names: %s", err)
+		log.Errorf("Failed to get database names: %s", err)
 
 		return
 	}
 
-	d.logger.Debugf("getting stats for databases: %v", dbNames)
+	log.Debugf("getting stats for databases: %v", dbNames)
 	for _, db := range dbNames {
 		var dbStats bson.M
 		cmd := bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}}
-		r := d.client.Database(db).RunCommand(d.ctx, cmd)
+		r := client.Database(db).RunCommand(d.ctx, cmd)
 		err := r.Decode(&dbStats)
 		if err != nil {
-			d.logger.Errorf("Failed to get $dbstats for database %s: %s", db, err)
+			log.Errorf("Failed to get $dbstats for database %s: %s", db, err)
 
 			continue
 		}
 
-		d.logger.Debugf("$dbStats metrics for %s", db)
-		debugResult(d.logger, dbStats)
+		log.Debugf("$dbStats metrics for %s", db)
+		debugResult(log, dbStats)
 
 		prefix := "dbstats"
 
@@ -112,7 +91,8 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 		// to differentiate metrics between different databases.
 		labels["database"] = db
 
-		for _, metric := range makeMetrics(prefix, dbStats, labels, d.compatibleMode) {
+		newMetrics := makeMetrics(prefix, dbStats, labels, d.compatibleMode)
+		for _, metric := range newMetrics {
 			ch <- metric
 		}
 	}

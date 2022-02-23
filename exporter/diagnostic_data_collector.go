@@ -18,110 +18,88 @@ package exporter
 
 import (
 	"context"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type diagnosticDataCollector struct {
-	ctx    context.Context
-	client *mongo.Client
-	logger *logrus.Logger
-
-	lock         sync.Mutex
-	metricsCache []prometheus.Metric
+	ctx  context.Context
+	base *baseCollector
 
 	compatibleMode bool
 	topologyInfo   labelsGetter
 }
 
-func NewDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *diagnosticDataCollector {
+func NewDiagnosticDataCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *diagnosticDataCollector {
 	return &diagnosticDataCollector{
-		ctx:            ctx,
-		client:         client,
-		logger:         logger,
+		ctx:  ctx,
+		base: base,
+
 		compatibleMode: compatible,
 		topologyInfo:   topology,
 	}
 }
 
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
-
-	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
-	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
-	// after it will call Collect, it is safe to populate the cache here.
-	metrics := make(chan prometheus.Metric)
-	go func() {
-		d.collect(metrics)
-		close(metrics)
-	}()
-
-	for m := range metrics {
-		d.metricsCache = append(d.metricsCache, m) // populate the cache
-		ch <- m.Desc()
-	}
+	d.base.Describe(ch, d.collect)
 }
 
 func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	for _, metric := range d.metricsCache {
-		ch <- metric
-	}
+	d.base.Collect(ch)
 }
 
 func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
+	if d.base == nil {
+		return
+	}
+
+	log := d.base.logger
+	client := d.base.client
+
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
-	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
+	res := client.Database("admin").RunCommand(d.ctx, cmd)
 	if res.Err() != nil {
-		if isArbiter, _ := isArbiter(d.ctx, d.client); isArbiter {
+		if isArbiter, _ := isArbiter(d.ctx, client); isArbiter {
 			return
 		}
 	}
 
 	if err := res.Decode(&m); err != nil {
-		d.logger.Errorf("cannot run getDiagnosticData: %s", err)
+		log.Errorf("cannot run getDiagnosticData: %s", err)
 	}
 
 	if m == nil || m["data"] == nil {
-		d.logger.Error("cannot run getDiagnosticData: response is empty")
+		log.Error("cannot run getDiagnosticData: response is empty")
 	}
 
 	m, ok := m["data"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
-		d.logger.Errorf("cannot decode getDiagnosticData: %s", err)
+		log.Errorf("cannot decode getDiagnosticData: %s", err)
 	}
 
-	d.logger.Debug("getDiagnosticData result")
-	debugResult(d.logger, m)
+	log.Debug("getDiagnosticData result")
+	debugResult(log, m)
 
 	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(m)...)
 
 	if d.compatibleMode {
-		metrics = append(metrics, specialMetrics(d.ctx, d.client, m, d.logger)...)
+		metrics = append(metrics, specialMetrics(d.ctx, client, m, log)...)
 
 		if cem, err := cacheEvictedTotalMetric(m); err == nil {
 			metrics = append(metrics, cem)
 		}
 
-		nodeType, err := getNodeType(d.ctx, d.client)
+		nodeType, err := getNodeType(d.ctx, client)
 		if err != nil {
-			d.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
+			log.Errorf("Cannot get node type to check if this is a mongos: %s", err)
 		} else if nodeType == typeMongos {
-			metrics = append(metrics, mongosMetrics(d.ctx, d.client, d.logger)...)
+			metrics = append(metrics, mongosMetrics(d.ctx, client, log)...)
 		}
 	}
 

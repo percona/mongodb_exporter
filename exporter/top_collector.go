@@ -18,31 +18,24 @@ package exporter
 
 import (
 	"context"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type topCollector struct {
-	ctx    context.Context
-	client *mongo.Client
-	logger *logrus.Logger
-
-	lock         sync.Mutex
-	metricsCache []prometheus.Metric
+	ctx  context.Context
+	base *baseCollector
 
 	compatibleMode bool
 	topologyInfo   labelsGetter
 }
 
-func NewTopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *topCollector {
+func NewTopCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *topCollector {
 	return &topCollector{
-		ctx:    ctx,
-		client: client,
-		logger: logger,
+		ctx:  ctx,
+		base: base,
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
@@ -50,38 +43,23 @@ func NewTopCollector(ctx context.Context, client *mongo.Client, logger *logrus.L
 }
 
 func (d *topCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
-
-	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
-	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
-	// after it will call Collect, it is safe to populate the cache here.
-	metrics := make(chan prometheus.Metric)
-	go func() {
-		d.collect(metrics)
-		close(metrics)
-	}()
-
-	for m := range metrics {
-		d.metricsCache = append(d.metricsCache, m) // populate the cache
-		ch <- m.Desc()
-	}
+	d.base.Describe(ch, d.collect)
 }
 
 func (d *topCollector) Collect(ch chan<- prometheus.Metric) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	for _, metric := range d.metricsCache {
-		ch <- metric
-	}
+	d.base.Collect(ch)
 }
 
 func (d *topCollector) collect(ch chan<- prometheus.Metric) {
+	if d.base == nil {
+		return
+	}
+
+	log := d.base.logger
+	client := d.base.client
+
 	cmd := bson.D{{Key: "top", Value: "1"}}
-	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
+	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
 	var m bson.M
 	if err := res.Decode(&m); err != nil {
@@ -90,7 +68,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	logrus.Debug("top result:")
-	debugResult(d.logger, m)
+	debugResult(log, m)
 
 	for _, metric := range makeMetrics("top", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric

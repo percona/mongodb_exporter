@@ -20,21 +20,15 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type indexstatsCollector struct {
-	ctx    context.Context
-	client *mongo.Client
-	logger *logrus.Logger
-
-	lock         sync.Mutex
-	metricsCache []prometheus.Metric
+	ctx  context.Context
+	base *baseCollector
 
 	discoveringMode bool
 	topologyInfo    labelsGetter
@@ -42,11 +36,11 @@ type indexstatsCollector struct {
 	collections []string
 }
 
-func NewIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery bool, topology labelsGetter, collections []string) *indexstatsCollector {
+func NewIndexStatsCollector(ctx context.Context, base *baseCollector, discovery bool, topology labelsGetter, collections []string) *indexstatsCollector {
 	return &indexstatsCollector{
-		ctx:             ctx,
-		client:          client,
-		logger:          logger,
+		ctx:  ctx,
+		base: base,
+
 		discoveringMode: discovery,
 		topologyInfo:    topology,
 		collections:     collections,
@@ -54,42 +48,27 @@ func NewIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *l
 }
 
 func (d *indexstatsCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	d.metricsCache = make([]prometheus.Metric, 0, defaultCacheSize)
-
-	// This is a copy/paste of prometheus.DescribeByCollect(d, ch) with the aggreated functionality
-	// to populate the metrics cache. Since on each scrape Prometheus will call Describe and inmediatelly
-	// after it will call Collect, it is safe to populate the cache here.
-	metrics := make(chan prometheus.Metric)
-	go func() {
-		d.collect(metrics)
-		close(metrics)
-	}()
-
-	for m := range metrics {
-		d.metricsCache = append(d.metricsCache, m) // populate the cache
-		ch <- m.Desc()
-	}
+	d.base.Describe(ch, d.collect)
 }
 
 func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	for _, metric := range d.metricsCache {
-		ch <- metric
-	}
+	d.base.Collect(ch)
 }
 
 func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	collections := d.collections
 
+	if d.base == nil {
+		return
+	}
+
+	log := d.base.logger
+	client := d.base.client
+
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, d.client, d.collections, systemDBs)
+		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
 		if err != nil {
-			d.logger.Errorf("cannot auto discover databases and collections")
+			log.Errorf("cannot auto discover databases and collections")
 
 			return
 		}
@@ -110,22 +89,22 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 			{Key: "$indexStats", Value: bson.M{}},
 		}
 
-		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
+		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
 		if err != nil {
-			d.logger.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
+			log.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
-			d.logger.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
+			log.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
-		d.logger.Debugf("indexStats for %s.%s", database, collection)
-		debugResult(d.logger, stats)
+		log.Debugf("indexStats for %s.%s", database, collection)
+		debugResult(log, stats)
 
 		for _, metric := range stats {
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the

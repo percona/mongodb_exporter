@@ -59,7 +59,8 @@ func TestDBStatsCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := NewDBStatsCollector(ctx, client, logrus.New(), false, ti, []string{dbName})
+	base := NewBaseCollector(client, logrus.New())
+	c := NewDBStatsCollector(ctx, base, false, ti, []string{dbName})
 	expected := strings.NewReader(`
 	# HELP mongodb_dbstats_collections dbstats.
 	# TYPE mongodb_dbstats_collections untyped
