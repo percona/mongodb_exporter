@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -44,23 +43,18 @@ func TestGeneralCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_up Whether MongoDB is up.
-# TYPE mongodb_up gauge
-mongodb_up 1` + "\n")
-
-	reg := prometheus.NewPedanticRegistry()
-	err := reg.Register(c)
+	# HELP mongodb_up Whether MongoDB is up.
+	# TYPE mongodb_up gauge
+	mongodb_up 1` + "\n")
+	err := testutil.CollectAndCompare(c, expected)
 	require.NoError(t, err)
-
-	err = testutil.GatherAndCompare(reg, expected)
-	assert.NoError(t, err)
 
 	assert.NoError(t, client.Disconnect(ctx))
 
 	expected = strings.NewReader(`
-	 # HELP mongodb_up Whether MongoDB is up.
-	 # TYPE mongodb_up gauge
-	 mongodb_up 0` + "\n")
-	err = testutil.GatherAndCompare(reg, expected)
-	assert.NoError(t, err)
+	# HELP mongodb_up Whether MongoDB is up.
+	# TYPE mongodb_up gauge
+	mongodb_up 0` + "\n")
+	err = testutil.CollectAndCompare(c, expected)
+	require.NoError(t, err)
 }

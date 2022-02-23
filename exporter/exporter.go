@@ -179,7 +179,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if e.opts.EnableDBStats && limitsOk && requestOpts.EnableDBStats {
 		cc := NewDBStatsCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
+			e.opts.CompatibleMode, topologyInfo, nil)
 		registry.MustRegister(cc)
 	}
 

@@ -54,15 +54,16 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_oplog_stats_ok local.oplog.rs.stats.
-# TYPE mongodb_oplog_stats_ok untyped
-mongodb_oplog_stats_ok 1
-# HELP mongodb_oplog_stats_wt_btree_fixed_record_size local.oplog.rs.stats.wiredTiger.btree.
-# TYPE mongodb_oplog_stats_wt_btree_fixed_record_size untyped
-mongodb_oplog_stats_wt_btree_fixed_record_size 0
-# HELP mongodb_oplog_stats_wt_transaction_update_conflicts local.oplog.rs.stats.wiredTiger.transaction.
-# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
-mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
+	# HELP mongodb_oplog_stats_ok local.oplog.rs.stats.
+	# TYPE mongodb_oplog_stats_ok untyped
+	mongodb_oplog_stats_ok 1
+	# HELP mongodb_oplog_stats_wt_btree_fixed_record_size local.oplog.rs.stats.wiredTiger.btree.
+	# TYPE mongodb_oplog_stats_wt_btree_fixed_record_size untyped
+	mongodb_oplog_stats_wt_btree_fixed_record_size 0
+	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts local.oplog.rs.stats.wiredTiger.transaction.
+	# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
+	mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
+
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
@@ -72,11 +73,8 @@ mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
 		"mongodb_oplog_stats_wt_btree_fixed_record_size",
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
 	}
-	// TODO: use NewPedanticRegistry when mongodb_exporter code fulfils its requirements (https://jira.percona.com/browse/PMM-6630).
-	reg := prometheus.NewRegistry()
-	err := reg.Register(c)
-	require.NoError(t, err)
-	err = testutil.GatherAndCompare(reg, expected, filter...)
+
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
 
@@ -96,6 +94,9 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 		topologyInfo:   ti,
 	}
 
+	reg := prometheus.NewRegistry()
+	err = reg.Register(c)
+	require.NoError(t, err)
 	metrics := helpers.CollectMetrics(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
 	filters := []string{
@@ -242,16 +243,15 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
-# TYPE mongodb_mongod_replset_my_state gauge
-mongodb_mongod_replset_my_state{set=""} 6
-# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
-# TYPE mongodb_mongod_storage_engine gauge
-mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
-# HELP mongodb_version_info The server version
-# TYPE mongodb_version_info gauge
-mongodb_version_info{mongodb="server version is unavailable"} 1
-` + "\n")
+	# HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
+	# TYPE mongodb_mongod_replset_my_state gauge
+	mongodb_mongod_replset_my_state{set=""} 6
+	# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
+	# TYPE mongodb_mongod_storage_engine gauge
+	mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
+	# HELP mongodb_version_info The server version
+	# TYPE mongodb_version_info gauge
+	mongodb_version_info{mongodb="server version is unavailable"} 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
@@ -262,9 +262,6 @@ mongodb_version_info{mongodb="server version is unavailable"} 1
 		"mongodb_version_info",
 	}
 
-	reg := prometheus.NewRegistry()
-	err = reg.Register(c)
-	require.NoError(t, err)
-	err = testutil.GatherAndCompare(reg, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }

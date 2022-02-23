@@ -36,15 +36,18 @@ type dbstatsCollector struct {
 
 	compatibleMode bool
 	topologyInfo   labelsGetter
+
+	databaseFilter []string
 }
 
-func NewDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *dbstatsCollector {
+func NewDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string) *dbstatsCollector {
 	return &dbstatsCollector{
 		ctx:            ctx,
 		client:         client,
 		logger:         logger,
 		compatibleMode: compatible,
 		topologyInfo:   topology,
+		databaseFilter: databaseRegex,
 	}
 }
 
@@ -79,8 +82,7 @@ func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
-	// List all databases names
-	dbNames, err := d.client.ListDatabaseNames(d.ctx, bson.M{})
+	dbNames, err := databases(d.ctx, d.client, d.databaseFilter, nil)
 	if err != nil {
 		d.logger.Errorf("Failed to get database names: %s", err)
 
