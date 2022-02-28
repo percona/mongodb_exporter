@@ -31,6 +31,10 @@ linters:
       - wsl
       - exhaustivestruct
       - varnamelen
+      - maligned
+      - scopelint
+      - golint
+      - interfacer
 issues:
   exclude-use-default: false
   exclude:
