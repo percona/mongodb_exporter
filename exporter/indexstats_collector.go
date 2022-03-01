@@ -36,7 +36,8 @@ type indexstatsCollector struct {
 	collections []string
 }
 
-func NewIndexStatsCollector(ctx context.Context, base *baseCollector, discovery bool, topology labelsGetter, collections []string) *indexstatsCollector {
+// newIndexStatsCollector creates a collector for statistics on index usage
+func newIndexStatsCollector(ctx context.Context, base *baseCollector, discovery bool, topology labelsGetter, collections []string) *indexstatsCollector {
 	return &indexstatsCollector{
 		ctx:  ctx,
 		base: base,

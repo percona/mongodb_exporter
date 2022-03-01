@@ -32,7 +32,8 @@ type generalCollector struct {
 	base *baseCollector
 }
 
-func NewGeneralCollector(ctx context.Context, base *baseCollector) *generalCollector {
+// newGeneralCollector creates a collector for MongoDB connectivity status
+func newGeneralCollector(ctx context.Context, base *baseCollector) *generalCollector {
 	return &generalCollector{
 		ctx:  ctx,
 		base: base,

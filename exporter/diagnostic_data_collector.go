@@ -32,7 +32,8 @@ type diagnosticDataCollector struct {
 	topologyInfo   labelsGetter
 }
 
-func NewDiagnosticDataCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *diagnosticDataCollector {
+// newDiagnosticDataCollector creates a collector for diagnostic information
+func newDiagnosticDataCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *diagnosticDataCollector {
 	return &diagnosticDataCollector{
 		ctx:  ctx,
 		base: base,

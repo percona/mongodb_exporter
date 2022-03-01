@@ -37,8 +37,8 @@ func TestTopCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	base := NewBaseCollector(client, logrus.New())
-	c := NewTopCollector(ctx, base, false, ti)
+	base := newBaseCollector(client, logrus.New())
+	c := newTopCollector(ctx, base, false, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`

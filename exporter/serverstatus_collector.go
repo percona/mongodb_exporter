@@ -32,7 +32,8 @@ type serverStatusCollector struct {
 	topologyInfo   labelsGetter
 }
 
-func NewServerStatusCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *serverStatusCollector {
+// newServerStatusCollector creates a collector for statistics on server status
+func newServerStatusCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *serverStatusCollector {
 	return &serverStatusCollector{
 		ctx:            ctx,
 		base:           base,

@@ -32,7 +32,8 @@ type topCollector struct {
 	topologyInfo   labelsGetter
 }
 
-func NewTopCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *topCollector {
+// newTopCollector creates a collector for statistics on collection usage
+func newTopCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *topCollector {
 	return &topCollector{
 		ctx:  ctx,
 		base: base,

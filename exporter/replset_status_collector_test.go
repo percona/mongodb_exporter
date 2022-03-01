@@ -37,8 +37,8 @@ func TestReplsetStatusCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	base := NewBaseCollector(client, logrus.New())
-	c := NewReplicationSetStatusCollector(ctx, base, false, ti)
+	base := newBaseCollector(client, logrus.New())
+	c := newReplicationSetStatusCollector(ctx, base, false, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -68,8 +68,8 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	base := NewBaseCollector(client, logrus.New())
-	c := NewReplicationSetStatusCollector(ctx, base, false, ti)
+	base := newBaseCollector(client, logrus.New())
+	c := newReplicationSetStatusCollector(ctx, base, false, ti)
 
 	expected := strings.NewReader(``)
 	err := testutil.CollectAndCompare(c, expected)
