@@ -32,7 +32,7 @@ type baseCollector struct {
 	metricsCache []prometheus.Metric
 }
 
-// newBaseCollector creates a skeletal collector, which is used to create other collectors
+// newBaseCollector creates a skeletal collector, which is used to create other collectors.
 func newBaseCollector(client *mongo.Client, logger *logrus.Logger) *baseCollector {
 	return &baseCollector{
 		client: client,

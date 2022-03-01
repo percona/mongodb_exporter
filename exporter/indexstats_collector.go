@@ -36,7 +36,7 @@ type indexstatsCollector struct {
 	collections []string
 }
 
-// newIndexStatsCollector creates a collector for statistics on index usage
+// newIndexStatsCollector creates a collector for statistics on index usage.
 func newIndexStatsCollector(ctx context.Context, base *baseCollector, discovery bool, topology labelsGetter, collections []string) *indexstatsCollector {
 	return &indexstatsCollector{
 		ctx:  ctx,

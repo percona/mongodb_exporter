@@ -37,7 +37,7 @@ type replSetGetStatusCollector struct {
 	topologyInfo   labelsGetter
 }
 
-// newReplicationSetStatusCollector creates a collector for statistics on replication set
+// newReplicationSetStatusCollector creates a collector for statistics on replication set.
 func newReplicationSetStatusCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *replSetGetStatusCollector {
 	return &replSetGetStatusCollector{
 		ctx:  ctx,

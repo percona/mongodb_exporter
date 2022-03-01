@@ -36,7 +36,7 @@ type collstatsCollector struct {
 	collections []string
 }
 
-// newCollectionStatsCollector creates a collector for statistics about collections
+// newCollectionStatsCollector creates a collector for statistics about collections.
 func newCollectionStatsCollector(ctx context.Context, base *baseCollector, compatible, discovery bool, topology labelsGetter, collections []string) *collstatsCollector {
 	return &collstatsCollector{
 		ctx:  ctx,

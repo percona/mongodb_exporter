@@ -33,7 +33,7 @@ type dbstatsCollector struct {
 	databaseFilter []string
 }
 
-// newDBStatsCollector creates a collector for statistics on database storage
+// newDBStatsCollector creates a collector for statistics on database storage.
 func newDBStatsCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter, databaseRegex []string) *dbstatsCollector {
 	return &dbstatsCollector{
 		ctx:  ctx,
