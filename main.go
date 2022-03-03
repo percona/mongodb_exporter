@@ -44,12 +44,12 @@ type GlobalFlags struct {
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
-	EnableDiagnosticData          bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
-	EnableReplicasetStatus        bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
-	EnableDBStats                 bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
-	EnableTopMetrics              bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
-	EnableIndexStats              bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
-	EnableCollStats               bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
+	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
+	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
+	EnableDBStats          bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
+	EnableTopMetrics       bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
+	EnableIndexStats       bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
+	EnableCollStats        bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
@@ -121,12 +121,12 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		WebListenAddress:      opts.WebListenAddress,
 		DirectConnect:         opts.DirectConnect,
 
-		EnableDiagnosticData:          opts.EnableDiagnosticData,
-		EnableReplicasetStatus:        opts.EnableReplicasetStatus,
-		EnableTopMetrics:              opts.EnableTopMetrics,
-		EnableDBStats:                 opts.EnableDBStats,
-		EnableIndexStats:              opts.EnableIndexStats,
-		EnableCollStats:               opts.EnableCollStats,
+		EnableDiagnosticData:   opts.EnableDiagnosticData,
+		EnableReplicasetStatus: opts.EnableReplicasetStatus,
+		EnableTopMetrics:       opts.EnableTopMetrics,
+		EnableDBStats:          opts.EnableDBStats,
+		EnableIndexStats:       opts.EnableIndexStats,
+		EnableCollStats:        opts.EnableCollStats,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 

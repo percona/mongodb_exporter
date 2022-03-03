@@ -59,13 +59,13 @@ type Opts struct {
 	DiscoveringMode        bool
 	GlobalConnPool         bool
 
-	CollectAll                    bool
-	EnableDBStats                 bool
-	EnableDiagnosticData          bool
-	EnableReplicasetStatus        bool
-	EnableTopMetrics              bool
-	EnableIndexStats              bool
-	EnableCollStats               bool
+	CollectAll             bool
+	EnableDBStats          bool
+	EnableDiagnosticData   bool
+	EnableReplicasetStatus bool
+	EnableTopMetrics       bool
+	EnableIndexStats       bool
+	EnableCollStats        bool
 
 	EnableOverrideDescendingIndex bool
 
