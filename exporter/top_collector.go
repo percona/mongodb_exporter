@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kr/pretty"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -35,6 +34,8 @@ type topCollector struct {
 	logger         *logrus.Logger
 	topologyInfo   labelsGetter
 }
+
+var ErrInvalidOrMissingTotalsEntry = fmt.Errorf("Invalid or misssing totals entry in top results")
 
 type topResponse struct {
 	Totals map[string]interface{} `bson:"totals"`
@@ -59,20 +60,79 @@ func (d *topCollector) Collect(ch chan<- prometheus.Metric) {
 
 	totals, ok := m["totals"].(primitive.M)
 	if !ok {
-		panic(fmt.Errorf("dsddd"))
+		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingTotalsEntry),
+			ErrInvalidOrMissingTotalsEntry)
 	}
 
-	pretty.Println(m)
+	/*
+		      The top command will return a structure with a key named totals and it is a map
+			  where the key is the collection namespace and for each collection there are per
+			  collection usage statistics.
+			  Example: 	rs1:SECONDARY> db.adminCommand({"top": 1});
+
+		      {
+		        "totals" : {
+		                "note" : "all times in microseconds",
+		                "admin.system.roles" : {
+		                        "total" : {
+		                                "time" : 41,
+		                                "count" : 1
+		                        },
+		                        "readLock" : {
+		                                "time" : 41,
+		                                "count" : 1
+		                        },
+		                        "writeLock" : {
+		                                "time" : 0,
+		                                "count" : 0
+		                        },
+		                        "queries" : {
+		                                "time" : 41,
+		                                "count" : 1
+		                        },
+		                        "getmore" : {
+		                                "time" : 0,
+		                                "count" : 0
+		                        },
+		                        "insert" : {
+		                                "time" : 0,
+		                                "count" : 0
+		                        },
+		                        "update" : {
+		                                "time" : 0,
+		                                "count" : 0
+		                        },
+		                        "remove" : {
+		                                "time" : 0,
+		                                "count" : 0
+		                        },
+		                        "commands" : {
+		                                "time" : 0,
+		                                "count" : 0
+		                        }
+		                },
+		                "admin.system.version" : {
+		                        "total" : {
+		                                "time" : 63541,
+		                                "count" : 218
+		                        },
+
+		      If we pass this structure to the makeMetrics function, we will have metric names with the form of
+			  prefix + namespace + metric like mongodb_top_totals_admin.system.role_readlock_count.
+			  Having the namespace as part of the metric is a Prometheus anti pattern and diffucults grouping
+			  metrics in Grafana. For this reason, we need to manually loop through the metric in the totals key
+			  and pass the namespace as a label to the makeMetrics function.
+	*/
+
 	for namespace, metrics := range totals {
-		fmt.Println(namespace, metrics)
 		labels := d.topologyInfo.baseLabels()
 		labels["namespace"] = namespace
-		pretty.Println(metrics)
-		mm, ok := metrics.(primitive.M)
+
+		mm, ok := metrics.(primitive.M) // ingore entries like -> "note" : "all times in microseconds"
 		if !ok {
 			continue
 		}
-		pretty.Println(mm)
+
 		for _, metric := range makeMetrics("top", mm, labels, d.compatibleMode) {
 			ch <- metric
 		}
