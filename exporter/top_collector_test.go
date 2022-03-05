@@ -56,6 +56,7 @@ mongodb_top_ok 1` + "\n")
 	filter := []string{
 		"mongodb_top_ok",
 	}
+	filter = nil
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
