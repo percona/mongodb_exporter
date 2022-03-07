@@ -101,11 +101,10 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		// Since all collections will have the same fields, we need to use a metric prefix (db+col)
 		// to differentiate metrics between collection. Labels are being set only to matke it easier
 		// to filter
-		prefix := database + "." + collection
+		prefix := "collstats"
 
 		labels := d.topologyInfo.baseLabels()
-		labels["database"] = database
-		labels["collection"] = collection
+		labels["namespace"] = database + "." + collection
 
 		for _, metrics := range stats {
 			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {

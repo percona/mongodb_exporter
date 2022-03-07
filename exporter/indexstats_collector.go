@@ -82,12 +82,13 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		d.logger.Debugf("indexStats for %s.%s", database, collection)
+
 		debugResult(d.logger, stats)
 
 		for _, metric := range stats {
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the
 			// same, for different collections.
-			prefix := fmt.Sprintf("%s_%s_%s", database, collection, metric["name"])
+			prefix := "indexstats"
 			labels := d.topologyInfo.baseLabels()
 			labels["namespace"] = database + "." + collection
 			labels["key_name"] = fmt.Sprintf("%s", metric["name"])
