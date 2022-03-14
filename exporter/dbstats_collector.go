@@ -20,7 +20,9 @@ import (
 	"context"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type dbstatsCollector struct {
@@ -34,10 +36,10 @@ type dbstatsCollector struct {
 }
 
 // newDBStatsCollector creates a collector for statistics on database storage.
-func newDBStatsCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter, databaseRegex []string) *dbstatsCollector {
+func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string) *dbstatsCollector {
 	return &dbstatsCollector{
 		ctx:  ctx,
-		base: base,
+		base: newBaseCollector(client, logger),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,

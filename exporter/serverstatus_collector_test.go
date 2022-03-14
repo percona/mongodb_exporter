@@ -37,8 +37,7 @@ func TestServerStatusDataCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	base := newBaseCollector(client, logrus.New())
-	c := newServerStatusCollector(ctx, base, false, ti)
+	c := newServerStatusCollector(ctx, client, logrus.New(), false, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`

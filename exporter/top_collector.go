@@ -22,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type topCollector struct {
@@ -33,10 +34,10 @@ type topCollector struct {
 }
 
 // newTopCollector creates a collector for statistics on collection usage.
-func newTopCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *topCollector {
+func newTopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *topCollector {
 	return &topCollector{
 		ctx:  ctx,
-		base: base,
+		base: newBaseCollector(client, logger),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,

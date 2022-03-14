@@ -124,9 +124,7 @@ func (e *Exporter) getTotalCollectionsCount() int {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	base := newBaseCollector(client, e.opts.Logger)
-
-	gc := newGeneralCollector(ctx, base)
+	gc := newGeneralCollector(ctx, client, e.opts.Logger)
 	registry.MustRegister(gc)
 
 	if client == nil {
@@ -160,7 +158,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk && requestOpts.EnableCollStats {
-		cc := newCollectionStatsCollector(ctx, base,
+		cc := newCollectionStatsCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, e.opts.DiscoveringMode,
 			topologyInfo, e.opts.CollStatsNamespaces)
 		registry.MustRegister(cc)
@@ -168,32 +166,32 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk && requestOpts.EnableIndexStats {
-		ic := newIndexStatsCollector(ctx, base,
+		ic := newIndexStatsCollector(ctx, client, e.opts.Logger,
 			e.opts.DiscoveringMode, topologyInfo, e.opts.IndexStatsCollections)
 		registry.MustRegister(ic)
 	}
 
 	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
-		ddc := newDiagnosticDataCollector(ctx, base,
+		ddc := newDiagnosticDataCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(ddc)
 	}
 
 	if e.opts.EnableDBStats && limitsOk && requestOpts.EnableDBStats {
-		cc := newDBStatsCollector(ctx, base,
+		cc := newDBStatsCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo, nil)
 		registry.MustRegister(cc)
 	}
 
 	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
-		tc := newTopCollector(ctx, base,
+		tc := newTopCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(tc)
 	}
 
 	// replSetGetStatus is not supported through mongos.
 	if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
-		rsgsc := newReplicationSetStatusCollector(ctx, base,
+		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
 	}

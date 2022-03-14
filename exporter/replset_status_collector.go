@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -38,10 +39,10 @@ type replSetGetStatusCollector struct {
 }
 
 // newReplicationSetStatusCollector creates a collector for statistics on replication set.
-func newReplicationSetStatusCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *replSetGetStatusCollector {
+func newReplicationSetStatusCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *replSetGetStatusCollector {
 	return &replSetGetStatusCollector{
 		ctx:  ctx,
-		base: base,
+		base: newBaseCollector(client, logger),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,

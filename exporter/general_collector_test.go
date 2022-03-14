@@ -35,8 +35,7 @@ func TestGeneralCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
-	base := newBaseCollector(client, logrus.New())
-	c := newGeneralCollector(ctx, base)
+	c := newGeneralCollector(ctx, client, logrus.New())
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`

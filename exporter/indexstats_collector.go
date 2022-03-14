@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -37,10 +38,10 @@ type indexstatsCollector struct {
 }
 
 // newIndexStatsCollector creates a collector for statistics on index usage.
-func newIndexStatsCollector(ctx context.Context, base *baseCollector, discovery bool, topology labelsGetter, collections []string) *indexstatsCollector {
+func newIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery bool, topology labelsGetter, collections []string) *indexstatsCollector {
 	return &indexstatsCollector{
 		ctx:  ctx,
-		base: base,
+		base: newBaseCollector(client, logger),
 
 		discoveringMode: discovery,
 		topologyInfo:    topology,

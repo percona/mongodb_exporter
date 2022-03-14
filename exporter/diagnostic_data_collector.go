@@ -21,7 +21,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type diagnosticDataCollector struct {
@@ -33,10 +35,10 @@ type diagnosticDataCollector struct {
 }
 
 // newDiagnosticDataCollector creates a collector for diagnostic information.
-func newDiagnosticDataCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *diagnosticDataCollector {
+func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *diagnosticDataCollector {
 	return &diagnosticDataCollector{
 		ctx:  ctx,
-		base: base,
+		base: newBaseCollector(client, logger),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,

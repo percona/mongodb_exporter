@@ -22,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type serverStatusCollector struct {
@@ -33,10 +34,10 @@ type serverStatusCollector struct {
 }
 
 // newServerStatusCollector creates a collector for statistics on server status.
-func newServerStatusCollector(ctx context.Context, base *baseCollector, compatible bool, topology labelsGetter) *serverStatusCollector {
+func newServerStatusCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *serverStatusCollector {
 	return &serverStatusCollector{
 		ctx:            ctx,
-		base:           base,
+		base:           newBaseCollector(client, logger),
 		compatibleMode: compatible,
 		topologyInfo:   topology,
 	}

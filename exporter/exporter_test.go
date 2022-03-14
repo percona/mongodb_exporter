@@ -179,8 +179,7 @@ func TestMongoS(t *testing.T) {
 
 		e := New(exporterOpts)
 
-		base := newBaseCollector(client, e.opts.Logger)
-		rsgsc := newReplicationSetStatusCollector(ctx, base,
+		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, new(labelsGetterMock))
 
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
@@ -208,8 +207,7 @@ func TestMongoUp(t *testing.T) {
 
 	e := New(exporterOpts)
 
-	base := newBaseCollector(client, e.opts.Logger)
-	gc := newGeneralCollector(ctx, base)
+	gc := newGeneralCollector(ctx, client, e.opts.Logger)
 
 	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 

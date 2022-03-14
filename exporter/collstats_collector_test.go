@@ -54,8 +54,7 @@ func TestCollStatsCollector(t *testing.T) {
 	ti := labelsGetterMock{}
 
 	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
-	base := newBaseCollector(client, logrus.New())
-	c := newCollectionStatsCollector(ctx, base, false, false, ti, collection)
+	c := newCollectionStatsCollector(ctx, client, logrus.New(), false, false, ti, collection)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
