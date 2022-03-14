@@ -56,11 +56,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	var m bson.M
 
-	if d.base == nil {
-		return
-	}
-
-	log := d.base.logger
+	logger := d.base.logger
 	client := d.base.client
 
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
@@ -72,27 +68,27 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if err := res.Decode(&m); err != nil {
-		log.Errorf("cannot run getDiagnosticData: %s", err)
+		logger.Errorf("cannot run getDiagnosticData: %s", err)
 	}
 
 	if m == nil || m["data"] == nil {
-		log.Error("cannot run getDiagnosticData: response is empty")
+		logger.Error("cannot run getDiagnosticData: response is empty")
 	}
 
 	m, ok := m["data"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
-		log.Errorf("cannot decode getDiagnosticData: %s", err)
+		logger.Errorf("cannot decode getDiagnosticData: %s", err)
 	}
 
-	log.Debug("getDiagnosticData result")
-	debugResult(log, m)
+	logger.Debug("getDiagnosticData result")
+	debugResult(logger, m)
 
 	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(m)...)
 
 	if d.compatibleMode {
-		metrics = append(metrics, specialMetrics(d.ctx, client, m, log)...)
+		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
 
 		if cem, err := cacheEvictedTotalMetric(m); err == nil {
 			metrics = append(metrics, cem)
@@ -100,9 +96,9 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 
 		nodeType, err := getNodeType(d.ctx, client)
 		if err != nil {
-			log.Errorf("Cannot get node type to check if this is a mongos: %s", err)
+			logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
 		} else if nodeType == typeMongos {
-			metrics = append(metrics, mongosMetrics(d.ctx, client, log)...)
+			metrics = append(metrics, mongosMetrics(d.ctx, client, logger)...)
 		}
 	}
 

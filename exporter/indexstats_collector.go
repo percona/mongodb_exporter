@@ -60,17 +60,13 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	collections := d.collections
 
-	if d.base == nil {
-		return
-	}
-
-	log := d.base.logger
+	logger := d.base.logger
 	client := d.base.client
 
 	if d.discoveringMode {
 		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
 		if err != nil {
-			log.Errorf("cannot auto discover databases and collections")
+			logger.Errorf("cannot auto discover databases and collections")
 
 			return
 		}
@@ -93,20 +89,20 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
 		if err != nil {
-			log.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
+			logger.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
-			log.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
+			logger.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
-		log.Debugf("indexStats for %s.%s", database, collection)
-		debugResult(log, stats)
+		logger.Debugf("indexStats for %s.%s", database, collection)
+		debugResult(logger, stats)
 
 		for _, metric := range stats {
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the

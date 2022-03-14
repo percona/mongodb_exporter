@@ -58,11 +58,7 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *replSetGetStatusCollector) collect(ch chan<- prometheus.Metric) {
-	if d.base == nil {
-		return
-	}
-
-	log := d.base.logger
+	logger := d.base.logger
 	client := d.base.client
 
 	cmd := bson.D{{Key: "replSetGetStatus", Value: "1"}}
@@ -76,13 +72,13 @@ func (d *replSetGetStatusCollector) collect(ch chan<- prometheus.Metric) {
 				return
 			}
 		}
-		log.Errorf("cannot get replSetGetStatus: %s", err)
+		logger.Errorf("cannot get replSetGetStatus: %s", err)
 
 		return
 	}
 
-	log.Debug("replSetGetStatus result:")
-	debugResult(log, m)
+	logger.Debug("replSetGetStatus result:")
+	debugResult(logger, m)
 
 	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric

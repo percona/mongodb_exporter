@@ -62,17 +62,13 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	collections := d.collections
 
-	if d.base == nil {
-		return
-	}
-
 	client := d.base.client
-	log := d.base.logger
+	logger := d.base.logger
 
 	if d.discoveringMode {
 		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
 		if err != nil {
-			log.Errorf("cannot auto discover databases and collections: %s", err.Error())
+			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
@@ -109,20 +105,20 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation, project})
 		if err != nil {
-			log.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
+			logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
-			log.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
+			logger.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
-		log.Debugf("$collStats metrics for %s.%s", database, collection)
-		debugResult(log, stats)
+		logger.Debugf("$collStats metrics for %s.%s", database, collection)
+		debugResult(logger, stats)
 
 		// Since all collections will have the same fields, we need to use a metric prefix (db+col)
 		// to differentiate metrics between collection. Labels are being set only to matke it easier

@@ -52,11 +52,7 @@ func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *serverStatusCollector) collect(ch chan<- prometheus.Metric) {
-	if d.base == nil {
-		return
-	}
-
-	log := d.base.logger
+	logger := d.base.logger
 	client := d.base.client
 
 	cmd := bson.D{{Key: "serverStatus", Value: "1"}}
@@ -69,7 +65,7 @@ func (d *serverStatusCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	logrus.Debug("serverStatus result:")
-	debugResult(log, m)
+	debugResult(logger, m)
 
 	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric

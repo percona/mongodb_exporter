@@ -53,11 +53,7 @@ func (d *topCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *topCollector) collect(ch chan<- prometheus.Metric) {
-	if d.base == nil {
-		return
-	}
-
-	log := d.base.logger
+	logger := d.base.logger
 	client := d.base.client
 
 	cmd := bson.D{{Key: "top", Value: "1"}}
@@ -70,7 +66,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	logrus.Debug("top result:")
-	debugResult(log, m)
+	debugResult(logger, m)
 
 	for _, metric := range makeMetrics("top", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric
