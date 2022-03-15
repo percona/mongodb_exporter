@@ -104,7 +104,8 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		prefix := "collstats"
 
 		labels := d.topologyInfo.baseLabels()
-		labels["namespace"] = database + "." + collection
+		labels["database"] = database
+		labels["collection"] = collection
 
 		for _, metrics := range stats {
 			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {

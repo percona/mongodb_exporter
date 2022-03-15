@@ -75,12 +75,12 @@ func TestIndexStatsCollector(t *testing.T) {
 	expected := strings.NewReader(`
 # HELP mongodb_indexstats_accesses_ops indexstats.accesses.
 # TYPE mongodb_indexstats_accesses_ops untyped
-mongodb_indexstats_accesses_ops{key_name="_id_",namespace="testdb.testcol_00"} 0
-mongodb_indexstats_accesses_ops{key_name="_id_",namespace="testdb.testcol_01"} 0
-mongodb_indexstats_accesses_ops{key_name="_id_",namespace="testdb.testcol_02"} 0
-mongodb_indexstats_accesses_ops{key_name="idx_01",namespace="testdb.testcol_00"} 0
-mongodb_indexstats_accesses_ops{key_name="idx_01",namespace="testdb.testcol_01"} 0
-mongodb_indexstats_accesses_ops{key_name="idx_01",namespace="testdb.testcol_02"} 0` +
+mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="idx_01"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="idx_01"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="idx_01"} 0` +
 		"\n")
 
 	err := testutil.CollectAndCompare(c, expected)

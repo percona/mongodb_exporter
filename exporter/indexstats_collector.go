@@ -90,7 +90,8 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			// same, for different collections.
 			prefix := "indexstats"
 			labels := d.topologyInfo.baseLabels()
-			labels["namespace"] = database + "." + collection
+			labels["database"] = database
+			labels["collection"] = collection
 			labels["key_name"] = fmt.Sprintf("%s", metric["name"])
 
 			metrics := sanitizeMetrics(metric)
