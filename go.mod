@@ -19,7 +19,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.7.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	go.mongodb.org/mongo-driver v1.8.3
+	go.mongodb.org/mongo-driver v1.8.4
 )
 
 require (
