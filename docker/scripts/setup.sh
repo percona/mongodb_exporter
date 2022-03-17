@@ -16,8 +16,39 @@ done
 echo "Started.."
 
 echo setup.sh time now: `date +"%T" `
-mongo --host ${mongodb1}:${port} <<EOF
-   var cfg = {
+
+
+function cnf_servers() {
+    echo "setup cnf servers"
+    mongo --host ${mongodb1}:${port} <<EOF
+    var cfg = {
+        "_id": "${RS}",
+        "protocolVersion": 1,
+        "configsvr": true,
+        "members": [
+            {
+                "_id": 0,
+                "host": "${mongodb1}:${port}"
+            },
+            {
+                "_id": 1,
+                "host": "${mongodb2}:${port}"
+            },
+            {
+                "_id": 2,
+                "host": "${mongodb3}:${port}"
+            }
+        ]
+    };
+    rs.initiate(cfg, { force: true });
+    rs.reconfig(cfg, { force: true });
+EOF
+}
+
+function general_servers() {
+    echo "setup servers"
+    mongo --host ${mongodb1}:${port} <<EOF
+    var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,
         "members": [
@@ -40,4 +71,15 @@ mongo --host ${mongodb1}:${port} <<EOF
 
     rs.addArb("${arbiter}:${port}")
 EOF
+}
 
+case $1 in
+    cnf_servers)
+        cnf_servers
+        shift
+        ;;
+    *)
+        general_servers
+        shift
+        ;;
+esac
