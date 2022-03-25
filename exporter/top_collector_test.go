@@ -37,18 +37,13 @@ func TestTopCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := &topCollector{
-		ctx:          ctx,
-		client:       client,
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
+	c := newTopCollector(ctx, client, logrus.New(), false, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_top_ok top.
-# TYPE mongodb_top_ok untyped
-mongodb_top_ok 1` + "\n")
+	# HELP mongodb_top_ok top.
+	# TYPE mongodb_top_ok untyped
+	mongodb_top_ok 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime

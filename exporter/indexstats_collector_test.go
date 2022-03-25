@@ -64,32 +64,28 @@ func TestIndexStatsCollector(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	c := &indexstatsCollector{
-		client:       client,
-		collections:  []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
+	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
+	c := newIndexStatsCollector(ctx, client, logrus.New(), false, ti, collection)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_testdb_testcol_00_id_accesses_ops testdb_testcol_00__id_.accesses.
-# TYPE mongodb_testdb_testcol_00_id_accesses_ops untyped
-mongodb_testdb_testcol_00_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_00"} 0
-# HELP mongodb_testdb_testcol_00_idx_01_accesses_ops testdb_testcol_00_idx_01.accesses.
-# TYPE mongodb_testdb_testcol_00_idx_01_accesses_ops untyped
-mongodb_testdb_testcol_00_idx_01_accesses_ops{key_name="idx_01",namespace="testdb.testcol_00"} 0
-# HELP mongodb_testdb_testcol_01_id_accesses_ops testdb_testcol_01__id_.accesses.
-# TYPE mongodb_testdb_testcol_01_id_accesses_ops untyped
-mongodb_testdb_testcol_01_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_01"} 0
-# HELP mongodb_testdb_testcol_01_idx_01_accesses_ops testdb_testcol_01_idx_01.accesses.
-# TYPE mongodb_testdb_testcol_01_idx_01_accesses_ops untyped
-mongodb_testdb_testcol_01_idx_01_accesses_ops{key_name="idx_01",namespace="testdb.testcol_01"} 0
-# HELP mongodb_testdb_testcol_02_id_accesses_ops testdb_testcol_02__id_.accesses.
-# TYPE mongodb_testdb_testcol_02_id_accesses_ops untyped
-mongodb_testdb_testcol_02_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_02"} 0
-# HELP mongodb_testdb_testcol_02_idx_01_accesses_ops testdb_testcol_02_idx_01.accesses.
-# TYPE mongodb_testdb_testcol_02_idx_01_accesses_ops untyped
+	# HELP mongodb_testdb_testcol_00_id_accesses_ops testdb_testcol_00__id_.accesses.
+	# TYPE mongodb_testdb_testcol_00_id_accesses_ops untyped
+	mongodb_testdb_testcol_00_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_00"} 0
+	# HELP mongodb_testdb_testcol_00_idx_01_accesses_ops testdb_testcol_00_idx_01.accesses.
+	# TYPE mongodb_testdb_testcol_00_idx_01_accesses_ops untyped
+	mongodb_testdb_testcol_00_idx_01_accesses_ops{key_name="idx_01",namespace="testdb.testcol_00"} 0
+	# HELP mongodb_testdb_testcol_01_id_accesses_ops testdb_testcol_01__id_.accesses.
+	# TYPE mongodb_testdb_testcol_01_id_accesses_ops untyped
+	mongodb_testdb_testcol_01_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_01"} 0
+	# HELP mongodb_testdb_testcol_01_idx_01_accesses_ops testdb_testcol_01_idx_01.accesses.
+	# TYPE mongodb_testdb_testcol_01_idx_01_accesses_ops untyped
+	mongodb_testdb_testcol_01_idx_01_accesses_ops{key_name="idx_01",namespace="testdb.testcol_01"} 0
+	# HELP mongodb_testdb_testcol_02_id_accesses_ops testdb_testcol_02__id_.accesses.
+	# TYPE mongodb_testdb_testcol_02_id_accesses_ops untyped
+	mongodb_testdb_testcol_02_id_accesses_ops{key_name="_id_",namespace="testdb.testcol_02"} 0
+	# HELP mongodb_testdb_testcol_02_idx_01_accesses_ops testdb_testcol_02_idx_01.accesses.
+	# TYPE mongodb_testdb_testcol_02_idx_01_accesses_ops untyped
 mongodb_testdb_testcol_02_idx_01_accesses_ops{key_name="idx_01",namespace="testdb.testcol_02"} 0` + "\n")
 
 	err := testutil.CollectAndCompare(c, expected)

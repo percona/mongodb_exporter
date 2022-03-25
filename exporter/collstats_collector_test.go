@@ -53,25 +53,20 @@ func TestCollStatsCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := &collstatsCollector{
-		client:       client,
-		collections:  []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
+	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
+	c := newCollectionStatsCollector(ctx, client, logrus.New(), false, false, ti, collection)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_testdb_testcol_00_latencyStats_commands_latency testdb.testcol_00.latencyStats.commands.
-# TYPE mongodb_testdb_testcol_00_latencyStats_commands_latency untyped
-mongodb_testdb_testcol_00_latencyStats_commands_latency{collection="testcol_00",database="testdb"} 0
-# HELP mongodb_testdb_testcol_01_latencyStats_commands_latency testdb.testcol_01.latencyStats.commands.
-# TYPE mongodb_testdb_testcol_01_latencyStats_commands_latency untyped
-mongodb_testdb_testcol_01_latencyStats_commands_latency{collection="testcol_01",database="testdb"} 0
-# HELP mongodb_testdb_testcol_02_latencyStats_commands_latency testdb.testcol_02.latencyStats.commands.
-# TYPE mongodb_testdb_testcol_02_latencyStats_commands_latency untyped
-mongodb_testdb_testcol_02_latencyStats_commands_latency{collection="testcol_02",database="testdb"} 0` +
-		"\n")
+	# HELP mongodb_testdb_testcol_00_latencyStats_commands_latency testdb.testcol_00.latencyStats.commands.
+	# TYPE mongodb_testdb_testcol_00_latencyStats_commands_latency untyped
+	mongodb_testdb_testcol_00_latencyStats_commands_latency{collection="testcol_00",database="testdb"} 0
+	# HELP mongodb_testdb_testcol_01_latencyStats_commands_latency testdb.testcol_01.latencyStats.commands.
+	# TYPE mongodb_testdb_testcol_01_latencyStats_commands_latency untyped
+	mongodb_testdb_testcol_01_latencyStats_commands_latency{collection="testcol_01",database="testdb"} 0
+	# HELP mongodb_testdb_testcol_02_latencyStats_commands_latency testdb.testcol_02.latencyStats.commands.
+	# TYPE mongodb_testdb_testcol_02_latencyStats_commands_latency untyped
+	mongodb_testdb_testcol_02_latencyStats_commands_latency{collection="testcol_02",database="testdb"} 0` + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
