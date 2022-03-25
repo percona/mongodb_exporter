@@ -6,4 +6,3 @@ bin
 build
 dist
 mongodb_exporter
-vendor
