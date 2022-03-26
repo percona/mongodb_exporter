@@ -52,7 +52,7 @@ func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logg
 }
 
 func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.base.Describe(ch, d.collect)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {

@@ -44,7 +44,7 @@ func newServerStatusCollector(ctx context.Context, client *mongo.Client, logger 
 }
 
 func (d *serverStatusCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.base.Describe(ch, d.collect)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {

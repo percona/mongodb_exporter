@@ -41,7 +41,7 @@ func newGeneralCollector(ctx context.Context, client *mongo.Client, logger *logr
 }
 
 func (d *generalCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.base.Describe(ch, d.collect)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {

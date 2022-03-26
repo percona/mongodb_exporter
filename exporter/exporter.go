@@ -293,18 +293,7 @@ func (e *Exporter) Handler() http.Handler {
 		}
 
 		// Topology can change between requests, so we need to get it every time.
-		var ti *topologyInfo
-		if client != nil {
-			ti, err = newTopologyInfo(ctx, client)
-			if err != nil {
-				e.logger.Errorf("Cannot get topology info: %v", err)
-				http.Error(
-					w,
-					"An error has occurred while getting topology info:\n\n"+err.Error(),
-					http.StatusInternalServerError,
-				)
-			}
-		}
+		ti := newTopologyInfo(ctx, client)
 
 		registry := e.makeRegistry(ctx, client, ti, requestOpts)
 

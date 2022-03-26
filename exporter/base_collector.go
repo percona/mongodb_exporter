@@ -17,6 +17,7 @@
 package exporter
 
 import (
+	"context"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -40,7 +41,13 @@ func newBaseCollector(client *mongo.Client, logger *logrus.Logger) *baseCollecto
 	}
 }
 
-func (d *baseCollector) Describe(ch chan<- *prometheus.Desc, collect func(mCh chan<- prometheus.Metric)) {
+func (d *baseCollector) Describe(ctx context.Context, ch chan<- *prometheus.Desc, collect func(mCh chan<- prometheus.Metric)) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
