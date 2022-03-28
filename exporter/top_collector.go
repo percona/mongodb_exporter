@@ -28,26 +28,39 @@ import (
 )
 
 type topCollector struct {
-	ctx            context.Context
-	client         *mongo.Client
+	ctx  context.Context
+	base *baseCollector
+
 	compatibleMode bool
-	logger         *logrus.Logger
 	topologyInfo   labelsGetter
 }
 
 var ErrInvalidOrMissingTotalsEntry = fmt.Errorf("Invalid or misssing totals entry in top results")
 
-type topResponse struct {
-	Totals map[string]interface{} `bson:"totals"`
+func newTopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool,
+	topology labelsGetter) *topCollector {
+	return &topCollector{
+		ctx:            ctx,
+		base:           newBaseCollector(client, logger),
+		compatibleMode: compatible,
+		topologyInfo:   topology,
+	}
 }
 
 func (d *topCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.base.Describe(ch, d.collect)
 }
 
 func (d *topCollector) Collect(ch chan<- prometheus.Metric) {
+	d.base.Collect(ch)
+}
+
+func (d *topCollector) collect(ch chan<- prometheus.Metric) {
+	logger := d.base.logger
+	client := d.base.client
+
 	cmd := bson.D{{Key: "top", Value: "1"}}
-	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
+	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
 	var m primitive.M
 	if err := res.Decode(&m); err != nil {
@@ -56,7 +69,7 @@ func (d *topCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	logrus.Debug("top result:")
-	debugResult(d.logger, m)
+	debugResult(logger, m)
 
 	totals, ok := m["totals"].(primitive.M)
 	if !ok {

@@ -64,12 +64,8 @@ func TestIndexStatsCollector(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	c := &indexstatsCollector{
-		client:       client,
-		collections:  []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
+	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
+	c := newIndexStatsCollector(ctx, client, logrus.New(), false, ti, collection)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`

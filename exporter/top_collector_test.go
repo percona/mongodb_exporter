@@ -36,12 +36,7 @@ func TestTopCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := &topCollector{
-		ctx:          ctx,
-		client:       client,
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
+	c := newTopCollector(ctx, client, logrus.New(), false, ti)
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge

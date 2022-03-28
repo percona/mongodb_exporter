@@ -28,17 +28,28 @@ import (
 // This collector is always enabled and it is not directly related to any particular MongoDB
 // command to gather stats.
 type generalCollector struct {
-	ctx    context.Context
-	client *mongo.Client
-	logger *logrus.Logger
+	ctx  context.Context
+	base *baseCollector
+}
+
+// newGeneralCollector creates a collector for MongoDB connectivity status.
+func newGeneralCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *generalCollector {
+	return &generalCollector{
+		ctx:  ctx,
+		base: newBaseCollector(client, logger),
+	}
 }
 
 func (d *generalCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.base.Describe(ch, d.collect)
 }
 
 func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
-	ch <- mongodbUpMetric(d.ctx, d.client, d.logger)
+	d.base.Collect(ch)
+}
+
+func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
+	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
 }
 
 func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {

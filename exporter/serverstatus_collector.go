@@ -26,20 +26,37 @@ import (
 )
 
 type serverStatusCollector struct {
-	ctx            context.Context
-	client         *mongo.Client
+	ctx  context.Context
+	base *baseCollector
+
 	compatibleMode bool
-	logger         *logrus.Logger
 	topologyInfo   labelsGetter
 }
 
+// newServerStatusCollector creates a collector for statistics on server status.
+func newServerStatusCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *serverStatusCollector {
+	return &serverStatusCollector{
+		ctx:            ctx,
+		base:           newBaseCollector(client, logger),
+		compatibleMode: compatible,
+		topologyInfo:   topology,
+	}
+}
+
 func (d *serverStatusCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.base.Describe(ch, d.collect)
 }
 
 func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
+	d.base.Collect(ch)
+}
+
+func (d *serverStatusCollector) collect(ch chan<- prometheus.Metric) {
+	logger := d.base.logger
+	client := d.base.client
+
 	cmd := bson.D{{Key: "serverStatus", Value: "1"}}
-	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
+	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
 	var m bson.M
 	if err := res.Decode(&m); err != nil {
@@ -48,7 +65,7 @@ func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	logrus.Debug("serverStatus result:")
-	debugResult(d.logger, m)
+	debugResult(logger, m)
 
 	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric

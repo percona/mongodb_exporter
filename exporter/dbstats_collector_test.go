@@ -19,16 +19,20 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"sort"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/percona/exporter_shared/helpers"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
+)
+
+const (
+	dbName = "testdb"
 )
 
 func TestDBStatsCollector(t *testing.T) {
@@ -37,7 +41,7 @@ func TestDBStatsCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	database := client.Database("testdb")
+	database := client.Database(dbName)
 	database.Drop(ctx) //nolint
 
 	defer func() {
@@ -55,47 +59,24 @@ func TestDBStatsCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := &dbstatsCollector{
-		client:       client,
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
+	c := newDBStatsCollector(ctx, client, logrus.New(), false, ti, []string{dbName})
+	expected := strings.NewReader(`
+	# HELP mongodb_dbstats_collections dbstats.
+	# TYPE mongodb_dbstats_collections untyped
+	mongodb_dbstats_collections{database="testdb"} 3
+	# HELP mongodb_dbstats_indexes dbstats.
+	# TYPE mongodb_dbstats_indexes untyped
+	mongodb_dbstats_indexes{database="testdb"} 3
+	# HELP mongodb_dbstats_objects dbstats.
+	# TYPE mongodb_dbstats_objects untyped
+	mongodb_dbstats_objects{database="testdb"} 30` + "\n")
 
-	expected := []string{
-		"# HELP mongodb_dbstats_collections dbstats.",
-		"# TYPE mongodb_dbstats_collections untyped",
-		"mongodb_dbstats_collections{database=\"testdb\"} 3",
-		"# HELP mongodb_dbstats_dataSize dbstats.",
-		"# TYPE mongodb_dbstats_dataSize untyped",
-		"mongodb_dbstats_dataSize{database=\"testdb\"} 1200",
-		"# HELP mongodb_dbstats_indexSize dbstats.",
-		"# TYPE mongodb_dbstats_indexSize untyped",
-		"mongodb_dbstats_indexSize{database=\"testdb\"} 12288",
-		"# HELP mongodb_dbstats_indexes dbstats.",
-		"# TYPE mongodb_dbstats_indexes untyped",
-		"mongodb_dbstats_indexes{database=\"testdb\"} 3",
-		"# HELP mongodb_dbstats_objects dbstats.",
-		"# TYPE mongodb_dbstats_objects untyped",
-		"mongodb_dbstats_objects{database=\"testdb\"} 30",
-	}
-
-	metrics := helpers.CollectMetrics(c)
-	actualMetrics := helpers.ReadMetrics(metrics)
+	// Only look at metrics created by our activity
 	filters := []string{
 		"mongodb_dbstats_collections",
-		"mongodb_dbstats_dataSize",
-		"mongodb_dbstats_indexSize",
 		"mongodb_dbstats_indexes",
 		"mongodb_dbstats_objects",
 	}
-	labels := map[string]string{
-		"database": "testdb",
-	}
-	actualMetrics = filterMetricsWithLabels(actualMetrics,
-		filters,
-		labels)
-	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
-	sort.Strings(actualLines)
-	sort.Strings(expected)
-	assert.Equal(t, expected, actualLines)
+	err := testutil.CollectAndCompare(c, expected, filters...)
+	assert.NoError(t, err)
 }
