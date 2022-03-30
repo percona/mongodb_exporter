@@ -217,3 +217,12 @@ func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includ
 
 	return count, nil
 }
+
+func splitNamespace(ns string) (database, collection string) {
+	parts := strings.Split(ns, ".")
+	if len(parts) < 2 { // there is no collection?
+		return parts[0], ""
+	}
+
+	return parts[0], strings.Join(parts[1:], ".")
+}
