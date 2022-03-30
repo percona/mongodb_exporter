@@ -31,24 +31,24 @@ type indexstatsCollector struct {
 	ctx  context.Context
 	base *baseCollector
 
-  discoveringMode         bool
-  overrideDescendingIndex bool
-  topologyInfo            labelsGetter
+	discoveringMode         bool
+	overrideDescendingIndex bool
+	topologyInfo            labelsGetter
 
- 	collections []string
+	collections []string
 }
 
 // newIndexStatsCollector creates a collector for statistics on index usage.
 func newIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery, overrideDescendingIndex bool, topology labelsGetter, collections []string) *indexstatsCollector {
-  return &indexstatsCollector{
+	return &indexstatsCollector{
 		ctx:  ctx,
 		base: newBaseCollector(client, logger),
 
-    discoveringMode:         discovery,
-    topologyInfo:            topology,
-    overrideDescendingIndex: overrideDescendingIndex,
+		discoveringMode:         discovery,
+		topologyInfo:            topology,
+		overrideDescendingIndex: overrideDescendingIndex,
 
-    collections: collections,
+		collections: collections,
 	}
 }
 

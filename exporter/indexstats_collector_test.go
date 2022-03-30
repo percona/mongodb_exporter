@@ -65,7 +65,7 @@ func TestIndexStatsCollector(t *testing.T) {
 	}
 
 	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
-  c := newIndexStatsCollector(ctx, client, logrus.New(), false, true, ti, collection)
+	c := newIndexStatsCollector(ctx, client, logrus.New(), false, true, ti, collection)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -111,11 +111,11 @@ func TestDescendingIndexOverride(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-  collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
-  c := newIndexStatsCollector(ctx, client, logrus.New(), false, true, ti, collection)
+	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
+	c := newIndexStatsCollector(ctx, client, logrus.New(), false, true, ti, collection)
 
-  // The last \n at the end of this string is important
-  expected := strings.NewReader(`
+	// The last \n at the end of this string is important
+	expected := strings.NewReader(`
   # HELP mongodb_indexstats_accesses_ops indexstats.accesses.
   # TYPE mongodb_indexstats_accesses_ops untyped
   mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_"} 0
