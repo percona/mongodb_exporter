@@ -1,3 +1,28 @@
+Release 0.31.0
+
+- Added support for DEB and RPM packages
+
+- Updated version for build tools
+- Updated build process for tools
+
+- Fixed warnings in CI pipeline
+- Updated test matrix for CI pipeline
+
+- Fixed bug in development infrastructure setup
+- Updated linter configuration
+
+- Added license checker for source files
+
+- Disabled some collectors in case collection limit is exceeded
+- Disabled most collectors by default; added flag to enable all collectors
+
+- Added flag to remove ambiguity for descending index metric
+- Updated metric names generation for collstats, indexstats and top to follow Prometheus pattern
+- Updated metric generation logic; use both cmdline flag and HTTP request param to generate metrics
+
+- Removed dual requests to database for metric generation
+- Fixed bug in collstats metric generation by disabling histogram for collstats
+
 Release 0.20.8
 
 Fixed bug   PMM-8849: Fixed panic on nil data

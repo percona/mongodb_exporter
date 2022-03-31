@@ -50,12 +50,12 @@ define TEST_ENV
 	TEST_MONGODB_S1_PRIMARY_PORT=$(TEST_MONGODB_S1_PRIMARY_PORT) \
 	TEST_MONGODB_S1_SECONDARY1_PORT=$(TEST_MONGODB_S1_SECONDARY1_PORT) \
 	TEST_MONGODB_S1_SECONDARY2_PORT=$(TEST_MONGODB_S1_SECONDARY2_PORT) \
-	TEST_MONGODB_S1_ARTBITER_PORT=$(TEST_MONGODB_S1_ARTBITER_PORT) \
+	TEST_MONGODB_S1_ARTBITER_PORT=$(TEST_MONGODB_S1_ARBITER_PORT) \
 	TEST_MONGODB_S2_RS=$(TEST_MONGODB_S2_RS) \
 	TEST_MONGODB_S2_PRIMARY_PORT=$(TEST_MONGODB_S2_PRIMARY_PORT) \
 	TEST_MONGODB_S2_SECONDARY1_PORT=$(TEST_MONGODB_S2_SECONDARY1_PORT) \
 	TEST_MONGODB_S2_SECONDARY2_PORT=$(TEST_MONGODB_S2_SECONDARY2_PORT) \
-	TEST_MONGODB_S2_ARTBITER_PORT=$(TEST_MONGODB_S2_ARTBITER_PORT) \
+	TEST_MONGODB_S2_ARTBITER_PORT=$(TEST_MONGODB_S2_ARBITER_PORT) \
 	TEST_MONGODB_CONFIGSVR_RS=$(TEST_MONGODB_CONFIGSVR_RS) \
 	TEST_MONGODB_CONFIGSVR1_PORT=$(TEST_MONGODB_CONFIGSVR1_PORT) \
 	TEST_MONGODB_CONFIGSVR2_PORT=$(TEST_MONGODB_CONFIGSVR2_PORT) \
@@ -68,10 +68,7 @@ env:
 	@echo $(TEST_ENV) | tr ' ' '\n' >.env
 
 init:                       ## Install linters.
-	go build -modfile=tools/go.mod -o bin/gofumports mvdan.cc/gofumpt/gofumports
-	go build -modfile=tools/go.mod -o bin/gofumpt mvdan.cc/gofumpt
-	go build -modfile=tools/go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
-	go build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
+	cd tools && go generate -x -tags=tools
 
 build:                      ## Compile using plain go build
 	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
@@ -86,8 +83,8 @@ FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 format:                     ## Format source code.
 	go mod tidy
-	bin/gofumpt -w -s $(FILES)
-	bin/gofumports -local github.com/percona/mongodb_exporter -l -w $(FILES)
+	bin/gofumpt -l -w $(FILES)
+	bin/goimports -local github.com/percona/mongodb_exporter -l -w $(FILES)
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run

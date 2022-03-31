@@ -161,11 +161,16 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 
 	fqName, label := nameAndLabel(prefix, name)
 
+	metricType := prometheus.UntypedValue
+	if strings.HasSuffix(strings.ToLower(name), "count") {
+		metricType = prometheus.CounterValue
+	}
+
 	rm := &rawMetric{
 		fqName: fqName,
 		help:   help,
 		val:    *f,
-		vt:     prometheus.UntypedValue,
+		vt:     metricType,
 		ln:     make([]string, 0, len(labels)),
 		lv:     make([]string, 0, len(labels)),
 	}

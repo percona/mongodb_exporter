@@ -53,24 +53,26 @@ func TestCollStatsCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := &collstatsCollector{
-		client:       client,
-		collections:  []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"},
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
+	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
+	c := newCollectionStatsCollector(ctx, client, logrus.New(), false, false, ti, collection)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_testdb_testcol_00_latencyStats_commands_latency testdb.testcol_00.latencyStats.commands.
-# TYPE mongodb_testdb_testcol_00_latencyStats_commands_latency untyped
-mongodb_testdb_testcol_00_latencyStats_commands_latency{collection="testcol_00",database="testdb"} 0
-# HELP mongodb_testdb_testcol_01_latencyStats_commands_latency testdb.testcol_01.latencyStats.commands.
-# TYPE mongodb_testdb_testcol_01_latencyStats_commands_latency untyped
-mongodb_testdb_testcol_01_latencyStats_commands_latency{collection="testcol_01",database="testdb"} 0
-# HELP mongodb_testdb_testcol_02_latencyStats_commands_latency testdb.testcol_02.latencyStats.commands.
-# TYPE mongodb_testdb_testcol_02_latencyStats_commands_latency untyped
-mongodb_testdb_testcol_02_latencyStats_commands_latency{collection="testcol_02",database="testdb"} 0` +
+# HELP mongodb_collstats_latencyStats_commands_latency collstats.latencyStats.commands.
+# TYPE mongodb_collstats_latencyStats_commands_latency untyped
+mongodb_collstats_latencyStats_commands_latency{collection="testcol_00",database="testdb"} 0
+mongodb_collstats_latencyStats_commands_latency{collection="testcol_01",database="testdb"} 0
+mongodb_collstats_latencyStats_commands_latency{collection="testcol_02",database="testdb"} 0
+# HELP mongodb_collstats_latencyStats_transactions_ops collstats.latencyStats.transactions.
+# TYPE mongodb_collstats_latencyStats_transactions_ops untyped
+mongodb_collstats_latencyStats_transactions_ops{collection="testcol_00",database="testdb"} 0
+mongodb_collstats_latencyStats_transactions_ops{collection="testcol_01",database="testdb"} 0
+mongodb_collstats_latencyStats_transactions_ops{collection="testcol_02",database="testdb"} 0
+# HELP mongodb_collstats_storageStats_capped collstats.storageStats.
+# TYPE mongodb_collstats_storageStats_capped untyped
+mongodb_collstats_storageStats_capped{collection="testcol_00",database="testdb"} 0
+mongodb_collstats_storageStats_capped{collection="testcol_01",database="testdb"} 0
+mongodb_collstats_storageStats_capped{collection="testcol_02",database="testdb"} 0` +
 		"\n")
 
 	// Filter metrics for 2 reasons:
@@ -78,9 +80,9 @@ mongodb_testdb_testcol_02_latencyStats_commands_latency{collection="testcol_02",
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_testdb_testcol_00_latencyStats_commands_latency",
-		"mongodb_testdb_testcol_01_latencyStats_commands_latency",
-		"mongodb_testdb_testcol_02_latencyStats_commands_latency",
+		"mongodb_collstats_latencyStats_commands_latency",
+		"mongodb_collstats_storageStats_capped",
+		"mongodb_collstats_latencyStats_transactions_ops",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)

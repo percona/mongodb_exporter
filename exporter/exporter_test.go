@@ -179,17 +179,12 @@ func TestMongoS(t *testing.T) {
 
 		e := New(exporterOpts)
 
-		rsgsc := replSetGetStatusCollector{
-			ctx:            ctx,
-			client:         client,
-			compatibleMode: e.opts.CompatibleMode,
-			logger:         e.opts.Logger,
-			topologyInfo:   new(labelsGetterMock),
-		}
+		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, new(labelsGetterMock))
 
-		r := e.makeRegistry(ctx, client, new(labelsGetterMock))
+		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
-		res := r.Unregister(&rsgsc)
+		res := r.Unregister(rsgsc)
 		assert.Equal(t, test.want, res, fmt.Sprintf("Port: %v", test.port))
 		err = client.Disconnect(ctx)
 		assert.NoError(t, err)
@@ -212,14 +207,10 @@ func TestMongoUp(t *testing.T) {
 
 	e := New(exporterOpts)
 
-	gc := generalCollector{
-		ctx:    ctx,
-		client: client,
-		logger: e.opts.Logger,
-	}
+	gc := newGeneralCollector(ctx, client, e.opts.Logger)
 
-	r := e.makeRegistry(ctx, client, new(labelsGetterMock))
+	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
-	res := r.Unregister(&gc)
+	res := r.Unregister(gc)
 	assert.Equal(t, true, res)
 }

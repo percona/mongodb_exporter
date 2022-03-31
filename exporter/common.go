@@ -1,3 +1,19 @@
+// mongodb_exporter
+// Copyright (C) 2022 Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package exporter
 
 import (
@@ -200,4 +216,13 @@ func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includ
 	}
 
 	return count, nil
+}
+
+func splitNamespace(ns string) (database, collection string) {
+	parts := strings.Split(ns, ".")
+	if len(parts) < 2 { // there is no collection?
+		return parts[0], ""
+	}
+
+	return parts[0], strings.Join(parts[1:], ".")
 }

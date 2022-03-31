@@ -22,13 +22,13 @@ jobs:
         go-version:
           - 1.17.x
         image:
-          - mongo:3.6
           - mongo:4.0
           - mongo:4.2
           - mongo:4.4
-          - percona/percona-server-mongodb:3.6
+          - mongo:5.0
           - percona/percona-server-mongodb:4.0
           - percona/percona-server-mongodb:4.2
+          - percona/percona-server-mongodb:4.4
         os: [ubuntu-latest]
         may-fail: [false]
 
@@ -83,3 +83,4 @@ jobs:
           # use GITHUB_TOKEN because only it has access to GitHub Checks API
           bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
           bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
+          make check-license
