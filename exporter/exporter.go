@@ -65,6 +65,8 @@ type Opts struct {
 	EnableIndexStats       bool
 	EnableCollStats        bool
 
+	EnableOverrideDescendingIndex bool
+
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
 	Path                  string
@@ -165,7 +167,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk && requestOpts.EnableIndexStats {
 		ic := newIndexStatsCollector(ctx, client, e.opts.Logger,
-			e.opts.DiscoveringMode, topologyInfo, e.opts.IndexStatsCollections)
+			e.opts.DiscoveringMode, e.opts.EnableOverrideDescendingIndex,
+			topologyInfo, e.opts.IndexStatsCollections)
 		registry.MustRegister(ic)
 	}
 
