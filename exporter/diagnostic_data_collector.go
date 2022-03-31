@@ -46,7 +46,7 @@ func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logge
 }
 
 func (d *diagnosticDataCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.base.Describe(ch, d.collect)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {

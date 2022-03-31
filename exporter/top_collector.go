@@ -49,7 +49,7 @@ func newTopCollector(ctx context.Context, client *mongo.Client, logger *logrus.L
 }
 
 func (d *topCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.base.Describe(ch, d.collect)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *topCollector) Collect(ch chan<- prometheus.Metric) {

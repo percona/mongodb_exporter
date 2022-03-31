@@ -80,13 +80,12 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti, err := newTopologyInfo(ctx, client)
-	require.NoError(t, err)
+	ti := newTopologyInfo(ctx, client)
 
 	c := newDiagnosticDataCollector(ctx, client, logrus.New(), true, ti)
 
 	reg := prometheus.NewRegistry()
-	err = reg.Register(c)
+	err := reg.Register(c)
 	require.NoError(t, err)
 	metrics := helpers.CollectMetrics(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
@@ -121,12 +120,11 @@ func TestContextTimeout(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti, err := newTopologyInfo(ctx, client)
-	require.NoError(t, err)
+	ti := newTopologyInfo(ctx, client)
 
 	dbCount := 100
 
-	err = addTestData(ctx, client, dbCount)
+	err := addTestData(ctx, client, dbCount)
 	assert.NoError(t, err)
 
 	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
