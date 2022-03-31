@@ -24,6 +24,7 @@ import (
 	"github.com/percona/percona-toolkit/src/go/mongolib/proto"
 	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -62,18 +63,19 @@ type topologyInfo struct {
 // ErrCannotGetTopologyLabels Cannot read topology labels.
 var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 
-func newTopologyInfo(ctx context.Context, client *mongo.Client) (*topologyInfo, error) {
+func newTopologyInfo(ctx context.Context, client *mongo.Client) *topologyInfo {
 	ti := &topologyInfo{
 		client: client,
 		labels: make(map[string]string),
+		rw:     sync.RWMutex{},
 	}
 
 	err := ti.loadLabels(ctx)
 	if err != nil {
-		return nil, err
+		logrus.Warnf("cannot load topology labels: %s", err)
 	}
 
-	return ti, nil
+	return ti
 }
 
 // baseLabels returns a copy of the topology labels because in some collectors like
