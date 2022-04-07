@@ -163,7 +163,7 @@ func TestMakeRawMetric(t *testing.T) {
 				ln:     ln,
 				lv:     lv,
 				val:    *tc.wantVal,
-				vt:     3,
+				vt:     prometheus.CounterValue,
 			}
 		}
 

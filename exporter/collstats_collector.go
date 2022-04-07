@@ -27,26 +27,48 @@ import (
 )
 
 type collstatsCollector struct {
-	ctx             context.Context
-	client          *mongo.Client
-	collections     []string
+	ctx  context.Context
+	base *baseCollector
+
 	compatibleMode  bool
 	discoveringMode bool
-	logger          *logrus.Logger
 	topologyInfo    labelsGetter
+
+	collections []string
+}
+
+// newCollectionStatsCollector creates a collector for statistics about collections.
+func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible, discovery bool, topology labelsGetter, collections []string) *collstatsCollector {
+	return &collstatsCollector{
+		ctx:  ctx,
+		base: newBaseCollector(client, logger),
+
+		compatibleMode:  compatible,
+		discoveringMode: discovery,
+		topologyInfo:    topology,
+
+		collections: collections,
+	}
 }
 
 func (d *collstatsCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
+	d.base.Collect(ch)
+}
+
+func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	collections := d.collections
 
+	client := d.base.client
+	logger := d.base.logger
+
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, d.client, d.collections, systemDBs)
+		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
 		if err != nil {
-			d.logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
+			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
@@ -81,28 +103,24 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			},
 		}
 
-		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation, project})
+		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation, project})
 		if err != nil {
-			d.logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
+			logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
-			d.logger.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
+			logger.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
-		d.logger.Debugf("$collStats metrics for %s.%s", database, collection)
-		debugResult(d.logger, stats)
+		logger.Debugf("$collStats metrics for %s.%s", database, collection)
+		debugResult(logger, stats)
 
-		// Since all collections will have the same fields, we need to use a metric prefix (db+col)
-		// to differentiate metrics between collection. Labels are being set only to matke it easier
-		// to filter
-		prefix := database + "." + collection
-
+		prefix := "collstats"
 		labels := d.topologyInfo.baseLabels()
 		labels["database"] = database
 		labels["collection"] = collection
