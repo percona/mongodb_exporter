@@ -88,8 +88,7 @@ func TestTopologyLabels(t *testing.T) {
 		require.NoError(t, err)
 
 		client := tu.TestClient(ctx, port, t)
-		ti, err := newTopologyInfo(ctx, client)
-		require.NoError(t, err)
+		ti := newTopologyInfo(ctx, client)
 		bl := ti.baseLabels()
 		assert.Equal(t, tc.want[labelReplicasetName], bl[labelReplicasetName], tc.containerName)
 		assert.Equal(t, tc.want[labelReplicasetState], bl[labelReplicasetState], tc.containerName)

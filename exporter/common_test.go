@@ -148,3 +148,28 @@ func TestListCollections(t *testing.T) {
 		assert.Equal(t, 6, count)
 	})
 }
+
+func TestSplitNamespace(t *testing.T) {
+	testCases := []struct {
+		namespace      string
+		wantDatabase   string
+		wantCollection string
+	}{
+		{
+			namespace:      "db.collection",
+			wantDatabase:   "db",
+			wantCollection: "collection",
+		},
+		{
+			namespace:      "db.this.is.a.valid.collection.name",
+			wantDatabase:   "db",
+			wantCollection: "this.is.a.valid.collection.name",
+		},
+	}
+
+	for _, tc := range testCases {
+		db, coll := splitNamespace(tc.namespace)
+		assert.Equal(t, tc.wantDatabase, db)
+		assert.Equal(t, tc.wantCollection, coll)
+	}
+}

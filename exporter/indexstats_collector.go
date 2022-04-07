@@ -28,25 +28,48 @@ import (
 )
 
 type indexstatsCollector struct {
-	ctx             context.Context
-	client          *mongo.Client
-	collections     []string
-	discoveringMode bool
-	logger          *logrus.Logger
-	topologyInfo    labelsGetter
+	ctx  context.Context
+	base *baseCollector
+
+	discoveringMode         bool
+	overrideDescendingIndex bool
+	topologyInfo            labelsGetter
+
+	collections []string
+}
+
+// newIndexStatsCollector creates a collector for statistics on index usage.
+func newIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery, overrideDescendingIndex bool, topology labelsGetter, collections []string) *indexstatsCollector {
+	return &indexstatsCollector{
+		ctx:  ctx,
+		base: newBaseCollector(client, logger),
+
+		discoveringMode:         discovery,
+		topologyInfo:            topology,
+		overrideDescendingIndex: overrideDescendingIndex,
+
+		collections: collections,
+	}
 }
 
 func (d *indexstatsCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
+	d.base.Collect(ch)
+}
+
+func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	collections := d.collections
 
+	logger := d.base.logger
+	client := d.base.client
+
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, d.client, d.collections, systemDBs)
+		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
 		if err != nil {
-			d.logger.Errorf("cannot auto discover databases and collections")
+			logger.Errorf("cannot auto discover databases and collections")
 
 			return
 		}
@@ -67,30 +90,38 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 			{Key: "$indexStats", Value: bson.M{}},
 		}
 
-		cursor, err := d.client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
+		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
 		if err != nil {
-			d.logger.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
+			logger.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
-			d.logger.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
+			logger.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
 
 			continue
 		}
 
-		d.logger.Debugf("indexStats for %s.%s", database, collection)
-		debugResult(d.logger, stats)
+		d.base.logger.Debugf("indexStats for %s.%s", database, collection)
+
+		debugResult(d.base.logger, stats)
 
 		for _, metric := range stats {
+			indexName := fmt.Sprintf("%s", metric["name"])
+			// Override the label name
+			if d.overrideDescendingIndex {
+				indexName = strings.ReplaceAll(fmt.Sprintf("%s", metric["name"]), "-1", "DESC")
+			}
+
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the
 			// same, for different collections.
-			prefix := fmt.Sprintf("%s_%s_%s", database, collection, metric["name"])
+			prefix := "indexstats"
 			labels := d.topologyInfo.baseLabels()
-			labels["namespace"] = database + "." + collection
-			labels["key_name"] = fmt.Sprintf("%s", metric["name"])
+			labels["database"] = database
+			labels["collection"] = collection
+			labels["key_name"] = indexName
 
 			metrics := sanitizeMetrics(metric)
 			for _, metric := range makeMetrics(prefix, metrics, labels, false) {
