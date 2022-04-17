@@ -327,7 +327,6 @@ func (e *Exporter) Run() {
 		Handler: e.Handler(),
 	}
 
-	// TODO: tls, etc.
 	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
 		e.logger.Errorf("error starting server: %v", err)
 		os.Exit(1)
