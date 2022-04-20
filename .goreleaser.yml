@@ -36,8 +36,10 @@ dockers:
 - goos: linux
   goarch: amd64
   image_templates:
-  - "percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64"
-  - "percona/mongodb_exporter:{{.Version}}-amd64"
+  - "docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64"
+  - "docker.io/percona/mongodb_exporter:{{.Version}}-amd64"
+  - "ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64"
+  - "ghcr.io/percona/mongodb_exporter:{{.Version}}-amd64"
   dockerfile: Dockerfile
   build_flag_templates:
     - "--pull"
@@ -45,23 +47,36 @@ dockers:
 - goos: linux
   goarch: arm64
   image_templates:
-  - "percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8"
-  - "percona/mongodb_exporter:{{.Version}}-arm64v8"
+  - "docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8"
+  - "docker.io/percona/mongodb_exporter:{{.Version}}-arm64v8"
+  - "ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8"
+  - "ghcr.io/percona/mongodb_exporter:{{.Version}}-arm64v8"
   dockerfile: Dockerfile
   use: buildx
   build_flag_templates:
     - "--pull"
     - "--platform=linux/arm64/v8"
 docker_manifests:
-  - name_template: percona/mongodb_exporter:{{.Major}}.{{.Minor}}
+## Docker Hub
+  - name_template: docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}
     image_templates:
-    - percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8
-    - percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64
+    - docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8
+    - docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64
 
-  - name_template: percona/mongodb_exporter:{{.Version}}
+  - name_template: docker.io/percona/mongodb_exporter:{{.Version}}
     image_templates:
-    - percona/mongodb_exporter:{{.Version}}-arm64v8
-    - percona/mongodb_exporter:{{.Version}}-amd64
+    - docker.io/percona/mongodb_exporter:{{.Version}}-arm64v8
+    - docker.io/percona/mongodb_exporter:{{.Version}}-amd64
+## GHCR
+  - name_template: ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}
+    image_templates:
+    - ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8
+    - ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64
+
+  - name_template: ghcr.io/percona/mongodb_exporter:{{.Version}}
+    image_templates:
+    - ghcr.io/percona/mongodb_exporter:{{.Version}}-arm64v8
+    - ghcr.io/percona/mongodb_exporter:{{.Version}}-amd64
 nfpms:
   - file_name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
     homepage:  https://www.percona.com/
