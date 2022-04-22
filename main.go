@@ -42,8 +42,8 @@ type GlobalFlags struct {
 	DirectConnect         bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true" negatable:""`
 	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
-	TLSConfigPath         string `name:"web.tls-config-path" help:"Path to the file having Prometheus TLS config for basic auth"`
-	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
+	TLSConfigPath         string `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
+	LogLevel              string `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
 	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
 	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
