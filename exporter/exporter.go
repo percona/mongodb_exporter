@@ -21,13 +21,15 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -72,6 +74,7 @@ type Opts struct {
 	Path                  string
 	URI                   string
 	WebListenAddress      string
+	TLSConfigPath         string
 }
 
 var (
@@ -319,8 +322,15 @@ func (e *Exporter) Handler() http.Handler {
 
 // Run starts the exporter.
 func (e *Exporter) Run() {
-	handler := e.Handler()
-	exporter_shared.RunServer("MongoDB", e.webListenAddress, e.path, handler)
+	server := &http.Server{
+		Addr:    e.webListenAddress,
+		Handler: e.Handler(),
+	}
+
+	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
+		e.logger.Errorf("error starting server: %v", err)
+		os.Exit(1)
+	}
 }
 
 func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client, error) {
