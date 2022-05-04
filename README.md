@@ -24,27 +24,6 @@ A flag, `--compatible-mode`, which exposes metrics with 0.1x compatible metric
 names has been implemented which simplifies migration from the old version to
 the current version.
 
-## Flags
-|Flag|Description|Example|
-|-----|-----|-----|
-|-h, \-\-help|Show context-sensitive help||
-|\-\-compatible-mode|Exposes new metrics in the new and old format at the same time||
-|\-\-discovering-mode|Enable autodiscover collections from databases which set in collstats-colls and indexstats-colls||
-|\-\-mongodb.collstats-colls|List of comma separated databases.collections to get stats|\-\-mongodb.collstats-colls=testdb.testcol1,testdb.testcol2|
-|\-\-mongodb.direct-connect|Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used|\-\-mongodb.direct-connect=false|
-|\-\-mongodb.indexstats-colls|List of comma separated database.collections to get index stats|\-\-mongodb.indexstats-colls=db1.col1,db1.col2|
-|\-\-mongodb.uri|MongoDB connection URI ($MONGODB_URI)|\-\-mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
-|\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new connection for each http request.||
-|\-\-web.listen-address|Address to listen on for web interface and telemetry|\-\-web.listen-address=":9216"|
-|\-\-web.telemetry-path|Metrics expose path|\-\-web.telemetry-path="/metrics"|
-|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level=error|
-|\-\-no-collector.diagnosticdata|Disable collecting metrics from getDiagnosticData||
-|\-\-no-collector.replicasetstatus|Disable collecting metrics from replSetGetStatus||
-|\-\-collector.dbstats|Enable collecting metrics from dbStats||
-|\-\-collector.topmetrics|Enable collecting metrics from top admin command||
-|\-\-metrics.overridedescendingindex| Enable descending index name override to replace -1 with _DESC ||
-|--version|Show version and exit|
-
 ### Build the exporter
 The build process uses the dockerized version of goreleaser so you don't need to install Go.
 Just run `make release` and the new binaries will be generated under the build directory.
@@ -135,6 +114,9 @@ The labels are:
 - rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`. 
 Check [the official documentation](https://docs.mongodb.com/manual/reference/replica-states/) for details on replicaset status values.
 
-## Submitting Bug Reports and adding new functionality
+## Usage Reference
 
-please see [Contribution Guide](CONTRIBUTING.md)
+Check out [Reference Guide](REFERENCE.md) for details on using exporter.
+## Bug Reports / Feature PR
+
+Please read [Contribution Guide](CONTRIBUTING.md).
