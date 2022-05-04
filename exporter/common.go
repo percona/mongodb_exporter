@@ -68,8 +68,10 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 
 // databases returns the list of databases matching the filters.
 // - filterInNamespaces: Include only the database names matching the any of the regular expressions in this list.
-//                       Case will be ignored because the function will automatically add the ignore case
-//                       flag to the regular expression.
+//
+//	Case will be ignored because the function will automatically add the ignore case
+//	flag to the regular expression.
+//
 // - exclude: List of databases to be excluded. Useful to ignore system databases.
 func databases(ctx context.Context, client *mongo.Client, filterInNamespaces []string, exclude []string) ([]string, error) {
 	opts := &options.ListDatabasesOptions{NameOnly: pointer.ToBool(true), AuthorizedDatabases: pointer.ToBool(true)}
