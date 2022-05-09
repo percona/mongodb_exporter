@@ -21,11 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestTopCollector(t *testing.T) {

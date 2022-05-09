@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
+	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -31,8 +32,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestIndexStatsCollector(t *testing.T) {
