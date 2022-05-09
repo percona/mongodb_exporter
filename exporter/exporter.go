@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
@@ -322,9 +324,12 @@ func (e *Exporter) Handler() http.Handler {
 
 // Run starts the exporter.
 func (e *Exporter) Run() {
+	mux := http.DefaultServeMux
+	mux.Handle("/metrics", e.Handler())
+
 	server := &http.Server{
 		Addr:    e.webListenAddress,
-		Handler: e.Handler(),
+		Handler: mux,
 	}
 
 	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
