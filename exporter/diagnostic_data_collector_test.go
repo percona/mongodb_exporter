@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/percona/exporter_shared/helpers"
-	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -35,6 +34,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestDiagnosticDataCollector(t *testing.T) {

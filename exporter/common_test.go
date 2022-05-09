@@ -22,10 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 //nolint:gochecknoglobals

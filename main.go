@@ -21,8 +21,9 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/percona/mongodb_exporter/exporter"
 	"github.com/sirupsen/logrus"
+
+	"github.com/percona/mongodb_exporter/exporter"
 )
 
 //nolint:gochecknoglobals

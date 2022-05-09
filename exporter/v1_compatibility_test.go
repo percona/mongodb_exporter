@@ -26,11 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestWalkTo(t *testing.T) {

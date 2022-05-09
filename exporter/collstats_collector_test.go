@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestCollStatsCollector(t *testing.T) {
