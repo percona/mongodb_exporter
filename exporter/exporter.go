@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +46,8 @@ type Exporter struct {
 	webListenAddress      string
 	lock                  *sync.Mutex
 	totalCollectionsCount int
+	MongoClientLRUPool    *MongoClientLRUPool
+	mux                   *http.ServeMux
 }
 
 // Opts holds new exporter options.
@@ -53,6 +56,7 @@ type Opts struct {
 	// Example: db1.col1,db.col1
 	CollStatsNamespaces    []string
 	CollStatsLimit         int
+	ConnPoolLimit          int
 	CompatibleMode         bool
 	DirectConnect          bool
 	DisableDefaultRegistry bool
@@ -105,6 +109,7 @@ func New(opts *Opts) *Exporter {
 		webListenAddress:      opts.WebListenAddress,
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
+		mux:                   http.NewServeMux(),
 	}
 	// Try initial connect. Connection will be retried with every scrape.
 	go func() {
@@ -113,6 +118,11 @@ func New(opts *Opts) *Exporter {
 			exp.logger.Errorf("Cannot connect to MongoDB: %v", err)
 		}
 	}()
+	exp.mux.HandleFunc("/", exp.Handler)
+	exp.mux.HandleFunc("/health", exp.healthHandler)
+	if opts.ConnPoolLimit > 0 {
+		exp.MongoClientLRUPool = NewMongoClientLRUPool(opts.ConnPoolLimit)
+	}
 
 	return exp
 }
@@ -160,7 +170,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
-	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk && requestOpts.EnableCollStats {
+	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && limitsOk && requestOpts.EnableCollStats {
 		cc := newCollectionStatsCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, e.opts.DiscoveringMode,
 			topologyInfo, e.opts.CollStatsNamespaces)
@@ -168,33 +178,33 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
-	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && e.opts.EnableIndexStats && limitsOk && requestOpts.EnableIndexStats {
+	if (len(e.opts.IndexStatsCollections) > 0 || e.opts.DiscoveringMode) && limitsOk && requestOpts.EnableIndexStats {
 		ic := newIndexStatsCollector(ctx, client, e.opts.Logger,
 			e.opts.DiscoveringMode, e.opts.EnableOverrideDescendingIndex,
 			topologyInfo, e.opts.IndexStatsCollections)
 		registry.MustRegister(ic)
 	}
 
-	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
+	if requestOpts.EnableDiagnosticData {
 		ddc := newDiagnosticDataCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(ddc)
 	}
 
-	if e.opts.EnableDBStats && limitsOk && requestOpts.EnableDBStats {
+	if limitsOk && requestOpts.EnableDBStats {
 		cc := newDBStatsCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo, nil)
 		registry.MustRegister(cc)
 	}
 
-	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
+	if nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
 		tc := newTopCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(tc)
 	}
 
 	// replSetGetStatus is not supported through mongos.
-	if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
+	if nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
@@ -205,7 +215,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	if e.opts.GlobalConnPool {
-		// Get global client. Maybe it must be initialized first.
+		// Get global client. Maybe it must be initialized front.
 		// Initialization is retried with every scrape until it succeeds once.
 		e.clientMu.Lock()
 		defer e.clientMu.Unlock()
@@ -233,98 +243,114 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	return client, nil
 }
 
-// Handler returns an http.Handler that serves metrics. Can be used instead of
-// run for hooking up custom HTTP servers.
-func (e *Exporter) Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
-		// To support also older ones vmagents.
-		if err != nil {
-			seconds = 10
+// Handler serves metrics.
+func (e *Exporter) Handler(w http.ResponseWriter, r *http.Request) {
+	seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
+	// To support also older ones vmagents.
+	if err != nil {
+		seconds = 10
+	}
+
+	var client *mongo.Client
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
+	defer cancel()
+
+	filters := strings.Split(r.URL.Query().Get("collect"), ",")
+	mongoUrls := r.URL.Query().Get("target")
+
+	requestOpts := Opts{}
+
+	if len(filters) == 0 {
+		requestOpts = *e.opts
+	}
+	e.logger.Debugf("filters: %v.\n", filters)
+
+	for _, filter := range filters {
+		switch filter {
+		case "diagnosticdata":
+			requestOpts.EnableDiagnosticData = true
+		case "replicasetstatus":
+			requestOpts.EnableReplicasetStatus = true
+		case "dbstats":
+			requestOpts.EnableDBStats = true
+		case "topmetrics":
+			requestOpts.EnableTopMetrics = true
+		case "indexstats":
+			requestOpts.EnableIndexStats = true
+		case "collstats":
+			requestOpts.EnableCollStats = true
 		}
-
-		var client *mongo.Client
-		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
-		defer cancel()
-
-		filters := r.URL.Query()["collect[]"]
-
-		requestOpts := Opts{}
-
-		if len(filters) == 0 {
-			requestOpts = *e.opts
+	}
+	if len(mongoUrls) > 0 && e.opts.ConnPoolLimit != 0 {
+		e.logger.Debugf("mongoUrls: %v.\n", mongoUrls)
+		var ok bool
+		client, ok = e.MongoClientLRUPool.Get(mongoUrls)
+		if !ok || client == nil {
+			client, err = connect(context.Background(), mongoUrls, false)
 		}
-
-		for _, filter := range filters {
-			switch filter {
-			case "diagnosticdata":
-				requestOpts.EnableDiagnosticData = true
-			case "replicasetstatus":
-				requestOpts.EnableReplicasetStatus = true
-			case "dbstats":
-				requestOpts.EnableDBStats = true
-			case "topmetrics":
-				requestOpts.EnableTopMetrics = true
-			case "indexstats":
-				requestOpts.EnableIndexStats = true
-			case "collstats":
-				requestOpts.EnableCollStats = true
-			}
-		}
-
+	} else {
 		client, err = e.getClient(ctx)
-		if err != nil {
-			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
-		}
+	}
 
-		if client != nil && e.getTotalCollectionsCount() <= 0 {
-			count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
-			if err == nil {
-				e.lock.Lock()
-				e.totalCollectionsCount = count
-				e.lock.Unlock()
-			}
-		}
+	if err != nil {
+		e.logger.Errorf("Cannot connect to MongoDB: %v", err)
+	}
 
-		// Close client after usage.
-		if !e.opts.GlobalConnPool {
-			defer func() {
-				if client != nil {
-					err := client.Disconnect(ctx)
-					if err != nil {
-						e.logger.Errorf("Cannot disconnect client: %v", err)
-					}
+	if client != nil && e.getTotalCollectionsCount() <= 0 {
+		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+		if err == nil {
+			e.lock.Lock()
+			e.totalCollectionsCount = count
+			e.lock.Unlock()
+		}
+	}
+
+	// Close client after usage.
+	if !e.opts.GlobalConnPool || (len(mongoUrls) > 0 && e.opts.ConnPoolLimit != 0) {
+		defer func() {
+			if client != nil {
+				err := client.Disconnect(ctx)
+				if err != nil {
+					e.logger.Errorf("Cannot disconnect client: %v", err)
 				}
-			}()
-		}
+			}
+		}()
+	}
 
-		// Topology can change between requests, so we need to get it every time.
-		ti := newTopologyInfo(ctx, client)
+	// Topology can change between requests, so we need to get it every time.
+	ti := newTopologyInfo(ctx, client)
 
-		registry := e.makeRegistry(ctx, client, ti, requestOpts)
+	registry := e.makeRegistry(ctx, client, ti, requestOpts)
 
-		var gatherers prometheus.Gatherers
+	var gatherers prometheus.Gatherers
 
-		if !e.opts.DisableDefaultRegistry {
-			gatherers = append(gatherers, prometheus.DefaultGatherer)
-		}
-		gatherers = append(gatherers, registry)
+	if !e.opts.DisableDefaultRegistry {
+		gatherers = append(gatherers, prometheus.DefaultGatherer)
+	}
+	gatherers = append(gatherers, registry)
 
-		// Delegate http serving to Prometheus client library, which will call collector.Collect.
-		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
-			ErrorHandling: promhttp.ContinueOnError,
-			ErrorLog:      e.logger,
-		})
-
-		h.ServeHTTP(w, r)
+	// Delegate http serving to Prometheus client library, which will call collector.Collect.
+	h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
+		ErrorHandling: promhttp.ContinueOnError,
+		ErrorLog:      e.logger,
 	})
+
+	h.ServeHTTP(w, r)
+}
+
+func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	e.mux.ServeHTTP(w, r)
+}
+
+func (e *Exporter) healthHandler(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`ok`))
 }
 
 // Run starts the exporter.
 func (e *Exporter) Run() {
 	server := &http.Server{
 		Addr:    e.webListenAddress,
-		Handler: e.Handler(),
+		Handler: e.mux,
 	}
 
 	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {

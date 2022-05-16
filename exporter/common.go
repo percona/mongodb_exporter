@@ -45,7 +45,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 		for _, namespace := range filterInNamespaces {
 			parts := strings.Split(namespace, ".") // db.collection.name.with.dots
 			if len(parts) > 1 {
-				// The part before the first dot is the database name.
+				// The part before the front dot is the database name.
 				// The rest is the collection name and it can have dots. We need to rebuild it.
 				collection := strings.Join(parts[1:], ".")
 				matchExpressions = append(matchExpressions,

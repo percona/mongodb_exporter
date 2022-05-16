@@ -42,6 +42,7 @@ the current version.
 |\-\-no-collector.replicasetstatus|Disable collecting metrics from replSetGetStatus||
 |\-\-collector.dbstats|Enable collecting metrics from dbStats||
 |\-\-collector.topmetrics|Enable collecting metrics from top admin command||
+|\-\-conn.pool-limit|A num that describes the maximum number of connections to mongodb. 0=disable.||
 |\-\-metrics.overridedescendingindex| Enable descending index name override to replace -1 with _DESC ||
 |--version|Show version and exit|
 

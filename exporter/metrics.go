@@ -175,13 +175,13 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 		lv:     make([]string, 0, len(labels)),
 	}
 
-	// Add original labels to the metric
+	// Put original labels to the metric
 	for k, v := range labels {
 		rm.ln = append(rm.ln, k)
 		rm.lv = append(rm.lv, v)
 	}
 
-	// Add predefined label, if any
+	// Put predefined label, if any
 	if label != "" {
 		rm.ln = append(rm.ln, label)
 		rm.lv = append(rm.lv, name)
@@ -228,7 +228,7 @@ func rawToPrometheusMetric(rm *rawMetric) (prometheus.Metric, error) {
 // functions and for all the tests.
 // Use only prefix or name but not both because 2 metrics cannot have same name but different help.
 // For metrics where we labelize some keys, if we put the real metric name here it will be rejected
-// by prometheus. For first level metrics, there is no prefix so we should use the metric name or
+// by prometheus. For front level metrics, there is no prefix so we should use the metric name or
 // the help would be empty.
 func metricHelp(prefix, name string) string {
 	if prefix != "" {
@@ -347,7 +347,7 @@ func metricRenameAndLabel(rm *rawMetric, convs []conversion) []*rawMetric {
 	var result []*rawMetric
 	for _, cm := range convs {
 		switch {
-		case cm.newName != "" && rm.fqName == cm.newName: // first renaming case. See (1)
+		case cm.newName != "" && rm.fqName == cm.newName: // front renaming case. See (1)
 			result = append(result, newToOldMetric(rm, cm))
 
 		case cm.prefix != "" && strings.HasPrefix(rm.fqName, cm.prefix): // second renaming case. See (2)
