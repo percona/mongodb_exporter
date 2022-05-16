@@ -81,8 +81,10 @@ func TestConnect(t *testing.T) {
 		}
 
 		e := New(exporterOpts)
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", e.Handler)
 
-		ts := httptest.NewServer(e.Handler())
+		ts := httptest.NewServer(mux)
 		defer ts.Close()
 
 		var wg sync.WaitGroup
@@ -112,10 +114,11 @@ func TestConnect(t *testing.T) {
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: true,
 		}
-
 		e := New(exporterOpts)
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", e.Handler)
 
-		ts := httptest.NewServer(e.Handler())
+		ts := httptest.NewServer(mux)
 		defer ts.Close()
 
 		var wg sync.WaitGroup

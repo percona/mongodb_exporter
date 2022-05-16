@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 	"strings"
@@ -255,6 +256,7 @@ func (e *Exporter) Handler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
 	defer cancel()
 
+	// Prometheus __param_xxxx  does not support collect[]=aa&collect[]=bbb
 	filters := strings.Split(r.URL.Query().Get("collect"), ",")
 	mongoUrls := r.URL.Query().Get("target")
 
