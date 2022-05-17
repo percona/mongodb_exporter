@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 	"sync"
@@ -322,9 +323,12 @@ func (e *Exporter) Handler() http.Handler {
 
 // Run starts the exporter.
 func (e *Exporter) Run() {
+	mux := http.DefaultServeMux
+	mux.Handle("/metrics", e.Handler())
+
 	server := &http.Server{
 		Addr:    e.webListenAddress,
-		Handler: e.Handler(),
+		Handler: mux,
 	}
 
 	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
