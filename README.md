@@ -116,7 +116,7 @@ Check [the official documentation](https://docs.mongodb.com/manual/reference/rep
 
 ## Usage Reference
 
-Check out [Reference Guide](REFERENCE.md) for details on using exporter.
+See the [Reference Guide](REFERENCE.md) for details on using the exporter.
 ## Bug Reports / Feature PR
 
-Please read [Contribution Guide](CONTRIBUTING.md).
+Refer to the [Contribution Guide](CONTRIBUTING.md).
