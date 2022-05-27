@@ -31,8 +31,6 @@ func TestMongoClientLRUPool_Get(t *testing.T) {
 	if !ok || cli == nil {
 		t.Fail()
 	}
-	fmt.Println("cli: ", cli)
-	fmt.Println("front: ", p.front)
 	if p.front.Val.URL != "mongo client num: 6" {
 		t.Fail()
 	}
