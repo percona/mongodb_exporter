@@ -24,6 +24,7 @@ A flag, `--compatible-mode`, which exposes metrics with 0.1x compatible metric
 names has been implemented which simplifies migration from the old version to
 the current version.
 
+
 ## Flags
 |Flag|Description|Example|
 |-----|-----|-----|
@@ -136,6 +137,9 @@ The labels are:
 - rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`. 
 Check [the official documentation](https://docs.mongodb.com/manual/reference/replica-states/) for details on replicaset status values.
 
-## Submitting Bug Reports and adding new functionality
+## Usage Reference
 
-please see [Contribution Guide](CONTRIBUTING.md)
+See the [Reference Guide](REFERENCE.md) for details on using the exporter.
+## Bug Reports / Feature PR
+
+Refer to the [Contribution Guide](CONTRIBUTING.md).
