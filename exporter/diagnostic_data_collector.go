@@ -85,7 +85,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	debugResult(logger, m)
 
 	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
-	metrics = append(metrics, locksMetrics(m)...)
+	metrics = append(metrics, locksMetrics(logger, m)...)
 
 	if d.compatibleMode {
 		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
