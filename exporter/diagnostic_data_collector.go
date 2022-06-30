@@ -54,7 +54,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
-	defer d.base.MeasureCollectTime(ch, "diagnostic_data")()
+	defer prometheus.MeasureCollectTime(ch, "mongodb", "diagnostic_data")()
 
 	var m bson.M
 

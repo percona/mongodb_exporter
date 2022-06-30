@@ -19,7 +19,6 @@ package exporter
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -75,26 +74,5 @@ func (d *baseCollector) Collect(ch chan<- prometheus.Metric) {
 
 	for _, metric := range d.metricsCache {
 		ch <- metric
-	}
-}
-
-var timeToCollectDesc = prometheus.NewDesc(
-	"collector_scrape_time_ms",
-	"Time taken for scrape by collector",
-	[]string{"exporter", "collector"},
-	nil)
-
-func (d *baseCollector) MeasureCollectTime(ch chan<- prometheus.Metric, collector string) func() {
-	startTime := time.Now()
-
-	return func() {
-		scrapeTime := time.Since(startTime)
-		scrapeMetric := prometheus.MustNewConstMetric(
-			timeToCollectDesc,
-			prometheus.GaugeValue,
-			float64(scrapeTime.Milliseconds()),
-			"mongodb",
-			collector)
-		ch <- scrapeMetric
 	}
 }

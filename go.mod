@@ -5,6 +5,8 @@ go 1.17
 // Update percona-toolkit with `go get -v github.com/percona/percona-toolkit@3.0; go mod tidy` (without `-u`)
 // until we have everything we need in a tagged release.
 
+replace github.com/prometheus/client_golang v1.12.2 => github.com/Percona-Lab/client_golang v1.12.2-0.20220630184503-42ed7fb4d6d9
+
 require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/alecthomas/kong v0.5.0
