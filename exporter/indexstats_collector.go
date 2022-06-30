@@ -19,11 +19,12 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"strings"
 )
 
 type indexstatsCollector struct {

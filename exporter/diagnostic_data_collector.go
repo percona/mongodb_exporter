@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"

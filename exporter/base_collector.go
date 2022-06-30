@@ -78,13 +78,11 @@ func (d *baseCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-var (
-	timeToCollectDesc = prometheus.NewDesc(
-		"collector_scrape_time_ms",
-		"Time taken for scrape by collector",
-		[]string{"exporter", "collector"},
-		nil)
-)
+var timeToCollectDesc = prometheus.NewDesc(
+	"collector_scrape_time_ms",
+	"Time taken for scrape by collector",
+	[]string{"exporter", "collector"},
+	nil)
 
 func (d *baseCollector) MeasureCollectTimeMetric(collector string) func() {
 	startTime := time.Now()

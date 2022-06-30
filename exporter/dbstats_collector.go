@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
