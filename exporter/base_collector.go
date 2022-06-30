@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -75,4 +76,15 @@ func (d *baseCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, metric := range d.metricsCache {
 		ch <- metric
 	}
+}
+
+func (d *baseCollector) GenerateMetaMetric(scrapeTime time.Duration, collector string) {
+	scrapeMetric := prometheus.MustNewConstMetric(
+		prometheus.GetScrapeDescripter(),
+		prometheus.GaugeValue,
+		float64(scrapeTime.Milliseconds()),
+		"mongodb",
+		collector)
+
+	prometheus.PushMetaMetrics(scrapeMetric)
 }

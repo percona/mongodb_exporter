@@ -18,11 +18,11 @@ package exporter
 
 import (
 	"context"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"time"
 )
 
 type serverStatusCollector struct {
@@ -55,6 +55,7 @@ func (d *serverStatusCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
+	startTime := time.Now()
 	cmd := bson.D{{Key: "serverStatus", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
@@ -70,4 +71,7 @@ func (d *serverStatusCollector) collect(ch chan<- prometheus.Metric) {
 	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric
 	}
+
+	scrapeTime := time.Since(startTime)
+	d.base.GenerateMetaMetric(scrapeTime, "serverstatus")
 }

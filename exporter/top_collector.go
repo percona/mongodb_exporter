@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -60,6 +61,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
+	startTime := time.Now()
 	cmd := bson.D{{Key: "top", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
@@ -153,4 +155,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 			ch <- metric
 		}
 	}
+
+	scrapeTime := time.Since(startTime)
+	d.base.GenerateMetaMetric(scrapeTime, "top")
 }

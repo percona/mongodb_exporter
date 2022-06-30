@@ -5,6 +5,10 @@ go 1.17
 // Update percona-toolkit with `go get -v github.com/percona/percona-toolkit@3.0; go mod tidy` (without `-u`)
 // until we have everything we need in a tagged release.
 
+replace github.com/prometheus/client_golang v1.12.2 => ../client_golang
+
+//replace github.com/prometheus/client_golang v1.12.2 => github.com/Percona-Lab/client_golang@PMM-9919-add-scrape-metrics-per-collector
+
 require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/alecthomas/kong v0.5.0
@@ -12,14 +16,14 @@ require (
 	github.com/percona/exporter_shared v0.7.4-0.20211108113423-8555cdbac68b
 	github.com/percona/percona-toolkit v0.0.0-20211210121818-b2860eee3152
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.34.0
 	github.com/prometheus/exporter-toolkit v0.7.1
 	github.com/shirou/gopsutil v3.21.8+incompatible // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.1
-	go.mongodb.org/mongo-driver v1.8.4
+	go.mongodb.org/mongo-driver v1.9.1
 )
 
 require (
@@ -51,10 +55,10 @@ require (
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
-	google.golang.org/protobuf v1.27.1 // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
