@@ -84,7 +84,7 @@ var timeToCollectDesc = prometheus.NewDesc(
 	[]string{"exporter", "collector"},
 	nil)
 
-func (d *baseCollector) MeasureCollectTimeMetric(collector string) func() {
+func (d *baseCollector) MeasureCollectTime(collector string) func() {
 	startTime := time.Now()
 
 	return func() {

@@ -61,7 +61,7 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
-	defer d.base.MeasureCollectTimeMetric("indexstats")
+	defer d.base.MeasureCollectTime("indexstats")
 
 	collections := d.collections
 
