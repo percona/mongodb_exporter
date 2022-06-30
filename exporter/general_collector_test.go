@@ -41,7 +41,10 @@ func TestGeneralCollector(t *testing.T) {
 	expected := strings.NewReader(`
 	# HELP mongodb_up Whether MongoDB is up.
 	# TYPE mongodb_up gauge
-	mongodb_up 1` + "\n")
+	mongodb_up 1
+	# HELP collector_scrape_time_ms Time taken for scrape by collector
+    # TYPE collector_scrape_time_ms gauge
+    collector_scrape_time_ms{collector="dbstats",exporter="mongodb"} 0` + "\n")
 	err := testutil.CollectAndCompare(c, expected)
 	require.NoError(t, err)
 
@@ -50,7 +53,10 @@ func TestGeneralCollector(t *testing.T) {
 	expected = strings.NewReader(`
 	# HELP mongodb_up Whether MongoDB is up.
 	# TYPE mongodb_up gauge
-	mongodb_up 0` + "\n")
+	mongodb_up 0
+	# HELP collector_scrape_time_ms Time taken for scrape by collector
+    # TYPE collector_scrape_time_ms gauge
+    collector_scrape_time_ms{collector="dbstats",exporter="mongodb"} 0` + "\n")
 	err = testutil.CollectAndCompare(c, expected)
 	require.NoError(t, err)
 }
