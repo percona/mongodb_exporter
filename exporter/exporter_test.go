@@ -76,7 +76,7 @@ func TestConnect(t *testing.T) {
 
 		exporterOpts := &Opts{
 			Logger:         log,
-			URI:            fmt.Sprintf("mongodb://localhost:%s/admin", tu.MongoDBS1PrimaryPort),
+			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: false,
 		}
 
