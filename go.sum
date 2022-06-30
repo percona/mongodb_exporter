@@ -37,8 +37,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/Masterminds/semver v1.4.2/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46/go.mod h1:3wb06e3pkSAbeQ52E9H9iFoQsEEwGN64994WTCIhntQ=
-github.com/Percona-Lab/client_golang v1.12.2-0.20220630184503-42ed7fb4d6d9 h1:YVpZP9SEKKKOjmr86yccsXrOFmYH2wdL5v5+aso8xmo=
-github.com/Percona-Lab/client_golang v1.12.2-0.20220630184503-42ed7fb4d6d9/go.mod h1:obkGjwg6Wf+MW4GSHajtE/Krl1VzvajWi2ruzjqNk1k=
+github.com/Percona-Lab/client_golang v1.12.2-0.20220630184746-ea5a3aa8c041 h1:zCZyE/60bYjgIizlkHg7KI8+rIT9PaI8EFPg5gh6OYU=
+github.com/Percona-Lab/client_golang v1.12.2-0.20220630184746-ea5a3aa8c041/go.mod h1:obkGjwg6Wf+MW4GSHajtE/Krl1VzvajWi2ruzjqNk1k=
 github.com/PuerkitoBio/purell v1.0.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 h1:fLjPD/aNc3UIOA6tDi6QXUemppXK3P9BI7mr2hd6gx8=
