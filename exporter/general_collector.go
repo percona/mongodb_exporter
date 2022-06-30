@@ -49,7 +49,7 @@ func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
-	defer d.base.MeasureCollectTime("dbstats")()
+	defer d.base.MeasureCollectTime(ch, "dbstats")()
 	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
 }
 

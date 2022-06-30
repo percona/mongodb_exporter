@@ -84,7 +84,7 @@ var timeToCollectDesc = prometheus.NewDesc(
 	[]string{"exporter", "collector"},
 	nil)
 
-func (d *baseCollector) MeasureCollectTime(collector string) func() {
+func (d *baseCollector) MeasureCollectTime(ch chan<- prometheus.Metric, collector string) func() {
 	startTime := time.Now()
 
 	return func() {
@@ -95,6 +95,6 @@ func (d *baseCollector) MeasureCollectTime(collector string) func() {
 			float64(scrapeTime.Milliseconds()),
 			"mongodb",
 			collector)
-		prometheus.MetricsCollector.Add(scrapeMetric)
+		ch <- scrapeMetric
 	}
 }
