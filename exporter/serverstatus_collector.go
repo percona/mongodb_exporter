@@ -52,7 +52,7 @@ func (d *serverStatusCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *serverStatusCollector) collect(ch chan<- prometheus.Metric) {
-	defer d.base.MeasureCollectTime("serverstatus")
+	defer d.base.MeasureCollectTime("serverstatus")()
 
 	logger := d.base.logger
 	client := d.base.client
