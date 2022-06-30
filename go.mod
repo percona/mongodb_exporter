@@ -5,7 +5,9 @@ go 1.17
 // Update percona-toolkit with `go get -v github.com/percona/percona-toolkit@3.0; go mod tidy` (without `-u`)
 // until we have everything we need in a tagged release.
 
-replace github.com/prometheus/client_golang v1.12.2 => github.com/Percona-Lab/client_golang v1.12.2-0.20220630163432-b4e77ba5b906
+replace github.com/prometheus/client_golang v1.12.2 => ../client_golang
+
+//replace github.com/prometheus/client_golang v1.12.2 => github.com/Percona-Lab/client_golang v1.12.2-0.20220630163432-b4e77ba5b906
 
 require (
 	github.com/AlekSi/pointer v1.1.0
@@ -21,7 +23,7 @@ require (
 	github.com/shirou/gopsutil v3.21.8+incompatible // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.1
-	go.mongodb.org/mongo-driver v1.9.1
+	go.mongodb.org/mongo-driver v1.8.1
 )
 
 require (
