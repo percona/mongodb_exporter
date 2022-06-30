@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -49,7 +50,11 @@ func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
+	startTime := time.Now()
 	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
+
+	scrapeTime := time.Since(startTime)
+	d.base.GenerateMetaMetric(scrapeTime, "general")
 }
 
 func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {

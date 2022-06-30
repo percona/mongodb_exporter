@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -66,6 +67,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
+	startTime := time.Now()
 	if d.discoveringMode {
 		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
 		if err != nil {
@@ -129,6 +131,9 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
+
+	scrapeTime := time.Since(startTime)
+	d.base.GenerateMetaMetric(scrapeTime, "indexstats")
 }
 
 // According to specs, we should expose only this 2 metrics. 'building' might not exist.

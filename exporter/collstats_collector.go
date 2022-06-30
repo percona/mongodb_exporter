@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -65,6 +66,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	logger := d.base.logger
 
+	startTime := time.Now()
 	if d.discoveringMode {
 		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
 		if err != nil {
@@ -131,6 +133,9 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
+
+	scrapeTime := time.Since(startTime)
+	d.base.GenerateMetaMetric(scrapeTime, "collstats")
 }
 
 func fromMapToSlice(databases map[string][]string) []string {
