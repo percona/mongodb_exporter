@@ -78,13 +78,25 @@ func (d *baseCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (d *baseCollector) GenerateMetaMetric(scrapeTime time.Duration, collector string) {
-	scrapeMetric := prometheus.MustNewConstMetric(
-		prometheus.GetScrapeDescripter(),
-		prometheus.GaugeValue,
-		float64(scrapeTime.Milliseconds()),
-		"mongodb",
-		collector)
+var (
+	timeToCollectDesc = prometheus.NewDesc(
+		"collector_scrape_time_ms",
+		"Time taken for scrape by collector",
+		[]string{"exporter", "collector"},
+		nil)
+)
 
-	prometheus.PushMetaMetrics(scrapeMetric)
+func (d *baseCollector) MeasureCollectTimeMetric(collector string) func() {
+	startTime := time.Now()
+
+	return func() {
+		scrapeTime := time.Since(startTime)
+		scrapeMetric := prometheus.MustNewConstMetric(
+			timeToCollectDesc,
+			prometheus.GaugeValue,
+			float64(scrapeTime.Milliseconds()),
+			"mongodb",
+			collector)
+		prometheus.MetricsCollector.Add(scrapeMetric)
+	}
 }

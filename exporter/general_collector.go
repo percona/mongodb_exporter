@@ -22,7 +22,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"time"
 )
 
 // This collector is always enabled and it is not directly related to any particular MongoDB
@@ -49,11 +48,8 @@ func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
-	startTime := time.Now()
+	defer d.base.MeasureCollectTimeMetric("dbstats")
 	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
-
-	scrapeTime := time.Since(startTime)
-	d.base.GenerateMetaMetric(scrapeTime, "general")
 }
 
 func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {

@@ -18,8 +18,6 @@ package exporter
 
 import (
 	"context"
-	"time"
-
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -55,12 +53,13 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
+	defer d.base.MeasureCollectTimeMetric("diagnostic_data")
+
 	var m bson.M
 
 	logger := d.base.logger
 	client := d.base.client
 
-	startTime := time.Now()
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 	if res.Err() != nil {
@@ -107,9 +106,6 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	for _, metric := range metrics {
 		ch <- metric
 	}
-
-	scrapeTime := time.Since(startTime)
-	d.base.GenerateMetaMetric(scrapeTime, "diagnostic_data")
 }
 
 // check interface.

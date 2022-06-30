@@ -19,7 +19,6 @@ package exporter
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -61,12 +60,13 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
+	defer d.base.MeasureCollectTimeMetric("collstats")
+
 	collections := d.collections
 
 	client := d.base.client
 	logger := d.base.logger
 
-	startTime := time.Now()
 	if d.discoveringMode {
 		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
 		if err != nil {
@@ -90,18 +90,18 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		aggregation := bson.D{
 			{
 				Key: "$collStats", Value: bson.M{
-				// TODO: PMM-9568 : Add support to handle histogram metrics
-				"latencyStats": bson.M{"histograms": false},
-				"storageStats": bson.M{"scale": 1},
-			},
+					// TODO: PMM-9568 : Add support to handle histogram metrics
+					"latencyStats": bson.M{"histograms": false},
+					"storageStats": bson.M{"scale": 1},
+				},
 			},
 		}
 		project := bson.D{
 			{
 				Key: "$project", Value: bson.M{
-				"storageStats.wiredTiger":   0,
-				"storageStats.indexDetails": 0,
-			},
+					"storageStats.wiredTiger":   0,
+					"storageStats.indexDetails": 0,
+				},
 			},
 		}
 
@@ -133,9 +133,6 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
-
-	scrapeTime := time.Since(startTime)
-	d.base.GenerateMetaMetric(scrapeTime, "collstats")
 }
 
 func fromMapToSlice(databases map[string][]string) []string {

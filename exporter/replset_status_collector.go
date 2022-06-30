@@ -18,8 +18,6 @@ package exporter
 
 import (
 	"context"
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -59,10 +57,11 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *replSetGetStatusCollector) collect(ch chan<- prometheus.Metric) {
+	defer d.base.MeasureCollectTimeMetric("replset_status")
+
 	logger := d.base.logger
 	client := d.base.client
 
-	startTime := time.Now()
 	cmd := bson.D{{Key: "replSetGetStatus", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
@@ -85,9 +84,6 @@ func (d *replSetGetStatusCollector) collect(ch chan<- prometheus.Metric) {
 	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric
 	}
-
-	scrapeTime := time.Since(startTime)
-	d.base.GenerateMetaMetric(scrapeTime, "replset_status")
 }
 
 var _ prometheus.Collector = (*replSetGetStatusCollector)(nil)

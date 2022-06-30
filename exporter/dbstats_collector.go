@@ -18,8 +18,6 @@ package exporter
 
 import (
 	"context"
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -58,10 +56,11 @@ func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
+	defer d.base.MeasureCollectTimeMetric("dbstats")
+
 	logger := d.base.logger
 	client := d.base.client
 
-	startTime := time.Now()
 	dbNames, err := databases(d.ctx, client, d.databaseFilter, nil)
 	if err != nil {
 		logger.Errorf("Failed to get database names: %s", err)
@@ -97,9 +96,6 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 			ch <- metric
 		}
 	}
-
-	scrapeTime := time.Since(startTime)
-	d.base.GenerateMetaMetric(scrapeTime, "dbstats")
 }
 
 var _ prometheus.Collector = (*dbstatsCollector)(nil)
