@@ -69,7 +69,10 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 
 	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti)
 
-	expected := strings.NewReader(``)
+	expected := strings.NewReader(`
+	# HELP collector_scrape_time_ms Time taken for scrape by collector
+    # TYPE collector_scrape_time_ms gauge
+    collector_scrape_time_ms{collector="replset_status",exporter="mongodb"} 0` + "\n")
 	err := testutil.CollectAndCompare(c, expected)
 	assert.NoError(t, err)
 }
