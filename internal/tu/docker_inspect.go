@@ -23,7 +23,7 @@ type HostPort struct {
 	HostPort string `json:"HostPort"`
 }
 
-//nolint
+// nolint
 type DockerInspectOutput []struct {
 	ID      string    `json:"Id"`
 	Created time.Time `json:"Created"`

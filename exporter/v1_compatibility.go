@@ -121,16 +121,17 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 // should be converted to mongodb_mongod_wiredtiger_cache_bytes with label "type": "total".
 // For this conversion, we have the suffixMapping field that holds the mapping for all suffixes.
 // Example definition:
-//    oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
-//    prefix:      "mongodb_ss_wt_cache_bytes",
-//    suffixLabel: "type",
-//    suffixMapping: map[string]string{
-//      "bytes_currently_in_the_cache":                           "total",
-//      "tracked_dirty_bytes_in_the_cache":                       "dirty",
-//      "tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
-//      "tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
-//    },
-//   },
+//
+//	 oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
+//	 prefix:      "mongodb_ss_wt_cache_bytes",
+//	 suffixLabel: "type",
+//	 suffixMapping: map[string]string{
+//	   "bytes_currently_in_the_cache":                           "total",
+//	   "tracked_dirty_bytes_in_the_cache":                       "dirty",
+//	   "tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
+//	   "tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
+//	 },
+//	},
 func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 	suffix := strings.TrimPrefix(rm.fqName, c.prefix)
 	suffix = strings.TrimPrefix(suffix, "_")

@@ -77,14 +77,14 @@ release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
 		-v ${PWD}:/go/src/github.com/user/repo \
 		-w /go/src/github.com/user/repo \
-		goreleaser/goreleaser release --snapshot --skip-publish --rm-dist
+		goreleaser/goreleaser release --snapshot --skip-publish --rm-dist 
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 format:                     ## Format source code.
 	go mod tidy
 	bin/gofumpt -l -w $(FILES)
-	bin/goimports -local github.com/percona/mongodb_exporter -l -w $(FILES)
+	bin/gci write --Section Standard --Section Default --Section "Prefix(github.com/percona/mongodb_exporter)" .
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run

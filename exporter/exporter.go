@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 	"sync"
@@ -137,7 +138,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
-		e.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
+		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
 	}
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
@@ -323,9 +324,12 @@ func (e *Exporter) Handler() http.Handler {
 
 // Run starts the exporter.
 func (e *Exporter) Run() {
+	mux := http.DefaultServeMux
+	mux.Handle("/metrics", e.Handler())
+
 	server := &http.Server{
 		Addr:    e.webListenAddress,
-		Handler: e.Handler(),
+		Handler: mux,
 	}
 
 	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
