@@ -61,6 +61,8 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
+	defer prometheus.MeasureCollectTime(ch, "mongodb", "indexstats")()
+
 	collections := d.collections
 
 	logger := d.base.logger
