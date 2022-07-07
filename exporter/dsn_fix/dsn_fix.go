@@ -19,7 +19,6 @@ package dsn_fix
 import (
 	"net/url"
 
-	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -31,7 +30,8 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 	// if username or password is set, need to replace it with correctly parsed credentials.
 	parsedDsn, err := url.Parse(dsn)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse DSN")
+		// for non-URI, do nothing (PMM-10265)
+		return clientOptions, nil
 	}
 	username := parsedDsn.User.Username()
 	password, _ := parsedDsn.User.Password()
