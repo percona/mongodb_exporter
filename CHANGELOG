@@ -1,3 +1,25 @@
+Release 0.33.0
+
+- Updated dependencies
+- Enabled multi-arch Docker images
+- Enabled pprof for exporter
+
+- Fixed postint script for DEB package
+- Fixed issue in CI pipeline for golang tip
+
+- Update usage documentation
+- Added fix for missing cluster role label
+- Added support to escape characters like '+' in MongoDB password
+- Added support for meta-metrics; runtime for each collector is reported
+
+Release 0.32.0
+
+- Updated dependencies
+- Updated README.md
+
+- Enable basic auth with Prometheus exporter toolkit
+- Created MongoDB exporter user in postinst
+
 Release 0.31.0
 
 - Added support for DEB and RPM packages
