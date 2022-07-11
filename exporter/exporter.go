@@ -33,7 +33,8 @@ import (
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
 )
 
 // Exporter holds Exporter methods and attributes.
@@ -137,7 +138,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
-		e.logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
+		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
 	}
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
@@ -338,7 +339,10 @@ func (e *Exporter) Run() {
 }
 
 func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client, error) {
-	clientOpts := options.Client().ApplyURI(dsn)
+	clientOpts, err := dsn_fix.ClientOptionsForDSN(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dsn: %w", err)
+	}
 	clientOpts.SetDirect(directConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 

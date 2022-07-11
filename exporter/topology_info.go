@@ -184,11 +184,6 @@ func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
 		return "mongos", nil
 	}
 
-	// standalone
-	if walkTo(cmdOpts, []string{"parsed", "replication", "replSet"}) == nil {
-		return "", nil
-	}
-
 	clusterRole := ""
 	if cr := walkTo(cmdOpts, []string{"parsed", "sharding", "clusterRole"}); cr != nil {
 		clusterRole, _ = cr.(string)

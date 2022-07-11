@@ -79,7 +79,10 @@ mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_na
 mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="idx_01"} 0` +
 		"\n")
 
-	err := testutil.CollectAndCompare(c, expected)
+	filter := []string{
+		"mongodb_indexstats_accesses_ops",
+	}
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
 
@@ -127,7 +130,11 @@ func TestDescendingIndexOverride(t *testing.T) {
   mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_"} 0
   mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_1"} 0
   mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_DESC"} 0` + "\n")
-	err := testutil.CollectAndCompare(c, expected)
+
+	filter := []string{
+		"mongodb_indexstats_accesses_ops",
+	}
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
 

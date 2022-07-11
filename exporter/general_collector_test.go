@@ -37,12 +37,22 @@ func TestGeneralCollector(t *testing.T) {
 	client := tu.DefaultTestClient(ctx, t)
 	c := newGeneralCollector(ctx, client, logrus.New())
 
+	filter := []string{
+		"collector_scrape_time_ms",
+	}
+	count := testutil.CollectAndCount(c, filter...)
+	assert.Equal(t, len(filter), count, "Meta-metric for collector is missing")
+
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
 	# HELP mongodb_up Whether MongoDB is up.
 	# TYPE mongodb_up gauge
-	mongodb_up 1` + "\n")
-	err := testutil.CollectAndCompare(c, expected)
+	mongodb_up 1
+	` + "\n")
+	filter = []string{
+		"mongodb_up",
+	}
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	require.NoError(t, err)
 
 	assert.NoError(t, client.Disconnect(ctx))
@@ -50,7 +60,11 @@ func TestGeneralCollector(t *testing.T) {
 	expected = strings.NewReader(`
 	# HELP mongodb_up Whether MongoDB is up.
 	# TYPE mongodb_up gauge
-	mongodb_up 0` + "\n")
-	err = testutil.CollectAndCompare(c, expected)
+	mongodb_up 0
+	` + "\n")
+	filter = []string{
+		"mongodb_up",
+	}
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	require.NoError(t, err)
 }

@@ -54,6 +54,8 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
+	defer prometheus.MeasureCollectTime(ch, "mongodb", "diagnostic_data")()
+
 	var m bson.M
 
 	logger := d.base.logger
@@ -96,7 +98,9 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 
 		nodeType, err := getNodeType(d.ctx, client)
 		if err != nil {
-			logger.Errorf("Cannot get node type to check if this is a mongos: %s", err)
+			logger.WithFields(logrus.Fields{
+				"component": "diagnosticDataCollector",
+			}).Errorf("Cannot get node type to check if this is a mongos: %s", err)
 		} else if nodeType == typeMongos {
 			metrics = append(metrics, mongosMetrics(d.ctx, client, logger)...)
 		}
