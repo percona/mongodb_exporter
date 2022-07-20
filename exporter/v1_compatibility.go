@@ -870,6 +870,13 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 		return nil, headRes.Err()
 	}
 
+	var id string
+	rs, err := util.ReplicasetConfig(ctx, client)
+	if err == nil {
+		id = rs.Config.ID
+	}
+	labels := map[string]string{"set": id}
+
 	if err := headRes.Decode(&head); err != nil {
 		return nil, err
 	}
@@ -885,11 +892,11 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	}
 
 	headDesc := prometheus.NewDesc("mongodb_mongod_replset_oplog_head_timestamp",
-		"The timestamp of the newest change in the oplog", nil, nil)
+		"The timestamp of the newest change in the oplog", nil, labels)
 	headMetric := prometheus.MustNewConstMetric(headDesc, prometheus.GaugeValue, float64(head.Timestamp.T))
 
 	tailDesc := prometheus.NewDesc("mongodb_mongod_replset_oplog_tail_timestamp",
-		"The timestamp of the oldest change in the oplog", nil, nil)
+		"The timestamp of the oldest change in the oplog", nil, labels)
 	tailMetric := prometheus.MustNewConstMetric(tailDesc, prometheus.GaugeValue, float64(tail.Timestamp.T))
 
 	return []prometheus.Metric{headMetric, tailMetric}, nil
