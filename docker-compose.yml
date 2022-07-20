@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 services:
     mongo-1-1:
         container_name: "mongo-1-1"

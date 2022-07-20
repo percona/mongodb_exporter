@@ -57,6 +57,8 @@ func (d *topCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *topCollector) collect(ch chan<- prometheus.Metric) {
+	defer prometheus.MeasureCollectTime(ch, "mongodb", "top")()
+
 	logger := d.base.logger
 	client := d.base.client
 

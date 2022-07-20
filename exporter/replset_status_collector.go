@@ -58,6 +58,8 @@ func (d *replSetGetStatusCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *replSetGetStatusCollector) collect(ch chan<- prometheus.Metric) {
+	defer prometheus.MeasureCollectTime(ch, "mongodb", "replset_status")()
+
 	logger := d.base.logger
 	client := d.base.client
 

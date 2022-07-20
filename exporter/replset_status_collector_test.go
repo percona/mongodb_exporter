@@ -69,7 +69,9 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 
 	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti)
 
-	expected := strings.NewReader(``)
-	err := testutil.CollectAndCompare(c, expected)
-	assert.NoError(t, err)
+	// Replication set metrics should not be generated for unsharded server
+	count := testutil.CollectAndCount(c)
+
+	metaMetricCount := 1
+	assert.Equal(t, metaMetricCount, count, "Mismatch in metric count for collector run on unsharded server")
 }
