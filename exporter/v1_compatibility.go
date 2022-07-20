@@ -697,7 +697,7 @@ func lockMetrics() []lockMetric {
 // This function reads the human readable list from lockMetrics() and creates a slice of metrics
 // ready to be exposed, taking the value for each metric from th provided bson.M structure from
 // getDiagnosticData.
-func locksMetrics(m bson.M) []prometheus.Metric {
+func locksMetrics(logger *logrus.Logger, m bson.M) []prometheus.Metric {
 	metrics := lockMetrics()
 	res := make([]prometheus.Metric, 0, len(metrics))
 
@@ -707,7 +707,7 @@ func locksMetrics(m bson.M) []prometheus.Metric {
 			continue
 		}
 		if err != nil {
-			logrus.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
+			logger.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
 			continue
 		}
 		res = append(res, mm)

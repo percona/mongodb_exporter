@@ -80,7 +80,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti := newTopologyInfo(ctx, client)
+	ti := newTopologyInfo(ctx, client, logrus.New())
 
 	c := newDiagnosticDataCollector(ctx, client, logrus.New(), true, ti)
 
@@ -120,7 +120,7 @@ func TestContextTimeout(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti := newTopologyInfo(ctx, client)
+	ti := newTopologyInfo(ctx, client, logrus.New())
 
 	dbCount := 100
 
