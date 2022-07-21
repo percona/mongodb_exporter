@@ -216,3 +216,57 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 		assert.Equal(t, m[0], tc.want)
 	}
 }
+
+func TestExtractHistogram(t *testing.T) {
+	t.Run("Valid Histogram", func(t *testing.T) {
+		m := primitive.A{
+			primitive.M{
+				"count":      0,
+				"lowerBound": 0,
+			},
+			primitive.M{
+				"lowerBound": 128,
+				"count":      0,
+			},
+			primitive.M{
+				"lowerBound": 256,
+				"count":      0,
+			},
+		}
+		want := map[string][]float64{
+			"lowerBound": {
+				0.000000,
+				128.000000,
+				256.000000,
+			},
+			"count": {
+				0.000000,
+				0.000000,
+				0.000000,
+			},
+		}
+		histograms := extractHistograms(m)
+		assert.Equal(t, want, histograms)
+	})
+
+	t.Run("Valid Histogram", func(t *testing.T) {
+		m := primitive.A{
+			primitive.M{
+				"count":      0,
+				"lowerBound": 0,
+			},
+			primitive.M{
+				"lowerBound": 128,
+				"count":      0,
+			},
+			primitive.M{
+				"lowerBound": 256,
+				"count":      0,
+				// This extra field makes this structure an invalid histogram
+				"extraField": 1,
+			},
+		}
+		histograms := extractHistograms(m)
+		assert.Nil(t, histograms)
+	})
+}

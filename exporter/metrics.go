@@ -253,6 +253,10 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
 		case primitive.A:
 			v = []interface{}(v)
+			if histograms := extractHistograms(v); histograms != nil {
+				res = append(res, makeHistograms(prefix, k, histograms, labels)...)
+				continue
+			}
 			res = append(res, processSlice(prefix, k, v, labels, compatibleMode)...)
 		case []interface{}:
 			continue
@@ -294,6 +298,99 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	}
 
 	return res
+}
+
+func extractHistograms(v []interface{}) map[string][]float64 {
+	if len(v) < 1 {
+		return nil
+	}
+
+	histograms := make(map[string][]float64)
+
+	for _, item := range v {
+		var s map[string]interface{}
+
+		switch i := item.(type) {
+		case map[string]interface{}:
+			s = i
+		case primitive.M:
+			s = map[string]interface{}(i)
+		default:
+			return nil
+		}
+
+		for key, value := range s {
+			switch i := value.(type) {
+			case int8:
+				histograms[key] = append(histograms[key], float64(i))
+			case int:
+				histograms[key] = append(histograms[key], float64(i))
+			case int32:
+				histograms[key] = append(histograms[key], float64(i))
+			case int64:
+				histograms[key] = append(histograms[key], float64(i))
+			case float32:
+				histograms[key] = append(histograms[key], float64(i))
+			case float64:
+				histograms[key] = append(histograms[key], float64(i))
+			}
+		}
+	}
+	// If all the items have the same number of fields, it is a histogram:
+	//         "histograms":  primitive.M{
+	//           "classicWorks": primitive.A{
+	//             primitive.M{
+	//               "count":      0,
+	//               "lowerBound": 0,
+	//             },
+	//             primitive.M{
+	//               "lowerBound": 128,
+	//               "count":      0,
+	//             },
+	//             primitive.M{
+	//               "lowerBound": 256,
+	//               "count":      0,
+	//             },
+	//           }
+	//         }
+
+	firstItemLenght := -1
+	for _, values := range histograms {
+		if firstItemLenght == -1 {
+			firstItemLenght = len(values)
+		}
+		if len(values) != firstItemLenght {
+			return nil // all items must have the same lenght
+		}
+	}
+
+	return histograms
+}
+
+func makeHistograms(prefix, key string, histograms map[string][]float64, labels map[string]string) []prometheus.Metric {
+	metrics := make([]prometheus.Metric, 0, len(histograms))
+
+	for histogramKey, values := range histograms {
+		name := key + "." + histogramKey
+
+		fqName := prometheusize(prefix + "." + name)
+		help := metricHelp(prefix, name)
+
+		histogramOpts := prometheus.HistogramOpts{
+			Name: fqName,
+			Help: help,
+		}
+
+		for label, value := range labels {
+			histogramOpts.ConstLabels[label] = value
+		}
+
+		copy(histogramOpts.Buckets, values)
+
+		metrics = append(metrics, prometheus.NewHistogram(histogramOpts))
+	}
+
+	return metrics
 }
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
