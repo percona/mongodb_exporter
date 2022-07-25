@@ -249,7 +249,7 @@ func TestExtractHistogram(t *testing.T) {
 		assert.Equal(t, want, histograms)
 	})
 
-	t.Run("Valid Histogram", func(t *testing.T) {
+	t.Run("Invalid Histogram", func(t *testing.T) {
 		m := primitive.A{
 			primitive.M{
 				"count":      0,
