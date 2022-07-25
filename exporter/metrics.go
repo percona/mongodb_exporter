@@ -360,7 +360,7 @@ func extractHistograms(v []interface{}) map[string][]float64 {
 			firstItemLenght = len(values)
 		}
 		if len(values) != firstItemLenght {
-			return nil // all items must have the same lenght
+			return nil // all items must have the same length
 		}
 	}
 
