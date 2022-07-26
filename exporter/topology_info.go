@@ -56,6 +56,7 @@ type topologyInfo struct {
 	// by a new connector, able to reconnect if needed. In case of reconnection, we should
 	// call loadLabels to refresh the labels because they might have changed
 	client *mongo.Client
+	logger *logrus.Logger
 	rw     sync.RWMutex
 	labels map[string]string
 }
@@ -63,16 +64,17 @@ type topologyInfo struct {
 // ErrCannotGetTopologyLabels Cannot read topology labels.
 var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 
-func newTopologyInfo(ctx context.Context, client *mongo.Client) *topologyInfo {
+func newTopologyInfo(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *topologyInfo {
 	ti := &topologyInfo{
 		client: client,
+		logger: logger,
 		labels: make(map[string]string),
 		rw:     sync.RWMutex{},
 	}
 
 	err := ti.loadLabels(ctx)
 	if err != nil {
-		logrus.Warnf("cannot load topology labels: %s", err)
+		logger.Warnf("cannot load topology labels: %s", err)
 	}
 
 	return ti

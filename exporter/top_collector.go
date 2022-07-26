@@ -71,7 +71,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	logrus.Debug("top result:")
+	logger.Debug("top result:")
 	debugResult(logger, m)
 
 	totals, ok := m["totals"].(primitive.M)

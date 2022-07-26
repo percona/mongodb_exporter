@@ -28,6 +28,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -108,7 +109,7 @@ func TestAddLocksMetrics(t *testing.T) {
 	assert.NoError(t, err)
 
 	var metrics []prometheus.Metric
-	metrics = locksMetrics(m)
+	metrics = locksMetrics(logrus.New(), m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
