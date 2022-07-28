@@ -36,7 +36,20 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 	username := parsedDsn.User.Username()
 	password, _ := parsedDsn.User.Password()
 	if username != "" || password != "" {
-		clientOptions = clientOptions.SetAuth(options.Credential{Username: username, Password: password})
+		_clientOptions := options.Credential{Username: username, Password: password, PasswordSet: true}
+
+		// Initialize fields other than username and password to values parsed by ApplyURI()
+		if clientOptions.Auth != nil {
+			_clientOptions.AuthMechanism = clientOptions.Auth.AuthMechanism
+			_clientOptions.AuthMechanismProperties = clientOptions.Auth.AuthMechanismProperties
+			_clientOptions.AuthSource = clientOptions.Auth.AuthSource
+			_clientOptions.PasswordSet = clientOptions.Auth.PasswordSet
+		} else if parsedDsn.Path != "/" && parsedDsn.Path != "" {
+			// When clientOptions.Auth nil, salvage AuthSource from parsedDsn
+			// This can happen when an invalid username or password are passed to ApplyURI()
+			_clientOptions.AuthSource = parsedDsn.Path
+		}
+		clientOptions = clientOptions.SetAuth(_clientOptions)
 	}
 
 	return clientOptions, nil

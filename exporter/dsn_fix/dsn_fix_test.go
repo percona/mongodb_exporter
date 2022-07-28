@@ -25,10 +25,11 @@ import (
 
 func TestClientOptionsForDSN(t *testing.T) {
 	tests := []struct {
-		name             string
-		dsn              string
-		expectedUser     string
-		expectedPassword string
+		name               string
+		dsn                string
+		expectedUser       string
+		expectedPassword   string
+		expectedAuthSource string
 	}{
 		{
 			name: "Escape username",
@@ -38,8 +39,9 @@ func TestClientOptionsForDSN(t *testing.T) {
 				Path:   "/db",
 				User:   url.UserPassword("user+", "pass"),
 			}).String(),
-			expectedUser:     "user+",
-			expectedPassword: "pass",
+			expectedUser:       "user+",
+			expectedPassword:   "pass",
+			expectedAuthSource: "/db",
 		},
 		{
 			name: "Escape password",
@@ -49,8 +51,9 @@ func TestClientOptionsForDSN(t *testing.T) {
 				Path:   "/db",
 				User:   url.UserPassword("user", "pass+"),
 			}).String(),
-			expectedUser:     "user",
-			expectedPassword: "pass+",
+			expectedUser:       "user",
+			expectedPassword:   "pass+",
+			expectedAuthSource: "/db",
 		},
 	}
 	for _, tt := range tests {
@@ -59,6 +62,7 @@ func TestClientOptionsForDSN(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, got.Auth.Username, tt.expectedUser)
 			assert.Equal(t, got.Auth.Password, tt.expectedPassword)
+			assert.Equal(t, got.Auth.AuthSource, tt.expectedAuthSource)
 		})
 	}
 }
