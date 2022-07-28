@@ -301,12 +301,17 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	return res
 }
 
-func extractHistograms(v []interface{}) map[string][]float64 {
+type histogramLabel struct {
+	key   string
+	value string
+}
+
+func extractHistograms(v []interface{}) map[histogramLabel][]float64 {
 	if len(v) < 1 {
 		return nil
 	}
 
-	histograms := make(map[string][]float64)
+	histograms := make(map[histogramLabel][]float64)
 
 	for _, item := range v {
 		var s map[string]interface{}
@@ -321,7 +326,8 @@ func extractHistograms(v []interface{}) map[string][]float64 {
 		}
 
 		var value float64
-		var label string
+		var label histogramLabel
+		var hasCount bool
 
 		for key, value := range s {
 			if key == "count" {
@@ -338,9 +344,16 @@ func extractHistograms(v []interface{}) map[string][]float64 {
 				case float64:
 					value = float64(i)
 				}
+				hasCount = true
 				continue
 			}
-			label = fmt.Sprintf("%s_%v", key, value)
+			label = histogramLabel{key: key, value: fmt.Sprintf("%v", value)}
+		}
+
+		// This should never happen but just in case, if there is no label, ignore the value.
+		// Also, if there is no "count" field, a 0 value for it would be a lie.
+		if label.key == "" || !hasCount {
+			continue
 		}
 
 		histograms[label] = append(histograms[label], value)
@@ -363,32 +376,23 @@ func extractHistograms(v []interface{}) map[string][]float64 {
 	//           }
 	//         }
 
-	firstItemLenght := len(histograms[0])
-	for _, values := range histograms {
-		if firstItemLenght == -1 {
-			firstItemLenght = len(values)
-		}
-		if len(values) != firstItemLenght {
-			return nil // all items must have the same length
-		}
-	}
-
 	return histograms
 }
 
-func makeHistograms(prefix, key string, histograms map[string][]float64, labels map[string]string) []prometheus.Metric {
+func makeHistograms(prefix, name string, histograms map[histogramLabel][]float64, labels map[string]string) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0, len(histograms))
 
-	for histogramKey, values := range histograms {
-		name := key + "." + histogramKey
-
+	for itemLabel, values := range histograms {
 		fqName := prometheusize(prefix + "." + name)
 		help := metricHelp(prefix, name)
 
 		histogramOpts := prometheus.HistogramOpts{
-			Name: fqName,
-			Help: help,
+			Name:        fqName,
+			Help:        help,
+			ConstLabels: prometheus.Labels{},
 		}
+
+		histogramOpts.ConstLabels[itemLabel.key] = itemLabel.value
 
 		for label, value := range labels {
 			histogramOpts.ConstLabels[label] = value
