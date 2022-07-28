@@ -17,6 +17,7 @@
 package exporter
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -319,22 +320,30 @@ func extractHistograms(v []interface{}) map[string][]float64 {
 			return nil
 		}
 
+		var value float64
+		var label string
+
 		for key, value := range s {
-			switch i := value.(type) {
-			case int8:
-				histograms[key] = append(histograms[key], float64(i))
-			case int:
-				histograms[key] = append(histograms[key], float64(i))
-			case int32:
-				histograms[key] = append(histograms[key], float64(i))
-			case int64:
-				histograms[key] = append(histograms[key], float64(i))
-			case float32:
-				histograms[key] = append(histograms[key], float64(i))
-			case float64:
-				histograms[key] = append(histograms[key], float64(i))
+			if key == "count" {
+				switch i := value.(type) {
+				case int8:
+				case int:
+					value = float64(i)
+				case int32:
+					value = float64(i)
+				case int64:
+					value = float64(i)
+				case float32:
+					value = float64(i)
+				case float64:
+					value = float64(i)
+				}
+				continue
 			}
+			label = fmt.Sprintf("%s_%v", key, value)
 		}
+
+		histograms[label] = append(histograms[label], value)
 	}
 	// If all the items have the same number of fields, it is a histogram:
 	//         "histograms":  primitive.M{
