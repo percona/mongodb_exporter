@@ -363,13 +363,13 @@ func extractHistograms(v []interface{}) map[string][]float64 {
 	//           }
 	//         }
 
-	firstItemLenght := -1
+	firstItemLenght := len(histograms[0])
 	for _, values := range histograms {
 		if firstItemLenght == -1 {
 			firstItemLenght = len(values)
 		}
 		if len(values) != firstItemLenght {
-			return nil // all items must have the same lenght
+			return nil // all items must have the same length
 		}
 	}
 
