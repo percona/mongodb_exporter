@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -238,6 +239,104 @@ func metricHelp(prefix, name string) string {
 	return name
 }
 
+// makeHistogramMetrics creates histogram metrics for MongoDB multi-planner data
+// These metrics are created in Prometheus expositon histogram format.
+func makeHistogramMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
+	var _res []prometheus.Metric
+
+	_prefix := prefix + "histogram" + "."
+
+	// Iterate through map containing "classicMicros", "classicNumPlans",
+	// and "classicWorks" entries
+	for k, val := range m {
+		// Clunky approach to extract BSON array (from primitive.A)
+		switch v := val.(type) {
+		case primitive.A:
+			_val := []interface{}(v)
+
+			// Iterate through array of maps containing, each "count" and "lowerBound" entries
+			for _, metric_map := range _val {
+				// Clunky approach to extract BSON map (from primitive.M)
+				switch _m := metric_map.(type) {
+				case primitive.M:
+					var count int64
+
+					// Extract "count" and "lowerBound", saving for use in makeSingleMetric() call
+					for _k, _v := range _m {
+						if _k == "lowerBound" || _k == "count" {
+							int_val, ok := _v.(int64)
+							if !ok {
+								break
+							}
+
+							if _k == "lowerBound" {
+								// Temporarily store "lowerBound" as label for histogram metric
+								labels["lowerBound"] = strconv.Itoa(int(int_val))
+							} else {
+								count = int_val
+							}
+						}
+					}
+					metrics := makeSingleMetric(_prefix, k, count, labels, compatibleMode)
+					if metrics != nil {
+						_res = append(_res, metrics...)
+					}
+				default:
+					continue
+				}
+			}
+		default:
+			continue
+		}
+	}
+
+	// Only delete pair if in map, errors above can lead to no key in map
+	if _, key_in_map := labels["lowerBound"]; key_in_map {
+		delete(labels, "lowerBound")
+	}
+
+	return _res
+}
+
+// makeSingleMetric creates and returns a prometheus.Metric for given parameters
+// This function also performs necessary metric renaming and compatibility substitutions
+func makeSingleMetric(prefix string, k string, v interface{}, labels map[string]string, compatibleMode bool) []prometheus.Metric {
+	var _res []prometheus.Metric
+
+	rm, err := makeRawMetric(prefix, k, v, labels)
+	if err != nil {
+		invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		return append(_res, invalidMetric)
+	} else if rm == nil {
+		// makeRawMetric returns a nil metric for some data types like strings
+		// because we cannot extract data from all types
+		return nil
+	}
+
+	metrics := []*rawMetric{rm}
+
+	if renamedMetrics := metricRenameAndLabel(rm, specialConversions()); renamedMetrics != nil {
+		metrics = renamedMetrics
+	}
+
+	for _, m := range metrics {
+		metric, err := rawToPrometheusMetric(m)
+		if err != nil {
+			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			_res = append(_res, invalidMetric)
+			continue
+		}
+
+		_res = append(_res, metric)
+
+		if compatibleMode {
+			_res = appendCompatibleMetric(_res, m)
+		}
+	}
+
+	return _res
+}
+
 func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
 	var res []prometheus.Metric
 
@@ -248,6 +347,15 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	for k, val := range m {
 		switch v := val.(type) {
 		case bson.M:
+			// If key is "histograms", know we will be handling multi-planner histogram data
+			if k == "histograms" {
+				histogram_metrics := makeHistogramMetrics(prefix, v, labels, compatibleMode)
+				if histogram_metrics != nil {
+					res = append(res, histogram_metrics...)
+				}
+				continue
+			}
+
 			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
 		case map[string]interface{}:
 			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
@@ -257,38 +365,9 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		case []interface{}:
 			continue
 		default:
-			rm, err := makeRawMetric(prefix, k, v, labels)
-			if err != nil {
-				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-				res = append(res, invalidMetric)
-				continue
-			}
-
-			// makeRawMetric returns a nil metric for some data types like strings
-			// because we cannot extract data from all types
-			if rm == nil {
-				continue
-			}
-
-			metrics := []*rawMetric{rm}
-
-			if renamedMetrics := metricRenameAndLabel(rm, specialConversions()); renamedMetrics != nil {
-				metrics = renamedMetrics
-			}
-
-			for _, m := range metrics {
-				metric, err := rawToPrometheusMetric(m)
-				if err != nil {
-					invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-					res = append(res, invalidMetric)
-					continue
-				}
-
-				res = append(res, metric)
-
-				if compatibleMode {
-					res = appendCompatibleMetric(res, m)
-				}
+			metric := makeSingleMetric(prefix, k, v, labels, compatibleMode)
+			if metric != nil {
+				res = append(res, metric...)
 			}
 		}
 	}
