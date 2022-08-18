@@ -22,13 +22,12 @@ jobs:
         go-version:
           - 1.17.x
         image:
-          - mongo:4.0
           - mongo:4.2
           - mongo:4.4
           - mongo:5.0
-          - percona/percona-server-mongodb:4.0
           - percona/percona-server-mongodb:4.2
           - percona/percona-server-mongodb:4.4
+          - percona/percona-server-mongodb:5.0
         os: [ubuntu-latest]
         may-fail: [false]
 
@@ -36,7 +35,7 @@ jobs:
           # test only one image on tip to detect major Go changes earlier
           # without wasting too much time on CI
           - go-version: tip
-            image: mongo:4.2
+            image: mongo:4.4
             os: ubuntu-latest
             may-fail: true
 
