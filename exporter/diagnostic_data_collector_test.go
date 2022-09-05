@@ -74,6 +74,34 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+	logger := logrus.New()
+	ti := labelsGetterMock{}
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+	// The last \n at the end of this string is important
+	expected := strings.NewReader(`
+	# HELP mongodb_version_info The server version
+	# TYPE mongodb_version_info gauge
+	mongodb_version_info{edition="Community",mongodb="4.2.22"} 1` + "\n")
+
+	// Filter metrics for 2 reasons:
+	// 1. The result is huge
+	// 2. We need to check against know values. Don't use metrics that return counters like uptime
+	//    or counters like the number of transactions because they won't return a known value to compare
+	filter := []string{
+		"mongodb_version_info",
+	}
+
+	err := testutil.CollectAndCompare(c, expected, filter...)
+	assert.NoError(t, err)
+}
+
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
