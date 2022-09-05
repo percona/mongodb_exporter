@@ -82,13 +82,19 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 	logger := logrus.New()
 	ti := labelsGetterMock{}
 
+	serverVersion, err := getMongoDBVersion(t, client, ctx, logger)
+	if err != nil {
+		assert.Fail(t, err.Error())
+		return
+	}
+
 	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
 
 	// The last \n at the end of this string is important
-	expected := strings.NewReader(`
+	expected := strings.NewReader(fmt.Sprintf(`
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{edition="Community",mongodb="4.2.22"} 1` + "\n")
+	mongodb_version_info{edition="Community",mongodb="%s"} 1`, serverVersion) + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
@@ -98,8 +104,33 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 		"mongodb_version_info",
 	}
 
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
+}
+
+func getMongoDBVersion(t *testing.T, client *mongo.Client, ctx context.Context, logger *logrus.Logger) (string, error) {
+	var m bson.M
+	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
+	res := client.Database("admin").RunCommand(ctx, cmd)
+	if res.Err() != nil {
+		return "", res.Err()
+	}
+
+	if err := res.Decode(&m); err != nil {
+		logger.Errorf("cannot run getDiagnosticData: %s", err)
+	}
+
+	m, ok := m["data"].(bson.M)
+	if !ok {
+		return "", errors.New("cannot decode getDiagnosticData")
+	}
+
+	v := walkTo(m, []string{"serverStatus", "version"})
+	serverVersion, ok := v.(string)
+	if !ok {
+		serverVersion = "server version is unavailable"
+	}
+	return serverVersion, nil
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
