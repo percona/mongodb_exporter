@@ -74,6 +74,65 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+	logger := logrus.New()
+	ti := labelsGetterMock{}
+
+	serverVersion, err := getMongoDBVersion(t, client, ctx, logger)
+	if err != nil {
+		assert.Fail(t, err.Error())
+		return
+	}
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+	// The last \n at the end of this string is important
+	expected := strings.NewReader(fmt.Sprintf(`
+	# HELP mongodb_version_info The server version
+	# TYPE mongodb_version_info gauge
+	mongodb_version_info{edition="Community",mongodb="%s"} 1`, serverVersion) + "\n")
+
+	// Filter metrics for 2 reasons:
+	// 1. The result is huge
+	// 2. We need to check against know values. Don't use metrics that return counters like uptime
+	//    or counters like the number of transactions because they won't return a known value to compare
+	filter := []string{
+		"mongodb_version_info",
+	}
+
+	err = testutil.CollectAndCompare(c, expected, filter...)
+	assert.NoError(t, err)
+}
+
+func getMongoDBVersion(t *testing.T, client *mongo.Client, ctx context.Context, logger *logrus.Logger) (string, error) {
+	var m bson.M
+	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
+	res := client.Database("admin").RunCommand(ctx, cmd)
+	if res.Err() != nil {
+		return "", res.Err()
+	}
+
+	if err := res.Decode(&m); err != nil {
+		logger.Errorf("cannot run getDiagnosticData: %s", err)
+	}
+
+	m, ok := m["data"].(bson.M)
+	if !ok {
+		return "", errors.New("cannot decode getDiagnosticData")
+	}
+
+	v := walkTo(m, []string{"serverStatus", "version"})
+	serverVersion, ok := v.(string)
+	if !ok {
+		serverVersion = "server version is unavailable"
+	}
+	return serverVersion, nil
+}
+
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -229,7 +288,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{mongodb="server version is unavailable"} 1` + "\n")
+	mongodb_version_info{edition="",mongodb="server version is unavailable"} 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
