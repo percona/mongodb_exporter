@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -88,7 +89,7 @@ func TestTopologyLabels(t *testing.T) {
 		require.NoError(t, err)
 
 		client := tu.TestClient(ctx, port, t)
-		ti := newTopologyInfo(ctx, client)
+		ti := newTopologyInfo(ctx, client, logrus.New())
 		bl := ti.baseLabels()
 		assert.Equal(t, tc.want[labelReplicasetName], bl[labelReplicasetName], tc.containerName)
 		assert.Equal(t, tc.want[labelReplicasetState], bl[labelReplicasetState], tc.containerName)

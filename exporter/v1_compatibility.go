@@ -697,7 +697,7 @@ func lockMetrics() []lockMetric {
 // This function reads the human readable list from lockMetrics() and creates a slice of metrics
 // ready to be exposed, taking the value for each metric from th provided bson.M structure from
 // getDiagnosticData.
-func locksMetrics(m bson.M) []prometheus.Metric {
+func locksMetrics(logger *logrus.Logger, m bson.M) []prometheus.Metric {
 	metrics := lockMetrics()
 	res := make([]prometheus.Metric, 0, len(metrics))
 
@@ -707,7 +707,7 @@ func locksMetrics(m bson.M) []prometheus.Metric {
 			continue
 		}
 		if err != nil {
-			logrus.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
+			logger.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
 			continue
 		}
 		res = append(res, mm)
@@ -783,8 +783,13 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metrics = append(metrics, metric)
 	}
 
+	edition, err := retrieveMongoDBEdition(ctx, client, l)
+	if err != nil {
+		l.Warnf("cannot retreive MongoDB edition: %s", err)
+	}
+
 	metrics = append(metrics, storageEngine(m))
-	metrics = append(metrics, serverVersion(m))
+	metrics = append(metrics, serverVersion(m, edition))
 	metrics = append(metrics, myState(ctx, client))
 
 	if mm := replSetMetrics(m); mm != nil {
@@ -798,6 +803,30 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	}
 
 	return metrics
+}
+
+func retrieveMongoDBEdition(ctx context.Context, client *mongo.Client, l *logrus.Logger) (string, error) {
+	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
+	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
+
+	var buildInfoDoc bson.M
+	err := res.Decode(&buildInfoDoc)
+	if err != nil {
+		return "", errors.Wrap(err, "Failed to run buildInfo command")
+	}
+
+	var edition string
+	modules, ok := buildInfoDoc["modules"].(bson.A)
+	if !ok {
+		return "", errors.Wrap(err, "Failed to cast module information variable")
+	}
+	if len(modules) > 0 && modules[0].(string) == "enterprise" {
+		edition = "Enterprise"
+	} else {
+		edition = "Community"
+	}
+	l.Debug("MongoDB edition: ", edition)
+	return edition, nil
 }
 
 func storageEngine(m bson.M) prometheus.Metric {
@@ -817,7 +846,7 @@ func storageEngine(m bson.M) prometheus.Metric {
 	return metric
 }
 
-func serverVersion(m bson.M) prometheus.Metric {
+func serverVersion(m bson.M, edition string) prometheus.Metric {
 	v := walkTo(m, []string{"serverStatus", "version"})
 	name := "mongodb_version_info"
 	help := "The server version"
@@ -826,7 +855,7 @@ func serverVersion(m bson.M) prometheus.Metric {
 	if !ok {
 		serverVersion = "server version is unavailable"
 	}
-	labels := map[string]string{"mongodb": serverVersion}
+	labels := map[string]string{"mongodb": serverVersion, "edition": edition}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
