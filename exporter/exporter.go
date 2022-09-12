@@ -207,7 +207,9 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(ic)
 	}
 
-	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
+	// getDiagnosticData does not return any data on mongos.
+	collectDiagnosticData := e.opts.EnableDiagnosticData && nodeType != typeMongos && requestOpts.EnableDiagnosticData
+	if collectDiagnosticData {
 		ddc := newDiagnosticDataCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(ddc)
@@ -237,17 +239,20 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(tc)
 	}
 
-	// replSetGetStatus is not supported through mongos.
-	if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
-		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
-		registry.MustRegister(rsgsc)
-	}
+	// Only collect replica set and server status separately if we're not already fetching via diagnostic data
+	if !collectDiagnosticData {
+		// replSetGetStatus is not supported through mongos.
+		if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
+			rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
+				e.opts.CompatibleMode, topologyInfo)
+			registry.MustRegister(rsgsc)
+		}
 
-	if e.opts.EnableServerStatus {
-		ssc := newServerStatusCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
-		registry.MustRegister(ssc)
+		if e.opts.EnableServerStatus && requestOpts.EnableServerStatus {
+			ssc := newServerStatusCollector(ctx, client, e.opts.Logger,
+				e.opts.CompatibleMode, topologyInfo)
+			registry.MustRegister(ssc)
+		}
 	}
 
 	return registry
