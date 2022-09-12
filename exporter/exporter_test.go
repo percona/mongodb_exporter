@@ -78,6 +78,7 @@ func TestConnect(t *testing.T) {
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: false,
+			DirectConnect:  true,
 		}
 
 		e := New(exporterOpts)
@@ -111,6 +112,7 @@ func TestConnect(t *testing.T) {
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: true,
+			DirectConnect:  true,
 		}
 
 		e := New(exporterOpts)
