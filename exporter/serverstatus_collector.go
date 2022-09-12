@@ -57,7 +57,17 @@ func (d *serverStatusCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
-	cmd := bson.D{{Key: "serverStatus", Value: "1"}}
+	cmd := bson.D{
+		{
+			Key: "serverStatus", Value: "1",
+		},
+		{
+			Key: "metrics", Value: bson.M{
+				// TODO: PMM-9568 : Add support to handle histogram metrics
+				"query": bson.M{"multiPlanner": bson.M{"histograms": false}},
+			},
+		},
+	}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
 	var m bson.M
