@@ -66,6 +66,7 @@ type Opts struct {
 	EnableDBStatsFreeStorage bool
 	EnableDiagnosticData     bool
 	EnableReplicasetStatus   bool
+	EnableServerStatus       bool
 	EnableCurrentopMetrics   bool
 	EnableTopMetrics         bool
 	EnableIndexStats         bool
@@ -172,6 +173,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCollStats = true
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
+		e.opts.EnableServerStatus = true
 		e.opts.EnableIndexStats = true
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
@@ -242,6 +244,12 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(rsgsc)
 	}
 
+	if e.opts.EnableServerStatus {
+		ssc := newServerStatusCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(ssc)
+	}
+
 	return registry
 }
 
@@ -303,6 +311,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableDiagnosticData = true
 			case "replicasetstatus":
 				requestOpts.EnableReplicasetStatus = true
+			case "serverstatus":
+				requestOpts.EnableServerStatus = true
 			case "dbstats":
 				requestOpts.EnableDBStats = true
 			case "topmetrics":
