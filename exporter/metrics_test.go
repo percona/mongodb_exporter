@@ -141,7 +141,7 @@ func TestMakeRawMetric(t *testing.T) {
 		{value: float32(1.23), wantVal: pointer.ToFloat64(float64(float32(1.23)))},
 		{value: float64(1.23), wantVal: pointer.ToFloat64(1.23)},
 		{value: primitive.A{}, wantVal: nil},
-		{value: primitive.Timestamp{}, wantVal: nil},
+		{value: primitive.Timestamp{T: 123, I: 456}, wantVal: pointer.ToFloat64(123)},
 		{value: "zapp", wantVal: nil},
 		{value: []byte{}, wantVal: nil},
 		{value: time.Date(2020, 6, 15, 0, 0, 0, 0, time.UTC), wantVal: nil},
