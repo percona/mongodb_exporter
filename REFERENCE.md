@@ -17,6 +17,7 @@
 |--log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]|--log.level="error"|
 |--collector.diagnosticdata|Enable collecting metrics from getDiagnosticData|
 |--collector.replicasetstatus|Enable collecting metrics from replSetGetStatus|
+|--collector.serverstatus|Enable collecting metrics from serverStatus|
 |--collector.dbstats|Enable collecting metrics from dbStats||
 |--collector.topmetrics|Enable collecting metrics from top admin command|
 |--collector.currentopmetrics|Enable collecting metrics from currentop admin command|
