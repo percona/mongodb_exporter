@@ -35,6 +35,8 @@ var (
 
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
+	User                  string `name:"mongodb.user" help:"monitor user, need clusterMonitor role in admin db and read role in local db" env:"MONGODB_USER" placeholder:"monitor" default:"monitor"`
+	Password              string `name:"mongodb.password" help:"monitor user password" env:"MONGODB_PASSWORD" placeholder:"123456"`
 	CollStatsNamespaces   string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1,db2.col2"`
 	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
 	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
@@ -103,9 +105,16 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
 
-	if !strings.HasPrefix(opts.URI, "mongodb") {
-		log.Debugf("Prepending mongodb:// to the URI")
-		opts.URI = "mongodb://" + opts.URI
+	if strings.HasPrefix(opts.URI, "mongodb") {
+		// trim mongodb:// prefix to add user and pass
+		opts.URI = strings.TrimPrefix(opts.URI, "mongodb://")
+	}
+
+	if !strings.Contains(opts.URI, "@") {
+		log.Debugf("add user and pass to the uri")
+		if !strings.HasPrefix(opts.URI, "mongodb") {
+			opts.URI = fmt.Sprintf("mongodb://%s:%s@%s", opts.User, opts.Password, opts.URI)
+		}
 	}
 
 	log.Debugf("Connection URI: %s", opts.URI)
