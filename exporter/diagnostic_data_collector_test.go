@@ -88,13 +88,19 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 		return
 	}
 
+	vendor, err := getVendor(t, client, ctx, logger)
+	if err != nil {
+		assert.Fail(t, err.Error())
+		return
+	}
+
 	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(fmt.Sprintf(`
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{edition="Community",mongodb="%s"} 1`, serverVersion) + "\n")
+	mongodb_version_info{edition="Community",mongodb="%s",vendor="%s"} 1`, serverVersion, vendor) + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
@@ -106,6 +112,23 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
+}
+
+func getVendor(t *testing.T, client *mongo.Client, ctx context.Context, logger *logrus.Logger) (string, error) {
+	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
+	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
+
+	var buildInfoDoc bson.M
+	err := res.Decode(&buildInfoDoc)
+	if err != nil {
+		return "", errors.Wrap(err, "Failed to run buildInfo command")
+	}
+	_, ok := buildInfoDoc["psmdbVersion"]
+	if ok {
+		return "Percona", nil
+	}
+
+	return "", nil
 }
 
 func getMongoDBVersion(t *testing.T, client *mongo.Client, ctx context.Context, logger *logrus.Logger) (string, error) {
