@@ -863,7 +863,10 @@ func serverVersion(m bson.M, bi buildInfo) prometheus.Metric {
 	if !ok {
 		serverVersion = "server version is unavailable"
 	}
-	labels := map[string]string{"mongodb": serverVersion, "edition": bi.Edition, "vendor": bi.Vendor}
+	labels := map[string]string{"mongodb": serverVersion, "edition": bi.Edition}
+	if bi.Vendor != "" {
+		labels["vendor"] = bi.Vendor
+	}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))

@@ -94,13 +94,18 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 		return
 	}
 
+	vendorStr := ""
+	if vendor != "" {
+		vendorStr = fmt.Sprintf(",vendor=\"%s\"", vendor)
+	}
+
 	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(fmt.Sprintf(`
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{edition="Community",mongodb="%s",vendor="%s"} 1`, serverVersion, vendor) + "\n")
+	mongodb_version_info{edition="Community",mongodb="%s"%s} 1`, serverVersion, vendorStr) + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
@@ -311,7 +316,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{edition="",mongodb="server version is unavailable",vendor=""} 1` + "\n")
+	mongodb_version_info{edition="",mongodb="server version is unavailable"} 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
