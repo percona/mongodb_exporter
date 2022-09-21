@@ -130,7 +130,9 @@ func getVendor(t *testing.T, client *mongo.Client, ctx context.Context, logger *
 	}
 	_, ok := buildInfoDoc["psmdbVersion"]
 	if ok {
-		return "Percona", nil
+		return "Percona Mongo", nil
+	} else {
+		return "Mongo", nil
 	}
 
 	return "", nil

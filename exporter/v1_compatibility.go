@@ -831,7 +831,9 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 
 	_, ok = buildInfoDoc["psmdbVersion"]
 	if ok {
-		bi.Vendor = "Percona"
+		bi.Vendor = "Percona Mongo"
+	} else {
+		bi.Vendor = "Mongo"
 	}
 
 	return bi, nil
