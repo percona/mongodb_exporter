@@ -38,6 +38,12 @@ const (
 	// UnknownState is the values for an unknown rs state.
 	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
 	UnknownState = 6
+
+	EnterpriseEdition = "Enterprise"
+	CommunityEdition  = "Community"
+
+	PerconaVendor = "Percona"
+	MongoDBVendor = "MongoDB"
 )
 
 // ErrInvalidMetricValue cannot create a new metric due to an invalid value.
@@ -785,7 +791,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 
 	buildInfo, err := retrieveMongoDBBuildInfo(ctx, client, l)
 	if err != nil {
-		l.Warnf("cannot retreive MongoDB edition: %s", err)
+		l.Errorf("cannot retreive MongoDB buildInfo: %s", err)
 	}
 
 	metrics = append(metrics, storageEngine(m))
@@ -823,17 +829,17 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 
 	var bi buildInfo
 	if len(modules) > 0 && modules[0].(string) == "enterprise" {
-		bi.Edition = "Enterprise"
+		bi.Edition = EnterpriseEdition
 	} else {
-		bi.Edition = "Community"
+		bi.Edition = CommunityEdition
 	}
 	l.Debug("MongoDB edition: ", edition)
 
 	_, ok = buildInfoDoc["psmdbVersion"]
 	if ok {
-		bi.Vendor = "Percona Mongo"
+		bi.Vendor = PerconaVendor
 	} else {
-		bi.Vendor = "Mongo"
+		bi.Vendor = MongoDBVendor
 	}
 
 	return bi, nil
@@ -865,10 +871,7 @@ func serverVersion(m bson.M, bi buildInfo) prometheus.Metric {
 	if !ok {
 		serverVersion = "server version is unavailable"
 	}
-	labels := map[string]string{"mongodb": serverVersion, "edition": bi.Edition}
-	if bi.Vendor != "" {
-		labels["vendor"] = bi.Vendor
-	}
+	labels := map[string]string{"mongodb": serverVersion, "edition": bi.Edition, "vendor": bi.Vendor}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
