@@ -79,11 +79,13 @@ func GetImageNameForDefault(ctx context.Context, t *testing.T) (imageBaseName, v
 		return "", "", errors.Wrapf(err, "cannot get error for container %q (empty array)", "mongo-1-1")
 	}
 
-	imageBaseName, version, found := strings.Cut(di[0].Config.Image, ":")
-	if !found {
+	split := strings.Split(di[0].Config.Image, ":")
+	if len(split) != 2 {
 		require.Fail(t, "image name is not correct:", di[0].Config.Image)
 		return
 	}
+
+	imageBaseName, version = split[0], split[1]
 
 	for _, s := range di[0].Config.Env {
 		if strings.HasPrefix(s, "MONGO_VERSION=") {
