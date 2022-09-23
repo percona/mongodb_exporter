@@ -90,6 +90,11 @@ func GetImageNameForDefault(ctx context.Context, t *testing.T) (imageBaseName, v
 	for _, s := range di[0].Config.Env {
 		if strings.HasPrefix(s, "MONGO_VERSION=") {
 			version = strings.ReplaceAll(s, "MONGO_VERSION=", "")
+			break
+		}
+		if strings.HasPrefix(s, "PSMDB_VERSION=") {
+			version = strings.ReplaceAll(s, "PSMDB_VERSION=", "")
+			break
 		}
 	}
 	return imageBaseName, version, nil
