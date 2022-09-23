@@ -206,10 +206,3 @@ services:
         ports:
             - "${TEST_MONGODB_STANDALONE_PORT:-27017}:27017"
         command: mongod --port 27017  --oplogSize 16
-
-    percona-mongo-standalone:
-        container_name: "percona-mongo-standalone"
-        image: percona/percona-server-mongodb:4.2
-        ports:
-            - "27018:27018"
-        command: mongod --port 27018  --oplogSize 16
