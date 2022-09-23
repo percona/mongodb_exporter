@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,6 +67,30 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	port, err := PortForContainer("mongo-1-1")
 	require.NoError(t, err)
 	return TestClient(ctx, port, t)
+}
+
+func GetImageNameForDefault(ctx context.Context, t *testing.T) (imageBaseName, version string, err error) {
+	di, err := InspectContainer("mongo-1-1")
+	if err != nil {
+		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
+	}
+
+	if len(di) == 0 {
+		return "", "", errors.Wrapf(err, "cannot get error for container %q (empty array)", "mongo-1-1")
+	}
+
+	imageBaseName, version, found := strings.Cut(di[0].Config.Image, ":")
+	if !found {
+		require.Fail(t, "image name is not correct:", di[0].Config.Image)
+		return
+	}
+
+	for _, s := range di[0].Config.Env {
+		if strings.HasPrefix(s, "MONGO_VERSION=") {
+			version = strings.ReplaceAll(s, "MONGO_VERSION=", "")
+		}
+	}
+	return imageBaseName, version, nil
 }
 
 // TestClient returns a new MongoDB connection to the specified server port.
