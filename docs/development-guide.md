@@ -1,3 +1,22 @@
+# Development Guide
+
+- [Development Guide](#development-guide)
+  - [Prerequisite knowledge](#prerequisite-knowledge)
+    - [Environment setup](#environment-setup)
+    - [Branching workflow](#branching-workflow)
+  - [Development](#development)
+    - [Using the Makefile](#using-the-makefile)
+    - [Kickstart development](#kickstart-development)
+    - [Coding guidelines and suggestions](#coding-guidelines-and-suggestions)
+  - [Tests](#tests)
+    - [Starting the sandbox](#starting-the-sandbox)
+    - [Running tests](#running-tests)
+  - [Submitting a Pull Request](#submitting-a-pull-request)
+    - [Sign the CLA](#sign-the-cla)
+    - [Code of Conduct](#code-of-conduct)
+    - [PR Checklist](#pr-checklist)
+  - [Pull Request is merged](#pull-request-is-merged)
+
 ## Prerequisite knowledge
 
 ### Environment setup
@@ -5,7 +24,7 @@
 For developing MongoDB exporter, you need following software installed in your development environment:
 
 - [Golang toolchain](https://go.dev/doc/install) (*v1.17 or higher*)
-- GNU make (*or any alternative to run Makefile*)
+- `make` utility (*to run Makefile*)
 - [Docker](https://docs.docker.com/engine/install/)  (*to run containers*)
 - `docker-compose` utlity (*generates local test cluster*)
 
@@ -17,7 +36,7 @@ MongoDB exporter uses [semantic versioning](https://semver.org/spec/v2.0.0.html)
 - MINOR version when you add functionality in a backwards compatible manner
 - PATCH version when you make backwards compatible bug fixes
 
-All PRs are merged only to `main` branch.
+All Pull Requests(**PR**) are merged only to `main` branch.
 
 A release is made by forking from `main`. Release branches follow the naming convention of `release-X.Y` (for release version **vX.Y.Z**) . Release branch accepts new commits only to get critical patches or to create a _patch_ release. Release branch is locked after new minor or patch release. The last commit for a new release **vX.Y.Z** gets tagged with `vX.Y.Z` tag in the release branch.
 
@@ -126,22 +145,28 @@ make test
 
 ## Submitting a Pull Request
 
+Before submitting contributions via a PR, you should first complete the following prerequisites.
+
+### Sign the CLA
+
+Before you can contribute, we kindly ask you to sign our [Contributor License Agreement](https://cla-assistant.percona.com/percona/mongodb_exporter) (CLA). You can do this using your GitHub account and one click.
+
+### Code of Conduct
+
+Please make sure to read and agree to our [Code of Conduct](./CODE_OF_CONDUCT.md).
+
 ### PR Checklist
 
 Before submitting a PR, please use following checklist to avoid common issues:
 
-- [ ] Format code as per our coding standards
+- [ ] [Format code](#coding-guidelines-and-suggestions) as per our coding standards
 - [ ] Add new tests (if applicable)
-- [ ] Run test suite
+- [ ] [Run test suite](#running-tests)
 - [ ] Capture screenshots of new behavior (if applicable)
 
 Once you have used above checklist, go ahead and file a PR against `main` branch of the project.
 
-### Code Reviews
-
-After submitting your PR please add `pmm-review-exporters` team as a reviewer - that would auto assign reviewers to review your PR.
-
-## After your Pull Request is merged
+## Pull Request is merged
 
 Once your pull request is merged, you are an official Percona Community Contributor.
 
