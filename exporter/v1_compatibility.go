@@ -39,10 +39,14 @@ const (
 	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
 	UnknownState = 6
 
+	// EnterpriseEdition shows that MongoDB is Enterprise edition
 	EnterpriseEdition = "Enterprise"
-	CommunityEdition  = "Community"
+	// CommunityEdition shows that MongoDB is Community edition
+	CommunityEdition = "Community"
 
+	// PerconaVendor means that MongoDB provided by Percona
 	PerconaVendor = "Percona"
+	// MongoDBVendor means that MongoDB provided by Mongo
 	MongoDBVendor = "MongoDB"
 )
 
@@ -791,7 +795,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 
 	buildInfo, err := retrieveMongoDBBuildInfo(ctx, client, l)
 	if err != nil {
-		l.Errorf("cannot retreive MongoDB buildInfo: %s", err)
+		l.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
 	}
 
 	metrics = append(metrics, storageEngine(m))
@@ -862,7 +866,7 @@ func storageEngine(m bson.M) prometheus.Metric {
 	return metric
 }
 
-func serverVersion(m bson.M, bi buildInfo) prometheus.Metric {
+func serverVersion(m bson.M, bi buildInfo) prometheus.Metric { //nolint:ireturn
 	v := walkTo(m, []string{"serverStatus", "version"})
 	name := "mongodb_version_info"
 	help := "The server version"

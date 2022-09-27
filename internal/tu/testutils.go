@@ -69,6 +69,8 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	return TestClient(ctx, port, t)
 }
 
+// GetImageNameForDefault returns image name and version of running
+// default test mongo container
 func GetImageNameForDefault(ctx context.Context, t *testing.T) (imageBaseName, version string, err error) {
 	di, err := InspectContainer("mongo-1-1")
 	if err != nil {
@@ -80,7 +82,9 @@ func GetImageNameForDefault(ctx context.Context, t *testing.T) (imageBaseName, v
 	}
 
 	split := strings.Split(di[0].Config.Image, ":")
-	if len(split) != 2 {
+
+	const numOfImageNameParts = 2
+	if len(split) != numOfImageNameParts {
 		require.Fail(t, "image name is not correct:", di[0].Config.Image)
 		return
 	}
@@ -90,10 +94,12 @@ func GetImageNameForDefault(ctx context.Context, t *testing.T) (imageBaseName, v
 	for _, s := range di[0].Config.Env {
 		if strings.HasPrefix(s, "MONGO_VERSION=") {
 			version = strings.ReplaceAll(s, "MONGO_VERSION=", "")
+
 			break
 		}
 		if strings.HasPrefix(s, "PSMDB_VERSION=") {
 			version = strings.ReplaceAll(s, "PSMDB_VERSION=", "")
+
 			break
 		}
 	}
