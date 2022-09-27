@@ -59,14 +59,13 @@ Following options are available:
 |check-license|Check license in headers|
 |help|Display Makefile usage|
 |test|Run all tests|
-|test-cluster|Start MongoDB test cluster. Use environment variable `TEST_MONGODB_IMAGE` to set flavor and version. Example:|
-| |`TEST_MONGODB_IMAGE=mongo:4.2 make test-cluster`|
+|test-cluster|Start MongoDB test cluster. Use environment variable `TEST_MONGODB_IMAGE` to set flavor and version. Example: `TEST_MONGODB_IMAGE=mongo:4.4 make test-cluster`|
 |test-cluster-clean|Stop MongoDB test cluster|
 
 **Please take care to do following**:
 
 - Before using any linting or check utility, invoke `make init` to generate the required utilities.
-- Before running any test, invoke `make test-cluster` to start the test cluster
+- Before running any test, invoke `make test-cluster` to start test sandbox
 
 ### Kickstart development
 
@@ -149,11 +148,11 @@ Before submitting contributions via a PR, you should first complete the followin
 
 ### Sign the CLA
 
-Before you can contribute, we kindly ask you to sign our [Contributor License Agreement](https://cla-assistant.percona.com/percona/mongodb_exporter) (CLA). You can do this using your GitHub account and one click.
+Before you can contribute, please sign our [Contributor License Agreement](https://cla-assistant.percona.com/percona/mongodb_exporter) (CLA). You can do this using your GitHub account and one click.
 
 ### Code of Conduct
 
-Please make sure to read and agree to our [Code of Conduct](./CODE_OF_CONDUCT.md).
+Please make sure to read and agree to our [Code of Conduct](https://github.com/percona/community/blob/main/content/contribute/coc.md).
 
 ### PR Checklist
 
