@@ -64,8 +64,8 @@ func TestTopologyLabels(t *testing.T) {
 		{
 			containerName: "mongo-1-arbiter",
 			want: map[string]string{
-				labelReplicasetName:  "",
-				labelReplicasetState: "0",
+				labelReplicasetName:  "rs1",
+				labelReplicasetState: "7",
 				labelClusterRole:     "shardsvr",
 				labelClusterID:       "",
 			},
