@@ -70,8 +70,8 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 }
 
 // GetImageNameForDefault returns image name and version of running
-// default test mongo container
-func GetImageNameForDefault(ctx context.Context, t *testing.T) (imageBaseName, version string, err error) {
+// default test mongo container.
+func GetImageNameForDefault(t *testing.T) (imageBaseName, version string, err error) {
 	di, err := InspectContainer("mongo-1-1")
 	if err != nil {
 		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")

@@ -39,14 +39,14 @@ const (
 	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
 	UnknownState = 6
 
-	// EnterpriseEdition shows that MongoDB is Enterprise edition
+	// EnterpriseEdition shows that MongoDB is Enterprise edition.
 	EnterpriseEdition = "Enterprise"
-	// CommunityEdition shows that MongoDB is Community edition
+	// CommunityEdition shows that MongoDB is Community edition.
 	CommunityEdition = "Community"
 
-	// PerconaVendor means that MongoDB provided by Percona
+	// PerconaVendor means that MongoDB provided by Percona.
 	PerconaVendor = "Percona"
-	// MongoDBVendor means that MongoDB provided by Mongo
+	// MongoDBVendor means that MongoDB provided by Mongo.
 	MongoDBVendor = "MongoDB"
 )
 
