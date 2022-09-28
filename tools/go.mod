@@ -3,7 +3,7 @@ module github.com/percona/mongodb_exporter/tools
 go 1.17
 
 require (
-	github.com/daixiang0/gci v0.5.0
+	github.com/daixiang0/gci v0.8.0
 	github.com/golangci/golangci-lint v1.47.3
 	github.com/reviewdog/reviewdog v0.14.1
 	mvdan.cc/gofumpt v0.3.1
