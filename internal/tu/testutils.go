@@ -20,6 +20,7 @@ package tu
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -71,7 +72,7 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 
 // GetImageNameForDefault returns image name and version of running
 // default test mongo container.
-func GetImageNameForDefault(t *testing.T) (imageBaseName, version string, err error) {
+func GetImageNameForDefault() (string, string, error) {
 	di, err := InspectContainer("mongo-1-1")
 	if err != nil {
 		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
@@ -85,11 +86,10 @@ func GetImageNameForDefault(t *testing.T) (imageBaseName, version string, err er
 
 	const numOfImageNameParts = 2
 	if len(split) != numOfImageNameParts {
-		require.Fail(t, "image name is not correct:", di[0].Config.Image)
-		return
+		return "", "", errors.New(fmt.Sprintf("image name is not correct: %s", di[0].Config.Image))
 	}
 
-	imageBaseName, version = split[0], split[1]
+	imageBaseName, version := split[0], split[1]
 
 	for _, s := range di[0].Config.Env {
 		if strings.HasPrefix(s, "MONGO_VERSION=") {

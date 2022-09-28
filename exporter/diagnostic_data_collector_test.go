@@ -82,7 +82,7 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 	logger := logrus.New()
 	ti := labelsGetterMock{}
 
-	imageBaseName, version, err := tu.GetImageNameForDefault(t)
+	imageBaseName, version, err := tu.GetImageNameForDefault()
 	require.NoError(t, err)
 
 	var vendor string
