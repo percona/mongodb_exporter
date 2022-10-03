@@ -84,7 +84,7 @@ FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 format:                     ## Format source code.
 	go mod tidy
 	bin/gofumpt -l -w $(FILES)
-	bin/gci write --Section Standard --Section Default --Section "Prefix(github.com/percona/mongodb_exporter)" .
+	bin/gci write --section Standard --section Default --section "Prefix(github.com/percona/mongodb_exporter)" .
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run
