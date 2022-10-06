@@ -14,7 +14,7 @@ Before you can contribute, we kindly ask you to sign our [Contributor License Ag
 
 ### 2. Code of Conduct
 
-Please make sure to read and agree to our [Code of Conduct](./CODE_OF_CONDUCT.md).
+Please make sure to read and agree to our [Code of Conduct](https://github.com/percona/community/blob/main/content/contribute/coc.md).
 
 ## Submitting a Bug
 
