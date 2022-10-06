@@ -100,6 +100,11 @@ func New(opts *Opts) *Exporter {
 
 	ctx := context.Background()
 
+	if opts.Path == "" {
+		opts.Logger.Warn("Web telemetry path \"\" invalid, falling back to \"/\" instead")
+		opts.Path = "/"
+	}
+
 	exp := &Exporter{
 		path:                  opts.Path,
 		logger:                opts.Logger,
@@ -325,7 +330,7 @@ func (e *Exporter) Handler() http.Handler {
 // Run starts the exporter.
 func (e *Exporter) Run() {
 	mux := http.DefaultServeMux
-	mux.Handle("/metrics", e.Handler())
+	mux.Handle(e.path, e.Handler())
 
 	server := &http.Server{
 		Addr:    e.webListenAddress,
