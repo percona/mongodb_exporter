@@ -82,10 +82,14 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 	logger := logrus.New()
 	ti := labelsGetterMock{}
 
-	serverVersion, err := getMongoDBVersion(t, client, ctx, logger)
-	if err != nil {
-		assert.Fail(t, err.Error())
-		return
+	imageBaseName, version, err := tu.GetImageNameForDefault()
+	require.NoError(t, err)
+
+	var vendor string
+	if strings.HasPrefix(imageBaseName, "percona/") {
+		vendor = "Percona"
+	} else {
+		vendor = "MongoDB"
 	}
 
 	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
@@ -94,7 +98,7 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 	expected := strings.NewReader(fmt.Sprintf(`
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{edition="Community",mongodb="%s"} 1`, serverVersion) + "\n")
+	mongodb_version_info{edition="Community",mongodb="%s",vendor="%s"} 1`, version, vendor) + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
@@ -288,7 +292,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{edition="",mongodb="server version is unavailable"} 1` + "\n")
+	mongodb_version_info{edition="",mongodb="server version is unavailable",vendor=""} 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
