@@ -312,7 +312,6 @@ func (e *Exporter) Handler() http.Handler {
 		}
 
 		if client != nil {
-
 			// Topology can change between requests, so we need to get it every time.
 			ti := newTopologyInfo(ctx, client, e.logger)
 
