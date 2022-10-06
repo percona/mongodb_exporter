@@ -305,17 +305,19 @@ func (e *Exporter) Handler() http.Handler {
 			}()
 		}
 
-		// Topology can change between requests, so we need to get it every time.
-		ti := newTopologyInfo(ctx, client, e.logger)
-
-		registry := e.makeRegistry(ctx, client, ti, requestOpts)
-
 		var gatherers prometheus.Gatherers
 
 		if !e.opts.DisableDefaultRegistry {
 			gatherers = append(gatherers, prometheus.DefaultGatherer)
 		}
-		gatherers = append(gatherers, registry)
+
+		if client != nil {
+			// Topology can change between requests, so we need to get it every time.
+			ti := newTopologyInfo(ctx, client, e.logger)
+
+			registry := e.makeRegistry(ctx, client, ti, requestOpts)
+			gatherers = append(gatherers, registry)
+		}
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
