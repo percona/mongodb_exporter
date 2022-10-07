@@ -333,6 +333,15 @@ func (e *Exporter) Handler() http.Handler {
 func (e *Exporter) Run() {
 	mux := http.DefaultServeMux
 	mux.Handle(e.path, e.Handler())
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html>
+            <head><title>MongoDB Exporter</title></head>
+            <body>
+            <h1>MongoDB Exporter</h1>
+            <p><a href='/metrics'>Metrics</a></p>
+            </body>
+            </html>`))
+	})
 
 	server := &http.Server{
 		Addr:    e.webListenAddress,
