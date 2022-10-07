@@ -100,6 +100,11 @@ func New(opts *Opts) *Exporter {
 
 	ctx := context.Background()
 
+	if opts.Path == "" {
+		opts.Logger.Warn("Web telemetry path \"\" invalid, falling back to \"/\" instead")
+		opts.Path = "/"
+	}
+
 	exp := &Exporter{
 		path:                  opts.Path,
 		logger:                opts.Logger,
@@ -300,17 +305,19 @@ func (e *Exporter) Handler() http.Handler {
 			}()
 		}
 
-		// Topology can change between requests, so we need to get it every time.
-		ti := newTopologyInfo(ctx, client, e.logger)
-
-		registry := e.makeRegistry(ctx, client, ti, requestOpts)
-
 		var gatherers prometheus.Gatherers
 
 		if !e.opts.DisableDefaultRegistry {
 			gatherers = append(gatherers, prometheus.DefaultGatherer)
 		}
-		gatherers = append(gatherers, registry)
+
+		if client != nil {
+			// Topology can change between requests, so we need to get it every time.
+			ti := newTopologyInfo(ctx, client, e.logger)
+
+			registry := e.makeRegistry(ctx, client, ti, requestOpts)
+			gatherers = append(gatherers, registry)
+		}
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
@@ -325,7 +332,7 @@ func (e *Exporter) Handler() http.Handler {
 // Run starts the exporter.
 func (e *Exporter) Run() {
 	mux := http.DefaultServeMux
-	mux.Handle("/metrics", e.Handler())
+	mux.Handle(e.path, e.Handler())
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
             <head><title>MongoDB Exporter</title></head>
