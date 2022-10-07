@@ -20,11 +20,13 @@ package tu
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,6 +68,42 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	port, err := PortForContainer("mongo-1-1")
 	require.NoError(t, err)
 	return TestClient(ctx, port, t)
+}
+
+// GetImageNameForDefault returns image name and version of running
+// default test mongo container.
+func GetImageNameForDefault() (string, string, error) {
+	di, err := InspectContainer("mongo-1-1")
+	if err != nil {
+		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
+	}
+
+	if len(di) == 0 {
+		return "", "", errors.Wrapf(err, "cannot get error for container %q (empty array)", "mongo-1-1")
+	}
+
+	split := strings.Split(di[0].Config.Image, ":")
+
+	const numOfImageNameParts = 2
+	if len(split) != numOfImageNameParts {
+		return "", "", errors.New(fmt.Sprintf("image name is not correct: %s", di[0].Config.Image))
+	}
+
+	imageBaseName, version := split[0], split[1]
+
+	for _, s := range di[0].Config.Env {
+		if strings.HasPrefix(s, "MONGO_VERSION=") {
+			version = strings.ReplaceAll(s, "MONGO_VERSION=", "")
+
+			break
+		}
+		if strings.HasPrefix(s, "PSMDB_VERSION=") {
+			version = strings.ReplaceAll(s, "PSMDB_VERSION=", "")
+
+			break
+		}
+	}
+	return imageBaseName, version, nil
 }
 
 // TestClient returns a new MongoDB connection to the specified server port.
