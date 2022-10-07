@@ -38,6 +38,16 @@ const (
 	// UnknownState is the values for an unknown rs state.
 	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
 	UnknownState = 6
+
+	// EnterpriseEdition shows that MongoDB is Enterprise edition.
+	EnterpriseEdition = "Enterprise"
+	// CommunityEdition shows that MongoDB is Community edition.
+	CommunityEdition = "Community"
+
+	// PerconaVendor means that MongoDB provided by Percona.
+	PerconaVendor = "Percona"
+	// MongoDBVendor means that MongoDB provided by Mongo.
+	MongoDBVendor = "MongoDB"
 )
 
 // ErrInvalidMetricValue cannot create a new metric due to an invalid value.
@@ -783,13 +793,13 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metrics = append(metrics, metric)
 	}
 
-	edition, err := retrieveMongoDBEdition(ctx, client, l)
+	buildInfo, err := retrieveMongoDBBuildInfo(ctx, client, l)
 	if err != nil {
-		l.Warnf("cannot retreive MongoDB edition: %s", err)
+		l.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
 	}
 
 	metrics = append(metrics, storageEngine(m))
-	metrics = append(metrics, serverVersion(m, edition))
+	metrics = append(metrics, serverVersion(m, buildInfo))
 	metrics = append(metrics, myState(ctx, client))
 
 	if mm := replSetMetrics(m); mm != nil {
@@ -805,28 +815,38 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	return metrics
 }
 
-func retrieveMongoDBEdition(ctx context.Context, client *mongo.Client, l *logrus.Logger) (string, error) {
+func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Logger) (buildInfo, error) {
 	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
 	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
 
 	var buildInfoDoc bson.M
 	err := res.Decode(&buildInfoDoc)
 	if err != nil {
-		return "", errors.Wrap(err, "Failed to run buildInfo command")
+		return buildInfo{}, errors.Wrap(err, "Failed to run buildInfo command")
 	}
 
 	var edition string
 	modules, ok := buildInfoDoc["modules"].(bson.A)
 	if !ok {
-		return "", errors.Wrap(err, "Failed to cast module information variable")
+		return buildInfo{}, errors.Wrap(err, "Failed to cast module information variable")
 	}
+
+	var bi buildInfo
 	if len(modules) > 0 && modules[0].(string) == "enterprise" {
-		edition = "Enterprise"
+		bi.Edition = EnterpriseEdition
 	} else {
-		edition = "Community"
+		bi.Edition = CommunityEdition
 	}
 	l.Debug("MongoDB edition: ", edition)
-	return edition, nil
+
+	_, ok = buildInfoDoc["psmdbVersion"]
+	if ok {
+		bi.Vendor = PerconaVendor
+	} else {
+		bi.Vendor = MongoDBVendor
+	}
+
+	return bi, nil
 }
 
 func storageEngine(m bson.M) prometheus.Metric {
@@ -846,7 +866,7 @@ func storageEngine(m bson.M) prometheus.Metric {
 	return metric
 }
 
-func serverVersion(m bson.M, edition string) prometheus.Metric {
+func serverVersion(m bson.M, bi buildInfo) prometheus.Metric { //nolint:ireturn
 	v := walkTo(m, []string{"serverStatus", "version"})
 	name := "mongodb_version_info"
 	help := "The server version"
@@ -855,7 +875,7 @@ func serverVersion(m bson.M, edition string) prometheus.Metric {
 	if !ok {
 		serverVersion = "server version is unavailable"
 	}
-	labels := map[string]string{"mongodb": serverVersion, "edition": edition}
+	labels := map[string]string{"mongodb": serverVersion, "edition": bi.Edition, "vendor": bi.Vendor}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
@@ -1325,6 +1345,11 @@ type rawStatus struct {
 	Collections int    `bson:"collections,omitempty"`
 	Objects     int    `bson:"objects,omitempty"`
 	Indexes     int    `bson:"indexes,omitempty"`
+}
+
+type buildInfo struct {
+	Edition string
+	Vendor  string
 }
 
 func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Logger) *databaseStatList {
