@@ -1055,6 +1055,28 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 
 	metrics = append(metrics, balancerEnabled(ctx, client))
 
+	if metric, err := balancerRunning(ctx, client); err != nil {
+		l.Debugf("cannot create metric for balancer running: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
+	if migratingMetrics, err := migratingCollections(ctx, client); err != nil {
+		l.Debugf("cannot create metric for migrating collections: %s", err)
+		// could still have some metrics in error case
+		if migratingMetrics != nil {
+			metrics = append(metrics, migratingMetrics...)
+		}
+	} else {
+		metrics = append(metrics, migratingMetrics...)
+	}
+
+	if metric, err := chunksSize(ctx, client); err != nil {
+		l.Debugf("cannot create metric for chunk size: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
+
 	metric, err := chunksTotal(ctx, client)
 	if err != nil {
 		l.Debugf("cannot create metric for chunks total: %s", err)
@@ -1166,7 +1188,7 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 
 func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	type bss struct {
-		stopped bool `bson:"stopped"`
+		Stopped bool `bson:"stopped"`
 	}
 	var bs bss
 	enabled := 0
@@ -1174,7 +1196,7 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metri
 	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
 	if err != nil {
 		enabled = 1
-	} else if !bs.stopped {
+	} else if !bs.Stopped {
 		enabled = 1
 	}
 
@@ -1200,9 +1222,93 @@ func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, 
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
 }
 
+func balancerRunning(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	type bss struct {
+		InBalancerRound bool `bson:"inBalancerRound"`
+	}
+	var bs bss
+	running := 0
+	err := client.Database("admin").RunCommand(ctx, bson.M{"balancerStatus": 1}).Decode(&bs)
+	if err != nil {
+		return nil, err
+	}
+
+	if bs.InBalancerRound {
+		running = 1
+	}
+	name := "mongodb_mongos_sharding_balancer_running"
+	help := "Balancer is running"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(running))
+
+	return metric, err
+}
+
+func migratingCollections(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+	cursor, err := client.Database("config").Collection("migrations").Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+
+	var migrations []bson.M
+	if err = cursor.All(ctx, &migrations); err != nil {
+		return nil, err
+	}
+	metrics := make([]prometheus.Metric, 0, len(migrations))
+
+	type bss struct {
+		When time.Time `bson:"when"`
+	}
+	var bs bss
+	for _, migration := range migrations {
+		name := "mongodb_mongos_sharding_migrating"
+		help := "Collection has active migration"
+		ns := migration["ns"].(string)
+		err = client.Database("config").Collection("locks").FindOne(ctx, bson.M{
+			"_id": migration["ns"].(string),
+			"why": "Migrating chunk(s) in collection " + ns,
+		}).Decode(&bs)
+		if err != nil {
+			continue
+		}
+		labels := map[string]string{
+			"ns":        ns,
+			"fromShard": migration["fromShard"].(string),
+			"toShard":   migration["toShard"].(string),
+			"startedAt": bs.When.String(),
+		}
+		d := prometheus.NewDesc(name, help, nil, labels)
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+		if err != nil {
+			continue
+		}
+
+		metrics = append(metrics, metric)
+	}
+	return metrics, nil
+}
+
+func chunksSize(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+	type bss struct {
+		Value float64 `bson:"value"`
+	}
+	var bs bss
+	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "chunksize"}).Decode(&bs)
+	if err != nil {
+		return nil, err
+	}
+
+	name := "mongodb_mongos_sharding_chunk_size_mb"
+	help := "chunk size in megabytes"
+
+	d := prometheus.NewDesc(name, help, nil, nil)
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, bs.Value)
+}
+
 func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
 	aggregation := bson.D{
-		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
+		{Key: "$group", Value: bson.M{"_id": bson.M{"shard": "$shard", "ns": "$ns"}, "count": bson.M{"$sum": 1}}},
 	}
 
 	cursor, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
@@ -1219,7 +1325,10 @@ func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheu
 
 	for _, shard := range shards {
 		help := "Total number of chunks per shard"
-		labels := map[string]string{"shard": shard["_id"].(string)}
+		labels := map[string]string{
+			"shard": shard["_id"].(primitive.M)["shard"].(string),
+			"ns":    shard["_id"].(primitive.M)["ns"].(string),
+		}
 
 		d := prometheus.NewDesc("mongodb_mongos_sharding_shard_chunks_total", help, nil, labels)
 		val, ok := shard["count"].(int32)
