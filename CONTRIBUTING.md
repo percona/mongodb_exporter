@@ -31,7 +31,7 @@ If there is no existing PMM report for the issue that relates to PMM, submit a r
 2. [Go to the Create Issue screen and select the relevant project.](https://jira.percona.com/secure/CreateIssueDetails!init.jspa?pid=11600&issuetype=1&priority=3&components=11603)
 3. Fill in the fields of Summary, Description, Steps To Reproduce, and Affects Version to the best you can. If the bug corresponds to a crash, attach the stack trace from the logs.
 
-An excellent resource is [Elika Etemad's article on filing good bug reports.](http://fantasai.inkedblade.net/style/talks/filing-good-bugs/).
+An excellent resource is [Elika Etemad's article on filing good bug reports.](https://fantasai.inkedblade.net/style/talks/filing-good-bugs/).
 
 As a general rule of thumb, please try to create bug reports that are:
 
