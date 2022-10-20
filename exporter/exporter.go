@@ -177,7 +177,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableDBStats = false
 		e.opts.EnableCollStats = false
 		e.opts.EnableTopMetrics = false
-		e.opts.EnableReplicasetStatus = true
+		e.opts.EnableReplicasetStatus = false
 		e.opts.EnableIndexStats = false
 	}
 
