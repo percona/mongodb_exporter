@@ -146,6 +146,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
 	}
 
+	isArbiter, err := isArbiter(ctx, client)
+	if err != nil {
+		e.logger.Errorf("Registry - Cannot get arbiterOnly to check if this is arbiter role : %s", err)
+	}
+
 	// Enable collectors like collstats and indexstats depending on the number of collections
 	// present in the database.
 	limitsOk := false
@@ -164,6 +169,16 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
 		e.opts.EnableIndexStats = true
+	}
+
+	// arbiter only have isMaster privileges
+	if isArbiter {
+		e.opts.EnableDiagnosticData = false
+		e.opts.EnableDBStats = false
+		e.opts.EnableCollStats = false
+		e.opts.EnableTopMetrics = false
+		e.opts.EnableReplicasetStatus = true
+		e.opts.EnableIndexStats = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
