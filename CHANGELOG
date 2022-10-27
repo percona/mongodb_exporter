@@ -1,3 +1,7 @@
+Release 0.35.0
+
+- Added to metrics info about running MongoDB version and Mongo vendor
+
 Release 0.34.0
 
 - Add logger with level
