@@ -1,6 +1,6 @@
 Release 0.35.0
 
-- Added to metrics info about running MongoDB version and Mongo vendor
+- Added version and vendor information to metrics info
 - Removed unused collector
 
 Release 0.34.0
