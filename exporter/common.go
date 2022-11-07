@@ -29,7 +29,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
+var (
+	systemDBs         = []string{"admin", "config", "local"} //nolint:gochecknoglobals
+	systemCollections = []string{"system.profile"}
+)
 
 func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string) ([]string, error) {
 	filter := bson.D{} // Default=empty -> list all collections
@@ -63,7 +66,15 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 		return nil, errors.Wrap(err, "cannot get the list of collections for discovery")
 	}
 
-	return collections, nil
+	filteredCollections := []string{}
+	for _, collection := range collections {
+		if collection == systemCollections[0] {
+			continue
+		}
+		filteredCollections = append(filteredCollections, collection)
+	}
+
+	return filteredCollections, nil
 }
 
 // databases returns the list of databases matching the filters.
