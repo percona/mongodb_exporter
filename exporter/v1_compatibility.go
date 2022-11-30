@@ -1053,7 +1053,11 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, metric)
 	}
 
-	metrics = append(metrics, balancerEnabled(ctx, client))
+	if metric, err := balancerEnabled(ctx, client); err != nil {
+		l.Debugf("cannot create metric for balancer is enabled: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
 
 	metric, err := chunksTotal(ctx, client)
 	if err != nil {
@@ -1164,17 +1168,19 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
 }
 
-func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metric {
+func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	type bss struct {
-		stopped bool `bson:"stopped"`
+		Stopped bool `bson:"stopped"`
 	}
 	var bs bss
 	enabled := 0
 
 	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
 	if err != nil {
-		enabled = 1
-	} else if !bs.stopped {
+		return nil, err
+	}
+
+	if !bs.Stopped {
 		enabled = 1
 	}
 
@@ -1184,7 +1190,7 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metri
 	d := prometheus.NewDesc(name, help, nil, nil)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
 
-	return metric
+	return metric, nil
 }
 
 func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
