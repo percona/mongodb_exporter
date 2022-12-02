@@ -123,10 +123,10 @@ func (d *diagnosticDataCollector) getSecurityMetricsFromLineOptions(client *mong
 	cmdLineOptions := bson.D{{Key: "getCmdLineOpts", Value: "1"}}
 	resCmdLineOptions := client.Database("admin").RunCommand(d.ctx, cmdLineOptions)
 	if resCmdLineOptions.Err() != nil {
-		return nil, resCmdLineOptions.Err()
+		return nil, errors.Wrap(resCmdLineOptions.Err(), "cannot execute getCmdLineOpts command")
 	}
 	if err := resCmdLineOptions.Decode(&cmdLineOpionsBson); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot parse response of the getCmdLineOpts command")
 	}
 
 	if cmdLineOpionsBson == nil || cmdLineOpionsBson["parsed"] == nil {
@@ -141,6 +141,15 @@ func (d *diagnosticDataCollector) getSecurityMetricsFromLineOptions(client *mong
 		return nil, nil
 	}
 
+	metrics, err := d.retrieveSecurityEncryptionMetrics(securityOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return metrics, nil
+}
+
+func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetrics(securityOptions bson.M) ([]prometheus.Metric, error) {
 	var metrics []prometheus.Metric
 	enabledEncryption, ok := securityOptions["enableEncryption"]
 	if ok && enabledEncryption == true {
@@ -148,7 +157,7 @@ func (d *diagnosticDataCollector) getSecurityMetricsFromLineOptions(client *mong
 			nil, nil)
 		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "cannot create metric mongodb_security_encryption_enabled")
 		}
 		metrics = append(metrics, metric)
 	}
@@ -159,11 +168,10 @@ func (d *diagnosticDataCollector) getSecurityMetricsFromLineOptions(client *mong
 			nil, nil)
 		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "cannot create metric mongodb_security_encryption_using_kmip_enabled")
 		}
 		metrics = append(metrics, metric)
 	}
-
 	return metrics, nil
 }
 
