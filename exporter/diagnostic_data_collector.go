@@ -172,6 +172,7 @@ func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetrics(securityOpti
 		}
 		metrics = append(metrics, metric)
 	}
+
 	return metrics, nil
 }
 
