@@ -89,6 +89,13 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(logger, m)...)
 
+	securityMetrics, err := d.getSecurityMetricsFromLineOptions(client)
+	if err != nil {
+		logger.Errorf("cannot decode getCmdLineOtpions: %s", err)
+	} else if len(securityMetrics) > 0 {
+		metrics = append(metrics, securityMetrics...)
+	}
+
 	if d.compatibleMode {
 		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
 
@@ -109,6 +116,55 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	for _, metric := range metrics {
 		ch <- metric
 	}
+}
+
+func (d *diagnosticDataCollector) getSecurityMetricsFromLineOptions(client *mongo.Client) ([]prometheus.Metric, error) {
+	var cmdLineOpionsBson bson.M
+	cmdLineOptions := bson.D{{Key: "getCmdLineOpts", Value: "1"}}
+	resCmdLineOptions := client.Database("admin").RunCommand(d.ctx, cmdLineOptions)
+	if resCmdLineOptions.Err() != nil {
+		return nil, resCmdLineOptions.Err()
+	}
+	if err := resCmdLineOptions.Decode(&cmdLineOpionsBson); err != nil {
+		return nil, err
+	}
+
+	if cmdLineOpionsBson == nil || cmdLineOpionsBson["parsed"] == nil {
+		return nil, errors.New("cmdlined options is empty")
+	}
+	parsedOptions, ok := cmdLineOpionsBson["parsed"].(bson.M)
+	if !ok {
+		return nil, errors.New("cannot cast parsed options to BSON")
+	}
+	securityOptions, ok := parsedOptions["security"].(bson.M)
+	if !ok {
+		return nil, nil
+	}
+
+	var metrics []prometheus.Metric
+	enabledEncryption, ok := securityOptions["enableEncryption"]
+	if ok && enabledEncryption == true {
+		d := prometheus.NewDesc("mongodb_security_encryption_enabled", "Shows that encryption is enabled",
+			nil, nil)
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+		if err != nil {
+			return nil, err
+		}
+		metrics = append(metrics, metric)
+	}
+
+	_, ok = securityOptions["kmip"]
+	if ok {
+		d := prometheus.NewDesc("mongodb_security_encryption_using_kmip_enabled", "Shows that encrytpion enabled using KMIP",
+			nil, nil)
+		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+		if err != nil {
+			return nil, err
+		}
+		metrics = append(metrics, metric)
+	}
+
+	return metrics, nil
 }
 
 // check interface.
