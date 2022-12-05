@@ -206,3 +206,12 @@ services:
         ports:
             - "${TEST_MONGODB_STANDALONE_PORT:-27017}:27017"
         command: mongod --port 27017  --oplogSize 16
+
+    standalone-encrypted:
+        container_name: "standalone-encrypted"
+        image: percona/percona-server-mongodb:5.0
+        ports:
+            - "${TEST_MONGODB_STANDALONE_ENCRYPTED_PORT:-27027}:27017"
+        volumes:
+            - ./test_files/mongodb_secrets:/secrets/mongodb_secrets
+        command: mongod --port 27017  --oplogSize 16 --enableEncryption --encryptionKeyFile  /secrets/mongodb_secrets
