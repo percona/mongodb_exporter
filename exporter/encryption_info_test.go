@@ -18,7 +18,7 @@ func TestGetEncryptionInfo(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := tu.TestClient(ctx, "27027", t)
+	client := tu.TestClient(ctx, tu.MongoDBStandAloneEncryptedPort, t)
 	defer client.Disconnect(ctx)
 
 	logger := logrus.New()

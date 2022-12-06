@@ -50,6 +50,8 @@ const (
 	MongoDBStandAlonePort = "27017"
 	// MongoDBConfigServer1Port MongoDB config server primary Port.
 	MongoDBConfigServer1Port = "17009"
+	// MongoDBStandAloneEncryptedPort MongoDB standalone encrypted instance Port.
+	MongoDBStandAloneEncryptedPort = "27027"
 )
 
 // GetenvDefault gets a variable from the environment and returns its value or the
@@ -184,8 +186,6 @@ func PortForContainer(name string) (string, error) {
 	if len(di) == 0 {
 		return "", errors.Wrapf(err, "cannot get error for container %q (empty array)", name)
 	}
-	fmt.Println(len(di))
-	fmt.Println(di)
 
 	ports := di[0].NetworkSettings.Ports["27017/tcp"]
 	if len(ports) == 0 {
