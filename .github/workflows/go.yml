@@ -74,7 +74,7 @@ jobs:
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
-          docker ps
+          docker logs standalone-encrypted
           make test-race
           make test-cluster-clean
 
