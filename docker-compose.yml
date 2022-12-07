@@ -213,5 +213,6 @@ services:
         ports:
             - "${TEST_MONGODB_STANDALONE_ENCRYPTED_PORT:-27027}:27017"
         volumes:
-            - ./test_files/mongodb_secrets.txt:/secrets/mongodb_secrets.txt:ro
-        command: mongod --port 27017  --oplogSize 16 --enableEncryption --encryptionKeyFile  /secrets/mongodb_secrets.txt
+            - ./docker/secret/mongodb_secrets.txt:/secret/mongodb_secrets.txt
+            - ./docker/scripts:/scripts
+        entrypoint: [ "/scripts/run-mongodb-encrypted.sh" ]
