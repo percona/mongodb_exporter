@@ -15,12 +15,16 @@ import (
 )
 
 func TestGetEncryptionInfo(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	client := tu.TestClient(ctx, tu.MongoDBStandAloneEncryptedPort, t)
-	defer client.Disconnect(ctx)
-
+	t.Cleanup(func() {
+		err := client.Disconnect(ctx)
+		assert.NoError(t, err)
+	})
 	logger := logrus.New()
 	logger.Out = io.Discard // disable logs in tests
 
