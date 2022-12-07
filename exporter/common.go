@@ -29,10 +29,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var (
-	systemDBs         = []string{"admin", "config", "local"} //nolint:gochecknoglobals
-	systemCollections = []string{"system.profile"}
-)
+var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
 
 func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string) ([]string, error) {
 	filter := bson.D{} // Default=empty -> list all collections
@@ -66,14 +63,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 		return nil, errors.Wrap(err, "cannot get the list of collections for discovery")
 	}
 
-	filteredCollections := []string{}
-	for _, collection := range collections {
-		if collection == systemCollections[0] {
-			continue
-		}
-		filteredCollections = append(filteredCollections, collection)
-	}
-
+	filteredCollections := filterSystemCollections(collections)
 	return filteredCollections, nil
 }
 
@@ -210,6 +200,21 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 	}
 
 	return namespaces, nil
+}
+
+func filterSystemCollections(cols []string) []string {
+	systemCollections := map[string]bool{
+		"system.profile": true,
+	}
+
+	filtered := make([]string, 0, len(cols))
+	for _, col := range cols {
+		if systemCollections[col] {
+			continue
+		}
+		filtered = append(filtered, col)
+	}
+	return filtered
 }
 
 func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includeNamespaces []string, filterInCollections []string) (int, error) {
