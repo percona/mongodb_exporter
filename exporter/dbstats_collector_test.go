@@ -18,7 +18,6 @@ package exporter
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +25,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -40,36 +38,25 @@ func TestDBStatsCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
-
-	database := client.Database(dbName)
-	database.Drop(ctx) //nolint
-
-	defer func() {
-		err := database.Drop(ctx)
-		assert.NoError(t, err)
-	}()
-
-	for i := 0; i < 3; i++ {
-		coll := fmt.Sprintf("testcol_%02d", i)
-		for j := 0; j < 10; j++ {
-			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
-			assert.NoError(t, err)
-		}
-	}
+	setupDB(ctx, t, client)
+	defer cleanupDB(ctx, client)
 
 	ti := labelsGetterMock{}
 
-	c := newDBStatsCollector(ctx, client, logrus.New(), false, ti, []string{dbName})
+	c := newDBStatsCollector(ctx, client, logrus.New(), false, ti, testDBs)
 	expected := strings.NewReader(`
 	# HELP mongodb_dbstats_collections dbstats.
 	# TYPE mongodb_dbstats_collections untyped
-	mongodb_dbstats_collections{database="testdb"} 3
+	mongodb_dbstats_collections{database="testdb01"} 5
+	mongodb_dbstats_collections{database="testdb02"} 5
 	# HELP mongodb_dbstats_indexes dbstats.
 	# TYPE mongodb_dbstats_indexes untyped
-	mongodb_dbstats_indexes{database="testdb"} 3
+	mongodb_dbstats_indexes{database="testdb01"} 4
+	mongodb_dbstats_indexes{database="testdb02"} 4
 	# HELP mongodb_dbstats_objects dbstats.
 	# TYPE mongodb_dbstats_objects untyped
-	mongodb_dbstats_objects{database="testdb"} 30` + "\n")
+	mongodb_dbstats_objects{database="testdb01"} 80
+	mongodb_dbstats_objects{database="testdb02"} 80` + "\n")
 
 	// Only look at metrics created by our activity
 	filters := []string{
