@@ -29,10 +29,6 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
-const (
-	dbName = "testdb"
-)
-
 func TestDBStatsCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

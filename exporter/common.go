@@ -64,6 +64,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 	}
 
 	filteredCollections := filterSystemCollections(collections)
+
 	return filteredCollections, nil
 }
 
@@ -214,6 +215,7 @@ func filterSystemCollections(cols []string) []string {
 		}
 		filtered = append(filtered, col)
 	}
+
 	return filtered
 }
 
