@@ -72,14 +72,6 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	return TestClient(ctx, port, t)
 }
 
-// StandaloneEncryptedClient returns the default MongoDB connection used for tests. It is a direct
-// connection to the standalone encrypted Percona MongoDB.
-func StandaloneEncryptedClient(ctx context.Context, t *testing.T) *mongo.Client {
-	port, err := PortForContainer("standalone-encrypted")
-	require.NoError(t, err)
-	return TestClient(ctx, port, t)
-}
-
 // GetImageNameForDefault returns image name and version of running
 // default test mongo container.
 func GetImageNameForDefault() (string, string, error) {

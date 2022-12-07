@@ -36,10 +36,7 @@ func TestGetEncryptionInfo(t *testing.T) {
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="Community",mongodb="5.0.13-11",vendor="Percona"} 1` + "\n")
-	// Filter metrics for 2 reasons:
-	// 1. The result is huge
-	// 2. We need to check against know values. Don't use metrics that return counters like uptime
-	//    or counters like the number of transactions because they won't return a known value to compare
+
 	filter := []string{
 		"mongodb_security_encryption_enabled",
 		"mongodb_version_info",

@@ -215,4 +215,4 @@ services:
         volumes:
             - ./docker/secret/mongodb_secrets.txt:/secret/mongodb_secrets.txt
             - ./docker/scripts:/scripts
-        entrypoint: [ "/scripts/run-mongodb-encrypted.sh" ]
+        command: /scripts/run-mongodb-encrypted.sh
