@@ -73,8 +73,9 @@ jobs:
 
       - name: Test
         run: |
-          chmod 400 mongodb_secrets.txt
-          ls -lah
+          ls -lah test_files
+          chmod 400 ./test_files/mongodb_secrets.txt
+          ls -lah test_files
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
           docker logs standalone-encrypted
           make test-race
