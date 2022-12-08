@@ -26,6 +26,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+const (
+	KmipEncryption         = "kmip"
+	VaultEncryption        = "vault"
+	LocalKeyFileEncryption = "localKeyFile"
+)
+
 type diagnosticDataCollector struct {
 	ctx  context.Context
 	base *baseCollector
@@ -153,22 +159,26 @@ func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetrics(securityOpti
 	var metrics []prometheus.Metric
 	enabledEncryption, ok := securityOptions["enableEncryption"]
 	if ok && enabledEncryption == true {
+		var encryptionType string
+		_, ok = securityOptions["kmip"]
+		if ok {
+			encryptionType = KmipEncryption
+		}
+		_, ok = securityOptions["vault"]
+		if ok {
+			encryptionType = VaultEncryption
+		}
+		_, ok = securityOptions["encryptionKeyFile"]
+		if ok {
+			encryptionType = LocalKeyFileEncryption
+		}
+
+		labels := map[string]string{"type": encryptionType}
 		d := prometheus.NewDesc("mongodb_security_encryption_enabled", "Shows that encryption is enabled",
-			nil, nil)
+			nil, labels)
 		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot create metric mongodb_security_encryption_enabled")
-		}
-		metrics = append(metrics, metric)
-	}
-
-	_, ok = securityOptions["kmip"]
-	if ok {
-		d := prometheus.NewDesc("mongodb_security_encryption_using_kmip_enabled", "Shows that encrytpion enabled using KMIP",
-			nil, nil)
-		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
-		if err != nil {
-			return nil, errors.Wrap(err, "cannot create metric mongodb_security_encryption_using_kmip_enabled")
 		}
 		metrics = append(metrics, metric)
 	}

@@ -52,7 +52,7 @@ func TestGetEncryptionInfo(t *testing.T) {
 	expected := strings.NewReader(`
 	# HELP mongodb_security_encryption_enabled Shows that encryption is enabled
 	# TYPE mongodb_security_encryption_enabled gauge
-	mongodb_security_encryption_enabled 1
+	mongodb_security_encryption_enabled{type="localKeyFile"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="Community",mongodb="5.0.13-11",vendor="Percona"} 1` + "\n")
