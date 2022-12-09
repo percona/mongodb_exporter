@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	KmipEncryption         = "kmip"
-	VaultEncryption        = "vault"
-	LocalKeyFileEncryption = "localKeyFile"
+	kmipEncryption         = "kmip"
+	vaultEncryption        = "vault"
+	localKeyFileEncryption = "localKeyFile"
 )
 
 type diagnosticDataCollector struct {
@@ -164,15 +164,15 @@ func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetric(securityOptio
 	var encryptionType string
 	_, ok = securityOptions["kmip"]
 	if ok {
-		encryptionType = KmipEncryption
+		encryptionType = kmipEncryption
 	}
 	_, ok = securityOptions["vault"]
 	if ok {
-		encryptionType = VaultEncryption
+		encryptionType = vaultEncryption
 	}
 	_, ok = securityOptions["encryptionKeyFile"]
 	if ok {
-		encryptionType = LocalKeyFileEncryption
+		encryptionType = localKeyFileEncryption
 	}
 
 	labels := map[string]string{"type": encryptionType}
