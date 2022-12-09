@@ -95,11 +95,11 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(logger, m)...)
 
-	securityMetrics, err := d.getSecurityMetricsFromLineOptions(client)
+	securityMetric, err := d.getSecurityMetricFromLineOptions(client)
 	if err != nil {
 		logger.Errorf("cannot decode getCmdLineOtpions: %s", err)
-	} else if len(securityMetrics) > 0 {
-		metrics = append(metrics, securityMetrics...)
+	} else if securityMetric != nil {
+		metrics = append(metrics, securityMetric)
 	}
 
 	if d.compatibleMode {
@@ -124,7 +124,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (d *diagnosticDataCollector) getSecurityMetricsFromLineOptions(client *mongo.Client) ([]prometheus.Metric, error) {
+func (d *diagnosticDataCollector) getSecurityMetricFromLineOptions(client *mongo.Client) (prometheus.Metric, error) {
 	var cmdLineOpionsBson bson.M
 	cmdLineOptions := bson.D{{Key: "getCmdLineOpts", Value: "1"}}
 	resCmdLineOptions := client.Database("admin").RunCommand(d.ctx, cmdLineOptions)
@@ -147,43 +147,43 @@ func (d *diagnosticDataCollector) getSecurityMetricsFromLineOptions(client *mong
 		return nil, nil
 	}
 
-	metrics, err := d.retrieveSecurityEncryptionMetrics(securityOptions)
+	metric, err := d.retrieveSecurityEncryptionMetric(securityOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	return metrics, nil
+	return metric, nil
 }
 
-func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetrics(securityOptions bson.M) ([]prometheus.Metric, error) {
-	var metrics []prometheus.Metric
-	enabledEncryption, ok := securityOptions["enableEncryption"]
-	if ok && enabledEncryption == true {
-		var encryptionType string
-		_, ok = securityOptions["kmip"]
-		if ok {
-			encryptionType = KmipEncryption
-		}
-		_, ok = securityOptions["vault"]
-		if ok {
-			encryptionType = VaultEncryption
-		}
-		_, ok = securityOptions["encryptionKeyFile"]
-		if ok {
-			encryptionType = LocalKeyFileEncryption
-		}
-
-		labels := map[string]string{"type": encryptionType}
-		d := prometheus.NewDesc("mongodb_security_encryption_enabled", "Shows that encryption is enabled",
-			nil, labels)
-		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
-		if err != nil {
-			return nil, errors.Wrap(err, "cannot create metric mongodb_security_encryption_enabled")
-		}
-		metrics = append(metrics, metric)
+func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetric(securityOptions bson.M) (prometheus.Metric, error) {
+	_, ok := securityOptions["enableEncryption"]
+	if !ok {
+		return nil, nil
 	}
 
-	return metrics, nil
+	var encryptionType string
+	_, ok = securityOptions["kmip"]
+	if ok {
+		encryptionType = KmipEncryption
+	}
+	_, ok = securityOptions["vault"]
+	if ok {
+		encryptionType = VaultEncryption
+	}
+	_, ok = securityOptions["encryptionKeyFile"]
+	if ok {
+		encryptionType = LocalKeyFileEncryption
+	}
+
+	labels := map[string]string{"type": encryptionType}
+	desc := prometheus.NewDesc("mongodb_security_encryption_enabled", "Shows that encryption is enabled",
+		nil, labels)
+	metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, float64(1))
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create metric mongodb_security_encryption_enabled")
+	}
+
+	return metric, nil
 }
 
 // check interface.
