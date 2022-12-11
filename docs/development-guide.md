@@ -23,7 +23,7 @@
 
 For developing MongoDB exporter, you need following software installed in your development environment:
 
-- [Golang toolchain](https://go.dev/doc/install) (*v1.17 or higher*)
+- [Golang toolchain](https://go.dev/doc/install) (*v1.18 or higher*)
 - `make` utility (*to run Makefile*)
 - [Docker](https://docs.docker.com/engine/install/)  (*to run containers*)
 - `docker-compose` utlity (*generates local test cluster*)
