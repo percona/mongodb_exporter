@@ -142,12 +142,8 @@ func (d *diagnosticDataCollector) getSecurityMetricFromLineOptions(client *mongo
 	if !ok {
 		return nil, errors.New("cannot cast parsed options to BSON")
 	}
-	securityOptions, ok := parsedOptions["security"].(bson.M)
-	if !ok {
-		return nil, nil
-	}
 
-	metric, err := d.retrieveSecurityEncryptionMetric(securityOptions)
+	metric, err := d.retrieveSecurityEncryptionMetric(parsedOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -155,30 +151,37 @@ func (d *diagnosticDataCollector) getSecurityMetricFromLineOptions(client *mongo
 	return metric, nil
 }
 
-func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetric(securityOptions bson.M) (prometheus.Metric, error) {
-	_, ok := securityOptions["enableEncryption"]
-	if !ok {
-		return nil, nil
+func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetric(parsedOptions bson.M) (prometheus.Metric, error) {
+	var value float64
+	var labels map[string]string
+
+	securityOptions, ok := parsedOptions["security"].(bson.M)
+	if ok {
+		value = 1
+		_, ok := securityOptions["enableEncryption"]
+		if !ok {
+			return nil, errors.New("if security option is here than it should be enabledEncryption option")
+		}
+		var encryptionType string
+		_, ok = securityOptions["kmip"]
+		if ok {
+			encryptionType = kmipEncryption
+		}
+		_, ok = securityOptions["vault"]
+		if ok {
+			encryptionType = vaultEncryption
+		}
+		_, ok = securityOptions["encryptionKeyFile"]
+		if ok {
+			encryptionType = localKeyFileEncryption
+		}
+
+		labels = map[string]string{"type": encryptionType}
 	}
 
-	var encryptionType string
-	_, ok = securityOptions["kmip"]
-	if ok {
-		encryptionType = kmipEncryption
-	}
-	_, ok = securityOptions["vault"]
-	if ok {
-		encryptionType = vaultEncryption
-	}
-	_, ok = securityOptions["encryptionKeyFile"]
-	if ok {
-		encryptionType = localKeyFileEncryption
-	}
-
-	labels := map[string]string{"type": encryptionType}
 	desc := prometheus.NewDesc("mongodb_security_encryption_enabled", "Shows that encryption is enabled",
 		nil, labels)
-	metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, float64(1))
+	metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, value)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create metric mongodb_security_encryption_enabled")
 	}

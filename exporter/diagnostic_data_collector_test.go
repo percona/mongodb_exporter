@@ -58,7 +58,10 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	mongodb_oplog_stats_wt_btree_fixed_record_size 0
 	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts local.oplog.rs.stats.wiredTiger.transaction.
 	# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
-	mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
+	mongodb_oplog_stats_wt_transaction_update_conflicts 0
+	# HELP mongodb_security_encryption_enabled Shows that encryption is enabled
+	# TYPE mongodb_security_encryption_enabled gauge
+	mongodb_security_encryption_enabled 0` + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
@@ -68,6 +71,7 @@ func TestDiagnosticDataCollector(t *testing.T) {
 		"mongodb_oplog_stats_ok",
 		"mongodb_oplog_stats_wt_btree_fixed_record_size",
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
+		"mongodb_security_encryption_enabled",
 	}
 
 	err := testutil.CollectAndCompare(c, expected, filter...)
