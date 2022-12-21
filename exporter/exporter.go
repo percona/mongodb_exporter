@@ -68,6 +68,7 @@ type Opts struct {
 	EnableTopMetrics       bool
 	EnableIndexStats       bool
 	EnableCollStats        bool
+	EnablePbmStats         bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -164,6 +165,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
 		e.opts.EnableIndexStats = true
+		e.opts.EnablePbmStats = true
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -205,6 +207,17 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
+	}
+
+	info, err := retrieveMongoDBBuildInfo(ctx, client, e.opts.Logger)
+	if err != nil {
+		e.logger.Errorf("Registry - Cannot get Mongo Build Info : %s", err)
+	}
+
+	// pbmCollector can work only with Percona Mongo DB
+	if e.opts.EnablePbmStats && requestOpts.EnablePbmStats && info.Vendor == PerconaVendor {
+		pbmc := newPbmCollector(ctx, client, e.opts.Logger, topologyInfo)
+		registry.MustRegister(pbmc)
 	}
 
 	return registry
