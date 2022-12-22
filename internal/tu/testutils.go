@@ -50,6 +50,8 @@ const (
 	MongoDBStandAlonePort = "27017"
 	// MongoDBConfigServer1Port MongoDB config server primary Port.
 	MongoDBConfigServer1Port = "17009"
+	// MongoDBStandAloneEncryptedPort MongoDB standalone encrypted instance Port.
+	MongoDBStandAloneEncryptedPort = "27027"
 )
 
 // GetenvDefault gets a variable from the environment and returns its value or the
