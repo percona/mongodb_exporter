@@ -284,12 +284,14 @@ func (e *Exporter) Handler() http.Handler {
 			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
 		}
 
-		if client != nil && e.getTotalCollectionsCount() <= 0 {
+		if client != nil && e.getTotalCollectionsCount() <= 0 && requestOpts.EnableIndexStats || requestOpts.EnableCollStats {
 			count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 			if err == nil {
 				e.lock.Lock()
 				e.totalCollectionsCount = count
 				e.lock.Unlock()
+			} else {
+				e.logger.Errorf("%v", err")
 			}
 		}
 
