@@ -291,7 +291,7 @@ func (e *Exporter) Handler() http.Handler {
 				e.totalCollectionsCount = count
 				e.lock.Unlock()
 			} else {
-				e.logger.Errorf("%v", err")
+				e.logger.Errorf("%v", err)
 			}
 		}
 
