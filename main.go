@@ -45,13 +45,14 @@ type GlobalFlags struct {
 	TLSConfigPath         string `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
-	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
-	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
-	EnableDBStats          bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
-	EnableTopMetrics       bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
-	EnableIndexStats       bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
-	EnableCollStats        bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
-	EnablePbmStats         bool `name:"collector.pbm-stats" help:"Enable collecting metrics about PBM"`
+	EnableDiagnosticData   bool  `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
+	EnableReplicasetStatus bool  `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
+	EnableDBStats          bool  `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
+	EnableTopMetrics       bool  `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
+	EnableIndexStats       bool  `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
+	EnableCollStats        bool  `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
+	EnablePbmStats         bool  `name:"collector.pbm-stats" help:"Enable collecting metrics about PBM"`
+	BackupPbmStatsLimit    int64 `name:"collector.backup-pbm-stats-limit" help:"Not show backup/restore metrics if there are more than <n> backup/restores. 0=No limit. Default is 200." default:"200"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
@@ -131,6 +132,7 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		EnableIndexStats:       opts.EnableIndexStats,
 		EnableCollStats:        opts.EnableCollStats,
 		EnablePbmStats:         opts.EnablePbmStats,
+		BackupPbmStatsLimit:    opts.BackupPbmStatsLimit,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 

@@ -69,6 +69,7 @@ type Opts struct {
 	EnableIndexStats       bool
 	EnableCollStats        bool
 	EnablePbmStats         bool
+	BackupPbmStatsLimit    int64
 
 	EnableOverrideDescendingIndex bool
 
@@ -209,14 +210,14 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(rsgsc)
 	}
 
-	info, err := retrieveMongoDBBuildInfo(ctx, client, e.opts.Logger)
+	isPbmConfigured, err := isPbmConfigured(ctx, client)
 	if err != nil {
 		e.logger.Errorf("Registry - Cannot get Mongo Build Info : %s", err)
 	}
 
 	// pbmCollector can work only with Percona Mongo DB
-	if e.opts.EnablePbmStats && requestOpts.EnablePbmStats && info.Vendor == PerconaVendor {
-		pbmc := newPbmCollector(ctx, client, e.opts.Logger, topologyInfo)
+	if e.opts.EnablePbmStats && requestOpts.EnablePbmStats && isPbmConfigured {
+		pbmc := newPbmCollector(ctx, client, e.opts.Logger, topologyInfo, e.opts.BackupPbmStatsLimit)
 		registry.MustRegister(pbmc)
 	}
 
