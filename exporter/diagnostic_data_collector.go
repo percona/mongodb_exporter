@@ -151,7 +151,7 @@ func (d *diagnosticDataCollector) getSecurityMetricFromLineOptions(client *mongo
 	return metric, nil
 }
 
-func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetric(parsedOptions bson.M) (prometheus.Metric, error) {
+func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetric(parsedOptions bson.M) (prometheus.Metric, error) { //nolint:ireturn
 	var value float64
 	var labels map[string]string
 
