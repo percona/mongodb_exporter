@@ -84,12 +84,12 @@ var (
 		300 * mb, 500 * mb, 10 * gb,
 	}
 
-	pbmBackupSpeedMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct
+	pbmBackupSpeedMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct,gochecknoglobals
 		Name:    "mongodb_pbm_backup_speed",
 		Help:    "Speed of the creating PBM backups (only successful backups counted) in bytes per second",
 		Buckets: speedBuckets,
 	}
-	pbmRestoreSpeedMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct
+	pbmRestoreSpeedMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct,gochecknoglobals
 		Name:    "mongodb_pbm_restore_speed",
 		Help:    "Speed of the creating PBM Restores (only successful backups counted) in bytes per second",
 		Buckets: speedBuckets,
@@ -247,7 +247,7 @@ func (p *pbmCollector) retrievePbmBackupInfo() ([]pbmBackupResult, error) {
 	client := p.base.client
 
 	pbmBackupCollection := client.Database(adminDB).Collection("pbmBackups")
-	opts := options.Find().SetSort(bson.D{primitive.E{"hb", -1}}).SetLimit(p.limitBackupRestores)
+	opts := options.Find().SetSort(bson.D{primitive.E{Key: "hb", Value: -1}}).SetLimit(p.limitBackupRestores)
 	pbmBackupsRes, err := pbmBackupCollection.Find(p.ctx, bson.D{}, opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot retrieve cursor from 'pbmBackups'")
