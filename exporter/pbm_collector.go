@@ -229,9 +229,8 @@ func (p *pbmCollector) collectPbmBackupMetrics(ch chan<- prometheus.Metric) erro
 	if err != nil {
 		p.base.logger.Error("Cannot create metrics 'mongodb_pbm_backup_total'", err)
 		return err
-	} else {
-		metrics = append(metrics, totalBackupMetric)
 	}
+	metrics = append(metrics, totalBackupMetric)
 
 	for _, metric := range metrics {
 		ch <- metric
@@ -318,9 +317,8 @@ func (p *pbmCollector) collectPbmRestoreMetrics(ch chan<- prometheus.Metric) err
 	if err != nil {
 		p.base.logger.Error("Cannot create metrics 'mongodb_pbm_backup_total'", err)
 		return err
-	} else {
-		metrics = append(metrics, totalBackupMetric)
 	}
+	metrics = append(metrics, totalBackupMetric)
 
 	for _, metric := range metrics {
 		ch <- metric
