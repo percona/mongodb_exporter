@@ -28,11 +28,11 @@ const (
 
 	adminDB = "admin"
 
-	KB = 1024
-	MB = 1024 * KB
-	GB = 1024 * MB
-	TB = 1024 * GB
-	PT = 1024 * TB
+	kb = 1024
+	mb = 1024 * kb
+	gb = 1024 * mb
+	tb = 1024 * gb
+	pt = 1024 * tb
 
 	base10 = 10
 )
@@ -62,26 +62,26 @@ var (
 	descriptionPBMRestoreTotal = prometheus.NewDesc("mongodb_pbm_restore_total", "Info about all PBM restores", nil, nil) //nolint:gochecknoglobals
 
 	sizeBuckets = []float64{ //nolint:gochecknoglobals
-		0, KB, 2 * KB, 10 * KB, 20 * KB, 100 * KB, MB, 10 * MB, 20 * MB, 50 * MB, 100 * MB,
-		200 * MB, 500 * MB, GB, 2 * GB, 5 * GB, 10 * GB, 100 * GB, 200 * GB, 500 * GB, TB,
-		2 * TB, 5 * TB, 10 * TB, 100 * TB, PT, 10 * PT, 100 * PT,
+		0, kb, 2 * kb, 10 * kb, 20 * kb, 100 * kb, mb, 10 * mb, 20 * mb, 50 * mb, 100 * mb,
+		200 * mb, 500 * mb, gb, 2 * gb, 5 * gb, 10 * gb, 100 * gb, 200 * gb, 500 * gb, tb,
+		2 * tb, 5 * tb, 10 * tb, 100 * tb, pt, 10 * pt, 100 * pt,
 	}
 
-	pbmBackupSizeMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct
+	pbmBackupSizeMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct,gochecknoglobals
 		Name:    "mongodb_pbm_backup_size",
 		Help:    "Size of the PBM backups",
 		Buckets: sizeBuckets,
 	}
-	pbmRestoreSizeMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct
+	pbmRestoreSizeMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct,gochecknoglobals
 		Name:    "mongodb_pbm_restore_size",
 		Help:    "Size of the PBM restores",
 		Buckets: sizeBuckets,
 	}
 
 	speedBuckets = []float64{ //nolint:gochecknoglobals
-		0, 100, KB, 2 * KB, 5 * KB, 10 * KB, 20 * KB, 50 * KB, 100 * KB, 200 * KB,
-		500 * KB, MB, 10 * MB, 20 * MB, 50 * MB, 100 * MB, 150 * MB, 200 * MB,
-		300 * MB, 500 * MB, 10 * GB,
+		0, 100, kb, 2 * kb, 5 * kb, 10 * kb, 20 * kb, 50 * kb, 100 * kb, 200 * kb,
+		500 * kb, mb, 10 * mb, 20 * mb, 50 * mb, 100 * mb, 150 * mb, 200 * mb,
+		300 * mb, 500 * mb, 10 * gb,
 	}
 
 	pbmBackupSpeedMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct
@@ -173,7 +173,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (p *pbmCollector) collectPbmBackupMetrics(ch chan<- prometheus.Metric) error { //nolint:funlen
+func (p *pbmCollector) collectPbmBackupMetrics(ch chan<- prometheus.Metric) error { //nolint:funlen,cyclop
 	pbmBackupResults, err := p.retrievePbmBackupInfo()
 	if err != nil {
 		return err
@@ -261,7 +261,7 @@ func (p *pbmCollector) retrievePbmBackupInfo() ([]pbmBackupResult, error) {
 	return pbmBackupResults, nil
 }
 
-func (p *pbmCollector) collectPbmRestoreMetrics(ch chan<- prometheus.Metric) error { //nolint:funlen
+func (p *pbmCollector) collectPbmRestoreMetrics(ch chan<- prometheus.Metric) error { //nolint:funlen,cyclop
 	pbmRestoreResults, err := p.retrievePbmRestoreInfo()
 	if err != nil {
 		return err
@@ -277,12 +277,12 @@ func (p *pbmCollector) collectPbmRestoreMetrics(ch chan<- prometheus.Metric) err
 		}
 
 		startTimeUnix := strconv.FormatInt(time.Unix(result.StartTime, 0).Unix(), base10)
-		lastTransactionTs := strconv.FormatInt(time.Unix(result.LastTransitionTime, 0).Unix(), base10)
+		lastTransactionTS := strconv.FormatInt(time.Unix(result.LastTransitionTime, 0).Unix(), base10)
 
 		switch result.Status {
 		case statusError:
 			metric, err := prometheus.NewConstMetric(descriptionPBMRestoreError, prometheus.GaugeValue, 1, []string{
-				startTimeUnix, lastTransactionTs, nss, result.Error, result.MongoDBVersion, result.PbmVersion,
+				startTimeUnix, lastTransactionTS, nss, result.Error, result.MongoDBVersion, result.PbmVersion,
 			}...)
 			if err != nil {
 				p.base.logger.Error("Cannot create metrics 'mongodb_pbm_restore_error'", err)
@@ -291,7 +291,7 @@ func (p *pbmCollector) collectPbmRestoreMetrics(ch chan<- prometheus.Metric) err
 			metrics = append(metrics, metric)
 		case statusDone:
 			metric, err := prometheus.NewConstMetric(descriptionPBMRestoreSuccess, prometheus.GaugeValue, 1, []string{
-				startTimeUnix, lastTransactionTs, nss, result.Status, result.MongoDBVersion, result.PbmVersion,
+				startTimeUnix, lastTransactionTS, nss, result.Status, result.MongoDBVersion, result.PbmVersion,
 			}...)
 			if err != nil {
 				p.base.logger.Error("Cannot create metrics 'mongodb_pbm_restore_success'", err)
@@ -304,7 +304,7 @@ func (p *pbmCollector) collectPbmRestoreMetrics(ch chan<- prometheus.Metric) err
 			pbmRestoreSpeedMetric.WithLabelValues(result.Store.Type).Observe(float64(result.Size) / float64(result.LastTransitionTime-result.StartTime))
 		default:
 			metric, err := prometheus.NewConstMetric(descriptionPBMRestoreUnfinished, prometheus.GaugeValue, 1, []string{
-				startTimeUnix, lastTransactionTs, nss, result.Status, result.MongoDBVersion, result.PbmVersion,
+				startTimeUnix, lastTransactionTS, nss, result.Status, result.MongoDBVersion, result.PbmVersion,
 			}...)
 			if err != nil {
 				p.base.logger.Error("Cannot create metrics 'mongodb_pbm_restore_unfinished'", err)
@@ -336,30 +336,31 @@ func (p *pbmCollector) retrievePbmRestoreInfo() ([]pbmRestoreResult, error) {
 
 	pbmBackupCollection := client.Database(adminDB).Collection("pbmRestores")
 
-	sortStage := bson.D{primitive.E{"$sort", bson.D{{"last_transition_ts", -1}}}}
-	limitStage := bson.D{primitive.E{"$limit", p.limitBackupRestores}} //nolint:govet
-	lookupStage := bson.D{primitive.E{"$lookup", bson.D{
+	sortStage := bson.D{primitive.E{Key: "$sort", Value: bson.D{primitive.E{"last_transition_ts", -1}}}}
+	limitStage := bson.D{primitive.E{Key: "$limit", Value: p.limitBackupRestores}}
+	lookupStage := bson.D{primitive.E{Key: "$lookup", Value: bson.D{
 		{"from", "pbmBackups"},
 		{"localField", "backup"},
 		{"foreignField", "name"},
 		{"as", "pbmBackups"},
 	}}}
-	projectStage := bson.D{primitive.E{"$project", bson.D{
-		{"status", 1},
-		{"name", 1},
-		{"last_transaction_ts", 1},
-		{"backup", 1},
-		{"start_ts", 1},
-		{"last_transition_ts", 1},
-		{"type", 1},
-		{"error", 1},
-		{"nss", 1},
-		{"res", 1},
-		{"size", bson.D{{"$first", "$pbmBackups.size"}}},
-		{"store", bson.D{{"$first", "$pbmBackups.store"}}},
-		{"mongodb_version", bson.D{{"$first", "$pbmBackups.mongodb_version"}}},
-		{"pbm_version", bson.D{{"$first", "$pbmBackups.pbm_version"}}},
-	}}}
+	projectStage := bson.D{primitive.E{Key: "$project",
+		Value: bson.D{
+			{"status", 1},
+			{"name", 1},
+			{"last_transaction_ts", 1},
+			{"backup", 1},
+			{"start_ts", 1},
+			{"last_transition_ts", 1},
+			{"type", 1},
+			{"error", 1},
+			{"nss", 1},
+			{"res", 1},
+			{"size", bson.D{{"$first", "$pbmBackups.size"}}},
+			{"store", bson.D{{"$first", "$pbmBackups.store"}}},
+			{"mongodb_version", bson.D{{"$first", "$pbmBackups.mongodb_version"}}},
+			{"pbm_version", bson.D{{"$first", "$pbmBackups.pbm_version"}}},
+		}}}
 
 	pbmRestoresRes, err := pbmBackupCollection.Aggregate(p.ctx, mongo.Pipeline{lookupStage, limitStage, sortStage, projectStage})
 	if err != nil {
