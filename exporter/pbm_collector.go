@@ -64,7 +64,8 @@ var (
 	sizeBuckets = []float64{ //nolint:gochecknoglobals
 		0, KB, 2 * KB, 10 * KB, 20 * KB, 100 * KB, MB, 10 * MB, 20 * MB, 50 * MB, 100 * MB,
 		200 * MB, 500 * MB, GB, 2 * GB, 5 * GB, 10 * GB, 100 * GB, 200 * GB, 500 * GB, TB,
-		2 * TB, 5 * TB, 10 * TB, 100 * TB, PT, 10 * PT, 100 * PT}
+		2 * TB, 5 * TB, 10 * TB, 100 * TB, PT, 10 * PT, 100 * PT,
+	}
 
 	pbmBackupSizeMetricOpts = prometheus.HistogramOpts{ //nolint:exhaustruct
 		Name:    "mongodb_pbm_backup_size",
