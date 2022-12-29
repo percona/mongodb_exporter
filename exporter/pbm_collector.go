@@ -247,7 +247,7 @@ func (p *pbmCollector) retrievePbmBackupInfo() ([]pbmBackupResult, error) {
 	client := p.base.client
 
 	pbmBackupCollection := client.Database(adminDB).Collection("pbmBackups")
-	opts := options.Find().SetSort(bson.D{{"hb", -1}}).SetLimit(p.limitBackupRestores)
+	opts := options.Find().SetSort(bson.D{primitive.E{"hb", -1}}).SetLimit(p.limitBackupRestores)
 	pbmBackupsRes, err := pbmBackupCollection.Find(p.ctx, bson.D{}, opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot retrieve cursor from 'pbmBackups'")
@@ -261,7 +261,7 @@ func (p *pbmCollector) retrievePbmBackupInfo() ([]pbmBackupResult, error) {
 	return pbmBackupResults, nil
 }
 
-func (p *pbmCollector) collectPbmRestoreMetrics(ch chan<- prometheus.Metric) error {
+func (p *pbmCollector) collectPbmRestoreMetrics(ch chan<- prometheus.Metric) error { //nolint:funlen
 	pbmRestoreResults, err := p.retrievePbmRestoreInfo()
 	if err != nil {
 		return err
