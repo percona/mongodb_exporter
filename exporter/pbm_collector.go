@@ -344,7 +344,8 @@ func (p *pbmCollector) retrievePbmRestoreInfo() ([]pbmRestoreResult, error) {
 		{"foreignField", "name"},
 		{"as", "pbmBackups"},
 	}}}
-	projectStage := bson.D{primitive.E{Key: "$project",
+	projectStage := bson.D{primitive.E{
+		Key: "$project",
 		Value: bson.D{
 			{"status", 1},
 			{"name", 1},
@@ -360,7 +361,8 @@ func (p *pbmCollector) retrievePbmRestoreInfo() ([]pbmRestoreResult, error) {
 			{"store", bson.D{{"$first", "$pbmBackups.store"}}},
 			{"mongodb_version", bson.D{{"$first", "$pbmBackups.mongodb_version"}}},
 			{"pbm_version", bson.D{{"$first", "$pbmBackups.pbm_version"}}},
-		}}}
+		},
+	}}
 
 	pbmRestoresRes, err := pbmBackupCollection.Aggregate(p.ctx, mongo.Pipeline{lookupStage, limitStage, sortStage, projectStage})
 	if err != nil {
