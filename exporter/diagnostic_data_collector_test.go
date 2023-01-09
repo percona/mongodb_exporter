@@ -96,6 +96,9 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(fmt.Sprintf(`
+	# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
+	# TYPE mongodb_mongod_storage_engine gauge
+	mongodb_mongod_storage_engine{engine="wiredTiger"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="Community",mongodb="%s",vendor="%s"} 1`, version, vendor) + "\n")
@@ -105,6 +108,7 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
+		"mongodb_mongod_storage_engine",
 		"mongodb_version_info",
 	}
 
@@ -287,9 +291,6 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	# HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
 	# TYPE mongodb_mongod_replset_my_state gauge
 	mongodb_mongod_replset_my_state{set=""} 6
-	# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
-	# TYPE mongodb_mongod_storage_engine gauge
-	mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="",mongodb="",vendor=""} 1` + "\n")

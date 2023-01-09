@@ -798,7 +798,11 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		l.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
 	}
 
-	metrics = append(metrics, storageEngine(m))
+	if engine, err := storageEngine(m); err != nil {
+		l.Errorf("cannot retrieve engine type: %s", err)
+	} else {
+		metrics = append(metrics, engine)
+	}
 	metrics = append(metrics, serverVersion(buildInfo))
 	metrics = append(metrics, myState(ctx, client))
 
@@ -853,21 +857,23 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 	return bi, nil
 }
 
-func storageEngine(m bson.M) prometheus.Metric {
+func storageEngine(m bson.M) (prometheus.Metric, error) {
 	v := walkTo(m, []string{"serverStatus", "storageEngine", "name"})
 	name := "mongodb_mongod_storage_engine"
 	help := "The storage engine used by the MongoDB instance"
 
 	engine, ok := v.(string)
 	if !ok {
-		engine = "Engine is unavailable"
+		return nil, errors.New("Engine is unavailable")
 	}
 	labels := map[string]string{"engine": engine}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
-	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
-
-	return metric
+	metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create metric for engine type")
+	}
+	return metric, nil
 }
 
 func serverVersion(bi buildInfo) prometheus.Metric { //nolint:ireturn
