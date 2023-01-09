@@ -857,7 +857,7 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 	return bi, nil
 }
 
-func storageEngine(m bson.M) (prometheus.Metric, error) {
+func storageEngine(m bson.M) (prometheus.Metric, error) { //nolint:ireturn
 	v := walkTo(m, []string{"serverStatus", "storageEngine", "name"})
 	name := "mongodb_mongod_storage_engine"
 	help := "The storage engine used by the MongoDB instance"
