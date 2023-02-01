@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -102,6 +103,18 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 	log.SetLevel(levels[opts.LogLevel])
 
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
+
+	_, err := os.Stat("/run/secrets/mongo_uri")
+	if err == nil {
+		log.Debugf("A secrets file was found for the Mongo URI - Using that...")
+		// file doesn't exist
+		data, err := os.ReadFile("/run/secrets/mongo_uri")
+		if err != nil {
+			log.Fatalf("Failed reading secrets file mongo_uri")
+		}
+
+		opts.URI = string(data)
+	}
 
 	if !strings.HasPrefix(opts.URI, "mongodb") {
 		log.Debugf("Prepending mongodb:// to the URI")
