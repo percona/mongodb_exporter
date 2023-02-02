@@ -12,6 +12,4 @@ COPY *.go ./
 
 RUN go build -o /mongodb_exporter
 
-EXPOSE 9216
-
 ENTRYPOINT [ "/mongodb_exporter" ]
