@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -104,16 +105,18 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
 
-	_, err := os.Stat("/run/secrets/mongo_uri")
+	files, err := ioutil.ReadDir("/run/secrets")
 	if err == nil {
-		log.Debugf("A secrets file was found for the Mongo URI - Using that...")
-		// file doesn't exist
-		data, err := os.ReadFile("/run/secrets/mongo_uri")
-		if err != nil {
-			log.Fatalf("Failed reading secrets file mongo_uri")
-		}
+		for _, file := range files {
+			log.Debugf("A secrets file was found for the Mongo URI - Using that...")
+			// file doesn't exist
+			data, err := os.ReadFile("/run/secrets/" + file.Name())
+			if err != nil {
+				log.Fatalf("Failed reading secrets file " + file.Name())
+			}
 
-		opts.URI = string(data)
+			opts.URI = string(data)
+		}
 	}
 
 	if !strings.HasPrefix(opts.URI, "mongodb") {
