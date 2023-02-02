@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -40,6 +39,7 @@ type GlobalFlags struct {
 	CollStatsNamespaces   string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1,db2.col2"`
 	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
 	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	URIPath				  string `name:"mongodb.uri-path" help:"The path to a Docker Secret created and injected into the container"`
 	GlobalConnPool        bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request." negatable:""`
 	DirectConnect         bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true" negatable:""`
 	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
@@ -105,18 +105,14 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
 
-	files, err := ioutil.ReadDir("/run/secrets")
-	if err == nil {
-		for _, file := range files {
-			log.Debugf("A secrets file was found for the Mongo URI - Using that...")
-			// file doesn't exist
-			data, err := os.ReadFile("/run/secrets/" + file.Name())
-			if err != nil {
-				log.Fatalf("Failed reading secrets file " + file.Name())
-			}
-
-			opts.URI = string(data)
+	if opts.URIPath != "" && opts.URI == "" {
+		// file doesn't exist
+		data, err := os.ReadFile(opts.URIPath)
+		if err != nil {
+			log.Fatalf("Failed reading secrets file " + opts.URIPath)
 		}
+
+		opts.URI = string(data)
 	}
 
 	if !strings.HasPrefix(opts.URI, "mongodb") {
