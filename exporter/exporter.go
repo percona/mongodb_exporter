@@ -19,6 +19,7 @@ package exporter
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -33,6 +34,7 @@ import (
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
 )
@@ -362,7 +364,7 @@ func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client
 	clientOpts.SetDirect(directConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
-	client, err := mongo.Connect(ctx, clientOpts)
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(dsn).SetTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 	if err != nil {
 		return nil, fmt.Errorf("invalid MongoDB options: %w", err)
 	}
