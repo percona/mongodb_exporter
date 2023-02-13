@@ -22,15 +22,12 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -39,12 +36,10 @@ import (
 
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
-	path                  string
 	client                *mongo.Client
 	clientMu              sync.Mutex
 	logger                *logrus.Logger
 	opts                  *Opts
-	webListenAddress      string
 	lock                  *sync.Mutex
 	totalCollectionsCount int
 }
@@ -73,10 +68,8 @@ type Opts struct {
 
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
-	Path                  string
-	URI                   string
-	WebListenAddress      string
-	TLSConfigPath         string
+
+	URI string
 }
 
 var (
@@ -100,16 +93,9 @@ func New(opts *Opts) *Exporter {
 
 	ctx := context.Background()
 
-	if opts.Path == "" {
-		opts.Logger.Warn("Web telemetry path \"\" invalid, falling back to \"/\" instead")
-		opts.Path = "/"
-	}
-
 	exp := &Exporter{
-		path:                  opts.Path,
 		logger:                opts.Logger,
 		opts:                  opts,
-		webListenAddress:      opts.WebListenAddress,
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
 	}
@@ -311,13 +297,14 @@ func (e *Exporter) Handler() http.Handler {
 			gatherers = append(gatherers, prometheus.DefaultGatherer)
 		}
 
+		var ti *topologyInfo = nil
 		if client != nil {
 			// Topology can change between requests, so we need to get it every time.
-			ti := newTopologyInfo(ctx, client, e.logger)
-
-			registry := e.makeRegistry(ctx, client, ti, requestOpts)
-			gatherers = append(gatherers, registry)
+			ti = newTopologyInfo(ctx, client, e.logger)
 		}
+
+		registry := e.makeRegistry(ctx, client, ti, requestOpts)
+		gatherers = append(gatherers, registry)
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
@@ -329,31 +316,6 @@ func (e *Exporter) Handler() http.Handler {
 	})
 }
 
-// Run starts the exporter.
-func (e *Exporter) Run() {
-	mux := http.DefaultServeMux
-	mux.Handle(e.path, e.Handler())
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
-            <head><title>MongoDB Exporter</title></head>
-            <body>
-            <h1>MongoDB Exporter</h1>
-            <p><a href='/metrics'>Metrics</a></p>
-            </body>
-            </html>`))
-	})
-
-	server := &http.Server{
-		Addr:    e.webListenAddress,
-		Handler: mux,
-	}
-
-	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
-		e.logger.Errorf("error starting server: %v", err)
-		os.Exit(1)
-	}
-}
-
 func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client, error) {
 	clientOpts, err := dsn_fix.ClientOptionsForDSN(dsn)
 	if err != nil {
@@ -361,8 +323,11 @@ func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client
 	}
 	clientOpts.SetDirect(directConnect)
 	clientOpts.SetAppName("mongodb_exporter")
+	clientOpts.SetConnectTimeout(9 * time.Second)
+	clientOpts.SetServerSelectionTimeout(9 * time.Second)
 
 	client, err := mongo.Connect(ctx, clientOpts)
+
 	if err != nil {
 		return nil, fmt.Errorf("invalid MongoDB options: %w", err)
 	}
