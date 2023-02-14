@@ -68,3 +68,35 @@ func TestGeneralCollector(t *testing.T) {
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	require.NoError(t, err)
 }
+
+func TestMongoClientDown(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	dsn := "mongodb://127.0.0.1:12345/admin"
+
+	exporterOpts := &Opts{
+		Logger:         logrus.New(),
+		URI:            dsn,
+		GlobalConnPool: false,
+		CollectAll:     true,
+	}
+
+	exporter := New(exporterOpts)
+
+	client, err := exporter.getClient(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, client)
+
+	collector := newGeneralCollector(ctx, client, logrus.New())
+
+	expected := strings.NewReader(`
+	# HELP mongodb_up Whether MongoDB is up.
+	# TYPE mongodb_up gauge
+	mongodb_up 0
+	` + "\n")
+	filter := []string{
+		"mongodb_up",
+	}
+	err = testutil.CollectAndCompare(collector, expected, filter...)
+	require.NoError(t, err)
+}

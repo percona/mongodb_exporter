@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -215,4 +216,37 @@ func TestMongoUp(t *testing.T) {
 
 	res := r.Unregister(gc)
 	assert.Equal(t, true, res)
+}
+
+// Make sure exporter only generates 'mongodb_up 0' when server is down
+func TestMongoDown(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1)*time.Second)
+	defer cancel()
+	dsn := "mongodb://127.0.0.1:12345/admin"
+
+	exporterOpts := &Opts{
+		Logger:         logrus.New(),
+		URI:            dsn,
+		GlobalConnPool: false,
+		CollectAll:     true,
+	}
+
+	exporter := New(exporterOpts)
+
+	client, err := exporter.getClient(ctx)
+	assert.Error(t, err)
+	assert.Nil(t, client)
+
+	registry := exporter.makeRegistry(ctx, client, nil, Opts{})
+	results, err := registry.Gather()
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(results))
+
+	for _, res := range results {
+		if res.GetName() == "mongodb_up" {
+			assert.Equal(t, float64(0), res.GetMetric()[0].GetGauge().GetValue())
+		} else {
+			assert.Equal(t, "collector_scrape_time_ms", res.GetName())
+		}
+	}
 }

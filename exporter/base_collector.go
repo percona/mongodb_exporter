@@ -44,7 +44,12 @@ func newBaseCollector(client *mongo.Client, logger *logrus.Logger) *baseCollecto
 func (d *baseCollector) Describe(ctx context.Context, ch chan<- *prometheus.Desc, collect func(mCh chan<- prometheus.Metric)) {
 	select {
 	case <-ctx.Done():
-		return
+		// client is nil when MongoDB is down
+		// in this case, we need general_collector to 'mongodb_up' to 0
+		// general_collector is the only collector registered when client is nil
+		if d.client != nil {
+			return
+		}
 	default:
 	}
 
