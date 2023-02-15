@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -215,4 +216,19 @@ func TestMongoUp(t *testing.T) {
 
 	res := r.Unregister(gc)
 	assert.Equal(t, true, res)
+}
+
+func TestConnectionTimeout(t *testing.T) {
+	ctx := context.Background()
+	timeout := time.After(200 * time.Millisecond)
+
+	dsn := "mongodb://127.0.0.1:12345/admin?connectTimeoutMS=100"
+	_, err := connect(ctx, dsn, true)
+	assert.Error(t, err, "Unexpected connection to %s", dsn)
+
+	select {
+	case <-timeout:
+		assert.Fail(t, "Connection was not timed out after specified timeout")
+	default:
+	}
 }

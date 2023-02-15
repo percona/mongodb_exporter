@@ -18,6 +18,8 @@ package dsn_fix
 
 import (
 	"net/url"
+	"strconv"
+	"time"
 
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -38,6 +40,15 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 	if username != "" || password != "" {
 		clientOptions = clientOptions.SetAuth(options.Credential{Username: username, Password: password})
 	}
-
+	if parsedDsn.RawQuery != "" {
+		params := parsedDsn.Query()
+		if connectTimeoutMs, ok := params["connectTimeoutMS"]; ok {
+			if connectTimeoutMs, err := strconv.Atoi(connectTimeoutMs[0]); err == nil {
+				timeoutS := time.Duration(connectTimeoutMs) * time.Millisecond
+				clientOptions.SetConnectTimeout(timeoutS)
+				clientOptions.SetServerSelectionTimeout(timeoutS)
+			}
+		}
+	}
 	return clientOptions, nil
 }
