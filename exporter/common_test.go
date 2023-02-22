@@ -44,6 +44,18 @@ func setupDB(ctx context.Context, t *testing.T, client *mongo.Client) {
 				_, err := client.Database(dbname).Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
 				assert.NoError(t, err)
 			}
+			// Create views (to ensure that they are not returned for collstats)
+			// This will also create the system.views collection
+			pipeline := mongo.Pipeline{bson.D{
+				{"$project", bson.D{
+					{"_id", 0},
+					{"f3", bson.D{
+						{"$concat", []string{"f1", " ", "f2"}},
+					}},
+				}},
+			}}
+			err := client.Database(dbname).CreateView(ctx, "view-"+coll, coll, pipeline)
+			assert.NoError(t, err)
 		}
 	}
 }
@@ -116,7 +128,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("With namespaces list", func(t *testing.T) {
 		// Advanced filtering test
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views"},
 			"testdb02": {"col01", "col02"},
 		}
 		// List all collections in testdb01 (inDBs[0]) but only col01 and col02 from testdb02.
@@ -128,8 +140,8 @@ func TestListCollections(t *testing.T) {
 
 	t.Run("Empty namespaces list", func(t *testing.T) {
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy"},
-			"testdb02": {"col01", "col02", "colxx", "colyy"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views"},
+			"testdb02": {"col01", "col02", "colxx", "colyy", "system.views"},
 		}
 		namespaces, err := listAllCollections(ctx, client, nil, systemDBs)
 		assert.NoError(t, err)
@@ -139,7 +151,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("Count basic", func(t *testing.T) {
 		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, 8, count)
+		assert.Equal(t, 10, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {
@@ -148,7 +160,6 @@ func TestListCollections(t *testing.T) {
 		assert.Equal(t, 6, count)
 	})
 }
-
 func TestSplitNamespace(t *testing.T) {
 	testCases := []struct {
 		namespace      string

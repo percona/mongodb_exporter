@@ -32,7 +32,7 @@ import (
 var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
 
 func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string) ([]string, error) {
-	filter := bson.D{} // Default=empty -> list all collections
+	filter := bson.D{{Key: "kind", Value: "collection"}} // Default = list collections but not views
 
 	// if there is a filter with the list of collections we want, create a filter like
 	// $or: {
@@ -54,7 +54,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 		}
 
 		if len(matchExpressions) > 0 {
-			filter = bson.D{{Key: "$or", Value: matchExpressions}}
+			filter = bson.D{{Key: "$and", Value: bson.A{filter, bson.D{{Key: "$or", Value: matchExpressions}}}}}
 		}
 	}
 
