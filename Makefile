@@ -27,10 +27,12 @@ export TEST_MONGODB_STANDALONE_PORT?=27017
 export TEST_MONGODB_S1_PRIMARY_PORT?=17001
 export TEST_MONGODB_S1_SECONDARY1_PORT?=17002
 export TEST_MONGODB_S1_SECONDARY2_PORT?=17003
+export TEST_MONGODB_S1_ARBITER_PORT?=17011
 export TEST_MONGODB_S2_RS?=rs2
 export TEST_MONGODB_S2_PRIMARY_PORT?=17004
 export TEST_MONGODB_S2_SECONDARY1_PORT?=17005
 export TEST_MONGODB_S2_SECONDARY2_PORT?=17006
+export TEST_MONGODB_S2_ARBITER_PORT?=17012
 export TEST_MONGODB_CONFIGSVR_RS?=csReplSet
 export TEST_MONGODB_CONFIGSVR1_PORT?=17007
 export TEST_MONGODB_CONFIGSVR2_PORT?=17008
@@ -48,10 +50,12 @@ define TEST_ENV
 	TEST_MONGODB_S1_PRIMARY_PORT=$(TEST_MONGODB_S1_PRIMARY_PORT) \
 	TEST_MONGODB_S1_SECONDARY1_PORT=$(TEST_MONGODB_S1_SECONDARY1_PORT) \
 	TEST_MONGODB_S1_SECONDARY2_PORT=$(TEST_MONGODB_S1_SECONDARY2_PORT) \
+	TEST_MONGODB_S1_ARTBITER_PORT=$(TEST_MONGODB_S1_ARBITER_PORT) \
 	TEST_MONGODB_S2_RS=$(TEST_MONGODB_S2_RS) \
 	TEST_MONGODB_S2_PRIMARY_PORT=$(TEST_MONGODB_S2_PRIMARY_PORT) \
 	TEST_MONGODB_S2_SECONDARY1_PORT=$(TEST_MONGODB_S2_SECONDARY1_PORT) \
 	TEST_MONGODB_S2_SECONDARY2_PORT=$(TEST_MONGODB_S2_SECONDARY2_PORT) \
+	TEST_MONGODB_S2_ARTBITER_PORT=$(TEST_MONGODB_S2_ARBITER_PORT) \
 	TEST_MONGODB_CONFIGSVR_RS=$(TEST_MONGODB_CONFIGSVR_RS) \
 	TEST_MONGODB_CONFIGSVR1_PORT=$(TEST_MONGODB_CONFIGSVR1_PORT) \
 	TEST_MONGODB_CONFIGSVR2_PORT=$(TEST_MONGODB_CONFIGSVR2_PORT) \
@@ -64,10 +68,7 @@ env:
 	@echo $(TEST_ENV) | tr ' ' '\n' >.env
 
 init:                       ## Install linters.
-	go build -modfile=tools/go.mod -o bin/gofumports mvdan.cc/gofumpt/gofumports
-	go build -modfile=tools/go.mod -o bin/gofumpt mvdan.cc/gofumpt
-	go build -modfile=tools/go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
-	go build -modfile=tools/go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
+	cd tools && go generate -x -tags=tools
 
 build:                      ## Compile using plain go build
 	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
@@ -76,14 +77,14 @@ release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
 		-v ${PWD}:/go/src/github.com/user/repo \
 		-w /go/src/github.com/user/repo \
-		goreleaser/goreleaser release --snapshot --skip-publish --rm-dist
+		goreleaser/goreleaser release --snapshot --skip-publish --rm-dist 
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 format:                     ## Format source code.
 	go mod tidy
-	bin/gofumpt -w -s $(FILES)
-	bin/gofumports -local github.com/percona/mongodb_exporter -l -w $(FILES)
+	bin/gofumpt -l -w $(FILES)
+	bin/gci write --section Standard --section Default --section "Prefix(github.com/percona/mongodb_exporter)" .
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run
@@ -97,7 +98,7 @@ help:                       ## Display this help message.
 	awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
 test: env                   ## Run all tests.
-	go test -v -timeout 30s ./...
+	go test -v -count 1 -timeout 30s ./...
 
 test-race: env              ## Run all tests with race flag.
 	go test -race -v -timeout 30s ./...
@@ -106,4 +107,4 @@ test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MON
 	docker-compose up -d
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
-	docker-compose down
+	docker-compose down --remove-orphans

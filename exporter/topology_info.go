@@ -24,6 +24,7 @@ import (
 	"github.com/percona/percona-toolkit/src/go/mongolib/proto"
 	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -40,6 +41,7 @@ const (
 	typeMongos      mongoDBNodeType = "mongos"
 	typeMongod      mongoDBNodeType = "mongod"
 	typeShardServer mongoDBNodeType = "shardsvr"
+	typeOther       mongoDBNodeType = ""
 )
 
 type labelsGetter interface {
@@ -54,6 +56,7 @@ type topologyInfo struct {
 	// by a new connector, able to reconnect if needed. In case of reconnection, we should
 	// call loadLabels to refresh the labels because they might have changed
 	client *mongo.Client
+	logger *logrus.Logger
 	rw     sync.RWMutex
 	labels map[string]string
 }
@@ -61,18 +64,20 @@ type topologyInfo struct {
 // ErrCannotGetTopologyLabels Cannot read topology labels.
 var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 
-func newTopologyInfo(ctx context.Context, client *mongo.Client) (*topologyInfo, error) {
+func newTopologyInfo(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *topologyInfo {
 	ti := &topologyInfo{
 		client: client,
+		logger: logger,
 		labels: make(map[string]string),
+		rw:     sync.RWMutex{},
 	}
 
 	err := ti.loadLabels(ctx)
 	if err != nil {
-		return nil, err
+		logger.Warnf("cannot load topology labels: %s", err)
 	}
 
-	return ti, nil
+	return ti
 }
 
 // baseLabels returns a copy of the topology labels because in some collectors like
@@ -97,21 +102,28 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 
 	t.labels = make(map[string]string)
 
-	nodeType, err := getNodeType(ctx, t.client)
+	role, err := getClusterRole(ctx, t.client)
 	if err != nil {
 		return errors.Wrap(err, "cannot get node type for topology info")
 	}
 
-	t.labels[labelClusterRole] = string(nodeType)
+	t.labels[labelClusterRole] = role
 
 	// Standalone instances or mongos instances won't have a replicaset name
 	if rs, err := util.ReplicasetConfig(ctx, t.client); err == nil {
 		t.labels[labelReplicasetName] = rs.Config.ID
 	}
 
+	isArbiter, err := isArbiter(ctx, t.client)
+	if err != nil {
+		return err
+	}
+
 	cid, err := util.ClusterID(ctx, t.client)
 	if err != nil {
-		return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting cluster ID: %s", err)
+		if !isArbiter { // arbiters don't have a cluster ID
+			return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting cluster ID: %s", err)
+		}
 	}
 	t.labels[labelClusterID] = cid
 
@@ -122,6 +134,18 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func isArbiter(ctx context.Context, client *mongo.Client) (bool, error) {
+	doc := struct {
+		ArbiterOnly bool `bson:"arbiterOnly"`
+	}{}
+
+	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&doc); err != nil {
+		return false, errors.Wrap(err, "cannot check if the instance is an arbiter")
+	}
+
+	return doc.ArbiterOnly, nil
 }
 
 func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, error) {
@@ -139,4 +163,33 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 	}
 
 	return typeMongod, nil
+}
+
+func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
+	cmdOpts := primitive.M{}
+	// Not always we can get this info. For example, we cannot get this for hidden hosts so
+	// if there is an error, just ignore it
+	res := client.Database("admin").RunCommand(ctx, primitive.D{
+		{Key: "getCmdLineOpts", Value: 1},
+		{Key: "recordStats", Value: 1},
+	})
+
+	if res.Err() != nil {
+		return "", nil
+	}
+
+	if err := res.Decode(&cmdOpts); err != nil {
+		return "", errors.Wrap(err, "cannot decode getCmdLineOpts response")
+	}
+
+	if walkTo(cmdOpts, []string{"parsed", "sharding", "configDB"}) != nil {
+		return "mongos", nil
+	}
+
+	clusterRole := ""
+	if cr := walkTo(cmdOpts, []string{"parsed", "sharding", "clusterRole"}); cr != nil {
+		clusterRole, _ = cr.(string)
+	}
+
+	return clusterRole, nil
 }

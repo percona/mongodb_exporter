@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -79,14 +78,12 @@ func TestConnect(t *testing.T) {
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: false,
+			DirectConnect:  true,
 		}
 
-		e, err := New(exporterOpts)
-		if err != nil {
-			log.Fatal(err)
-		}
+		e := New(exporterOpts)
 
-		ts := httptest.NewServer(e.handler())
+		ts := httptest.NewServer(e.Handler())
 		defer ts.Close()
 
 		var wg sync.WaitGroup
@@ -115,14 +112,12 @@ func TestConnect(t *testing.T) {
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: true,
+			DirectConnect:  true,
 		}
 
-		e, err := New(exporterOpts)
-		if err != nil {
-			log.Fatal(err)
-		}
+		e := New(exporterOpts)
 
-		ts := httptest.NewServer(e.handler())
+		ts := httptest.NewServer(e.Handler())
 		defer ts.Close()
 
 		var wg sync.WaitGroup
@@ -178,29 +173,46 @@ func TestMongoS(t *testing.T) {
 		assert.NoError(t, err)
 
 		exporterOpts := &Opts{
-			Logger:         logrus.New(),
-			URI:            dsn,
-			GlobalConnPool: false,
+			Logger:                 logrus.New(),
+			URI:                    dsn,
+			GlobalConnPool:         false,
+			EnableReplicasetStatus: true,
 		}
 
-		e, err := New(exporterOpts)
-		if err != nil {
-			log.Fatal(err)
-		}
+		e := New(exporterOpts)
 
-		rsgsc := replSetGetStatusCollector{
-			ctx:            ctx,
-			client:         client,
-			compatibleMode: e.opts.CompatibleMode,
-			logger:         e.opts.Logger,
-			topologyInfo:   new(labelsGetterMock),
-		}
+		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, new(labelsGetterMock))
 
-		r := e.makeRegistry(ctx, client, new(labelsGetterMock))
+		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
-		res := r.Unregister(&rsgsc)
-		assert.Equal(t, test.want, res)
+		res := r.Unregister(rsgsc)
+		assert.Equal(t, test.want, res, fmt.Sprintf("Port: %v", test.port))
 		err = client.Disconnect(ctx)
 		assert.NoError(t, err)
 	}
+}
+
+func TestMongoUp(t *testing.T) {
+	ctx := context.Background()
+
+	dsn := "mongodb://127.0.0.1:123456/admin"
+	client, err := connect(ctx, dsn, true)
+	assert.Error(t, err)
+
+	exporterOpts := &Opts{
+		Logger:         logrus.New(),
+		URI:            dsn,
+		GlobalConnPool: false,
+		CollectAll:     true,
+	}
+
+	e := New(exporterOpts)
+
+	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+
+	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+	res := r.Unregister(gc)
+	assert.Equal(t, true, res)
 }

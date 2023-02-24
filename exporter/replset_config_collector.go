@@ -32,20 +32,40 @@ import (
 // )
 
 type replSetGetConfigCollector struct {
-	ctx            context.Context
-	client         *mongo.Client
+	ctx  context.Context
+	base *baseCollector
+
 	compatibleMode bool
-	logger         *logrus.Logger
 	topologyInfo   labelsGetter
 }
 
+// newReplicationSetConfigCollector creates a collector for configuration of replication set.
+func newReplicationSetConfigCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *replSetGetConfigCollector {
+	return &replSetGetConfigCollector{
+		ctx:  ctx,
+		base: newBaseCollector(client, logger),
+
+		compatibleMode: compatible,
+		topologyInfo:   topology,
+	}
+}
+
 func (d *replSetGetConfigCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *replSetGetConfigCollector) Collect(ch chan<- prometheus.Metric) {
+	d.base.Collect(ch)
+}
+
+func (d *replSetGetConfigCollector) collect(ch chan<- prometheus.Metric) {
+	defer prometheus.MeasureCollectTime(ch, "mongodb", "replset_config")()
+
+	logger := d.base.logger
+	client := d.base.client
+
 	cmd := bson.D{{Key: "replSetGetConfig", Value: "1"}}
-	res := d.client.Database("admin").RunCommand(d.ctx, cmd)
+	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
 	var m bson.M
 
@@ -55,7 +75,7 @@ func (d *replSetGetConfigCollector) Collect(ch chan<- prometheus.Metric) {
 				return
 			}
 		}
-		d.logger.Errorf("cannot get replSetGetConfig: %s", err)
+		logger.Errorf("cannot get replSetGetConfig: %s", err)
 
 		return
 	}
@@ -63,14 +83,14 @@ func (d *replSetGetConfigCollector) Collect(ch chan<- prometheus.Metric) {
 	config, ok := m["config"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["config"])
-		d.logger.Errorf("cannot decode getDiagnosticData: %s", err)
+		logger.Errorf("cannot decode getDiagnosticData: %s", err)
 
 		return
 	}
 	m = config
 
-	d.logger.Debug("replSetGetConfig result:")
-	debugResult(d.logger, m)
+	logger.Debug("replSetGetConfig result:")
+	debugResult(logger, m)
 
 	for _, metric := range makeMetrics("cfg", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric

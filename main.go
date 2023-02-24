@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -36,22 +35,32 @@ var (
 
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
-	CollStatsCollections  string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1.col1,db2.col2"`
+	CollStatsNamespaces   string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1,db2.col2"`
 	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
 	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
-	GlobalConnPool        bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request."`
-	DirectConnect         bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true"`
+	GlobalConnPool        bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request." negatable:""`
+	DirectConnect         bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true" negatable:""`
 	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
-	LogLevel              string `name:"log.level" help:"Only log messages with the given severuty or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
+	TLSConfigPath         string `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
+	LogLevel              string `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
-	DisableDiagnosticData   bool `name:"disable.diagnosticdata" help:"Disable collecting metrics from getDiagnosticData"`
-	DisableReplicasetStatus bool `name:"disable.replicasetstatus" help:"Disable collecting metrics from replSetGetStatus"`
-	DisableReplicasetConfig bool `name:"disable.replicasetconfig" help:"Disable collecting metrics from replSetGetConfig"`
-	DisableDBStats          bool `name:"disable.dbstats" help:"Disable collecting metrics from dbStats"`
+	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
+	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
+	EnableReplicasetConfig bool `name:"collector.replicasetconfig" help:"Enable collecting metrics from replSetGetConfig"`
+	EnableDBStats          bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
+	EnableTopMetrics       bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
+	EnableIndexStats       bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
+	EnableCollStats        bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 
-	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections"`
-	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics"`
+	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
+
+	CollectAll bool `name:"collect-all" help:"Enable all collectors. Same as specifying all --collector.<name>"`
+
+	CollStatsLimit int `name:"collector.collstats-limit" help:"Disable collstats, dbstats, topmetrics and indexstats collector if there are more than <n> collections. 0=No limit" default:"0"`
+
+	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections" negatable:""`
+	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" negatable:""`
 	Version         bool `name:"version" help:"Show version and exit"`
 }
 
@@ -77,15 +86,11 @@ func main() {
 		return
 	}
 
-	e, err := buildExporter(opts)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	e := buildExporter(opts)
 	e.Run()
 }
 
-func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
+func buildExporter(opts GlobalFlags) *exporter.Exporter {
 	log := logrus.New()
 
 	levels := map[string]logrus.Level{
@@ -107,26 +112,33 @@ func buildExporter(opts GlobalFlags) (*exporter.Exporter, error) {
 	log.Debugf("Connection URI: %s", opts.URI)
 
 	exporterOpts := &exporter.Opts{
-		CollStatsCollections:    strings.Split(opts.CollStatsCollections, ","),
-		CompatibleMode:          opts.CompatibleMode,
-		DiscoveringMode:         opts.DiscoveringMode,
-		IndexStatsCollections:   strings.Split(opts.IndexStatsCollections, ","),
-		Logger:                  log,
-		Path:                    opts.WebTelemetryPath,
-		URI:                     opts.URI,
-		GlobalConnPool:          opts.GlobalConnPool,
-		WebListenAddress:        opts.WebListenAddress,
-		DisableDiagnosticData:   opts.DisableDiagnosticData,
-		DisableReplicasetStatus: opts.DisableReplicasetStatus,
-		DisableReplicasetConfig: opts.DisableReplicasetConfig,
-		DirectConnect:           opts.DirectConnect,
-		DisableDBStats:          opts.DisableDBStats,
+		CollStatsNamespaces:   strings.Split(opts.CollStatsNamespaces, ","),
+		CompatibleMode:        opts.CompatibleMode,
+		DiscoveringMode:       opts.DiscoveringMode,
+		IndexStatsCollections: strings.Split(opts.IndexStatsCollections, ","),
+		Logger:                log,
+		Path:                  opts.WebTelemetryPath,
+		URI:                   opts.URI,
+		GlobalConnPool:        opts.GlobalConnPool,
+		WebListenAddress:      opts.WebListenAddress,
+		TLSConfigPath:         opts.TLSConfigPath,
+		DirectConnect:         opts.DirectConnect,
+
+		EnableDiagnosticData:   opts.EnableDiagnosticData,
+		EnableReplicasetStatus: opts.EnableReplicasetStatus,
+		EnableReplicasetConfig: opts.EnableReplicasetConfig,
+		EnableTopMetrics:       opts.EnableTopMetrics,
+		EnableDBStats:          opts.EnableDBStats,
+		EnableIndexStats:       opts.EnableIndexStats,
+		EnableCollStats:        opts.EnableCollStats,
+
+		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
+
+		CollStatsLimit: opts.CollStatsLimit,
+		CollectAll:     opts.CollectAll,
 	}
 
-	e, err := exporter.New(exporterOpts)
-	if err != nil {
-		return nil, err
-	}
+	e := exporter.New(exporterOpts)
 
-	return e, nil
+	return e
 }

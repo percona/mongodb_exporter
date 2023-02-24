@@ -1,0 +1,19 @@
+[Unit]
+Description=Prometheus MongoDB Exporter
+Documentation=https://github.com/percona/mongodb_exporter
+After=network.target
+
+[Service]
+Type=simple
+
+User=mongodb_exporter
+Group=nogroup
+
+EnvironmentFile=-/etc/default/mongodb_exporter
+ExecStart=/usr/bin/mongodb_exporter $OPTIONS
+SyslogIdentifier=mongodb_exporter
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+echo "Creating user and group..."
+
+adduser --system --no-create-home -c "Mongodb Exporter User" mongodb_exporter
+
+systemctl daemon-reload > dev/null || exit $?
+
+exit 0

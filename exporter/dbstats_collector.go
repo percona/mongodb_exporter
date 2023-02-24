@@ -26,37 +26,63 @@ import (
 )
 
 type dbstatsCollector struct {
-	ctx            context.Context
-	client         *mongo.Client
+	ctx  context.Context
+	base *baseCollector
+
 	compatibleMode bool
-	logger         *logrus.Logger
 	topologyInfo   labelsGetter
+
+	databaseFilter []string
+}
+
+// newDBStatsCollector creates a collector for statistics on database storage.
+func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string) *dbstatsCollector {
+	return &dbstatsCollector{
+		ctx:  ctx,
+		base: newBaseCollector(client, logger),
+
+		compatibleMode: compatible,
+		topologyInfo:   topology,
+
+		databaseFilter: databaseRegex,
+	}
 }
 
 func (d *dbstatsCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
-	// List all databases names
-	dbNames, err := d.client.ListDatabaseNames(d.ctx, bson.M{})
+	d.base.Collect(ch)
+}
+
+func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
+	defer prometheus.MeasureCollectTime(ch, "mongodb", "dbstats")()
+
+	logger := d.base.logger
+	client := d.base.client
+
+	dbNames, err := databases(d.ctx, client, d.databaseFilter, nil)
 	if err != nil {
-		d.logger.Errorf("Failed to get database names: %s", err)
+		logger.Errorf("Failed to get database names: %s", err)
+
 		return
 	}
-	d.logger.Debugf("getting stats for databases: %v", dbNames)
+
+	logger.Debugf("getting stats for databases: %v", dbNames)
 	for _, db := range dbNames {
 		var dbStats bson.M
 		cmd := bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}}
-		r := d.client.Database(db).RunCommand(d.ctx, cmd)
+		r := client.Database(db).RunCommand(d.ctx, cmd)
 		err := r.Decode(&dbStats)
 		if err != nil {
-			d.logger.Errorf("Failed to get $dbstats for database %s: %s", db, err)
+			logger.Errorf("Failed to get $dbstats for database %s: %s", db, err)
+
 			continue
 		}
 
-		d.logger.Debugf("$dbStats metrics for %s", db)
-		debugResult(d.logger, dbStats)
+		logger.Debugf("$dbStats metrics for %s", db)
+		debugResult(logger, dbStats)
 
 		prefix := "dbstats"
 
@@ -66,7 +92,8 @@ func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
 		// to differentiate metrics between different databases.
 		labels["database"] = db
 
-		for _, metric := range makeMetrics(prefix, dbStats, labels, d.compatibleMode) {
+		newMetrics := makeMetrics(prefix, dbStats, labels, d.compatibleMode)
+		for _, metric := range newMetrics {
 			ch <- metric
 		}
 	}

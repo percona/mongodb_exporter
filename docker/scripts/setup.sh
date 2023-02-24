@@ -3,6 +3,7 @@
 mongodb1=`getent hosts ${MONGO1} | awk '{ print $1 }'`
 mongodb2=`getent hosts ${MONGO2} | awk '{ print $1 }'`
 mongodb3=`getent hosts ${MONGO3} | awk '{ print $1 }'`
+arbiter=`getent hosts ${ARBITER} | awk '{ print $1 }'`
 
 port=${PORT:-27017}
 
@@ -15,8 +16,39 @@ done
 echo "Started.."
 
 echo setup.sh time now: `date +"%T" `
-mongo --host ${mongodb1}:${port} <<EOF
-   var cfg = {
+
+
+function cnf_servers() {
+    echo "setup cnf servers"
+    mongo --host ${mongodb1}:${port} <<EOF
+    var cfg = {
+        "_id": "${RS}",
+        "protocolVersion": 1,
+        "configsvr": true,
+        "members": [
+            {
+                "_id": 0,
+                "host": "${mongodb1}:${port}"
+            },
+            {
+                "_id": 1,
+                "host": "${mongodb2}:${port}"
+            },
+            {
+                "_id": 2,
+                "host": "${mongodb3}:${port}"
+            }
+        ]
+    };
+    rs.initiate(cfg, { force: true });
+    rs.reconfig(cfg, { force: true });
+EOF
+}
+
+function general_servers() {
+    echo "setup servers"
+    mongo --host ${mongodb1}:${port} <<EOF
+    var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,
         "members": [
@@ -36,5 +68,18 @@ mongo --host ${mongodb1}:${port} <<EOF
     };
     rs.initiate(cfg, { force: true });
     rs.reconfig(cfg, { force: true });
-EOF
 
+    rs.addArb("${arbiter}:${port}")
+EOF
+}
+
+case $1 in
+    cnf_servers)
+        cnf_servers
+        shift
+        ;;
+    *)
+        general_servers
+        shift
+        ;;
+esac

@@ -1,6 +1,74 @@
+Release 0.36.0
+
+- Added security metrics with info about encryption
+- Fixed fetching build info for mongos instance
+- Fix metric mongodb_mongos_sharding_balancer_enabled
+
+Release 0.35.0
+
+- Added to metrics info about running MongoDB version and Mongo vendor
+- Removed unused collector
+
+Release 0.34.0
+
+- Add logger with level
+
+Release 0.33.0
+
+- Updated dependencies
+- Enabled multi-arch Docker images
+- Enabled pprof for exporter
+
+- Fixed postint script for DEB package
+- Fixed issue in CI pipeline for golang tip
+
+- Update usage documentation
+- Added fix for missing cluster role label
+- Added support to escape characters like '+' in MongoDB password
+- Added support for meta-metrics; runtime for each collector is reported
+
+Release 0.32.0
+
+- Updated dependencies
+- Updated README.md
+
+- Enable basic auth with Prometheus exporter toolkit
+- Created MongoDB exporter user in postinst
+
+Release 0.31.0
+
+- Added support for DEB and RPM packages
+
+- Updated version for build tools
+- Updated build process for tools
+
+- Fixed warnings in CI pipeline
+- Updated test matrix for CI pipeline
+
+- Fixed bug in development infrastructure setup
+- Updated linter configuration
+
+- Added license checker for source files
+
+- Disabled some collectors in case collection limit is exceeded
+- Disabled most collectors by default; added flag to enable all collectors
+
+- Added flag to remove ambiguity for descending index metric
+- Updated metric names generation for collstats, indexstats and top to follow Prometheus pattern
+- Updated metric generation logic; use both cmdline flag and HTTP request param to generate metrics
+
+- Removed dual requests to database for metric generation
+- Fixed bug in collstats metric generation by disabling histogram for collstats
+
 Release 0.20.8
-Improvement PMM-7424: Add dbStats metric
-Improvement         : Add support for compatible mode for dbStats metric to provide old metrics
+
+Fixed bug   PMM-8849: Fixed panic on nil data
+Improvement PMM-8772: DBStats are disabled by default. Adde 'enable' parameter
+Fixed bug   PMM-8539: cl_role is always "shardsvr" even for configsvr
+Fixed bug   PMM-8489: Fixed topology labels on mongos
+Improvement PMM-7424: Add support for compatible mode for dbStats metric to provide old metrics
+Improvemebt PMM-7116: myState metric always has a value
+Improvement PR  #344: Documented minimum permissions needed to collect data
 
 Release 0.20.7 released 2021-08-10
 

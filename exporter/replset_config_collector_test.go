@@ -37,18 +37,13 @@ func TestReplsetConfigCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := &replSetGetConfigCollector{
-		ctx:          ctx,
-		client:       client,
-		logger:       logrus.New(),
-		topologyInfo: ti,
-	}
+	c := newReplicationSetConfigCollector(ctx, client, logrus.New(), false, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_cfg_protocolVersion cfg.
-# TYPE mongodb_cfg_protocolVersion untyped
-mongodb_cfg_protocolVersion 1` + "\n")
+	# HELP mongodb_cfg_protocolVersion cfg.
+	# TYPE mongodb_cfg_protocolVersion untyped
+	mongodb_cfg_protocolVersion 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
@@ -74,7 +69,9 @@ func TestReplsetConfigCollectorNoSharding(t *testing.T) {
 		topologyInfo: ti,
 	}
 
-	expected := strings.NewReader(``)
-	err := testutil.CollectAndCompare(c, expected)
-	assert.NoError(t, err)
+	// Replication set metrics should not be generated for unsharded server
+	count := testutil.CollectAndCount(c)
+
+	metaMetricCount := 1
+	assert.Equal(t, metaMetricCount, count, "Mismatch in metric count for collector run on unsharded server")
 }

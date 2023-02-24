@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -36,31 +35,36 @@ func TestGeneralCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
-	c := &generalCollector{
-		ctx:    ctx,
-		client: client,
-		logger: logrus.New(),
+	c := newGeneralCollector(ctx, client, logrus.New())
+
+	filter := []string{
+		"collector_scrape_time_ms",
 	}
+	count := testutil.CollectAndCount(c, filter...)
+	assert.Equal(t, len(filter), count, "Meta-metric for collector is missing")
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_up Whether MongoDB is up.
-# TYPE mongodb_up gauge
-mongodb_up 1` + "\n")
-
-	reg := prometheus.NewPedanticRegistry()
-	err := reg.Register(c)
+	# HELP mongodb_up Whether MongoDB is up.
+	# TYPE mongodb_up gauge
+	mongodb_up 1
+	` + "\n")
+	filter = []string{
+		"mongodb_up",
+	}
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	require.NoError(t, err)
-
-	err = testutil.GatherAndCompare(reg, expected)
-	assert.NoError(t, err)
 
 	assert.NoError(t, client.Disconnect(ctx))
 
 	expected = strings.NewReader(`
-# HELP mongodb_up Whether MongoDB is up.
-# TYPE mongodb_up gauge
-mongodb_up 0` + "\n")
-	err = testutil.GatherAndCompare(reg, expected)
-	assert.NoError(t, err)
+	# HELP mongodb_up Whether MongoDB is up.
+	# TYPE mongodb_up gauge
+	mongodb_up 0
+	` + "\n")
+	filter = []string{
+		"mongodb_up",
+	}
+	err = testutil.CollectAndCompare(c, expected, filter...)
+	require.NoError(t, err)
 }

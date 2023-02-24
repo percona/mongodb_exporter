@@ -1,17 +1,38 @@
+// mongodb_exporter
+// Copyright (C) 2022 Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package exporter
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestWalkTo(t *testing.T) {
@@ -88,7 +109,7 @@ func TestAddLocksMetrics(t *testing.T) {
 	assert.NoError(t, err)
 
 	var metrics []prometheus.Metric
-	metrics = locksMetrics(m)
+	metrics = locksMetrics(logrus.New(), m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
@@ -183,4 +204,28 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 	}
 	nm := createOldMetricFromNew(rm, c)
 	assert.Equal(t, want, nm)
+}
+
+// myState should always return a metric. If there is no connection, the value
+// should be the MongoDB unknown state = 6
+func TestMyState(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	var m dto.Metric
+
+	metric := myState(ctx, client)
+	err := metric.Write(&m)
+	assert.NoError(t, err)
+	assert.NotEqual(t, float64(UnknownState), *m.Gauge.Value)
+
+	err = client.Disconnect(ctx)
+	assert.NoError(t, err)
+
+	metric = myState(ctx, client)
+	err = metric.Write(&m)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
 }

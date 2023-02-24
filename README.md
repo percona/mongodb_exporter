@@ -1,7 +1,7 @@
 # MongoDB exporter
 [![Release](https://img.shields.io/github/release/percona/mongodb_exporter.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
 [![Build Status](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml?query=branch%3Amain)
-[![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=master)
+[![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
 [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
 [![Discord](https://img.shields.io/discord/808660945513611334?style=flat)](http://per.co.na/discord)
@@ -14,37 +14,18 @@ Currently, these metric sources are implemented:
 - $indexStats
 - getDiagnosticData
 - replSetGetStatus
+- replSetGetConfig
 - serverStatus
 
-| Old Percona MongoDB exporter                                                  |
-|:------------------------------------------------------------------------------|
-| old 0.1x.y version (ex `master` branch) is moved to the `release-0.1x` branch.|
-| If you considering migrating from the old version of the exporter  - you can  |
-| use flag `--compatible-mode` to expose metrics in the old metric names. This  |
-| will simplify migration to the new version for you.                           |
+## Info on Percona MongoDB exporter versions
 
+The old 0.1x.y version (ex `master` branch) has been moved to the `release-0.1x` branch.
 
-## Flags
-|Flag|Description|Example|
-|-----|-----|-----|
-|-h, \-\-help|Show context-sensitive help||
-|\-\-compatible-mode|Exposes new metrics in the new and old format at the same time||
-|\-\-discovering-mode|Enable autodiscover collections from databases which set in collstats-colls and indexstats-colls||
-|\-\-mongodb.collstats-colls|List of comma separated databases.collections to get stats|\-\-mongodb.collstats-colls=testdb.testcol1,testdb.testcol2|
-|\-\-mongodb.direct-connect|Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used|\-\-mongodb.direct-connect=false|
-|\-\-mongodb.indexstats-colls|List of comma separated database.collections to get index stats|\-\-mongodb.indexstats-colls=db1.col1,db1.col2|
-|\-\-mongodb.uri|MongoDB connection URI ($MONGODB_URI)|\-\-mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
-|\-\-mongodb.global-conn-pool|Use global connection pool instead of creating new connection for each http request.||
-|\-\-web.listen-address|Address to listen on for web interface and telemetry|\-\-web.listen-address=":9216"|
-|\-\-web.telemetry-path|Metrics expose path|\-\-web.telemetry-path="/metrics"|
-|\-\-log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]|\-\-log.level="error"|
-|\-\-disable.diagnosticdata|Disable collecting metrics from getDiagnosticData||
-|\-\-disable.replicasetstatus|Disable collecting metrics from replSetGetStatus||
-|\-\-disable.replicasetconfig|Disable collecting metrics from replSetGetConfig||
-|\-\-disable.dbstats|Disable collecting metrics from dbStats||
-|--version|Show version and exit|
+A flag, `--compatible-mode`, which exposes metrics with 0.1x compatible metric
+names has been implemented which simplifies migration from the old version to
+the current version.
 
- ### Build the exporter
+### Build the exporter
 The build process uses the dockerized version of goreleaser so you don't need to install Go.
 Just run `make release` and the new binaries will be generated under the build directory.
 ```
@@ -61,10 +42,40 @@ Just run `make release` and the new binaries will be generated under the build d
 ### Running the exporter
 If you built the exporter using the method mentioned in the previous section, the generated binaries are in `mongodb_exporter_linux_amd64/mongodb_exporter` or `mongodb_exporter_darwin_amd64/mongodb_exporter`
 
+#### Docker
+A docker image is available on the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter).
+
+##### Examples
+
+```sh
+# with podman
+podman run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+
+# with docker
+docker run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+```
+
+#### Permissions
+Connecting user should have sufficient rights to query needed stats:
+
+```
+      {
+         "role":"clusterMonitor",
+         "db":"admin"
+      },
+      {
+         "role":"read",
+         "db":"local"
+      }
+```
+
+More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
+
 #### Example
 ```
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001
 ```
+
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.
 Usage example: `--mongodb.collstats-colls=database1.collection1,database2.collection2`
@@ -86,6 +97,27 @@ HELP mongodb_mongod_wiredtiger_log_bytes_total mongodb_mongod_wiredtiger_log_byt
 mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
 ```
 
-## Submitting Bug Reports and adding new functionality
+#### Cluster role labels
+The exporter sets some topology labels in all metrics.
+The labels are:
 
-please see [Contribution Guide](CONTRIBUTING.md)
+- cl_role: Cluster role according to this table:
+
+|Server type|Label|
+|-----|-----|
+|mongos|mongos|
+|regular instance (primary or secondary)|shardsvr|
+|arbiter|shardsvr|
+|standalone|(empty string)|
+
+- cl_id: Cluster ID
+- rs_nm: Replicaset name
+- rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`. 
+Check [the official documentation](https://docs.mongodb.com/manual/reference/replica-states/) for details on replicaset status values.
+
+## Usage Reference
+
+See the [Reference Guide](REFERENCE.md) for details on using the exporter.
+## Bug Reports / Feature PR
+
+Refer to the [Contribution Guide](CONTRIBUTING.md).

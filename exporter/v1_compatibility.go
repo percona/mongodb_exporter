@@ -1,3 +1,19 @@
+// mongodb_exporter
+// Copyright (C) 2022 Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package exporter
 
 import (
@@ -11,12 +27,27 @@ import (
 	"github.com/percona/percona-toolkit/src/go/mongolib/util"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+const (
+	// UnknownState is the values for an unknown rs state.
+	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
+	UnknownState = 6
+
+	// EnterpriseEdition shows that MongoDB is Enterprise edition.
+	EnterpriseEdition = "Enterprise"
+	// CommunityEdition shows that MongoDB is Community edition.
+	CommunityEdition = "Community"
+
+	// PerconaVendor means that MongoDB provided by Percona.
+	PerconaVendor = "Percona"
+	// MongoDBVendor means that MongoDB provided by Mongo.
+	MongoDBVendor = "MongoDB"
 )
 
 // ErrInvalidMetricValue cannot create a new metric due to an invalid value.
@@ -100,16 +131,17 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 // should be converted to mongodb_mongod_wiredtiger_cache_bytes with label "type": "total".
 // For this conversion, we have the suffixMapping field that holds the mapping for all suffixes.
 // Example definition:
-//	 	oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
-//	 	prefix:      "mongodb_ss_wt_cache_bytes",
-//	 	suffixLabel: "type",
-//	 	suffixMapping: map[string]string{
-//	 		"bytes_currently_in_the_cache":                           "total",
-//	 		"tracked_dirty_bytes_in_the_cache":                       "dirty",
-//	 		"tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
-//	 		"tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
-//	 	},
+//
+//	 oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
+//	 prefix:      "mongodb_ss_wt_cache_bytes",
+//	 suffixLabel: "type",
+//	 suffixMapping: map[string]string{
+//	   "bytes_currently_in_the_cache":                           "total",
+//	   "tracked_dirty_bytes_in_the_cache":                       "dirty",
+//	   "tracked_bytes_belonging_to_internal_pages_in_the_cache": "internal_pages",
+//	   "tracked_bytes_belonging_to_leaf_pages_in_the_cache":     "internal_pages",
 //	 },
+//	},
 func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 	suffix := strings.TrimPrefix(rm.fqName, c.prefix)
 	suffix = strings.TrimPrefix(suffix, "_")
@@ -675,7 +707,7 @@ func lockMetrics() []lockMetric {
 // This function reads the human readable list from lockMetrics() and creates a slice of metrics
 // ready to be exposed, taking the value for each metric from th provided bson.M structure from
 // getDiagnosticData.
-func locksMetrics(m bson.M) []prometheus.Metric {
+func locksMetrics(logger *logrus.Logger, m bson.M) []prometheus.Metric {
 	metrics := lockMetrics()
 	res := make([]prometheus.Metric, 0, len(metrics))
 
@@ -685,7 +717,7 @@ func locksMetrics(m bson.M) []prometheus.Metric {
 			continue
 		}
 		if err != nil {
-			logrus.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
+			logger.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
 			continue
 		}
 		res = append(res, mm)
@@ -761,15 +793,18 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metrics = append(metrics, metric)
 	}
 
-	metrics = append(metrics, storageEngine(m))
-	metrics = append(metrics, serverVersion(m))
-
-	ms, err := myState(ctx, client)
+	buildInfo, err := retrieveMongoDBBuildInfo(ctx, client, l)
 	if err != nil {
-		l.Debugf("cannot create metric for my state: %s", err)
-	} else {
-		metrics = append(metrics, ms)
+		l.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
 	}
+
+	if engine, err := storageEngine(m); err != nil {
+		l.Errorf("cannot retrieve engine type: %s", err)
+	} else {
+		metrics = append(metrics, engine)
+	}
+	metrics = append(metrics, serverVersion(buildInfo))
+	metrics = append(metrics, myState(ctx, client))
 
 	if mm := replSetMetrics(m); mm != nil {
 		metrics = append(metrics, mm...)
@@ -784,33 +819,68 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	return metrics
 }
 
-func storageEngine(m bson.M) prometheus.Metric {
+func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Logger) (buildInfo, error) {
+	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
+	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
+
+	var buildInfoDoc bson.M
+	err := res.Decode(&buildInfoDoc)
+	if err != nil {
+		return buildInfo{}, errors.Wrap(err, "Failed to run buildInfo command")
+	}
+
+	modules, ok := buildInfoDoc["modules"].(bson.A)
+	if !ok {
+		return buildInfo{}, errors.Wrap(err, "Failed to cast module information variable")
+	}
+
+	var bi buildInfo
+	if len(modules) > 0 && modules[0].(string) == "enterprise" {
+		bi.Edition = EnterpriseEdition
+	} else {
+		bi.Edition = CommunityEdition
+	}
+	l.Debug("MongoDB edition: ", bi.Edition)
+
+	_, ok = buildInfoDoc["psmdbVersion"]
+	if ok {
+		bi.Vendor = PerconaVendor
+	} else {
+		bi.Vendor = MongoDBVendor
+	}
+
+	bi.Version, ok = buildInfoDoc["version"].(string)
+	if !ok {
+		return buildInfo{}, errors.Wrap(err, "Failed to cast version information variable")
+	}
+
+	return bi, nil
+}
+
+func storageEngine(m bson.M) (prometheus.Metric, error) { //nolint:ireturn
 	v := walkTo(m, []string{"serverStatus", "storageEngine", "name"})
 	name := "mongodb_mongod_storage_engine"
 	help := "The storage engine used by the MongoDB instance"
 
 	engine, ok := v.(string)
 	if !ok {
-		engine = "Engine is unavailable"
+		return nil, errors.New("Engine is unavailable")
 	}
 	labels := map[string]string{"engine": engine}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
-	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
-
-	return metric
+	metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create metric for engine type")
+	}
+	return metric, nil
 }
 
-func serverVersion(m bson.M) prometheus.Metric {
-	v := walkTo(m, []string{"serverStatus", "version"})
+func serverVersion(bi buildInfo) prometheus.Metric { //nolint:ireturn
 	name := "mongodb_version_info"
 	help := "The server version"
 
-	serverVersion, ok := v.(string)
-	if !ok {
-		serverVersion = "server version is unavailable"
-	}
-	labels := map[string]string{"mongodb": serverVersion}
+	labels := map[string]string{"mongodb": bi.Version, "edition": bi.Edition, "vendor": bi.Vendor}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
@@ -818,26 +888,27 @@ func serverVersion(m bson.M) prometheus.Metric {
 	return metric
 }
 
-func myState(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	state, err := util.MyState(ctx, client)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot get my state")
+		state = UnknownState
 	}
 
+	var id string
 	rs, err := util.ReplicasetConfig(ctx, client)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot get replicaset config")
+	if err == nil {
+		id = rs.Config.ID
 	}
 
 	name := "mongodb_mongod_replset_my_state"
 	help := "An integer between 0 and 10 that represents the replica state of the current member"
 
-	labels := map[string]string{"set": rs.Config.ID}
+	labels := map[string]string{"set": id}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(state))
 
-	return metric, nil
+	return metric
 }
 
 func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
@@ -987,7 +1058,11 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, metric)
 	}
 
-	metrics = append(metrics, balancerEnabled(ctx, client))
+	if metric, err := balancerEnabled(ctx, client); err != nil {
+		l.Debugf("cannot create metric for balancer is enabled: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
 
 	metric, err := chunksTotal(ctx, client)
 	if err != nil {
@@ -1009,7 +1084,7 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, metric)
 	}
 
-	ms, err = changelog10m(ctx, client)
+	ms, err = changelog10m(ctx, client, l)
 	if err != nil {
 		l.Errorf("cannot create metric for changelog: %s", err)
 	} else {
@@ -1098,17 +1173,19 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
 }
 
-func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metric {
+func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	type bss struct {
-		stopped bool `bson:"stopped"`
+		Stopped bool `bson:"stopped"`
 	}
 	var bs bss
 	enabled := 0
 
 	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
 	if err != nil {
-		enabled = 1
-	} else if !bs.stopped {
+		return nil, err
+	}
+
+	if !bs.Stopped {
 		enabled = 1
 	}
 
@@ -1118,7 +1195,7 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metri
 	d := prometheus.NewDesc(name, help, nil, nil)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
 
-	return metric
+	return metric, nil
 }
 
 func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
@@ -1215,7 +1292,7 @@ type ShardingChangelogStats struct {
 	Items *[]ShardingChangelogSummary
 }
 
-func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Logger) ([]prometheus.Metric, error) {
 	var metrics []prometheus.Metric
 
 	coll := client.Database("config").Collection("changelog")
@@ -1232,7 +1309,7 @@ func changelog10m(ctx context.Context, client *mongo.Client) ([]prometheus.Metri
 	for c.Next(ctx) {
 		s := &ShardingChangelogSummary{}
 		if err := c.Decode(s); err != nil {
-			log.Error(err)
+			l.Error(err)
 			continue
 		}
 
@@ -1281,6 +1358,12 @@ type rawStatus struct {
 	Indexes     int    `bson:"indexes,omitempty"`
 }
 
+type buildInfo struct {
+	Version string
+	Edition string
+	Vendor  string
+}
+
 func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Logger) *databaseStatList {
 	dbStatList := &databaseStatList{}
 	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
@@ -1307,6 +1390,9 @@ func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger)
 	var metrics []prometheus.Metric
 
 	dbStatList := getDatabaseStatList(ctx, client, l)
+	if dbStatList == nil {
+		return metrics
+	}
 
 	for _, member := range dbStatList.Members {
 		if len(member.Shards) > 0 {

@@ -29,7 +29,12 @@ linters:
       - unused
       - testpackage
       - wsl
-
+      - exhaustivestruct
+      - varnamelen
+      - maligned          #deprecated
+      - scopelint         #deprecated
+      - golint            #deprecated
+      - interfacer        #deprecated
 issues:
   exclude-use-default: false
   exclude:

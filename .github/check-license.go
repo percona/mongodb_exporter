@@ -21,7 +21,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -29,45 +28,54 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 )
 
-func getHeader() string {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("runtime.Caller(0) failed")
-	}
-	f, err := os.Open(file)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
+var (
+	generatedHeader = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.`)
 
-	var header string
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		if s.Text() == "" {
-			break
-		}
-		header += s.Text() + "\n"
-	}
-	header += "\n"
-	if err := s.Err(); err != nil {
-		log.Fatal(err)
-	}
-	return header
-}
+	copyrightText = `// mongodb_exporter
+// Copyright (C) 2022 Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+`
 
-var generatedHeader = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.`)
+	copyrightPattern = regexp.MustCompile(`^// mongodb_exporter
+// Copyright \(C\) 20\d{2} Percona LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// \(at your option\) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+`)
+)
 
-func checkHeader(path string, header string) bool {
+func checkHeader(path string) bool {
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 
-	actual := make([]byte, len(header))
+	actual := make([]byte, len(copyrightText))
 	_, err = io.ReadFull(f, actual)
 	if err == io.ErrUnexpectedEOF {
 		err = nil // some files are shorter than license header
@@ -81,7 +89,7 @@ func checkHeader(path string, header string) bool {
 		return true
 	}
 
-	if header != string(actual) {
+	if !copyrightPattern.Match(actual) {
 		log.Print(path)
 		return false
 	}
@@ -95,8 +103,6 @@ func main() {
 		flag.CommandLine.PrintDefaults()
 	}
 	flag.Parse()
-
-	header := getHeader()
 
 	ok := true
 	filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
@@ -113,7 +119,7 @@ func main() {
 		}
 
 		if filepath.Ext(info.Name()) == ".go" {
-			if !checkHeader(path, header) {
+			if !checkHeader(path) {
 				ok = false
 			}
 		}

@@ -28,26 +28,40 @@ import (
 // This collector is always enabled and it is not directly related to any particular MongoDB
 // command to gather stats.
 type generalCollector struct {
-	ctx    context.Context
-	client *mongo.Client
-	logger *logrus.Logger
+	ctx  context.Context
+	base *baseCollector
+}
+
+// newGeneralCollector creates a collector for MongoDB connectivity status.
+func newGeneralCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *generalCollector {
+	return &generalCollector{
+		ctx:  ctx,
+		base: newBaseCollector(client, logger),
+	}
 }
 
 func (d *generalCollector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(d, ch)
+	d.base.Describe(d.ctx, ch, d.collect)
 }
 
 func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
-	ch <- mongodbUpMetric(d.ctx, d.client, d.logger)
+	d.base.Collect(ch)
+}
+
+func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
+	defer prometheus.MeasureCollectTime(ch, "mongodb", "general")()
+	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
 }
 
 func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {
 	var value float64
 
-	if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {
-		value = 1
-	} else {
-		log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err)
+	if client != nil {
+		if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {
+			value = 1
+		} else {
+			log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err)
+		}
 	}
 
 	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)

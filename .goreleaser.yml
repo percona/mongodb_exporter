@@ -8,10 +8,17 @@ builds:
       - darwin
     goarch:
       - amd64
+      - arm
+      - arm64
+    goarm:
+      - 7
+    ignore:
+      - goos: darwin
+        goarch: arm
     flags:
       - -v
     ldflags:
-        - -s -w -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
+        - -s -w -X main.version=v{{.Version}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
     wrap_in_directory: true
@@ -25,3 +32,69 @@ release:
     name: mongodb_exporter
   draft: true
   prerelease: auto
+dockers:
+- goos: linux
+  goarch: amd64
+  image_templates:
+  - "docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64"
+  - "docker.io/percona/mongodb_exporter:{{.Version}}-amd64"
+  - "ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64"
+  - "ghcr.io/percona/mongodb_exporter:{{.Version}}-amd64"
+  dockerfile: Dockerfile
+  build_flag_templates:
+    - "--pull"
+    - "--platform=linux/amd64"
+- goos: linux
+  goarch: arm64
+  image_templates:
+  - "docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8"
+  - "docker.io/percona/mongodb_exporter:{{.Version}}-arm64v8"
+  - "ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8"
+  - "ghcr.io/percona/mongodb_exporter:{{.Version}}-arm64v8"
+  dockerfile: Dockerfile
+  use: buildx
+  build_flag_templates:
+    - "--pull"
+    - "--platform=linux/arm64/v8"
+docker_manifests:
+## Docker Hub
+  - name_template: docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}
+    image_templates:
+    - docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8
+    - docker.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64
+
+  - name_template: docker.io/percona/mongodb_exporter:{{.Version}}
+    image_templates:
+    - docker.io/percona/mongodb_exporter:{{.Version}}-arm64v8
+    - docker.io/percona/mongodb_exporter:{{.Version}}-amd64
+## GHCR
+  - name_template: ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}
+    image_templates:
+    - ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-arm64v8
+    - ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64
+
+  - name_template: ghcr.io/percona/mongodb_exporter:{{.Version}}
+    image_templates:
+    - ghcr.io/percona/mongodb_exporter:{{.Version}}-arm64v8
+    - ghcr.io/percona/mongodb_exporter:{{.Version}}-amd64
+nfpms:
+  - file_name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
+    homepage:  https://www.percona.com/
+    description: MongoDB exporter for Prometheus
+    maintainer: Percona
+    vendor: Percona
+    license: Apache 2.0
+    formats:
+    - deb
+    - rpm
+    bindir: /usr/bin
+    replacements:
+      amd64: 64-bit
+    scripts:
+      postinstall: ".scripts/postinst"
+    contents:
+      - src: .scripts/systemd/mongodb_exporter.service
+        dst: /etc/systemd/system/mongodb_exporter.service
+        type: "config|noreplace"
+      - src: .scripts/default/mongodb_exporter.example
+        dst: /etc/default/mongodb_exporter.example
