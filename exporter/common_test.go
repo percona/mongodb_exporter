@@ -160,6 +160,7 @@ func TestListCollections(t *testing.T) {
 		assert.Equal(t, 6, count)
 	})
 }
+
 func TestSplitNamespace(t *testing.T) {
 	testCases := []struct {
 		namespace      string
