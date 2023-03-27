@@ -36,7 +36,8 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 	username := parsedDsn.User.Username()
 	password, _ := parsedDsn.User.Password()
 	if username != "" || password != "" {
-		clientOptions = clientOptions.SetAuth(options.Credential{Username: username, Password: password})
+		clientOptions.Auth.Username = username
+		clientOptions.Auth.Password = password
 	}
 
 	return clientOptions, nil
