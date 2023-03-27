@@ -33,7 +33,7 @@ func TestClientOptionsForDSN(t *testing.T) {
 		{
 			name: "Escape username",
 			dsn: (&url.URL{
-				Scheme: "mongo",
+				Scheme: "mongodb",
 				Host:   "localhost",
 				Path:   "/db",
 				User:   url.UserPassword("user+", "pass"),
@@ -44,7 +44,7 @@ func TestClientOptionsForDSN(t *testing.T) {
 		{
 			name: "Escape password",
 			dsn: (&url.URL{
-				Scheme: "mongo",
+				Scheme: "mongodb",
 				Host:   "localhost",
 				Path:   "/db",
 				User:   url.UserPassword("user", "pass+"),
