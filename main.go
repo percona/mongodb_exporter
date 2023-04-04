@@ -44,6 +44,7 @@ type GlobalFlags struct {
 	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	TLSConfigPath         string `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
+	TimeoutOffset         int    `name:"mongodb.timeout-offset" help:"Offset to subtract from the timeout in seconds" default:"1"`
 
 	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
 	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
@@ -122,6 +123,7 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		WebListenAddress:      opts.WebListenAddress,
 		TLSConfigPath:         opts.TLSConfigPath,
 		DirectConnect:         opts.DirectConnect,
+		TimeoutOffset:         opts.TimeoutOffset,
 
 		EnableDiagnosticData:   opts.EnableDiagnosticData,
 		EnableReplicasetStatus: opts.EnableReplicasetStatus,

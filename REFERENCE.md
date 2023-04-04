@@ -11,6 +11,7 @@
 |--[no-]mongodb.direct-connect|Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used||
 |--[no-]mongodb.global-conn-pool|Use global connection pool instead of creating new pool for each http request||
 |--mongodb.uri|MongoDB connection URI ($MONGODB_URI)|--mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin?ssl=true|
+|--mongodb.timeout-offset|Offset to subtract from the timeout in seconds|--mongodb.timeout-offset=1|
 |--web.listen-address|Address to listen on for web interface and telemetry|--web.listen-address=":9216"|
 |--web.telemetry-path|Metrics expose path|--web.telemetry-path="/metrics"|
 |--web.config|Path to the file having Prometheus TLS config for basic auth|--web.config=STRING|
