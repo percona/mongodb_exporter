@@ -1,3 +1,14 @@
+Release 0.36.0
+
+- Added security metrics with info about encryption
+- Fixed fetching build info for mongos instance
+- Fix metric mongodb_mongos_sharding_balancer_enabled
+
+Release 0.35.0
+
+- Added to metrics info about running MongoDB version and Mongo vendor
+- Removed unused collector
+
 Release 0.34.0
 
 - Add logger with level
