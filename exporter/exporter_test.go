@@ -62,8 +62,11 @@ func TestConnect(t *testing.T) {
 
 	t.Run("Connect without SSL", func(t *testing.T) {
 		for name, port := range ports {
-			dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, port)
-			client, err := connect(ctx, dsn, true)
+			exporterOpts := &Opts{
+				URI:           fmt.Sprintf("mongodb://%s:%s/admin", hostname, port),
+				DirectConnect: true,
+			}
+			client, err := connect(ctx, exporterOpts)
 			assert.NoError(t, err, name)
 			err = client.Disconnect(ctx)
 			assert.NoError(t, err, name)
@@ -168,16 +171,16 @@ func TestMongoS(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, test.port)
-		client, err := connect(ctx, dsn, true)
-		assert.NoError(t, err)
-
 		exporterOpts := &Opts{
 			Logger:                 logrus.New(),
-			URI:                    dsn,
+			URI:                    fmt.Sprintf("mongodb://%s:%s/admin", hostname, test.port),
+			DirectConnect:          true,
 			GlobalConnPool:         false,
 			EnableReplicasetStatus: true,
 		}
+
+		client, err := connect(ctx, exporterOpts)
+		assert.NoError(t, err)
 
 		e := New(exporterOpts)
 
@@ -196,23 +199,58 @@ func TestMongoS(t *testing.T) {
 func TestMongoUp(t *testing.T) {
 	ctx := context.Background()
 
-	dsn := "mongodb://127.0.0.1:123456/admin"
-	client, err := connect(ctx, dsn, true)
-	assert.Error(t, err)
-
-	exporterOpts := &Opts{
-		Logger:         logrus.New(),
-		URI:            dsn,
-		GlobalConnPool: false,
-		CollectAll:     true,
+	type testcase struct {
+		URI  string
+		Want int
 	}
 
-	e := New(exporterOpts)
+	testCases := []testcase{
+		{URI: "mongodb://127.0.0.1:12345/admin", Want: 0},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1},
+	}
 
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+	for _, tc := range testCases {
+		exporterOpts := &Opts{
+			Logger:           logrus.New(),
+			URI:              tc.URI,
+			ConnectTimeoutMS: 200,
+			DirectConnect:    true,
+			GlobalConnPool:   false,
+			CollectAll:       true,
+		}
 
-	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+		client, err := connect(ctx, exporterOpts)
+		if tc.Want == 1 {
+			assert.NoError(t, err, "Must be able to connect to %s", tc.URI)
+		} else {
+			assert.Error(t, err, "Must be unable to connect to %s", tc.URI)
+		}
 
-	res := r.Unregister(gc)
-	assert.Equal(t, true, res)
+		e := New(exporterOpts)
+
+		gc := newGeneralCollector(ctx, client, e.opts.Logger)
+
+		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+		mfs, err := r.Gather()
+		assert.NoError(t, err)
+
+		mongo_metric_exists := false
+		mongo_up := 0
+		for _, mf := range mfs {
+			if mf.GetName() == "mongodb_up" {
+				mongo_metric_exists = true
+				for _, m := range mf.GetMetric() {
+					if m.GetGauge().GetValue() == 1 {
+						mongo_up = 1
+					}
+				}
+			}
+		}
+
+		assert.True(t, mongo_metric_exists, "mongodb_up metric must exists in the registry")
+		assert.EqualValues(t, tc.Want, mongo_up, "mongodb_up metric must be %d in for %s", tc.Want, tc.URI)
+
+		res := r.Unregister(gc)
+		assert.Equal(t, true, res)
+	}
 }

@@ -52,6 +52,7 @@ type Opts struct {
 	CollStatsLimit         int
 	CompatibleMode         bool
 	DirectConnect          bool
+	ConnectTimeoutMS       int
 	DisableDefaultRegistry bool
 	DiscoveringMode        bool
 	GlobalConnPool         bool
@@ -223,7 +224,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 			return e.client, nil
 		}
 
-		client, err := connect(context.Background(), e.opts.URI, e.opts.DirectConnect)
+		client, err := connect(context.Background(), e.opts)
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +234,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	}
 
 	// !e.opts.GlobalConnPool: create new client for every scrape.
-	client, err := connect(ctx, e.opts.URI, e.opts.DirectConnect)
+	client, err := connect(ctx, e.opts)
 	if err != nil {
 		return nil, err
 	}
@@ -331,15 +332,21 @@ func (e *Exporter) Handler() http.Handler {
 	})
 }
 
-func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client, error) {
-	clientOpts, err := dsn_fix.ClientOptionsForDSN(dsn)
+func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
+
+	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
-	clientOpts.SetDirect(directConnect)
+
+	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
-	clientOpts.SetConnectTimeout(9 * time.Second)
-	clientOpts.SetServerSelectionTimeout(9 * time.Second)
+
+	if clientOpts.ConnectTimeout == nil {
+		connectTimeoutMS := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
+		clientOpts.SetConnectTimeout(connectTimeoutMS)
+		clientOpts.SetServerSelectionTimeout(connectTimeoutMS)
+	}
 
 	client, err := mongo.Connect(ctx, clientOpts)
 
