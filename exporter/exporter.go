@@ -339,8 +339,12 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 
 	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
-	clientOpts.SetConnectTimeout(9 * time.Second)
-	clientOpts.SetServerSelectionTimeout(9 * time.Second)
+
+	if clientOpts.ConnectTimeout == nil {
+		connectTimeoutMS := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
+		clientOpts.SetConnectTimeout(connectTimeoutMS)
+		clientOpts.SetServerSelectionTimeout(connectTimeoutMS)
+	}
 
 	if clientOpts.ConnectTimeout == nil {
 		connectTimeoutMS := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
