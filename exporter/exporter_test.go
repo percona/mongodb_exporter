@@ -22,9 +22,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -199,6 +202,30 @@ func TestMongoS(t *testing.T) {
 func TestMongoUp(t *testing.T) {
 	ctx := context.Background()
 
+	exporterOpts := &Opts{
+		Logger:         logrus.New(),
+		URI:            "mongodb://127.0.0.1:123456/admin",
+		DirectConnect:  true,
+		GlobalConnPool: false,
+		CollectAll:     true,
+	}
+
+	client, err := connect(ctx, exporterOpts)
+	assert.Error(t, err)
+
+	e := New(exporterOpts)
+
+	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+
+	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+	res := r.Unregister(gc)
+	assert.Equal(t, true, res)
+}
+
+func TestMongoUpMetric(t *testing.T) {
+	ctx := context.Background()
+
 	type testcase struct {
 		URI  string
 		Want int
@@ -227,28 +254,18 @@ func TestMongoUp(t *testing.T) {
 		}
 
 		e := New(exporterOpts)
-
 		gc := newGeneralCollector(ctx, client, e.opts.Logger)
-
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
-		mfs, err := r.Gather()
-		assert.NoError(t, err)
 
-		mongo_metric_exists := false
-		mongo_up := 0
-		for _, mf := range mfs {
-			if mf.GetName() == "mongodb_up" {
-				mongo_metric_exists = true
-				for _, m := range mf.GetMetric() {
-					if m.GetGauge().GetValue() == 1 {
-						mongo_up = 1
-					}
-				}
-			}
+		expected := strings.NewReader(`
+		# HELP mongodb_up Whether MongoDB is up.
+		# TYPE mongodb_up gauge
+		mongodb_up ` + strconv.Itoa(tc.Want) + "\n")
+		filter := []string{
+			"mongodb_up",
 		}
-
-		assert.True(t, mongo_metric_exists, "mongodb_up metric must exists in the registry")
-		assert.EqualValues(t, tc.Want, mongo_up, "mongodb_up metric must be %d in for %s", tc.Want, tc.URI)
+		err = testutil.CollectAndCompare(gc, expected, filter...)
+		assert.NoError(t, err, "mongodb_up metric should be %d", tc.Want)
 
 		res := r.Unregister(gc)
 		assert.Equal(t, true, res)

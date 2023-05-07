@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var ServerMap map[string]*Exporter
+var ServerMap map[string]http.Handler
 
 type ServerOpts struct {
 	Path             string
@@ -27,23 +27,11 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 		panic("No exporters were builded. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
 	}
 
-	serverMap := buildServerMap(exporters, log)
+	ServerMap = buildServerMap(exporters, log)
 
 	defaultExporter := exporters[0]
 	mux.Handle(opts.Path, defaultExporter.Handler())
-	mux.HandleFunc(opts.MultiTargetPath, func(w http.ResponseWriter, r *http.Request) {
-		targetHost := r.URL.Query().Get("target")
-		if targetHost != "" {
-			if !strings.HasPrefix(targetHost, "mongodb://") {
-				targetHost = "mongodb://" + targetHost
-			}
-			if uri, err := url.Parse(targetHost); err == nil {
-				if e, ok := serverMap[uri.Host]; ok {
-					e.ServeHTTP(w, r)
-				}
-			}
-		}
-	})
+	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
             <head><title>MongoDB Exporter</title></head>
@@ -63,6 +51,22 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 		log.Errorf("error starting server: %v", err)
 		os.Exit(1)
 	}
+}
+
+func multiTargetHandler(w http.ResponseWriter, r *http.Request) {
+	targetHost := r.URL.Query().Get("target")
+	if targetHost != "" {
+		if !strings.HasPrefix(targetHost, "mongodb://") {
+			targetHost = "mongodb://" + targetHost
+		}
+		if uri, err := url.Parse(targetHost); err == nil {
+			if e, ok := ServerMap[uri.Host]; ok {
+				e.ServeHTTP(w, r)
+				return
+			}
+		}
+	}
+	http.Error(w, "Unable to find target", http.StatusNotFound)
 }
 
 func buildServerMap(exporters []*Exporter, log *logrus.Logger) map[string]http.Handler {
