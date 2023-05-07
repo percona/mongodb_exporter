@@ -60,7 +60,7 @@ func TestMultiTarget(t *testing.T) {
 		"mongodb_up 1\n",
 		"mongodb_up 1\n",
 		"mongodb_up 1\n",
-		"mongodb_up 1\n",
+		"mongodb_up 0\n",
 	}
 
 	// Test all targets
