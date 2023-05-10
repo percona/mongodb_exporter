@@ -1,4 +1,6 @@
-#!/bin/bash 
+#!/bin/bash
+
+set -x
 
 mongodb1=`getent hosts ${MONGO1} | awk '{ print $1 }'`
 mongodb2=`getent hosts ${MONGO2} | awk '{ print $1 }'`
@@ -48,26 +50,15 @@ EOF
 function general_servers() {
     echo "setup servers"
     mongo --host ${mongodb1}:${port} <<EOF
-    var cfg = {
-        "_id": "${RS}",
-        "protocolVersion": 1,
-        "members": [
-            {
-                "_id": 0,
-                "host": "${mongodb1}:${port}"
-            },
-            {
-                "_id": 1,
-                "host": "${mongodb2}:${port}"
-            },
-            {
-                "_id": 2,
-                "host": "${mongodb3}:${port}"
-            }
-        ]
-    };
-    rs.initiate(cfg, { force: true });
-    rs.reconfig(cfg, { force: true });
+    use admin;
+    db.auth("root", "root");
+    rs.initiate()
+    rs.conf()
+
+    rs.add("${mongodb1}:${port}")
+    rs.add("${mongodb2}:${port}")
+    rs.add("${mongodb3}:${port}")
+    rs.status()
 
     rs.addArb("${arbiter}:${port}")
 EOF
