@@ -43,7 +43,7 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 		clientOptions.Auth.Password = password
 		// set this flag to connect to arbiter when there authentication is enabled
 		b := true
-		clientOptions.AuthenticateToAnything = &b
+		clientOptions.AuthenticateToAnything = &b //nolint:staticcheck
 	}
 
 	return clientOptions, nil
