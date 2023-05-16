@@ -17,6 +17,7 @@
 package dsn_fix
 
 import (
+	"github.com/AlekSi/pointer"
 	"net/url"
 
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -42,8 +43,7 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 		clientOptions.Auth.Username = username
 		clientOptions.Auth.Password = password
 		// set this flag to connect to arbiter when there authentication is enabled
-		b := true
-		clientOptions.AuthenticateToAnything = &b //nolint:staticcheck
+		clientOptions.AuthenticateToAnything = pointer.ToBool(true) //nolint:staticcheck
 	}
 
 	return clientOptions, nil
