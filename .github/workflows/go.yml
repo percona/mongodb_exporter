@@ -3,7 +3,7 @@ name: Go
 on:
   schedule:
     # run every Sunday
-    - cron: "0 13 * * 0"
+    - cron: '0 13 * * 0'
   push:
     branches:
       - main
@@ -45,7 +45,7 @@ jobs:
     steps:
       - name: Set up Go release
         if: matrix.go-version != 'tip'
-        uses: percona-platform/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -59,7 +59,7 @@ jobs:
           echo "$HOME/gotip/bin" >> $GITHUB_PATH
 
       - name: Check out code into the Go module directory
-        uses: percona-platform/checkout@v3
+        uses: actions/checkout@v3
 
       - name: Initialize dependencies and linters
         run: |
