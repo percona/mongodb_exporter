@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/AlekSi/pointer"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -43,6 +44,8 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 	if username != "" || password != "" {
 		clientOptions.Auth.Username = username
 		clientOptions.Auth.Password = password
+		// set this flag to connect to arbiter when there authentication is enabled
+		clientOptions.AuthenticateToAnything = pointer.ToBool(true) //nolint:staticcheck
 	}
 	if parsedDsn.RawQuery != "" {
 		params := parsedDsn.Query()
