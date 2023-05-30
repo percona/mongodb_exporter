@@ -160,7 +160,6 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	// arbiter only have isMaster privileges
 	if isArbiter {
-		e.opts.EnableDiagnosticData = false
 		e.opts.EnableDBStats = false
 		e.opts.EnableCollStats = false
 		e.opts.EnableTopMetrics = false

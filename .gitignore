@@ -6,3 +6,4 @@ bin
 build
 dist
 mongodb_exporter
+.DS_Store
