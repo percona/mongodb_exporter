@@ -76,7 +76,12 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debugf("getting stats for databases: %v", dbNames)
 	for _, db := range dbNames {
 		var dbStats bson.M
-		cmd := bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}, {Key: "freeStorage", Value: d.freeStorage}}
+		var cmd bson.D
+		if d.freeStorage {
+			cmd = bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}, {Key: "freeStorage", Value: 1}}
+		} else {
+			cmd = bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}}
+		}
 		r := client.Database(db).RunCommand(d.ctx, cmd)
 		err := r.Decode(&dbStats)
 		if err != nil {
