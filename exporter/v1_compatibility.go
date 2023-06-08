@@ -798,8 +798,12 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		l.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
 	}
 
-	metrics = append(metrics, storageEngine(m))
-	metrics = append(metrics, serverVersion(m, buildInfo))
+	if engine, err := storageEngine(m); err != nil {
+		l.Errorf("cannot retrieve engine type: %s", err)
+	} else {
+		metrics = append(metrics, engine)
+	}
+	metrics = append(metrics, serverVersion(buildInfo))
 	metrics = append(metrics, myState(ctx, client))
 
 	if mm := replSetMetrics(m); mm != nil {
@@ -825,7 +829,6 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 		return buildInfo{}, errors.Wrap(err, "Failed to run buildInfo command")
 	}
 
-	var edition string
 	modules, ok := buildInfoDoc["modules"].(bson.A)
 	if !ok {
 		return buildInfo{}, errors.Wrap(err, "Failed to cast module information variable")
@@ -837,7 +840,7 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 	} else {
 		bi.Edition = CommunityEdition
 	}
-	l.Debug("MongoDB edition: ", edition)
+	l.Debug("MongoDB edition: ", bi.Edition)
 
 	_, ok = buildInfoDoc["psmdbVersion"]
 	if ok {
@@ -846,36 +849,38 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 		bi.Vendor = MongoDBVendor
 	}
 
+	bi.Version, ok = buildInfoDoc["version"].(string)
+	if !ok {
+		return buildInfo{}, errors.Wrap(err, "Failed to cast version information variable")
+	}
+
 	return bi, nil
 }
 
-func storageEngine(m bson.M) prometheus.Metric {
+func storageEngine(m bson.M) (prometheus.Metric, error) { //nolint:ireturn
 	v := walkTo(m, []string{"serverStatus", "storageEngine", "name"})
 	name := "mongodb_mongod_storage_engine"
 	help := "The storage engine used by the MongoDB instance"
 
 	engine, ok := v.(string)
 	if !ok {
-		engine = "Engine is unavailable"
+		return nil, errors.New("Engine is unavailable")
 	}
 	labels := map[string]string{"engine": engine}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
-	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
-
-	return metric
+	metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create metric for engine type")
+	}
+	return metric, nil
 }
 
-func serverVersion(m bson.M, bi buildInfo) prometheus.Metric { //nolint:ireturn
-	v := walkTo(m, []string{"serverStatus", "version"})
+func serverVersion(bi buildInfo) prometheus.Metric { //nolint:ireturn
 	name := "mongodb_version_info"
 	help := "The server version"
 
-	serverVersion, ok := v.(string)
-	if !ok {
-		serverVersion = "server version is unavailable"
-	}
-	labels := map[string]string{"mongodb": serverVersion, "edition": bi.Edition, "vendor": bi.Vendor}
+	labels := map[string]string{"mongodb": bi.Version, "edition": bi.Edition, "vendor": bi.Vendor}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(1))
@@ -1060,7 +1065,11 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, metric)
 	}
 
-	metrics = append(metrics, balancerEnabled(ctx, client))
+	if metric, err := balancerEnabled(ctx, client); err != nil {
+		l.Debugf("cannot create metric for balancer is enabled: %s", err)
+	} else {
+		metrics = append(metrics, metric)
+	}
 
 	metric, err := chunksTotal(ctx, client)
 	if err != nil {
@@ -1171,17 +1180,19 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
 }
 
-func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metric {
+func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	type bss struct {
-		stopped bool `bson:"stopped"`
+		Stopped bool `bson:"stopped"`
 	}
 	var bs bss
 	enabled := 0
 
 	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
 	if err != nil {
-		enabled = 1
-	} else if !bs.stopped {
+		return nil, err
+	}
+
+	if !bs.Stopped {
 		enabled = 1
 	}
 
@@ -1191,7 +1202,7 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) prometheus.Metri
 	d := prometheus.NewDesc(name, help, nil, nil)
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
 
-	return metric
+	return metric, nil
 }
 
 func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
@@ -1355,6 +1366,7 @@ type rawStatus struct {
 }
 
 type buildInfo struct {
+	Version string
 	Edition string
 	Vendor  string
 }

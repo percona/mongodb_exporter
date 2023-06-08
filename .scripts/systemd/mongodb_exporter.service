@@ -6,8 +6,8 @@ After=network.target
 [Service]
 Type=simple
 
-User=pmm
-Group=pmm
+User=mongodb_exporter
+Group=nogroup
 
 EnvironmentFile=-/etc/default/mongodb_exporter
 ExecStart=/usr/bin/mongodb_exporter $OPTIONS

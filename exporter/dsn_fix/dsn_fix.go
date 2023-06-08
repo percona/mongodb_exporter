@@ -19,12 +19,16 @@ package dsn_fix
 import (
 	"net/url"
 
+	"github.com/AlekSi/pointer"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ClientOptionsForDSN applies URI to Client.
 func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 	clientOptions := options.Client().ApplyURI(dsn)
+	if e := clientOptions.Validate(); e != nil {
+		return nil, e
+	}
 
 	// Workaround for PMM-9320
 	// if username or password is set, need to replace it with correctly parsed credentials.
@@ -36,7 +40,10 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 	username := parsedDsn.User.Username()
 	password, _ := parsedDsn.User.Password()
 	if username != "" || password != "" {
-		clientOptions = clientOptions.SetAuth(options.Credential{Username: username, Password: password})
+		clientOptions.Auth.Username = username
+		clientOptions.Auth.Password = password
+		// set this flag to connect to arbiter when there authentication is enabled
+		clientOptions.AuthenticateToAnything = pointer.ToBool(true) //nolint:staticcheck
 	}
 
 	return clientOptions, nil
