@@ -7,7 +7,7 @@ After=network.target
 Type=simple
 
 User=mongodb_exporter
-Group=nogroup
+Group=nobody
 
 EnvironmentFile=-/etc/default/mongodb_exporter
 ExecStart=/usr/bin/mongodb_exporter $OPTIONS
