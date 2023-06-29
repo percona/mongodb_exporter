@@ -20,19 +20,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-const (
-	REPLICA_SET_MEMBER_STARTUP = iota
-	REPLICA_SET_MEMBER_PRIMARY
-	REPLICA_SET_MEMBER_SECONDARY
-	REPLICA_SET_MEMBER_RECOVERING
-	REPLICA_SET_MEMBER_STARTUP2
-	REPLICA_SET_MEMBER_UNKNOWN
-	REPLICA_SET_MEMBER_ARBITER
-	REPLICA_SET_MEMBER_DOWN
-	REPLICA_SET_MEMBER_ROOLBACK
-	REPLICA_SET_MEMBER_REMOVED
-)
-
 type Optime struct {
 	Ts primitive.Timestamp `bson:"ts"` // The Timestamp of the last operation applied to this member of the replica set from the oplog.
 	T  float64             `bson:"t"`  // The term in which the last applied operation was originally generated on the primary.
@@ -40,7 +27,7 @@ type Optime struct {
 
 type StorageEngine struct {
 	Name                  string `bson:"name"`
-	SupportCommittedREads bool   `bson:supportsCommittedReads"`
+	SupportCommittedReads bool   `bson:supportsCommittedReads"`
 	ReadOnly              bool   `bson:"readOnly"`
 	Persistent            bool   `bson:"persistent"`
 }

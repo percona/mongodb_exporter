@@ -2,10 +2,13 @@
 linters-settings:
   # prevent import of "errors" instead of "github.com/pkg/errors"
   depguard:
-    list-type: blacklist
-    include-go-root: true
-    packages:
-      - errors
+    rules:
+      # Name of a rule.
+      main:
+        # Packages that are not allowed where the value is a suggestion.
+        deny:
+          - pkg: "errors"
+            desc: Should be replaced by github.com/pkg/errors package
 
   lll:
     line-length: 140
@@ -35,6 +38,7 @@ linters:
       - scopelint         #deprecated
       - golint            #deprecated
       - interfacer        #deprecated
+      - tagalign          #failing with panic
 issues:
   exclude-use-default: false
   exclude:
