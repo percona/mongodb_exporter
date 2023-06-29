@@ -38,7 +38,6 @@ linters:
       - scopelint         #deprecated
       - golint            #deprecated
       - interfacer        #deprecated
-      - tagalign          #failing with panic
 issues:
   exclude-use-default: false
   exclude:

@@ -27,7 +27,7 @@ type Optime struct {
 
 type StorageEngine struct {
 	Name                  string `bson:"name"`
-	SupportCommittedReads bool   `bson:supportsCommittedReads"`
+	SupportCommittedReads bool   `bson:"supportsCommittedReads"`
 	ReadOnly              bool   `bson:"readOnly"`
 	Persistent            bool   `bson:"persistent"`
 }

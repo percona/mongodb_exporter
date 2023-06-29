@@ -18,7 +18,7 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"sort"
 	"strings"
 	"testing"
@@ -279,7 +279,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	assert.NoError(t, err)
 
 	logger := logrus.New()
-	logger.Out = ioutil.Discard // diable logs in tests
+	logger.Out = io.Discard // diable logs in tests
 
 	ti := labelsGetterMock{}
 

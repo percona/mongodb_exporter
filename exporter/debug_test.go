@@ -16,7 +16,7 @@
 package exporter
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -57,7 +57,7 @@ func TestDebug(t *testing.T) {
 
 	debugResult(log, m)
 	assert.NoError(t, w.Close())
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 
 	assert.Equal(t, want, string(out))
 }

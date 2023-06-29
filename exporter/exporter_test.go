@@ -18,7 +18,7 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -93,7 +93,7 @@ func TestConnect(t *testing.T) {
 				res, err := http.Get(ts.URL) //nolint:noctx
 				assert.Nil(t, e.client)
 				assert.NoError(t, err)
-				g, err := ioutil.ReadAll(res.Body)
+				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
 				assert.NoError(t, err)
 				assert.NotEmpty(t, g)
@@ -127,7 +127,7 @@ func TestConnect(t *testing.T) {
 				res, err := http.Get(ts.URL) //nolint:noctx
 				assert.NotNil(t, e.client)
 				assert.NoError(t, err)
-				g, err := ioutil.ReadAll(res.Body)
+				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
 				assert.NoError(t, err)
 				assert.NotEmpty(t, g)
