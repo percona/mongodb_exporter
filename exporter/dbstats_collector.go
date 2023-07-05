@@ -56,7 +56,7 @@ func (d *dbstatsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
-	defer prometheus.MeasureCollectTime(ch, "mongodb", "dbstats")()
+	defer measureCollectTime(ch, "mongodb", "dbstats")()
 
 	logger := d.base.logger
 	client := d.base.client
