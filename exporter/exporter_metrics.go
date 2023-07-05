@@ -24,7 +24,7 @@ import (
 // measureCollectTime measures time taken for scrape by collector
 func measureCollectTime(ch chan<- prometheus.Metric, exporter, collector string) func() {
 	startTime := time.Now()
-	var timeToCollectDesc = prometheus.NewDesc(
+	timeToCollectDesc := prometheus.NewDesc(
 		"collector_scrape_time_ms",
 		"Time taken for scrape by collector",
 		[]string{"exporter"},
