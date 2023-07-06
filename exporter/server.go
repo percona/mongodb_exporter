@@ -43,11 +43,13 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	})
 
 	server := &http.Server{
-		Addr:    opts.WebListenAddress,
 		Handler: mux,
 	}
-
-	if err := web.ListenAndServe(server, opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
+	flags := &web.FlagConfig{
+		WebListenAddresses: &[]string{opts.WebListenAddress},
+		WebConfigFile:      &opts.TLSConfigPath,
+	}
+	if err := web.ListenAndServe(server, flags, promlog.New(&promlog.Config{})); err != nil {
 		log.Errorf("error starting server: %v", err)
 		os.Exit(1)
 	}
