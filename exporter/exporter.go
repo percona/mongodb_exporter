@@ -64,6 +64,7 @@ type Opts struct {
 	EnableDBStats          bool
 	EnableDiagnosticData   bool
 	EnableReplicasetStatus bool
+	EnableReplicasetConfig bool
 	EnableTopMetrics       bool
 	EnableIndexStats       bool
 	EnableCollStats        bool
@@ -167,6 +168,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCollStats = true
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
+		e.opts.EnableReplicasetConfig = true
 		e.opts.EnableIndexStats = true
 	}
 
@@ -216,6 +218,13 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	// replSetGetStatus is not supported through mongos.
 	if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(rsgsc)
+	}
+
+	// replSetGetStatus is not supported through mongos.
+	if e.opts.EnableReplicasetConfig && nodeType != typeMongos && requestOpts.EnableReplicasetConfig {
+		rsgsc := newReplicationSetConfigCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
 	}
@@ -281,6 +290,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableDiagnosticData = true
 			case "replicasetstatus":
 				requestOpts.EnableReplicasetStatus = true
+			case "replicasetconfig":
+				requestOpts.EnableReplicasetConfig = true
 			case "dbstats":
 				requestOpts.EnableDBStats = true
 			case "topmetrics":

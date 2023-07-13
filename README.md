@@ -14,6 +14,7 @@ Currently, these metric sources are implemented:
 - $indexStats
 - getDiagnosticData
 - replSetGetStatus
+- replSetGetConfig
 - serverStatus
 
 ## Info on Percona MongoDB exporter versions
