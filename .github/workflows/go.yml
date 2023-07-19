@@ -30,13 +30,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Go release
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version-file: ${{ github.workspace }}/go.mod
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
 
       - name: Initialize dependencies and linters
         run: make init
