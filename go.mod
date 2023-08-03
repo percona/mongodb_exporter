@@ -6,7 +6,7 @@ require (
 	github.com/AlekSi/pointer v1.1.0
 	github.com/alecthomas/kong v0.8.0
 	github.com/golang/snappy v0.0.3 // indirect
-	github.com/percona/exporter_shared v0.7.4-0.20211108113423-8555cdbac68b
+	github.com/percona/exporter_shared v0.7.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.4.0
