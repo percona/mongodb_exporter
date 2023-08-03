@@ -109,11 +109,9 @@ func main() {
 		TLSConfigPath:    opts.TLSConfigPath,
 	}
 	exporter.RunWebServer(serverOpts, buildServers(opts, log), log)
-
 }
 
 func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.Exporter {
-
 	log.Debugf("Connection URI: %s", uri)
 
 	exporterOpts := &exporter.Opts{
@@ -146,7 +144,6 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 }
 
 func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
-
 	var servers []*exporter.Exporter
 
 	if len(opts.URI) == 1 {

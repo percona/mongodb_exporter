@@ -331,7 +331,6 @@ func (e *Exporter) Handler() http.Handler {
 }
 
 func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
-
 	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
@@ -353,7 +352,6 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 	}
 
 	client, err := mongo.Connect(ctx, clientOpts)
-
 	if err != nil {
 		return nil, fmt.Errorf("invalid MongoDB options: %w", err)
 	}
