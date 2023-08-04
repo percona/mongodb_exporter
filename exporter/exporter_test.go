@@ -195,7 +195,7 @@ func TestMongoS(t *testing.T) {
 func TestMongoUp(t *testing.T) {
 	ctx := context.Background()
 
-	dsn := "mongodb://127.0.0.1:123456/admin"
+	dsn := "mongodb://127.0.0.1:123456/admin" // test on non existing port?
 	client, err := connect(ctx, dsn, true)
 	assert.Error(t, err)
 
