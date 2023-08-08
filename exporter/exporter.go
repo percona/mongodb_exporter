@@ -311,7 +311,7 @@ func (e *Exporter) Handler() http.Handler {
 			gatherers = append(gatherers, prometheus.DefaultGatherer)
 		}
 
-		var ti *topologyInfo = nil
+		var ti *topologyInfo
 		if client != nil {
 			// Topology can change between requests, so we need to get it every time.
 			ti = newTopologyInfo(ctx, client, e.logger)
@@ -340,15 +340,15 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 	clientOpts.SetAppName("mongodb_exporter")
 
 	if clientOpts.ConnectTimeout == nil {
-		connectTimeoutMS := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
-		clientOpts.SetConnectTimeout(connectTimeoutMS)
-		clientOpts.SetServerSelectionTimeout(connectTimeoutMS)
+		connectTimeout := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
+		clientOpts.SetConnectTimeout(connectTimeout)
+		clientOpts.SetServerSelectionTimeout(connectTimeout)
 	}
 
 	if clientOpts.ConnectTimeout == nil {
-		connectTimeoutMS := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
-		clientOpts.SetConnectTimeout(connectTimeoutMS)
-		clientOpts.SetServerSelectionTimeout(connectTimeoutMS)
+		connectTimeout := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
+		clientOpts.SetConnectTimeout(connectTimeout)
+		clientOpts.SetServerSelectionTimeout(connectTimeout)
 	}
 
 	client, err := mongo.Connect(ctx, clientOpts)

@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 
@@ -28,34 +29,36 @@ import (
 )
 
 func TestMultiTarget(t *testing.T) {
-	var exporters []*Exporter
+	hostname := "127.0.0.1"
 	opts := []*Opts{
 		{
-			URI:              fmt.Sprintf("mongodb://%s:%s", "127.0.0.1", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")),
+			URI:              fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017"))),
 			DirectConnect:    true,
 			ConnectTimeoutMS: 1000,
 		},
 		{
-			URI:              fmt.Sprintf("mongodb://%s:%s", "127.0.0.1", tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001")),
+			URI:              fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"))),
 			DirectConnect:    true,
 			ConnectTimeoutMS: 1000,
 		},
 		{
-			URI:              fmt.Sprintf("mongodb://%s:%s", "127.0.0.1", tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004")),
+			URI:              fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"))),
 			DirectConnect:    true,
 			ConnectTimeoutMS: 1000,
 		},
 		{
-			URI:              fmt.Sprintf("mongodb://%s:%s", "127.0.0.1", "12345"),
+			URI:              fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, "12345")),
 			DirectConnect:    true,
 			ConnectTimeoutMS: 1000,
 		},
 	}
-	for _, opt := range opts {
-		exporters = append(exporters, New(opt))
+	exporters := make([]*Exporter, len(opts))
+
+	for i, opt := range opts {
+		exporters[i] = New(opt)
 	}
 	log := logrus.New()
-	ServerMap = buildServerMap(exporters, log)
+	buildServerMap(exporters, log)
 
 	expected := []string{
 		"mongodb_up 1\n",

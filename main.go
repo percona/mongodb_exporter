@@ -144,11 +144,12 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 }
 
 func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
-	var servers []*exporter.Exporter
-
 	if len(opts.URI) == 1 {
 		opts.URI = strings.Split(opts.URI[0], " ")
 	}
+
+	servers := make([]*exporter.Exporter, len(opts.URI))
+
 	for serverIdx := range opts.URI {
 		URI := opts.URI[serverIdx]
 
@@ -157,7 +158,7 @@ func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
 			URI = "mongodb://" + URI
 		}
 
-		servers = append(servers, buildExporter(opts, URI, log))
+		servers[serverIdx] = buildExporter(opts, URI, log)
 	}
 
 	return servers

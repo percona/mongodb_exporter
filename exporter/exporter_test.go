@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -65,7 +66,7 @@ func TestConnect(t *testing.T) {
 	t.Run("Connect without SSL", func(t *testing.T) {
 		for name, port := range ports {
 			exporterOpts := &Opts{
-				URI:           fmt.Sprintf("mongodb://%s:%s/admin", hostname, port),
+				URI:           fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, port)),
 				DirectConnect: true,
 			}
 			client, err := connect(ctx, exporterOpts)
@@ -175,7 +176,7 @@ func TestMongoS(t *testing.T) {
 	for _, test := range tests {
 		exporterOpts := &Opts{
 			Logger:                 logrus.New(),
-			URI:                    fmt.Sprintf("mongodb://%s:%s/admin", hostname, test.port),
+			URI:                    fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, test.port)),
 			DirectConnect:          true,
 			GlobalConnPool:         false,
 			EnableReplicasetStatus: true,

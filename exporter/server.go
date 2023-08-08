@@ -5,14 +5,17 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 )
 
-var ServerMap map[string]http.Handler
+// ServerMap stores http handlers for each host
+var serverMap map[string]http.Handler
 
+// ServerOpts is the options for the main http handler
 type ServerOpts struct {
 	Path             string
 	MultiTargetPath  string
@@ -20,6 +23,7 @@ type ServerOpts struct {
 	TLSConfigPath    string
 }
 
+// Runs the main web-server
 func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	mux := http.DefaultServeMux
 
@@ -27,23 +31,27 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 		panic("No exporters were builded. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
 	}
 
-	ServerMap = buildServerMap(exporters, log)
+	buildServerMap(exporters, log)
 
 	defaultExporter := exporters[0]
 	mux.Handle(opts.Path, defaultExporter.Handler())
 	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
+		_, err := w.Write([]byte(`<html>
             <head><title>MongoDB Exporter</title></head>
             <body>
             <h1>MongoDB Exporter</h1>
             <p><a href='/metrics'>Metrics</a></p>
             </body>
             </html>`))
+		if err != nil {
+			log.Errorf("error writing response: %v", err)
+		}
 	})
 
 	server := &http.Server{
-		Handler: mux,
+		ReadHeaderTimeout: 2 * time.Second,
+		Handler:           mux,
 	}
 	flags := &web.FlagConfig{
 		WebListenAddresses: &[]string{opts.WebListenAddress},
@@ -62,7 +70,7 @@ func multiTargetHandler(w http.ResponseWriter, r *http.Request) {
 			targetHost = "mongodb://" + targetHost
 		}
 		if uri, err := url.Parse(targetHost); err == nil {
-			if e, ok := ServerMap[uri.Host]; ok {
+			if e, ok := serverMap[uri.Host]; ok {
 				e.ServeHTTP(w, r)
 				return
 			}
@@ -72,7 +80,7 @@ func multiTargetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func buildServerMap(exporters []*Exporter, log *logrus.Logger) map[string]http.Handler {
-	serverMap := make(map[string]http.Handler, len(exporters))
+	serverMap = make(map[string]http.Handler, len(exporters))
 	for _, e := range exporters {
 		if url, err := url.Parse(e.opts.URI); err == nil {
 			serverMap[url.Host] = e.Handler()
