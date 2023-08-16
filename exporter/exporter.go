@@ -56,13 +56,14 @@ type Opts struct {
 	DiscoveringMode        bool
 	GlobalConnPool         bool
 
-	CollectAll             bool
-	EnableDBStats          bool
-	EnableDiagnosticData   bool
-	EnableReplicasetStatus bool
-	EnableTopMetrics       bool
-	EnableIndexStats       bool
-	EnableCollStats        bool
+	CollectAll               bool
+	EnableDBStats            bool
+	EnableDBStatsFreeStorage bool
+	EnableDiagnosticData     bool
+	EnableReplicasetStatus   bool
+	EnableTopMetrics         bool
+	EnableIndexStats         bool
+	EnableCollStats          bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -151,6 +152,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		}
 		e.opts.EnableDiagnosticData = true
 		e.opts.EnableDBStats = true
+		e.opts.EnableDBStatsFreeStorage = true
 		e.opts.EnableCollStats = true
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
@@ -160,6 +162,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	// arbiter only have isMaster privileges
 	if isArbiter {
 		e.opts.EnableDBStats = false
+		e.opts.EnableDBStatsFreeStorage = false
 		e.opts.EnableCollStats = false
 		e.opts.EnableTopMetrics = false
 		e.opts.EnableReplicasetStatus = false
@@ -190,7 +193,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if e.opts.EnableDBStats && limitsOk && requestOpts.EnableDBStats {
 		cc := newDBStatsCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo, nil)
+			e.opts.CompatibleMode, topologyInfo, nil, e.opts.EnableDBStatsFreeStorage)
 		registry.MustRegister(cc)
 	}
 
