@@ -32,10 +32,12 @@ type dbstatsCollector struct {
 	topologyInfo   labelsGetter
 
 	databaseFilter []string
+
+	freeStorage bool
 }
 
 // newDBStatsCollector creates a collector for statistics on database storage.
-func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string) *dbstatsCollector {
+func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string, freeStorage bool) *dbstatsCollector {
 	return &dbstatsCollector{
 		ctx:  ctx,
 		base: newBaseCollector(client, logger),
@@ -44,6 +46,8 @@ func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logr
 		topologyInfo:   topology,
 
 		databaseFilter: databaseRegex,
+
+		freeStorage: freeStorage,
 	}
 }
 
@@ -71,7 +75,12 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debugf("getting stats for databases: %v", dbNames)
 	for _, db := range dbNames {
 		var dbStats bson.M
-		cmd := bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}}
+		var cmd bson.D
+		if d.freeStorage {
+			cmd = bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}, {Key: "freeStorage", Value: 1}}
+		} else {
+			cmd = bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}}
+		}
 		r := client.Database(db).RunCommand(d.ctx, cmd)
 		err := r.Decode(&dbStats)
 		if err != nil {
