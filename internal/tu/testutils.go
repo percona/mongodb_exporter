@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -139,7 +138,7 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 
 // LoadJSON loads a file and returns the result of unmarshaling it into a bson.M structure.
 func LoadJSON(filename string) (bson.M, error) {
-	buf, err := ioutil.ReadFile(filepath.Clean(filename))
+	buf, err := os.ReadFile(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
 	}
