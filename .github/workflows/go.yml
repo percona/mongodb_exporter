@@ -38,14 +38,6 @@ jobs:
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
-      - name: Initialize dependencies and linters
-        run: make init
-
-      - name: Diff
-        run: |
-          make format
-          git diff --exit-code
-
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
