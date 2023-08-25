@@ -18,7 +18,7 @@ package exporter
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -100,7 +100,7 @@ func TestMakeLockMetric(t *testing.T) {
 }
 
 func TestAddLocksMetrics(t *testing.T) {
-	buf, err := ioutil.ReadFile(filepath.Join("testdata/", "locks.json"))
+	buf, err := os.ReadFile(filepath.Join("testdata/", "locks.json"))
 	assert.NoError(t, err)
 
 	var m bson.M
@@ -163,7 +163,7 @@ func TestSumMetrics(t *testing.T) {
 		testCase := tt
 
 		t.Run(tt.name, func(t *testing.T) {
-			buf, err := ioutil.ReadFile(filepath.Join("testdata/", "get_diagnostic_data.json"))
+			buf, err := os.ReadFile(filepath.Join("testdata/", "get_diagnostic_data.json"))
 			assert.NoError(t, err)
 
 			var m bson.M
