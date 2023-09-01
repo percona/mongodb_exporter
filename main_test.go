@@ -130,5 +130,4 @@ func TestBuildURI(t *testing.T) {
 		t.Fail()
 	}
 	newUri = ""
-
 }
