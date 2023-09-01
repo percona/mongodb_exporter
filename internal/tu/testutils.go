@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // Package tu has Test Util functions
 package tu
@@ -20,11 +19,12 @@ package tu
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +48,8 @@ const (
 	MongoDBStandAlonePort = "27017"
 	// MongoDBConfigServer1Port MongoDB config server primary Port.
 	MongoDBConfigServer1Port = "17009"
+	// MongoDBStandAloneEncryptedPort MongoDB standalone encrypted instance Port.
+	MongoDBStandAloneEncryptedPort = "27027"
 )
 
 // GetenvDefault gets a variable from the environment and returns its value or the
@@ -66,6 +68,42 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	port, err := PortForContainer("mongo-1-1")
 	require.NoError(t, err)
 	return TestClient(ctx, port, t)
+}
+
+// GetImageNameForDefault returns image name and version of running
+// default test mongo container.
+func GetImageNameForDefault() (string, string, error) {
+	di, err := InspectContainer("mongo-1-1")
+	if err != nil {
+		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
+	}
+
+	if len(di) == 0 {
+		return "", "", errors.Wrapf(err, "cannot get error for container %q (empty array)", "mongo-1-1")
+	}
+
+	split := strings.Split(di[0].Config.Image, ":")
+
+	const numOfImageNameParts = 2
+	if len(split) != numOfImageNameParts {
+		return "", "", errors.New(fmt.Sprintf("image name is not correct: %s", di[0].Config.Image))
+	}
+
+	imageBaseName, version := split[0], split[1]
+
+	for _, s := range di[0].Config.Env {
+		if strings.HasPrefix(s, "MONGO_VERSION=") {
+			version = strings.ReplaceAll(s, "MONGO_VERSION=", "")
+
+			break
+		}
+		if strings.HasPrefix(s, "PSMDB_VERSION=") {
+			version = strings.ReplaceAll(s, "PSMDB_VERSION=", "")
+
+			break
+		}
+	}
+	return imageBaseName, version, nil
 }
 
 // TestClient returns a new MongoDB connection to the specified server port.
@@ -100,7 +138,7 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 
 // LoadJSON loads a file and returns the result of unmarshaling it into a bson.M structure.
 func LoadJSON(filename string) (bson.M, error) {
-	buf, err := ioutil.ReadFile(filepath.Clean(filename))
+	buf, err := os.ReadFile(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
 	}

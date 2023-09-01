@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package main
 
@@ -47,12 +46,13 @@ type GlobalFlags struct {
 	TLSConfigPath         string `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
 	LogLevel              string `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 
-	EnableDiagnosticData   bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
-	EnableReplicasetStatus bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
-	EnableDBStats          bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
-	EnableTopMetrics       bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
-	EnableIndexStats       bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
-	EnableCollStats        bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
+	EnableDiagnosticData     bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
+	EnableReplicasetStatus   bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
+	EnableDBStats            bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
+	EnableDBStatsFreeStorage bool `name:"collector.dbstatsfreestorage" help:"Enable collecting free space metrics from dbStats"`
+	EnableTopMetrics         bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
+	EnableIndexStats         bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
+	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
@@ -138,12 +138,13 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		TLSConfigPath:         opts.TLSConfigPath,
 		DirectConnect:         opts.DirectConnect,
 
-		EnableDiagnosticData:   opts.EnableDiagnosticData,
-		EnableReplicasetStatus: opts.EnableReplicasetStatus,
-		EnableTopMetrics:       opts.EnableTopMetrics,
-		EnableDBStats:          opts.EnableDBStats,
-		EnableIndexStats:       opts.EnableIndexStats,
-		EnableCollStats:        opts.EnableCollStats,
+		EnableDiagnosticData:     opts.EnableDiagnosticData,
+		EnableReplicasetStatus:   opts.EnableReplicasetStatus,
+		EnableTopMetrics:         opts.EnableTopMetrics,
+		EnableDBStats:            opts.EnableDBStats,
+		EnableDBStatsFreeStorage: opts.EnableDBStatsFreeStorage,
+		EnableIndexStats:         opts.EnableIndexStats,
+		EnableCollStats:          opts.EnableCollStats,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 

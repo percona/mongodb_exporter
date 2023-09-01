@@ -1,25 +1,24 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"sort"
 	"strings"
 	"testing"
@@ -72,6 +71,73 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
+}
+
+func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+	logger := logrus.New()
+	ti := labelsGetterMock{}
+
+	imageBaseName, version, err := tu.GetImageNameForDefault()
+	require.NoError(t, err)
+
+	var vendor string
+	if strings.HasPrefix(imageBaseName, "percona/") {
+		vendor = "Percona"
+	} else {
+		vendor = "MongoDB"
+	}
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+	// The last \n at the end of this string is important
+	expected := strings.NewReader(fmt.Sprintf(`
+	# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
+	# TYPE mongodb_mongod_storage_engine gauge
+	mongodb_mongod_storage_engine{engine="wiredTiger"} 1
+	# HELP mongodb_version_info The server version
+	# TYPE mongodb_version_info gauge
+	mongodb_version_info{edition="Community",mongodb="%s",vendor="%s"} 1`, version, vendor) + "\n")
+
+	// Filter metrics for 2 reasons:
+	// 1. The result is huge
+	// 2. We need to check against know values. Don't use metrics that return counters like uptime
+	//    or counters like the number of transactions because they won't return a known value to compare
+	filter := []string{
+		"mongodb_mongod_storage_engine",
+		"mongodb_version_info",
+	}
+
+	err = testutil.CollectAndCompare(c, expected, filter...)
+	assert.NoError(t, err)
+}
+
+func getMongoDBVersion(t *testing.T, client *mongo.Client, ctx context.Context, logger *logrus.Logger) (string, error) {
+	var m bson.M
+	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
+	res := client.Database("admin").RunCommand(ctx, cmd)
+	if res.Err() != nil {
+		return "", res.Err()
+	}
+
+	if err := res.Decode(&m); err != nil {
+		logger.Errorf("cannot run getDiagnosticData: %s", err)
+	}
+
+	m, ok := m["data"].(bson.M)
+	if !ok {
+		return "", errors.New("cannot decode getDiagnosticData")
+	}
+
+	v := walkTo(m, []string{"serverStatus", "version"})
+	serverVersion, ok := v.(string)
+	if !ok {
+		serverVersion = "server version is unavailable"
+	}
+	return serverVersion, nil
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
@@ -213,7 +279,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	assert.NoError(t, err)
 
 	logger := logrus.New()
-	logger.Out = ioutil.Discard // diable logs in tests
+	logger.Out = io.Discard // diable logs in tests
 
 	ti := labelsGetterMock{}
 
@@ -224,12 +290,9 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	# HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
 	# TYPE mongodb_mongod_replset_my_state gauge
 	mongodb_mongod_replset_my_state{set=""} 6
-	# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
-	# TYPE mongodb_mongod_storage_engine gauge
-	mongodb_mongod_storage_engine{engine="Engine is unavailable"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{mongodb="server version is unavailable"} 1` + "\n")
+	mongodb_version_info{edition="",mongodb="",vendor=""} 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime

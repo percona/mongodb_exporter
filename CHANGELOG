@@ -1,3 +1,28 @@
+Release 0.39.0
+
+- Fixed issue with connection to authenticated MongoDB Arbiter
+- Update dependencies
+
+Release 0.38.0
+
+- Fixed setting auth options for connection to MongoDB
+
+Release 0.37.0
+
+- Disable creating metric mongodb_mongod_storage_engine when it's not possible to retrieve (for example for mongos type of instance)
+- Update dependencies
+
+Release 0.36.0
+
+- Added security metrics with info about encryption
+- Fixed fetching build info for mongos instance
+- Fix metric mongodb_mongos_sharding_balancer_enabled
+
+Release 0.35.0
+
+- Added to metrics info about running MongoDB version and Mongo vendor
+- Removed unused collector
+
 Release 0.34.0
 
 - Add logger with level
