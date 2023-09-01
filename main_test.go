@@ -40,7 +40,6 @@ func TestBuildExporter(t *testing.T) {
 }
 
 func TestBuildURI(t *testing.T) {
-
 	tests := []struct {
 		situation   string
 		origin      string
