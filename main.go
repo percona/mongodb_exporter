@@ -91,6 +91,22 @@ func main() {
 	e.Run()
 }
 
+func buildURI(uri string, user string, password string) string {
+	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
+	// DO concat a new uri with user and pass arguments value
+	if !strings.Contains(uri, "@") && user != "" && password != "" {
+		// trim mongodb:// prefix to handle user and pass logic
+		uri = strings.TrimPrefix(uri, "mongodb://")
+
+		// log.Debugf("add user and pass to the uri")
+		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
+
+		// add back mongodb://
+		uri = "mongodb://" + uri
+	}
+	return uri
+}
+
 func buildExporter(opts GlobalFlags) *exporter.Exporter {
 	log := logrus.New()
 
@@ -105,18 +121,7 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
 
-	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
-	// DO concat a new uri with user and pass arguments value
-	if !strings.Contains(opts.URI, "@") && opts.User != "" && opts.Password != "" {
-		// trim mongodb:// prefix to handle user and pass logic
-		opts.URI = strings.TrimPrefix(opts.URI, "mongodb://")
-
-		log.Debugf("add user and pass to the uri")
-		opts.URI = fmt.Sprintf("%s:%s@%s", opts.User, opts.Password, opts.URI)
-
-		// add back mongodb://
-		opts.URI = "mongodb://" + opts.URI
-	}
+	opts.URI = buildURI(opts.URI, opts.User, opts.Password)
 
 	log.Debugf("Connection URI: %s", opts.URI)
 
