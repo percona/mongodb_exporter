@@ -67,14 +67,14 @@ func TestBuildURI(t *testing.T) {
 			origin:      "usr:pwd@127.0.0.1",
 			newUser:     "xxx",
 			newPassword: "yyy",
-			expect:      "usr:pwd@127.0.0.1",
+			expect:      "mongodb://usr:pwd@127.0.0.1",
 		},
 		{
 			situation:   "uri with no prefix and auth, no auth supplied in opt.User/Password",
 			origin:      "usr:pwd@127.0.0.1",
 			newUser:     "",
 			newPassword: "",
-			expect:      "usr:pwd@127.0.0.1",
+			expect:      "mongodb://usr:pwd@127.0.0.1",
 		},
 		{
 			situation:   "uri with prefix and no auth, and auth supplied in opt.User/Password",
@@ -102,7 +102,7 @@ func TestBuildURI(t *testing.T) {
 			origin:      "127.0.0.1",
 			newUser:     "",
 			newPassword: "",
-			expect:      "127.0.0.1",
+			expect:      "mongodb://127.0.0.1",
 		},
 	}
 	for _, tc := range tests {
