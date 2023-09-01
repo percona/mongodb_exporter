@@ -16,6 +16,7 @@
 package main
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -39,98 +40,76 @@ func TestBuildExporter(t *testing.T) {
 }
 
 func TestBuildURI(t *testing.T) {
-	const newUser = "xxx"
-	const newPass = "yyy"
 
-	const originalBareURI = "127.0.0.1"
-	const originalAuthURI = "usr:pwd@127.0.0.1"
-
-	const originalPrefixBareURI = "mongodb://127.0.0.1"
-	const originalPrefixAuthURI = "mongodb://usr:pwd@127.0.0.1"
-	const changedPrefixAuthURI = "mongodb://xxx:yyy@127.0.0.1"
-
-	var newUri string
-	resetNewUri := func() {
-		newUri = ""
+	tests := []struct {
+		situation   string
+		origin      string
+		expect      string
+		newUser     string
+		newPassword string
+	}{
+		{
+			situation:   "uri with prefix and auth, and auth supplied in opt.User/Password",
+			origin:      "mongodb://usr:pwd@127.0.0.1",
+			expect:      "mongodb://usr:pwd@127.0.0.1",
+			newUser:     "xxx",
+			newPassword: "yyy",
+		},
+		{
+			situation:   "uri with prefix and auth, no auth supplied in opt.User/Password",
+			origin:      "mongodb://usr:pwd@127.0.0.1",
+			expect:      "mongodb://usr:pwd@127.0.0.1",
+			newUser:     "",
+			newPassword: "",
+		},
+		{
+			situation:   "uri with no prefix and auth, and auth supplied in opt.User/Password",
+			origin:      "usr:pwd@127.0.0.1",
+			expect:      "usr:pwd@127.0.0.1",
+			newUser:     "xxx",
+			newPassword: "yyy",
+		},
+		{
+			situation:   "uri with no prefix and auth, no auth supplied in opt.User/Password",
+			origin:      "usr:pwd@127.0.0.1",
+			expect:      "usr:pwd@127.0.0.1",
+			newUser:     "",
+			newPassword: "",
+		},
+		{
+			situation:   "uri with prefix and no auth, and auth supplied in opt.User/Password",
+			origin:      "mongodb://127.0.0.1",
+			expect:      "mongodb://xxx:yyy@127.0.0.1",
+			newUser:     "xxx",
+			newPassword: "yyy",
+		},
+		{
+			situation:   "uri with prefix and no auth, no auth supplied in opt.User/Password",
+			origin:      "mongodb://127.0.0.1",
+			expect:      "mongodb://127.0.0.1",
+			newUser:     "",
+			newPassword: "",
+		},
+		{
+			situation:   "uri with no prefix and no auth, and auth supplied in opt.User/Password",
+			origin:      "127.0.0.1",
+			expect:      "mongodb://xxx:yyy@127.0.0.1",
+			newUser:     "xxx",
+			newPassword: "yyy",
+		},
+		{
+			situation:   "uri with no prefix and no auth, no auth supplied in opt.User/Password",
+			origin:      "127.0.0.1",
+			expect:      "127.0.0.1",
+			newUser:     "",
+			newPassword: "",
+		},
 	}
-
-	t.Log("\nuri with prefix and auth, and auth supplied in opt.User/Password")
-	newUri = buildURI(originalPrefixAuthURI, newUser, newPass)
-	t.Logf("Origin: %s", originalPrefixAuthURI)
-	t.Logf("Expect: %s", originalPrefixAuthURI)
-	t.Logf("Result: %s", newUri)
-	if newUri != originalPrefixAuthURI {
-		t.Fail()
+	for _, tc := range tests {
+		newUri := buildURI(tc.origin, tc.newUser, tc.newPassword)
+		// t.Logf("Origin: %s", tc.origin)
+		// t.Logf("Expect: %s", tc.expect)
+		// t.Logf("Result: %s", newUri)
+		assert.Equal(t, newUri, tc.expect)
 	}
-	resetNewUri()
-
-	t.Log("\nuri with prefix and auth, no auth supplied in opt.User/Password")
-	newUri = buildURI(originalPrefixAuthURI, "", "")
-	t.Logf("Origin: %s", originalPrefixAuthURI)
-	t.Logf("Expect: %s", originalPrefixAuthURI)
-	t.Logf("Result: %s", newUri)
-	if newUri != originalPrefixAuthURI {
-		t.Fail()
-	}
-	resetNewUri()
-
-	t.Log("\nuri with no prefix and auth, and auth supplied in opt.User/Password")
-	newUri = buildURI(originalAuthURI, newUser, newPass)
-	t.Logf("Origin: %s", originalAuthURI)
-	t.Logf("Expect: %s", originalAuthURI)
-	t.Logf("Result: %s", newUri)
-	if newUri != originalAuthURI {
-		t.Fail()
-	}
-	resetNewUri()
-
-	t.Log("\nuri with no prefix and auth, no auth supplied in opt.User/Password")
-	newUri = buildURI(originalAuthURI, "", "")
-	t.Logf("Origin: %s", originalAuthURI)
-	t.Logf("Expect: %s", originalAuthURI)
-	t.Logf("Result: %s", newUri)
-	if newUri != originalAuthURI {
-		t.Fail()
-	}
-	resetNewUri()
-
-	t.Log("\nuri with prefix and no auth, and auth supplied in opt.User/Password")
-	newUri = buildURI(originalPrefixBareURI, newUser, newPass)
-	t.Logf("Origin: %s", originalPrefixBareURI)
-	t.Logf("Expect: %s", changedPrefixAuthURI)
-	t.Logf("Result: %s", newUri)
-	if newUri != changedPrefixAuthURI {
-		t.Fail()
-	}
-	resetNewUri()
-
-	t.Log("\nuri with prefix and no auth, no auth supplied in opt.User/Password")
-	newUri = buildURI(originalPrefixBareURI, "", "")
-	t.Logf("Origin: %s", originalPrefixBareURI)
-	t.Logf("Expect: %s", originalPrefixBareURI)
-	t.Logf("Result: %s", newUri)
-	if newUri != originalPrefixBareURI {
-		t.Fail()
-	}
-	resetNewUri()
-
-	t.Log("\nuri with no prefix and no auth, and auth supplied in opt.User/Password")
-	newUri = buildURI(originalBareURI, newUser, newPass)
-	t.Logf("Origin: %s", originalBareURI)
-	t.Logf("Expect: %s", changedPrefixAuthURI)
-	t.Logf("Result: %s", newUri)
-	if newUri != changedPrefixAuthURI {
-		t.Fail()
-	}
-	resetNewUri()
-
-	t.Log("\nuri with no prefix and no auth, no auth supplied in opt.User/Password")
-	newUri = buildURI(originalBareURI, "", "")
-	t.Logf("Origin: %s", originalBareURI)
-	t.Logf("Expect: %s", originalBareURI)
-	t.Logf("Result: %s", newUri)
-	if newUri != originalBareURI {
-		t.Fail()
-	}
-	resetNewUri()
 }
