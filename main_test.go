@@ -50,6 +50,9 @@ func TestBuildURI(t *testing.T) {
 	const changedPrefixAuthURI = "mongodb://xxx:yyy@127.0.0.1"
 
 	var newUri string
+	resetNewUri := func() {
+		newUri = ""
+	}
 
 	t.Log("\nuri with prefix and auth, and auth supplied in opt.User/Password")
 	newUri = buildURI(originalPrefixAuthURI, newUser, newPass)
@@ -59,7 +62,7 @@ func TestBuildURI(t *testing.T) {
 	if newUri != originalPrefixAuthURI {
 		t.Fail()
 	}
-	newUri = ""
+	resetNewUri()
 
 	t.Log("\nuri with prefix and auth, no auth supplied in opt.User/Password")
 	newUri = buildURI(originalPrefixAuthURI, "", "")
@@ -69,7 +72,7 @@ func TestBuildURI(t *testing.T) {
 	if newUri != originalPrefixAuthURI {
 		t.Fail()
 	}
-	newUri = ""
+	resetNewUri()
 
 	t.Log("\nuri with no prefix and auth, and auth supplied in opt.User/Password")
 	newUri = buildURI(originalAuthURI, newUser, newPass)
@@ -79,7 +82,7 @@ func TestBuildURI(t *testing.T) {
 	if newUri != originalAuthURI {
 		t.Fail()
 	}
-	newUri = ""
+	resetNewUri()
 
 	t.Log("\nuri with no prefix and auth, no auth supplied in opt.User/Password")
 	newUri = buildURI(originalAuthURI, "", "")
@@ -89,7 +92,7 @@ func TestBuildURI(t *testing.T) {
 	if newUri != originalAuthURI {
 		t.Fail()
 	}
-	newUri = ""
+	resetNewUri()
 
 	t.Log("\nuri with prefix and no auth, and auth supplied in opt.User/Password")
 	newUri = buildURI(originalPrefixBareURI, newUser, newPass)
@@ -99,7 +102,7 @@ func TestBuildURI(t *testing.T) {
 	if newUri != changedPrefixAuthURI {
 		t.Fail()
 	}
-	newUri = ""
+	resetNewUri()
 
 	t.Log("\nuri with prefix and no auth, no auth supplied in opt.User/Password")
 	newUri = buildURI(originalPrefixBareURI, "", "")
@@ -109,7 +112,7 @@ func TestBuildURI(t *testing.T) {
 	if newUri != originalPrefixBareURI {
 		t.Fail()
 	}
-	newUri = ""
+	resetNewUri()
 
 	t.Log("\nuri with no prefix and no auth, and auth supplied in opt.User/Password")
 	newUri = buildURI(originalBareURI, newUser, newPass)
@@ -119,7 +122,7 @@ func TestBuildURI(t *testing.T) {
 	if newUri != changedPrefixAuthURI {
 		t.Fail()
 	}
-	newUri = ""
+	resetNewUri()
 
 	t.Log("\nuri with no prefix and no auth, no auth supplied in opt.User/Password")
 	newUri = buildURI(originalBareURI, "", "")
@@ -129,5 +132,5 @@ func TestBuildURI(t *testing.T) {
 	if newUri != originalBareURI {
 		t.Fail()
 	}
-	newUri = ""
+	resetNewUri()
 }
