@@ -1,0 +1,31 @@
+name: Build
+
+on:
+  pull_request:
+    branches:
+      - master
+      - dev
+
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
+
+      - run: make init
+      - run: make build
+
+      - name: Docker build
+        run: docker build . --tag ${{ secrets.DOCKERHUB_USERNAME }}/mongodb-exporter:latest
+
+      - name: Docker login
+        run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker push
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/mongodb-exporter:latest
