@@ -16,9 +16,10 @@
 |--web.config|Path to the file having Prometheus TLS config for basic auth|--web.config=STRING|
 |--log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]|--log.level="error"|
 |--collector.diagnosticdata|Enable collecting metrics from getDiagnosticData|
-|--collector.replicasetstatus|Enable collecting metrics from replSetGetStatus|
+|--collector.topmetrics|Enable collecting metrics from replSetGetStatus|
 |--collector.dbstats|Enable collecting metrics from dbStats||
 |--collector.topmetrics|Enable collecting metrics from top admin command|
+|--collector.topmetrics|Enable collecting metrics currentop admin command|
 |--collector.indexstats|Enable collecting metrics from $indexStats|
 |--collector.collstats|Enable collecting metrics from $collStats|
 |--collect-all|Enable all collectors. Same as specifying all --collector.\<name\>|

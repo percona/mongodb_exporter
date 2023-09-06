@@ -49,6 +49,7 @@ type GlobalFlags struct {
 	EnableDBStats            bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
 	EnableDBStatsFreeStorage bool `name:"collector.dbstatsfreestorage" help:"Enable collecting free space metrics from dbStats"`
 	EnableTopMetrics         bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
+	EnableCurrentopMetrics   bool `name:"collector.currentopmetrics" help:"Enable collecting metrics currentop admin command"`
 	EnableIndexStats         bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
 	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 
@@ -125,6 +126,7 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 
 		EnableDiagnosticData:     opts.EnableDiagnosticData,
 		EnableReplicasetStatus:   opts.EnableReplicasetStatus,
+		EnableCurrentopMetrics:   opts.EnableCurrentopMetrics,
 		EnableTopMetrics:         opts.EnableTopMetrics,
 		EnableDBStats:            opts.EnableDBStats,
 		EnableDBStatsFreeStorage: opts.EnableDBStatsFreeStorage,
