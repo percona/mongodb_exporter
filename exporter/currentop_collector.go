@@ -116,7 +116,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 			logger.Errorf("Invalid type string assertion for 'op': %t", ok)
 			break
 		}
-		desс, ok := bsonMapElement["desc"].(string)
+		desc, ok := bsonMapElement["desc"].(string)
 		if !ok {
 			logger.Errorf("Invalid type string assertion for 'desc': %t", ok)
 			break
@@ -130,7 +130,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 		labels := d.topologyInfo.baseLabels()
 		labels["opid"] = strconv.Itoa(int(opid))
 		labels["op"] = op
-		labels["desс"] = desс
+		labels["desc"] = desc
 		labels["database"] = db
 		labels["collection"] = collection
 		labels["ns"] = namespace
