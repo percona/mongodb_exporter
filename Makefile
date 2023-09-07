@@ -16,6 +16,7 @@ NAME ?= mongodb_exporter
 REPO ?= percona/$(NAME)
 GORELEASER_FLAGS ?=
 UID ?= $(shell id -u)
+CGO_ENABLED ?= 0
 
 export TEST_MONGODB_IMAGE?=mongo:4.2
 export TEST_MONGODB_ADMIN_USERNAME?=
