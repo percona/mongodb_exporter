@@ -223,7 +223,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(coc)
 	}
 
-	if e.opts.EnableProfile && nodeType != typeMongos && limitsOk && requestOpts.EnableProfile {
+	if e.opts.EnableProfile && nodeType != typeMongos && limitsOk && requestOpts.EnableProfile && e.opts.ProfileTimeTS != 0 {
 		pc := newProfileCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo, e.opts.ProfileTimeTS)
 		registry.MustRegister(pc)

@@ -35,6 +35,7 @@ type profileCollector struct {
 	profiletimets  int
 }
 
+// newProfileCollector creates a collector for being processed queries.
 func newProfileCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger,
 	compatible bool, topology labelsGetter, profileTimeTS int,
 ) *profileCollector {
@@ -68,24 +69,27 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	// Now time + '--collector.profile-time-ts'
 	ts := primitive.NewDateTimeFromTime(time.Now().Add(-time.Duration(time.Second * time.Duration(timeScrape))))
 
 	labels := d.topologyInfo.baseLabels()
+
+	// Get all slow queries from all databases
 	cmd := bson.M{"ts": bson.M{"$gte": ts}}
 	for _, db := range databases {
-		m, _ := client.Database(db).Collection("system.profile").CountDocuments(d.ctx, cmd)
+		res, err := client.Database(db).Collection("system.profile").CountDocuments(d.ctx, cmd)
 		if err != nil {
-			errors.Wrapf(err, "cannot read system.profile", err)
+			errors.Wrapf(err, "cannot read system.profile")
 			break
 		}
 		labels["database"] = db
 
-		mm := primitive.M{"count": m}
+		m := primitive.M{"count": res}
 
 		logger.Debug("profile response from MongoDB:")
-		debugResult(logger, primitive.M{db: mm})
+		debugResult(logger, primitive.M{db: m})
 
-		for _, metric := range makeMetrics("profile_slow_query", mm, labels, d.compatibleMode) {
+		for _, metric := range makeMetrics("profile_slow_query", m, labels, d.compatibleMode) {
 			ch <- metric
 		}
 	}
