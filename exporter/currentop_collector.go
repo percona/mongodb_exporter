@@ -17,7 +17,7 @@ package exporter
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -97,34 +97,34 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 		bsonMapElement, ok := bsonMap.(primitive.M)
 		if !ok {
-			logger.Errorf("Invalid type primitive.M assertion for bsonMap: %t", ok)
-			break
+			logger.Errorf("Invalid type primitive.M assertion for bsonMap: %T", bsonMapElement)
+			continue
 		}
 		opid, ok := bsonMapElement["opid"].(int32)
 		if !ok {
-			logger.Errorf("Invalid type int32 assertion for 'opid': %t", ok)
-			break
+			logger.Errorf("Invalid type int32 assertion for 'opid': %T", bsonMapElement)
+			continue
 		}
 		namespace, ok := bsonMapElement["ns"].(string)
 		if !ok {
-			logger.Errorf("Invalid type string assertion for 'ns': %t", ok)
-			break
+			logger.Errorf("Invalid type string assertion for 'ns': %T", bsonMapElement)
+			continue
 		}
 		db, collection := splitNamespace(namespace)
 		op, ok := bsonMapElement["op"].(string)
 		if !ok {
-			logger.Errorf("Invalid type string assertion for 'op': %t", ok)
-			break
+			logger.Errorf("Invalid type string assertion for 'op': %T", bsonMapElement)
+			continue
 		}
 		desc, ok := bsonMapElement["desc"].(string)
 		if !ok {
-			logger.Errorf("Invalid type string assertion for 'desc': %t", ok)
-			break
+			logger.Errorf("Invalid type string assertion for 'desc': %T", bsonMapElement)
+			continue
 		}
 		microsecs_running, ok := bsonMapElement["microsecs_running"].(int64)
 		if !ok {
-			logger.Errorf("Invalid type int64 assertion for 'microsecs_running': %t", ok)
-			break
+			logger.Errorf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement)
+			continue
 		}
 
 		labels := d.topologyInfo.baseLabels()
