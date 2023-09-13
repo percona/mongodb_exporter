@@ -51,12 +51,15 @@ type GlobalFlags struct {
 	EnableTopMetrics         bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
 	EnableIndexStats         bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
 	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
+	EnableProfile            bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
 	CollectAll bool `name:"collect-all" help:"Enable all collectors. Same as specifying all --collector.<name>"`
 
 	CollStatsLimit int `name:"collector.collstats-limit" help:"Disable collstats, dbstats, topmetrics and indexstats collector if there are more than <n> collections. 0=No limit" default:"0"`
+
+	ProfileTimeTS int `name:"collector.profile-time-ts" help:"Set time for scrape slow queries." default:"30"`
 
 	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections" negatable:""`
 	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" negatable:""`
@@ -130,11 +133,13 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		EnableDBStatsFreeStorage: opts.EnableDBStatsFreeStorage,
 		EnableIndexStats:         opts.EnableIndexStats,
 		EnableCollStats:          opts.EnableCollStats,
+		EnableProfile:            opts.EnableProfile,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 
 		CollStatsLimit: opts.CollStatsLimit,
 		CollectAll:     opts.CollectAll,
+		ProfileTimeTS:  opts.ProfileTimeTS,
 	}
 
 	e := exporter.New(exporterOpts)
