@@ -59,6 +59,7 @@ type Opts struct {
 	DisableDefaultRegistry bool
 	DiscoveringMode        bool
 	GlobalConnPool         bool
+	ProfileTimeTS          int
 
 	CollectAll               bool
 	EnableDBStats            bool
@@ -69,6 +70,7 @@ type Opts struct {
 	EnableTopMetrics         bool
 	EnableIndexStats         bool
 	EnableCollStats          bool
+	EnableProfile            bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -172,6 +174,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableReplicasetStatus = true
 		e.opts.EnableIndexStats = true
 		e.opts.EnableCurrentopMetrics = true
+		e.opts.EnableProfile = true
 	}
 
 	// arbiter only have isMaster privileges
@@ -183,6 +186,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableReplicasetStatus = false
 		e.opts.EnableIndexStats = false
 		e.opts.EnableCurrentopMetrics = false
+		e.opts.EnableProfile = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -217,6 +221,12 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		coc := newCurrentopCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(coc)
+	}
+
+	if e.opts.EnableProfile && nodeType != typeMongos && limitsOk && requestOpts.EnableProfile && e.opts.ProfileTimeTS != 0 {
+		pc := newProfileCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo, e.opts.ProfileTimeTS)
+		registry.MustRegister(pc)
 	}
 
 	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
@@ -303,6 +313,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableIndexStats = true
 			case "collstats":
 				requestOpts.EnableCollStats = true
+			case "profile":
+				requestOpts.EnableProfile = true
 			}
 		}
 
