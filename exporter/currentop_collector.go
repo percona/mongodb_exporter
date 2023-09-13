@@ -34,7 +34,7 @@ type currentopCollector struct {
 	topologyInfo   labelsGetter
 }
 
-var ErrInvalidOrMissingInprogEntry = fmt.Errorf("invalid or misssing inprog entry in currentop results")
+var ErrInvalidOrMissingInprogEntry = errors.New("invalid or missing inprog entry in currentop results")
 
 // newCurrentopCollector creates a collector for being processed queries.
 func newCurrentopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger,
