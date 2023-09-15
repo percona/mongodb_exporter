@@ -71,14 +71,25 @@ Connecting user should have sufficient rights to query needed stats:
 More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
 
 #### Example
-```
+```sh
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001
+```
+
+#### MongoDB Authentication
+You can supply the mongodb user/password direct in the `--mongodb.uri=` like `--mongodb.uri=mongodb://user:pass@127.0.0.1:17001`, you can also supply the mongodb user/password with `--mongodb.user=`, `--mongodb.password=`
+but the user and password info will be leaked via `ps` or `top` command, for security issue, you can use `MONGODB_USER` and `MONGODB_PASSWORD` env variable to set user/password for given uri
+```sh
+MONGODB_USER=XXX MONGODB_PASSWORD=YYY mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+# or
+export MONGODB_USER=XXX
+export MONGODB_PASSWORD=YYY
+mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.
 Usage example: `--mongodb.collstats-colls=database1.collection1,database2.collection2`
-```
+```sh
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 #### Enabling compatibility mode.
