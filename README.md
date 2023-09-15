@@ -95,6 +95,16 @@ HELP mongodb_mongod_wiredtiger_log_bytes_total mongodb_mongod_wiredtiger_log_byt
 # TYPE mongodb_mongod_wiredtiger_log_bytes_total untyped
 mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
 ```
+#### Enabling profile metrics gathering
+`--collector.profile` 
+To collect metrics, you need to enable the profiler in [MongoDB](https://www.mongodb.com/docs/manual/tutorial/manage-the-database-profiler/):
+Usage example: `db.setProfilingLevel(2)`
+
+|Level|Description|
+|-----|-----------|
+|0| The profiler is off and does not collect any data. This is the default profiler level.|
+|1| The profiler collects data for operations that take longer than the value of `slowms` or that match a filter.<br> When a filter is set: <ul><li> The `slowms` and `sampleRate` options are not used for profiling.</li><li>The profiler only captures operations that match the filter.</li></ul>
+|2|The profiler collects data for all operations.|
 
 #### Cluster role labels
 The exporter sets some topology labels in all metrics.
