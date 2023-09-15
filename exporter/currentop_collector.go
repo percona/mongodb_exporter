@@ -17,9 +17,9 @@ package exporter
 
 import (
 	"context"
-	"errors"
 	"strconv"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
