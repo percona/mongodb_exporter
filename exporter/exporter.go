@@ -66,6 +66,7 @@ type Opts struct {
 	EnableDBStatsFreeStorage bool
 	EnableDiagnosticData     bool
 	EnableReplicasetStatus   bool
+	EnableCurrentopMetrics   bool
 	EnableTopMetrics         bool
 	EnableIndexStats         bool
 	EnableCollStats          bool
@@ -172,6 +173,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
 		e.opts.EnableIndexStats = true
+		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
 	}
 
@@ -183,6 +185,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableTopMetrics = false
 		e.opts.EnableReplicasetStatus = false
 		e.opts.EnableIndexStats = false
+		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
 	}
 
@@ -213,6 +216,12 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 			e.opts.CompatibleMode, topologyInfo, nil, e.opts.EnableDBStatsFreeStorage)
 		registry.MustRegister(cc)
 	}
+
+	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableCurrentopMetrics {
+		coc := newCurrentopCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(coc)
+  }
 
 	if e.opts.EnableProfile && nodeType != typeMongos && limitsOk && requestOpts.EnableProfile && e.opts.ProfileTimeTS != 0 {
 		pc := newProfileCollector(ctx, client, e.opts.Logger,
@@ -298,6 +307,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableDBStats = true
 			case "topmetrics":
 				requestOpts.EnableTopMetrics = true
+			case "currentopmetrics":
+				requestOpts.EnableCurrentopMetrics = true
 			case "indexstats":
 				requestOpts.EnableIndexStats = true
 			case "collstats":

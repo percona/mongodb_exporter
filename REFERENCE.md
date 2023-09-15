@@ -19,6 +19,7 @@
 |--collector.replicasetstatus|Enable collecting metrics from replSetGetStatus|
 |--collector.dbstats|Enable collecting metrics from dbStats||
 |--collector.topmetrics|Enable collecting metrics from top admin command|
+|--collector.currentopmetrics|Enable collecting metrics from currentop admin command|
 |--collector.indexstats|Enable collecting metrics from $indexStats|
 |--collector.collstats|Enable collecting metrics from $collStats|
 |--collect-all|Enable all collectors. Same as specifying all --collector.\<name\>|
