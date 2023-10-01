@@ -208,7 +208,9 @@ func asFloat64(value interface{}) (*float64, error) {
 		f = v
 	case primitive.DateTime:
 		f = float64(v)
-	case primitive.A, primitive.ObjectID, primitive.Timestamp, primitive.Binary, string, []uint8, time.Time:
+	case primitive.Timestamp:
+		f = float64(v.T)
+	case primitive.A, primitive.ObjectID, primitive.Binary, string, []uint8, time.Time:
 		return nil, nil
 	default:
 		return nil, errors.Wrapf(errCannotHandleType, "%T", v)
