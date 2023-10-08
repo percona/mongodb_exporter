@@ -43,7 +43,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	mux := http.DefaultServeMux
 
 	if len(exporters) == 0 {
-		panic("No exporters were builded. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
+		panic("No exporters were built. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
 	}
 
 	buildServerMap(exporters, log)
