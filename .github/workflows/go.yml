@@ -3,7 +3,7 @@ name: Go
 on:
   schedule:
     # run every Sunday
-    - cron: "0 13 * * 0"
+    - cron: '0 13 * * 0'
   push:
     branches:
       - main
@@ -19,8 +19,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version:
-          - 1.17.x
         image:
           - mongo:4.2
           - mongo:4.4
@@ -28,58 +26,20 @@ jobs:
           - percona/percona-server-mongodb:4.2
           - percona/percona-server-mongodb:4.4
           - percona/percona-server-mongodb:5.0
-        os: [ubuntu-latest]
-        may-fail: [false]
 
-        include:
-          # test only one image on tip to detect major Go changes earlier
-          # without wasting too much time on CI
-          - go-version: tip
-            image: mongo:4.4
-            os: ubuntu-latest
-            may-fail: true
-
-    continue-on-error: ${{ matrix.may-fail }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Go release
-        if: matrix.go-version != 'tip'
-        uses: percona-platform/setup-go@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go-version }}
-
-      - name: Set up Go tip
-        if: matrix.go-version == 'tip'
-        run: |
-          git clone --depth=1 https://go.googlesource.com/go $HOME/gotip
-          cd $HOME/gotip/src
-          ./make.bash
-          echo "GOROOT=$HOME/gotip" >> $GITHUB_ENV
-          echo "$HOME/gotip/bin" >> $GITHUB_PATH
-
-      - name: Check out code into the Go module directory
-        uses: percona-platform/checkout@v3
-
-      - name: Initialize dependencies and linters
-        run: |
-          make init
-
-      - name: Diff
-        if: startsWith( ${{ matrix.go-version }}, '1.17')
-        run: |
-          make format
-          git diff --exit-code
+          go-version-file: ${{ github.workspace }}/go.mod
 
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
           make test-race
           make test-cluster-clean
-
-      - name: Run checks/linters
-        run: |
-          # use GITHUB_TOKEN because only it has access to GitHub Checks API
-          bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
-          bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
-          make check-license
