@@ -72,7 +72,7 @@ type GlobalFlags struct {
 
 func main() {
 	var opts GlobalFlags
-	_ = kong.Parse(&opts,
+	ctx := kong.Parse(&opts,
 		kong.Name("mongodb_exporter"),
 		kong.Description("MongoDB Prometheus exporter"),
 		kong.UsageOnError(),
@@ -106,6 +106,10 @@ func main() {
 	if opts.WebTelemetryPath == "" {
 		log.Warn("Web telemetry path \"\" invalid, falling back to \"/\" instead")
 		opts.WebTelemetryPath = "/"
+	}
+
+	if len(opts.URI) == 0 {
+		ctx.Fatalf("No MongoDB hosts were specified. You must specify the host(s) with the --mongodb.uri command argument or the MONGODB_URI environment variable")
 	}
 
 	serverOpts := &exporter.ServerOpts{
@@ -155,9 +159,6 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 }
 
 func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
-	if len(opts.URI) == 1 {
-		opts.URI = strings.Split(opts.URI[0], " ")
-	}
 
 	servers := make([]*exporter.Exporter, len(opts.URI))
 

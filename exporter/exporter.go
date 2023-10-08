@@ -371,12 +371,6 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 		clientOpts.SetServerSelectionTimeout(connectTimeout)
 	}
 
-	if clientOpts.ConnectTimeout == nil {
-		connectTimeout := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
-		clientOpts.SetConnectTimeout(connectTimeout)
-		clientOpts.SetServerSelectionTimeout(connectTimeout)
-	}
-
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
 		return nil, fmt.Errorf("invalid MongoDB options: %w", err)
