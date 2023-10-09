@@ -40,7 +40,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
