@@ -106,8 +106,8 @@ test-race: env              ## Run all tests with race flag
 test-cover: env              ## Run tests and collect cross-package coverage information
 	go test -race -timeout 30s -coverprofile=cover.out -covermode=atomic -coverpkg=./... ./...
 
-test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:4.4 make test-cluster
-	docker-compose up -d
+test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
+	docker compose up -d --wait
 
-test-cluster-clean: env     ## Stops MongoDB test cluster
-	docker-compose down --remove-orphans --volumes --timeout 1
+test-cluster-clean: env     ## Stops MongoDB test cluster.
+	docker compose down --remove-orphans --volumes --timeout 1

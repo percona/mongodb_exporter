@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // Package exporter implements the collectors and metrics handlers.
 package exporter
@@ -60,14 +59,18 @@ type Opts struct {
 	DisableDefaultRegistry bool
 	DiscoveringMode        bool
 	GlobalConnPool         bool
+	ProfileTimeTS          int
 
-	CollectAll             bool
-	EnableDBStats          bool
-	EnableDiagnosticData   bool
-	EnableReplicasetStatus bool
-	EnableTopMetrics       bool
-	EnableIndexStats       bool
-	EnableCollStats        bool
+	CollectAll               bool
+	EnableDBStats            bool
+	EnableDBStatsFreeStorage bool
+	EnableDiagnosticData     bool
+	EnableReplicasetStatus   bool
+	EnableCurrentopMetrics   bool
+	EnableTopMetrics         bool
+	EnableIndexStats         bool
+	EnableCollStats          bool
+	EnableProfile            bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -165,20 +168,25 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		}
 		e.opts.EnableDiagnosticData = true
 		e.opts.EnableDBStats = true
+		e.opts.EnableDBStatsFreeStorage = true
 		e.opts.EnableCollStats = true
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
 		e.opts.EnableIndexStats = true
+		e.opts.EnableCurrentopMetrics = true
+		e.opts.EnableProfile = true
 	}
 
 	// arbiter only have isMaster privileges
 	if isArbiter {
-		e.opts.EnableDiagnosticData = false
 		e.opts.EnableDBStats = false
+		e.opts.EnableDBStatsFreeStorage = false
 		e.opts.EnableCollStats = false
 		e.opts.EnableTopMetrics = false
 		e.opts.EnableReplicasetStatus = false
 		e.opts.EnableIndexStats = false
+		e.opts.EnableCurrentopMetrics = false
+		e.opts.EnableProfile = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -205,8 +213,20 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if e.opts.EnableDBStats && limitsOk && requestOpts.EnableDBStats {
 		cc := newDBStatsCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo, nil)
+			e.opts.CompatibleMode, topologyInfo, nil, e.opts.EnableDBStatsFreeStorage)
 		registry.MustRegister(cc)
+	}
+
+	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableCurrentopMetrics {
+		coc := newCurrentopCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(coc)
+	}
+
+	if e.opts.EnableProfile && nodeType != typeMongos && limitsOk && requestOpts.EnableProfile && e.opts.ProfileTimeTS != 0 {
+		pc := newProfileCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo, e.opts.ProfileTimeTS)
+		registry.MustRegister(pc)
 	}
 
 	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
@@ -287,10 +307,14 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableDBStats = true
 			case "topmetrics":
 				requestOpts.EnableTopMetrics = true
+			case "currentopmetrics":
+				requestOpts.EnableCurrentopMetrics = true
 			case "indexstats":
 				requestOpts.EnableIndexStats = true
 			case "collstats":
 				requestOpts.EnableCollStats = true
+			case "profile":
+				requestOpts.EnableProfile = true
 			}
 		}
 
@@ -359,11 +383,13 @@ func (e *Exporter) Run() {
 	})
 
 	server := &http.Server{
-		Addr:    e.webListenAddress,
 		Handler: mux,
 	}
-
-	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
+	flags := &web.FlagConfig{
+		WebListenAddresses: &[]string{e.webListenAddress},
+		WebConfigFile:      &e.opts.TLSConfigPath,
+	}
+	if err := web.ListenAndServe(server, flags, promlog.New(&promlog.Config{})); err != nil {
 		e.logger.Errorf("error starting server: %v", err)
 		os.Exit(1)
 	}

@@ -24,46 +24,46 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
-func TestGeneralCollector(t *testing.T) {
+func TestProfileCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
-	c := newGeneralCollector(ctx, client, logrus.New())
+
+	database := client.Database("testdb")
+	database.Drop(ctx) //nolint
+
+	defer func() {
+		err := database.Drop(ctx)
+		assert.NoError(t, err)
+	}()
+
+	// Enable database profiler https://www.mongodb.com/docs/manual/tutorial/manage-the-database-profiler/
+	cmd := bson.M{"profile": 2}
+	_ = database.RunCommand(ctx, cmd)
+
+	ti := labelsGetterMock{}
+
+	c := newProfileCollector(ctx, client, logrus.New(), false, ti, 30)
+
+	expected := strings.NewReader(`
+	# HELP mongodb_profile_slow_query_count profile_slow_query.
+	# TYPE mongodb_profile_slow_query_count counter
+	mongodb_profile_slow_query_count{database="admin"} 0
+	mongodb_profile_slow_query_count{database="config"} 0
+	mongodb_profile_slow_query_count{database="local"} 0
+	mongodb_profile_slow_query_count{database="testdb"} 0` +
+		"\n")
 
 	filter := []string{
-		"collector_scrape_time_ms",
+		"mongodb_profile_slow_query_count",
 	}
-	count := testutil.CollectAndCount(c, filter...)
-	assert.Equal(t, len(filter), count, "Meta-metric for collector is missing")
 
-	// The last \n at the end of this string is important
-	expected := strings.NewReader(`
-	# HELP mongodb_up Whether MongoDB is up.
-	# TYPE mongodb_up gauge
-	mongodb_up 1
-	` + "\n")
-	filter = []string{
-		"mongodb_up",
-	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
-	require.NoError(t, err)
-
-	assert.NoError(t, client.Disconnect(ctx))
-
-	expected = strings.NewReader(`
-	# HELP mongodb_up Whether MongoDB is up.
-	# TYPE mongodb_up gauge
-	mongodb_up 0
-	` + "\n")
-	filter = []string{
-		"mongodb_up",
-	}
-	err = testutil.CollectAndCompare(c, expected, filter...)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
