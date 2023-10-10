@@ -20,9 +20,12 @@
 |--collector.replicasetstatus|Enable collecting metrics from replSetGetStatus|
 |--collector.dbstats|Enable collecting metrics from dbStats||
 |--collector.topmetrics|Enable collecting metrics from top admin command|
+|--collector.currentopmetrics|Enable collecting metrics from currentop admin command|
 |--collector.indexstats|Enable collecting metrics from $indexStats|
 |--collector.collstats|Enable collecting metrics from $collStats|
 |--collect-all|Enable all collectors. Same as specifying all --collector.\<name\>|
 |--collector.collstats-limit=0|Disable collstats, dbstats, topmetrics and indexstats collector if there are more than \<n\> collections. 0=No limit|
+|--collector.profile-time-ts=30|Set time for scrape slow queries| This interval must be synchronized with the Prometheus scrape interval|
+|--collector.profile|Enable collecting metrics from profile|
 |--metrics.overridedescendingindex| Enable descending index name override to replace -1 with _DESC ||
 |--version|Show version and exit|
