@@ -159,7 +159,6 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 }
 
 func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
-
 	servers := make([]*exporter.Exporter, len(opts.URI))
 
 	for serverIdx := range opts.URI {
