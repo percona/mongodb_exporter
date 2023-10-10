@@ -18,7 +18,6 @@ package exporter
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -57,7 +56,7 @@ func TestMultiTarget(t *testing.T) {
 		exporters[i] = New(opt)
 	}
 	log := logrus.New()
-	buildServerMap(exporters, log)
+	serverMap := buildServerMap(exporters, log)
 
 	expected := []string{
 		"mongodb_up 1\n",
@@ -68,6 +67,6 @@ func TestMultiTarget(t *testing.T) {
 
 	// Test all targets
 	for sn, opt := range opts {
-		assert.HTTPBodyContains(t, http.HandlerFunc(multiTargetHandler), "GET", fmt.Sprintf("?target=%s", opt.URI), nil, expected[sn])
+		assert.HTTPBodyContains(t, multiTargetHandler(serverMap), "GET", fmt.Sprintf("?target=%s", opt.URI), nil, expected[sn])
 	}
 }

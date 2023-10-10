@@ -187,5 +187,6 @@ func buildURI(uri string, user string, password string) string {
 	if !strings.HasPrefix(uri, "mongodb") {
 		uri = "mongodb://" + uri
 	}
+
 	return uri
 }

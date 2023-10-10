@@ -28,7 +28,7 @@ import (
 )
 
 // ServerMap stores http handlers for each host
-var serverMap map[string]http.Handler
+type ServerMap map[string]http.Handler
 
 // ServerOpts is the options for the main http handler
 type ServerOpts struct {
@@ -46,11 +46,12 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 		panic("No exporters were built. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
 	}
 
-	buildServerMap(exporters, log)
+	serverMap := buildServerMap(exporters, log)
 
 	defaultExporter := exporters[0]
 	mux.Handle(opts.Path, defaultExporter.Handler())
-	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler)
+	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap))
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
             <head><title>MongoDB Exporter</title></head>
@@ -78,30 +79,33 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	}
 }
 
-func multiTargetHandler(w http.ResponseWriter, r *http.Request) {
-	targetHost := r.URL.Query().Get("target")
-	if targetHost != "" {
-		if !strings.HasPrefix(targetHost, "mongodb://") {
-			targetHost = "mongodb://" + targetHost
-		}
-		if uri, err := url.Parse(targetHost); err == nil {
-			if e, ok := serverMap[uri.Host]; ok {
-				e.ServeHTTP(w, r)
-				return
+func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		targetHost := r.URL.Query().Get("target")
+		if targetHost != "" {
+			if !strings.HasPrefix(targetHost, "mongodb://") {
+				targetHost = "mongodb://" + targetHost
+			}
+			if uri, err := url.Parse(targetHost); err == nil {
+				if e, ok := serverMap[uri.Host]; ok {
+					e.ServeHTTP(w, r)
+					return
+				}
 			}
 		}
+		http.Error(w, "Unable to find target", http.StatusNotFound)
 	}
-	http.Error(w, "Unable to find target", http.StatusNotFound)
 }
 
-func buildServerMap(exporters []*Exporter, log *logrus.Logger) map[string]http.Handler {
-	serverMap = make(map[string]http.Handler, len(exporters))
+func buildServerMap(exporters []*Exporter, log *logrus.Logger) ServerMap {
+	servers := make(ServerMap, len(exporters))
 	for _, e := range exporters {
 		if url, err := url.Parse(e.opts.URI); err == nil {
-			serverMap[url.Host] = e.Handler()
+			servers[url.Host] = e.Handler()
 		} else {
 			log.Errorf("Unable to parse addr %s as url: %s", e.opts.URI, err)
 		}
 	}
-	return serverMap
+
+	return servers
 }
