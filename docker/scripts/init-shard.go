@@ -11,6 +11,7 @@ import (
 func resolveHost(hostname string) (string, error) {
 	addrs, err := net.LookupHost(hostname)
 	if err != nil {
+		fmt.Println("Error resolving hostname:", err)
 		return "", err
 	}
 	return addrs[0], nil

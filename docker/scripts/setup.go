@@ -60,6 +60,7 @@ func generalServers(client *mongo.Client, ctx context.Context, replicaSet []stri
 }
 
 func main() {
+	
 	ctx := context.TODO()
 
 	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
@@ -69,7 +70,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer client.Disconnect(ctx)
-
+    
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run main.go <command>")
+		return
+    }
+	
 	mongo1 := os.Getenv("MONGO1")
 	mongo2 := os.Getenv("MONGO2")
 	mongo3 := os.Getenv("MONGO3")
@@ -83,7 +89,9 @@ func main() {
 		fmt.Println("Error waiting for startup:", err)
 		os.Exit(1)
 	}
-
+	
+	
+	
 	switch os.Args[1] {
 	case "cnf_servers":
 		err = cnfServers(client, ctx, configServers)
