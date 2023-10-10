@@ -98,3 +98,5 @@ nfpms:
         type: "config|noreplace"
       - src: .scripts/default/mongodb_exporter.example
         dst: /etc/default/mongodb_exporter.example
+      - src: LICENSE
+        dst: /usr/share/doc/mongodb_exporter/LICENSE
