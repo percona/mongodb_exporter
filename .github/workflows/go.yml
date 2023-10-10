@@ -20,10 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         image:
-          - mongo:4.2
           - mongo:4.4
           - mongo:5.0
-          - percona/percona-server-mongodb:4.2
           - percona/percona-server-mongodb:4.4
           - percona/percona-server-mongodb:5.0
 
@@ -31,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v4
