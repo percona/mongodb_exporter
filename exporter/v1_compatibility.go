@@ -971,7 +971,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 	for _, m := range repl.Members {
 		if m.StateStr == "PRIMARY" {
 			primaryOpTime = m.OptimeDate.Time()
-			gotPrimary = true
+			gotPrimary = !primaryOpTime.IsZero()
 
 			break
 		}

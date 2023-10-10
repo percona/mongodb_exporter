@@ -31,7 +31,7 @@ import (
 )
 
 func TestCurrentopCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	var wg sync.WaitGroup
@@ -48,7 +48,7 @@ func TestCurrentopCollector(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 3; i++ {
+		for i := 0; i < 300; i++ {
 			coll := fmt.Sprintf("testcol_%02d", i)
 			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": 1, "f2": "2"})
 			assert.NoError(t, err)
