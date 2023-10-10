@@ -1,6 +1,6 @@
 module github.com/percona/mongodb_exporter
 
-go 1.19
+go 1.21
 
 require (
 	github.com/AlekSi/pointer v1.1.0
