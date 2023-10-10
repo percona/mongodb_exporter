@@ -67,6 +67,7 @@ func GetenvDefault(key, defaultValue string) string {
 func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	port, err := PortForContainer("mongo-1-1")
 	require.NoError(t, err)
+
 	return TestClient(ctx, port, t)
 }
 
@@ -103,6 +104,7 @@ func GetImageNameForDefault() (string, string, error) {
 			break
 		}
 	}
+
 	return imageBaseName, version, nil
 }
 
