@@ -44,7 +44,7 @@ type GlobalFlags struct {
 	WebListenAddress      string   `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string   `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	TLSConfigPath         string   `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
-	TimeoutOffset         int      `name:"web.timeout-offset" help:"Offset to subtract from the timeout in seconds" default:"1"`
+	TimeoutOffset         int      `name:"web.timeout-offset" help:"Offset to subtract from the request timeout in seconds" default:"1"`
 	LogLevel              string   `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 	ConnectTimeoutMS      int      `name:"mongodb.connect-timeout-ms" help:"Connection timeout in milliseconds" default:"5000"`
 
@@ -111,6 +111,11 @@ func main() {
 
 	if len(opts.URI) == 0 {
 		ctx.Fatalf("No MongoDB hosts were specified. You must specify the host(s) with the --mongodb.uri command argument or the MONGODB_URI environment variable")
+	}
+
+	if opts.TimeoutOffset <= 0 {
+		log.Warn("Timeout offset needs to be greater than \"0\", falling back to \"1\". You can specify the timout offset with --web.timeout-offset command argument")
+		opts.TimeoutOffset = 1
 	}
 
 	serverOpts := &exporter.ServerOpts{

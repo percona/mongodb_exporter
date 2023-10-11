@@ -56,7 +56,7 @@ type Opts struct {
 	DiscoveringMode        bool
 	GlobalConnPool         bool
 	ProfileTimeTS          int
-  TimeoutOffset          int
+	TimeoutOffset          int
 
 	CollectAll               bool
 	EnableDBStats            bool
