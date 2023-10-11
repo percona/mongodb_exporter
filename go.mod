@@ -1,9 +1,9 @@
 module github.com/percona/mongodb_exporter
 
-go 1.19
+go 1.21
 
 require (
-	github.com/AlekSi/pointer v1.1.0
+	github.com/AlekSi/pointer v1.2.0
 	github.com/alecthomas/kong v0.8.0
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/percona/exporter_shared v0.7.4
