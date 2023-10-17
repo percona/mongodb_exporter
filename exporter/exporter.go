@@ -56,6 +56,7 @@ type Opts struct {
 	DiscoveringMode        bool
 	GlobalConnPool         bool
 	ProfileTimeTS          int
+	TimeoutOffset          int
 
 	CollectAll               bool
 	EnableDBStats            bool
@@ -271,6 +272,7 @@ func (e *Exporter) Handler() http.Handler {
 		if err != nil {
 			seconds = 10
 		}
+		seconds -= e.opts.TimeoutOffset
 
 		var client *mongo.Client
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)

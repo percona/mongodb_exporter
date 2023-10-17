@@ -14,6 +14,7 @@
 |--web.listen-address|Address to listen on for web interface and telemetry|--web.listen-address=":9216"|
 |--web.telemetry-path|Metrics expose path|--web.telemetry-path="/metrics"|
 |--web.config|Path to the file having Prometheus TLS config for basic auth|--web.config=STRING|
+|--web.timeout-offset|Offset to subtract from the timeout in seconds|--web.timeout-offset=1|
 |--log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]|--log.level="error"|
 |--collector.diagnosticdata|Enable collecting metrics from getDiagnosticData|
 |--collector.replicasetstatus|Enable collecting metrics from replSetGetStatus|
