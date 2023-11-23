@@ -19,11 +19,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -61,8 +65,11 @@ func TestConnect(t *testing.T) {
 
 	t.Run("Connect without SSL", func(t *testing.T) {
 		for name, port := range ports {
-			dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, port)
-			client, err := connect(ctx, dsn, true)
+			exporterOpts := &Opts{
+				URI:           fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, port)),
+				DirectConnect: true,
+			}
+			client, err := connect(ctx, exporterOpts)
 			assert.NoError(t, err, name)
 			err = client.Disconnect(ctx)
 			assert.NoError(t, err, name)
@@ -167,16 +174,16 @@ func TestMongoS(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, test.port)
-		client, err := connect(ctx, dsn, true)
-		assert.NoError(t, err)
-
 		exporterOpts := &Opts{
 			Logger:                 logrus.New(),
-			URI:                    dsn,
+			URI:                    fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, test.port)),
+			DirectConnect:          true,
 			GlobalConnPool:         false,
 			EnableReplicasetStatus: true,
 		}
+
+		client, err := connect(ctx, exporterOpts)
+		assert.NoError(t, err)
 
 		e := New(exporterOpts)
 
@@ -195,16 +202,16 @@ func TestMongoS(t *testing.T) {
 func TestMongoUp(t *testing.T) {
 	ctx := context.Background()
 
-	dsn := "mongodb://127.0.0.1:123456/admin"
-	client, err := connect(ctx, dsn, true)
-	assert.Error(t, err)
-
 	exporterOpts := &Opts{
 		Logger:         logrus.New(),
-		URI:            dsn,
+		URI:            "mongodb://127.0.0.1:123456/admin",
+		DirectConnect:  true,
 		GlobalConnPool: false,
 		CollectAll:     true,
 	}
+
+	client, err := connect(ctx, exporterOpts)
+	assert.Error(t, err)
 
 	e := New(exporterOpts)
 
@@ -214,4 +221,53 @@ func TestMongoUp(t *testing.T) {
 
 	res := r.Unregister(gc)
 	assert.Equal(t, true, res)
+}
+
+func TestMongoUpMetric(t *testing.T) {
+	ctx := context.Background()
+
+	type testcase struct {
+		URI  string
+		Want int
+	}
+
+	testCases := []testcase{
+		{URI: "mongodb://127.0.0.1:12345/admin", Want: 0},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1},
+	}
+
+	for _, tc := range testCases {
+		exporterOpts := &Opts{
+			Logger:           logrus.New(),
+			URI:              tc.URI,
+			ConnectTimeoutMS: 200,
+			DirectConnect:    true,
+			GlobalConnPool:   false,
+			CollectAll:       true,
+		}
+
+		client, err := connect(ctx, exporterOpts)
+		if tc.Want == 1 {
+			assert.NoError(t, err, "Must be able to connect to %s", tc.URI)
+		} else {
+			assert.Error(t, err, "Must be unable to connect to %s", tc.URI)
+		}
+
+		e := New(exporterOpts)
+		gc := newGeneralCollector(ctx, client, e.opts.Logger)
+		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+		expected := strings.NewReader(`
+		# HELP mongodb_up Whether MongoDB is up.
+		# TYPE mongodb_up gauge
+		mongodb_up ` + strconv.Itoa(tc.Want) + "\n")
+		filter := []string{
+			"mongodb_up",
+		}
+		err = testutil.CollectAndCompare(gc, expected, filter...)
+		assert.NoError(t, err, "mongodb_up metric should be %d", tc.Want)
+
+		res := r.Unregister(gc)
+		assert.Equal(t, true, res)
+	}
 }

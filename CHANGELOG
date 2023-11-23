@@ -1,3 +1,14 @@
+Release 0.40.0
+
+- Multi-target support
+- Update license to Apache 2.0
+- Add option --collector.dbstatsfreestorage to receive freeStorage stats from dbstats
+- New Current Op Metrics collector
+- New collector to collect data from the system profile
+- Add support for timestamp metrics with seconds precision
+- Update Go version
+- Update dependencies
+
 Release 0.39.0
 
 - Fixed issue with connection to authenticated MongoDB Arbiter
