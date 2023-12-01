@@ -67,6 +67,39 @@ func TestMultiTarget(t *testing.T) {
 
 	// Test all targets
 	for sn, opt := range opts {
-		assert.HTTPBodyContains(t, multiTargetHandler(serverMap), "GET", fmt.Sprintf("?target=%s", opt.URI), nil, expected[sn])
+		assert.HTTPBodyContains(t, multiTargetHandler(serverMap, nil), "GET", fmt.Sprintf("?target=%s", opt.URI), nil, expected[sn])
+	}
+}
+
+func TestDynamicTarget(t *testing.T) {
+	hostname := "127.0.0.1"
+
+	hosts := []string{
+		fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017"))),
+		fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"))),
+		fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"))),
+		fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, "12345")),
+	}
+
+	expected := []string{
+		"mongodb_up 1\n",
+		"mongodb_up 1\n",
+		"mongodb_up 1\n",
+		"mongodb_up 0\n",
+	}
+
+	log := logrus.New()
+	serverMap := buildServerMap(nil, log)
+
+	// Test all targets
+	for sn, host := range hosts {
+		assert.HTTPBodyContains(t, multiTargetHandler(serverMap, func(uri string) *Exporter {
+			opt := &Opts{
+				URI:              "mongodb://" + uri,
+				DirectConnect:    true,
+				ConnectTimeoutMS: 1000,
+			}
+			return New(opt)
+		}), "GET", fmt.Sprintf("?target=%s", host), nil, expected[sn])
 	}
 }

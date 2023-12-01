@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/prometheus/common/promlog"
@@ -30,6 +31,8 @@ import (
 // ServerMap stores http handlers for each host
 type ServerMap map[string]http.Handler
 
+var serverMapMux sync.Mutex
+
 // ServerOpts is the options for the main http handler
 type ServerOpts struct {
 	Path             string
@@ -39,18 +42,16 @@ type ServerOpts struct {
 }
 
 // Runs the main web-server
-func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
+func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger, buildExporter func(uri string) *Exporter) {
 	mux := http.DefaultServeMux
-
-	if len(exporters) == 0 {
-		panic("No exporters were built. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
-	}
 
 	serverMap := buildServerMap(exporters, log)
 
-	defaultExporter := exporters[0]
-	mux.Handle(opts.Path, defaultExporter.Handler())
-	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap))
+	if len(exporters) > 0 {
+		defaultExporter := exporters[0]
+		mux.Handle(opts.Path, defaultExporter.Handler())
+	}
+	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap, buildExporter))
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
@@ -79,7 +80,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	}
 }
 
-func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
+func multiTargetHandler(serverMap ServerMap, buildExporter func(uri string) *Exporter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		targetHost := r.URL.Query().Get("target")
 		if targetHost != "" {
@@ -87,10 +88,17 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 				targetHost = "mongodb://" + targetHost
 			}
 			if uri, err := url.Parse(targetHost); err == nil {
-				if e, ok := serverMap[uri.Host]; ok {
-					e.ServeHTTP(w, r)
-					return
+				serverMapMux.Lock()
+				defer serverMapMux.Unlock()
+
+				e, ok := serverMap[uri.Host]
+				if !ok {
+					e = buildExporter(uri.Host).Handler()
+					serverMap[uri.Host] = e
 				}
+
+				e.ServeHTTP(w, r)
+				return
 			}
 		}
 		http.Error(w, "Unable to find target", http.StatusNotFound)

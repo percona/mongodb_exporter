@@ -73,7 +73,7 @@ type GlobalFlags struct {
 
 func main() {
 	var opts GlobalFlags
-	ctx := kong.Parse(&opts,
+	kong.Parse(&opts,
 		kong.Name("mongodb_exporter"),
 		kong.Description("MongoDB Prometheus exporter"),
 		kong.UsageOnError(),
@@ -109,10 +109,6 @@ func main() {
 		opts.WebTelemetryPath = "/"
 	}
 
-	if len(opts.URI) == 0 {
-		ctx.Fatalf("No MongoDB hosts were specified. You must specify the host(s) with the --mongodb.uri command argument or the MONGODB_URI environment variable")
-	}
-
 	if opts.TimeoutOffset <= 0 {
 		log.Warn("Timeout offset needs to be greater than \"0\", falling back to \"1\". You can specify the timout offset with --web.timeout-offset command argument")
 		opts.TimeoutOffset = 1
@@ -124,7 +120,9 @@ func main() {
 		WebListenAddress: opts.WebListenAddress,
 		TLSConfigPath:    opts.TLSConfigPath,
 	}
-	exporter.RunWebServer(serverOpts, buildServers(opts, log), log)
+	exporter.RunWebServer(serverOpts, buildServers(opts, log), log, func(uri string) *exporter.Exporter {
+		return buildExporter(opts, uri, log)
+	})
 }
 
 func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.Exporter {
