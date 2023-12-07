@@ -19,10 +19,11 @@ echo setup.sh time now: `date +"%T" `
 
 
 function cnf_servers() {
-    echo "setup cnf servers"
+    echo "setup cnf servers on ${MONGO1}(${mongodb1}:${port})"
     mongo --host ${mongodb1}:${port} <<EOF
     var cfg = {
         "_id": "${RS}",
+        "version": 1,
         "protocolVersion": 1,
         "configsvr": true,
         "members": [
@@ -40,17 +41,19 @@ function cnf_servers() {
             }
         ]
     };
-    rs.initiate(cfg, { force: true });
+    rs.initiate(cfg);
+    cfg.version = 2;
     rs.reconfig(cfg, { force: true });
 EOF
 }
 
 function general_servers() {
-    echo "setup servers"
+    echo "setup servers on ${MONGO1}(${mongodb1}:${port})"
     mongo --host ${mongodb1}:${port} <<EOF
     var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,
+        "version": 1,
         "members": [
             {
                 "_id": 0,
@@ -66,7 +69,8 @@ function general_servers() {
             }
         ]
     };
-    rs.initiate(cfg, { force: true });
+    rs.initiate(cfg);
+    cfg.version = 2;
     rs.reconfig(cfg, { force: true });
 
     rs.addArb("${arbiter}:${port}")
