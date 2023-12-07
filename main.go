@@ -34,17 +34,19 @@ var (
 
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
-	User                  string `name:"mongodb.user" help:"monitor user, need clusterMonitor role in admin db and read role in local db" env:"MONGODB_USER" placeholder:"monitorUser"`
-	Password              string `name:"mongodb.password" help:"monitor user password" env:"MONGODB_PASSWORD" placeholder:"monitorPassword"`
-	CollStatsNamespaces   string `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1,db2.col2"`
-	IndexStatsCollections string `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
-	URI                   string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
-	GlobalConnPool        bool   `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request." negatable:""`
-	DirectConnect         bool   `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true" negatable:""`
-	WebListenAddress      string `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
-	WebTelemetryPath      string `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
-	TLSConfigPath         string `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
-	LogLevel              string `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
+	User                  string   `name:"mongodb.user" help:"monitor user, need clusterMonitor role in admin db and read role in local db" env:"MONGODB_USER" placeholder:"monitorUser"`
+	Password              string   `name:"mongodb.password" help:"monitor user password" env:"MONGODB_PASSWORD" placeholder:"monitorPassword"`
+	CollStatsNamespaces   string   `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1,db2.col2"`
+	IndexStatsCollections string   `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
+	URI                   []string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	GlobalConnPool        bool     `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request." negatable:""`
+	DirectConnect         bool     `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true" negatable:""`
+	WebListenAddress      string   `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
+	WebTelemetryPath      string   `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
+	TLSConfigPath         string   `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
+	TimeoutOffset         int      `name:"web.timeout-offset" help:"Offset to subtract from the request timeout in seconds" default:"1"`
+	LogLevel              string   `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
+	ConnectTimeoutMS      int      `name:"mongodb.connect-timeout-ms" help:"Connection timeout in milliseconds" default:"5000"`
 
 	EnableDiagnosticData     bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
 	EnableReplicasetStatus   bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
@@ -71,7 +73,7 @@ type GlobalFlags struct {
 
 func main() {
 	var opts GlobalFlags
-	_ = kong.Parse(&opts,
+	ctx := kong.Parse(&opts,
 		kong.Name("mongodb_exporter"),
 		kong.Description("MongoDB Prometheus exporter"),
 		kong.UsageOnError(),
@@ -87,30 +89,9 @@ func main() {
 		fmt.Printf("Version: %s\n", version)
 		fmt.Printf("Commit: %s\n", commit)
 		fmt.Printf("Build date: %s\n", buildDate)
-
 		return
 	}
 
-	e := buildExporter(opts)
-	e.Run()
-}
-
-func buildURI(uri string, user string, password string) string {
-	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
-	// DO concat a new uri with user and pass arguments value
-	if !strings.Contains(uri, "@") && user != "" && password != "" {
-		// trim mongodb:// prefix to handle user and pass logic
-		uri = strings.TrimPrefix(uri, "mongodb://")
-		// add user and pass to the uri
-		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
-	}
-	if !strings.HasPrefix(uri, "mongodb") {
-		uri = "mongodb://" + uri
-	}
-	return uri
-}
-
-func buildExporter(opts GlobalFlags) *exporter.Exporter {
 	log := logrus.New()
 
 	levels := map[string]logrus.Level{
@@ -121,12 +102,34 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		"warn":  logrus.WarnLevel,
 	}
 	log.SetLevel(levels[opts.LogLevel])
-
 	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
 
-	opts.URI = buildURI(opts.URI, opts.User, opts.Password)
+	if opts.WebTelemetryPath == "" {
+		log.Warn("Web telemetry path \"\" invalid, falling back to \"/\" instead")
+		opts.WebTelemetryPath = "/"
+	}
 
-	log.Debugf("Connection URI: %s", opts.URI)
+	if len(opts.URI) == 0 {
+		ctx.Fatalf("No MongoDB hosts were specified. You must specify the host(s) with the --mongodb.uri command argument or the MONGODB_URI environment variable")
+	}
+
+	if opts.TimeoutOffset <= 0 {
+		log.Warn("Timeout offset needs to be greater than \"0\", falling back to \"1\". You can specify the timout offset with --web.timeout-offset command argument")
+		opts.TimeoutOffset = 1
+	}
+
+	serverOpts := &exporter.ServerOpts{
+		Path:             opts.WebTelemetryPath,
+		MultiTargetPath:  "/scrape",
+		WebListenAddress: opts.WebListenAddress,
+		TLSConfigPath:    opts.TLSConfigPath,
+	}
+	exporter.RunWebServer(serverOpts, buildServers(opts, log), log)
+}
+
+func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.Exporter {
+	uri = buildURI(uri, opts.User, opts.Password)
+	log.Debugf("Connection URI: %s", uri)
 
 	exporterOpts := &exporter.Opts{
 		CollStatsNamespaces:   strings.Split(opts.CollStatsNamespaces, ","),
@@ -134,12 +137,11 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 		DiscoveringMode:       opts.DiscoveringMode,
 		IndexStatsCollections: strings.Split(opts.IndexStatsCollections, ","),
 		Logger:                log,
-		Path:                  opts.WebTelemetryPath,
-		URI:                   opts.URI,
+		URI:                   uri,
 		GlobalConnPool:        opts.GlobalConnPool,
-		WebListenAddress:      opts.WebListenAddress,
-		TLSConfigPath:         opts.TLSConfigPath,
 		DirectConnect:         opts.DirectConnect,
+		ConnectTimeoutMS:      opts.ConnectTimeoutMS,
+		TimeoutOffset:         opts.TimeoutOffset,
 
 		EnableDiagnosticData:     opts.EnableDiagnosticData,
 		EnableReplicasetStatus:   opts.EnableReplicasetStatus,
@@ -161,4 +163,37 @@ func buildExporter(opts GlobalFlags) *exporter.Exporter {
 	e := exporter.New(exporterOpts)
 
 	return e
+}
+
+func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
+	servers := make([]*exporter.Exporter, len(opts.URI))
+
+	for serverIdx := range opts.URI {
+		URI := opts.URI[serverIdx]
+
+		if !strings.HasPrefix(URI, "mongodb") {
+			log.Debugf("Prepending mongodb:// to the URI %s", URI)
+			URI = "mongodb://" + URI
+		}
+
+		servers[serverIdx] = buildExporter(opts, URI, log)
+	}
+
+	return servers
+}
+
+func buildURI(uri string, user string, password string) string {
+	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
+	// DO concat a new uri with user and pass arguments value
+	if !strings.Contains(uri, "@") && user != "" && password != "" {
+		// trim mongodb:// prefix to handle user and pass logic
+		uri = strings.TrimPrefix(uri, "mongodb://")
+		// add user and pass to the uri
+		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
+	}
+	if !strings.HasPrefix(uri, "mongodb") {
+		uri = "mongodb://" + uri
+	}
+
+	return uri
 }

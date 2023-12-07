@@ -86,6 +86,17 @@ export MONGODB_PASSWORD=YYY
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 
+#### Multi-target support
+You can run the exporter specifying multiple URIs, devided by a comma in --mongodb.uri option or MONGODB_URI environment variable in order to monitor multiple mongodb instances with the a single mongodb_exporter instance.
+```sh
+--mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin,mongodb://user2:pass2@127.0.0.1:27018/admin
+```
+In this case you can use the **/scrape** endpoint with the **target** parameter to retreive the specified tartget's metrics.  When querying the data you can use just mongodb://host:port in the targer parameter without other parameters and, of course without host credentials
+```sh
+GET /scrape?target=mongodb://127.0.0.1:27018
+```
+
+
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.
 Usage example: `--mongodb.collstats-colls=database1.collection1,database2.collection2`
