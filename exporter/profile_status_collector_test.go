@@ -17,7 +17,6 @@ package exporter
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -30,17 +29,13 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
-const (
-	dbName = "testdb"
-)
-
-func TestDBStatsCollector(t *testing.T) {
+func TestProfileCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	database := client.Database(dbName)
+	database := client.Database("testdb")
 	database.Drop(ctx) //nolint
 
 	defer func() {
@@ -48,34 +43,27 @@ func TestDBStatsCollector(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	for i := 0; i < 3; i++ {
-		coll := fmt.Sprintf("testcol_%02d", i)
-		for j := 0; j < 10; j++ {
-			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
-			assert.NoError(t, err)
-		}
-	}
+	// Enable database profiler https://www.mongodb.com/docs/manual/tutorial/manage-the-database-profiler/
+	cmd := bson.M{"profile": 2}
+	_ = database.RunCommand(ctx, cmd)
 
 	ti := labelsGetterMock{}
 
-	c := newDBStatsCollector(ctx, client, logrus.New(), false, ti, []string{dbName}, false)
-	expected := strings.NewReader(`
-	# HELP mongodb_dbstats_collections dbstats.
-	# TYPE mongodb_dbstats_collections untyped
-	mongodb_dbstats_collections{database="testdb"} 3
-	# HELP mongodb_dbstats_indexes dbstats.
-	# TYPE mongodb_dbstats_indexes untyped
-	mongodb_dbstats_indexes{database="testdb"} 3
-	# HELP mongodb_dbstats_objects dbstats.
-	# TYPE mongodb_dbstats_objects untyped
-	mongodb_dbstats_objects{database="testdb"} 30` + "\n")
+	c := newProfileCollector(ctx, client, logrus.New(), false, ti, 30)
 
-	// Only look at metrics created by our activity
-	filters := []string{
-		"mongodb_dbstats_collections",
-		"mongodb_dbstats_indexes",
-		"mongodb_dbstats_objects",
+	expected := strings.NewReader(`
+	# HELP mongodb_profile_slow_query_count profile_slow_query.
+	# TYPE mongodb_profile_slow_query_count counter
+	mongodb_profile_slow_query_count{database="admin"} 0
+	mongodb_profile_slow_query_count{database="config"} 0
+	mongodb_profile_slow_query_count{database="local"} 0
+	mongodb_profile_slow_query_count{database="testdb"} 0` +
+		"\n")
+
+	filter := []string{
+		"mongodb_profile_slow_query_count",
 	}
-	err := testutil.CollectAndCompare(c, expected, filters...)
+
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }

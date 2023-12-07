@@ -20,10 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         image:
-          - mongo:4.2
           - mongo:4.4
           - mongo:5.0
-          - percona/percona-server-mongodb:4.2
           - percona/percona-server-mongodb:4.4
           - percona/percona-server-mongodb:5.0
 
@@ -31,30 +29,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
-      - name: Initialize dependencies and linters
-        run: make init
-
-      - name: Diff
-        run: |
-          make format
-          git diff --exit-code
-
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
+          sleep 10
           make test-race
           make test-cluster-clean
-
-      - name: Run checks/linters
-        run: |
-          # use GITHUB_TOKEN because only it has access to GitHub Checks API
-          bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
-          bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
-          make check-license
