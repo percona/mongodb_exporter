@@ -18,7 +18,6 @@ package exporter
 import (
 	"context"
 	"encoding/json"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"sort"
@@ -30,6 +29,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"

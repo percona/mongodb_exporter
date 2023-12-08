@@ -17,7 +17,6 @@ package util
 
 import (
 	"context"
-	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -37,7 +36,6 @@ func MyState(ctx context.Context, client *mongo.Client) (int, error) {
 
 	err := client.Database("admin").RunCommand(ctx, bson.M{"replSetGetStatus": 1}).Decode(&status)
 	if err != nil {
-		log.Println(err)
 		return 0, err
 	}
 
