@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"encoding/json"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"sort"
@@ -208,23 +209,69 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 // myState should always return a metric. If there is no connection, the value
 // should be the MongoDB unknown state = 6
 func TestMyState(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	t.Run("correctly gets state for primary node", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		client := tu.DefaultTestClient(ctx, t)
+		var m dto.Metric
 
-	client := tu.DefaultTestClient(ctx, t)
+		metric := myState(ctx, client)
+		err := metric.Write(&m)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(PrimaryState), *m.Gauge.Value)
 
-	var m dto.Metric
+		err = client.Disconnect(ctx)
+		assert.NoError(t, err)
 
-	metric := myState(ctx, client)
-	err := metric.Write(&m)
-	assert.NoError(t, err)
-	assert.NotEqual(t, float64(UnknownState), *m.Gauge.Value)
+		metric = myState(ctx, client)
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+	})
 
-	err = client.Disconnect(ctx)
-	assert.NoError(t, err)
+	t.Run("correctly gets state for arbiter node", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
 
-	metric = myState(ctx, client)
-	err = metric.Write(&m)
-	assert.NoError(t, err)
-	assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+		port, err := tu.PortForContainer("mongo-1-arbiter")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+		var m dto.Metric
+
+		metric := myState(ctx, client)
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(ArbiterState), *m.Gauge.Value)
+
+		err = client.Disconnect(ctx)
+		assert.NoError(t, err)
+
+		metric = myState(ctx, client)
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+	})
+
+	t.Run("standalone instance is tagged as unknown", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("standalone")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+		var m dto.Metric
+
+		metric := myState(ctx, client)
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+
+		err = client.Disconnect(ctx)
+		assert.NoError(t, err)
+
+		metric = myState(ctx, client)
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+	})
 }

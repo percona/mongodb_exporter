@@ -35,9 +35,15 @@ import (
 )
 
 const (
-	// UnknownState is the values for an unknown rs state.
-	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
+	// PrimaryState is the state of the primary node in a replica set.
+	// See: https://docs.mongodb.com/manual/reference/replica-states/
+	PrimaryState = 1
+
+	// UnknownState is the state of an unknown node in a replica set.
 	UnknownState = 6
+
+	// ArbiterState is the state of an arbiter in a replica set.
+	ArbiterState = 7
 
 	// EnterpriseEdition shows that MongoDB is Enterprise edition.
 	EnterpriseEdition = "Enterprise"

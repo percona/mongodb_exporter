@@ -31,19 +31,12 @@ function cnf_servers() {
                 "_id": 0,
                 "host": "${mongodb1}:${port}"
             },
-            {
-                "_id": 1,
-                "host": "${mongodb2}:${port}"
-            },
-            {
-                "_id": 2,
-                "host": "${mongodb3}:${port}"
-            }
         ]
     };
+
     rs.initiate(cfg);
-    cfg.version = 2;
-    rs.reconfig(cfg, { force: true });
+    rs.add({"_id": 1, "host": "${mongodb2}:${port}"});
+    rs.add({"_id": 2, "host": "${mongodb3}:${port}"});
 EOF
 }
 
@@ -59,21 +52,12 @@ function general_servers() {
                 "_id": 0,
                 "host": "${mongodb1}:${port}"
             },
-            {
-                "_id": 1,
-                "host": "${mongodb2}:${port}"
-            },
-            {
-                "_id": 2,
-                "host": "${mongodb3}:${port}"
-            }
         ]
     };
     rs.initiate(cfg);
-    cfg.version = 2;
-    rs.reconfig(cfg, { force: true });
-
-    rs.addArb("${arbiter}:${port}")
+    rs.add({"_id": 1, "host": "${mongodb2}:${port}"});
+    rs.add({"_id": 2, "host": "${mongodb3}:${port}"});
+    rs.addArb("${arbiter}:${port}");
 EOF
 }
 

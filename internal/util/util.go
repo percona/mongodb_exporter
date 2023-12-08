@@ -17,6 +17,7 @@ package util
 
 import (
 	"context"
+	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -32,14 +33,15 @@ const (
 )
 
 func MyState(ctx context.Context, client *mongo.Client) (int, error) {
-	var ms proto.MyState
+	var status proto.ReplicaSetStatus
 
-	err := client.Database("admin").RunCommand(ctx, bson.M{"getDiagnosticData": 1}).Decode(&ms)
+	err := client.Database("admin").RunCommand(ctx, bson.M{"replSetGetStatus": 1}).Decode(&status)
 	if err != nil {
+		log.Println(err)
 		return 0, err
 	}
 
-	return ms.Data.ReplicasetGetStatus.MyState, nil
+	return int(status.MyState), nil
 }
 
 func ReplicasetConfig(ctx context.Context, client *mongo.Client) (*proto.ReplicasetConfig, error) {

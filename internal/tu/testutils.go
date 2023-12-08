@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -184,5 +185,6 @@ func PortForContainer(name string) (string, error) {
 		return "", errors.Wrapf(err, "cannot get error for container %q (empty ports list)", name)
 	}
 
+	log.Println(ports[0].HostPort)
 	return ports[0].HostPort, nil
 }
