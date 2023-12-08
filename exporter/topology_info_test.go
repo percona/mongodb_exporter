@@ -37,7 +37,7 @@ func TestTopologyLabels(t *testing.T) {
 			containerName: "mongos",
 			want: map[string]string{
 				labelReplicasetName:  "",
-				labelReplicasetState: "0",
+				labelReplicasetState: "",
 				labelClusterRole:     "mongos",
 				labelClusterID:       "q",
 			},
@@ -63,8 +63,8 @@ func TestTopologyLabels(t *testing.T) {
 		{
 			containerName: "mongo-1-arbiter",
 			want: map[string]string{
-				labelReplicasetName:  "",
-				labelReplicasetState: "0",
+				labelReplicasetName:  "rs1",
+				labelReplicasetState: "7",
 				labelClusterRole:     "shardsvr",
 				labelClusterID:       "",
 			},
@@ -73,7 +73,7 @@ func TestTopologyLabels(t *testing.T) {
 			containerName: "standalone",
 			want: map[string]string{
 				labelReplicasetName:  "",
-				labelReplicasetState: "0",
+				labelReplicasetState: "",
 				labelClusterRole:     "",
 				labelClusterID:       "",
 			},
@@ -84,18 +84,20 @@ func TestTopologyLabels(t *testing.T) {
 	defer cancel()
 
 	for _, tc := range tests {
-		port, err := tu.PortForContainer(tc.containerName)
-		require.NoError(t, err)
+		t.Run(tc.containerName, func(t *testing.T) {
+			port, err := tu.PortForContainer(tc.containerName)
+			require.NoError(t, err)
 
-		client := tu.TestClient(ctx, port, t)
-		ti := newTopologyInfo(ctx, client, logrus.New())
-		bl := ti.baseLabels()
-		assert.Equal(t, tc.want[labelReplicasetName], bl[labelReplicasetName], tc.containerName)
-		assert.Equal(t, tc.want[labelReplicasetState], bl[labelReplicasetState], tc.containerName)
-		assert.Equal(t, tc.want[labelClusterRole], bl[labelClusterRole], tc.containerName)
-		if tc.want[labelClusterID] != "" {
-			assert.NotEmpty(t, bl[labelClusterID], tc.containerName) // this is variable inside a container
-		}
+			client := tu.TestClient(ctx, port, t)
+			ti := newTopologyInfo(ctx, client, logrus.New())
+			bl := ti.baseLabels()
+			assert.Equal(t, tc.want[labelReplicasetName], bl[labelReplicasetName], tc.containerName)
+			assert.Equal(t, tc.want[labelReplicasetState], bl[labelReplicasetState], tc.containerName)
+			assert.Equal(t, tc.want[labelClusterRole], bl[labelClusterRole], tc.containerName)
+			if tc.want[labelClusterID] != "" {
+				assert.NotEmpty(t, bl[labelClusterID], tc.containerName) // this is variable inside a container
+			}
+		})
 	}
 }
 
