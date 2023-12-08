@@ -163,7 +163,7 @@ func TestSumMetrics(t *testing.T) {
 	for _, tt := range tests {
 		testCase := tt
 
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			buf, err := os.ReadFile(filepath.Join("testdata/", "get_diagnostic_data.json"))
 			assert.NoError(t, err)
 
@@ -209,69 +209,51 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 // myState should always return a metric. If there is no connection, the value
 // should be the MongoDB unknown state = 6
 func TestMyState(t *testing.T) {
-	t.Run("correctly gets state for primary node", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		client := tu.DefaultTestClient(ctx, t)
-		var m dto.Metric
+	tests := []struct {
+		name          string
+		containerName string
+		expectedState float64
+	}{
+		{
+			name:          "correctly gets state for primary node",
+			containerName: "mongo-1-1",
+			expectedState: float64(PrimaryState),
+		},
+		{
+			name:          "correctly gets state for arbiter node",
+			containerName: "mongo-1-arbiter",
+			expectedState: float64(ArbiterState),
+		},
+		{
+			name:          "gets unknown state for standalone instance",
+			containerName: "standalone",
+			expectedState: float64(UnknownState),
+		},
+	}
 
-		metric := myState(ctx, client)
-		err := metric.Write(&m)
-		assert.NoError(t, err)
-		assert.Equal(t, float64(PrimaryState), *m.Gauge.Value)
+	for _, tt := range tests {
+		testCase := tt
+		t.Run(testCase.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
 
-		err = client.Disconnect(ctx)
-		assert.NoError(t, err)
+			port, err := tu.PortForContainer(testCase.containerName)
+			require.NoError(t, err)
+			client := tu.TestClient(ctx, port, t)
+			var m dto.Metric
 
-		metric = myState(ctx, client)
-		err = metric.Write(&m)
-		assert.NoError(t, err)
-		assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
-	})
+			metric := myState(ctx, client)
+			err = metric.Write(&m)
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.expectedState, *m.Gauge.Value)
 
-	t.Run("correctly gets state for arbiter node", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
+			err = client.Disconnect(ctx)
+			assert.NoError(t, err)
 
-		port, err := tu.PortForContainer("mongo-1-arbiter")
-		require.NoError(t, err)
-		client := tu.TestClient(ctx, port, t)
-		var m dto.Metric
-
-		metric := myState(ctx, client)
-		err = metric.Write(&m)
-		assert.NoError(t, err)
-		assert.Equal(t, float64(ArbiterState), *m.Gauge.Value)
-
-		err = client.Disconnect(ctx)
-		assert.NoError(t, err)
-
-		metric = myState(ctx, client)
-		err = metric.Write(&m)
-		assert.NoError(t, err)
-		assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
-	})
-
-	t.Run("standalone instance is tagged as unknown", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		port, err := tu.PortForContainer("standalone")
-		require.NoError(t, err)
-		client := tu.TestClient(ctx, port, t)
-		var m dto.Metric
-
-		metric := myState(ctx, client)
-		err = metric.Write(&m)
-		assert.NoError(t, err)
-		assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
-
-		err = client.Disconnect(ctx)
-		assert.NoError(t, err)
-
-		metric = myState(ctx, client)
-		err = metric.Write(&m)
-		assert.NoError(t, err)
-		assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
-	})
+			metric = myState(ctx, client)
+			err = metric.Write(&m)
+			assert.NoError(t, err)
+			assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+		})
+	}
 }
