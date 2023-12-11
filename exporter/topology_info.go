@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -170,17 +171,29 @@ func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
 	// Not always we can get this info. For example, we cannot get this for hidden hosts so
 	// if there is an error, just ignore it
 	res := client.Database("admin").RunCommand(ctx, primitive.D{
-		{Key: "getCmdLineOpts", Value: 1},
-		{Key: "recordStats", Value: 1},
+		{Key: "listDatabases", Value: 1},
 	})
-
 	if res.Err() != nil {
-		return "", nil
+		return "", res.Err()
 	}
 
 	if err := res.Decode(&cmdOpts); err != nil {
 		return "", errors.Wrap(err, "cannot decode getCmdLineOpts response")
 	}
+
+	aggregation := bson.D{
+		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
+	}
+	col, err := client.Database("config").Collection("shards").Aggregate(ctx, mongo.Pipeline{aggregation})
+	if err != nil {
+		return "", err
+	}
+	var shards []bson.M
+	if err = col.All(ctx, &shards); err != nil {
+		return "", err
+	}
+
+	fmt.Printf("\n\n\n\n\n %+v \n\n %+v \n\n\n\n\n", client.Database("config").Collection("shards"), cmdOpts)
 
 	if walkTo(cmdOpts, []string{"parsed", "sharding", "configDB"}) != nil {
 		return "mongos", nil
