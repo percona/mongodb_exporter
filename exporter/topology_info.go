@@ -184,7 +184,7 @@ func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
 	aggregation := bson.D{
 		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
 	}
-	col, err := client.Database("config").Collection("shards").Aggregate(ctx, mongo.Pipeline{aggregation})
+	col, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
 	if err != nil {
 		return "", err
 	}
@@ -193,7 +193,7 @@ func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
 		return "", err
 	}
 
-	fmt.Printf("\n\n\n\n\n %+v \n\n %+v \n\n\n\n\n", client.Database("config").Collection("shards"), cmdOpts)
+	fmt.Printf("\n\n\n\n\n %+v \n\n %+v \n\n\n\n\n", shards, cmdOpts)
 
 	if walkTo(cmdOpts, []string{"parsed", "sharding", "configDB"}) != nil {
 		return "mongos", nil
