@@ -71,7 +71,7 @@ init:                       ## Install linters.
 	cd tools && go generate -x -tags=tools
 
 build:                      ## Compile using plain go build
-	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
+	env CGO_ENABLED=0 go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
 
 release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
@@ -104,7 +104,7 @@ test-race: env              ## Run all tests with race flag.
 	go test -race -v -timeout 30s ./...
 
 test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
-	docker compose up -d --wait
+	docker compose up -d
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
 	docker compose down --remove-orphans

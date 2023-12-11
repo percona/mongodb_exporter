@@ -39,6 +39,9 @@ const (
 	// See: https://docs.mongodb.com/manual/reference/replica-states/
 	PrimaryState = 1
 
+	// SecondaryState is the state of a secondary node in a replica set.
+	SecondaryState = 2
+
 	// UnknownState is the state of an unknown node in a replica set.
 	UnknownState = 6
 
@@ -812,8 +815,8 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	metrics = append(metrics, serverVersion(buildInfo))
 	metrics = append(metrics, myState(ctx, client))
 
-	if mm := replSetMetrics(m); mm != nil {
-		metrics = append(metrics, mm...)
+	if rm := replSetMetrics(m); rm != nil {
+		metrics = append(metrics, rm...)
 	}
 
 	if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
@@ -915,6 +918,38 @@ func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(state))
 
 	return metric
+}
+
+// helloMetrics returns "fallback" metrics based on the response from Mongo's hello command.
+func helloMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+	response, err := util.GetHelloResponse(ctx, client)
+	if err != nil {
+		l.Errorf("cannot get hello response: %s", err)
+		return nil
+	}
+
+	var metrics []prometheus.Metric
+	if response.ArbiterOnly {
+		createMetric := func(name, help string, value float64, labels map[string]string) {
+			const prefix = "mongodb_mongod_replset_"
+			d := prometheus.NewDesc(prefix+name, help, nil, labels)
+			metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value))
+		}
+
+		createMetric("my_state",
+			"An integer between 0 and 10 that represents the replica state of the current member",
+			float64(ArbiterState), map[string]string{
+				"set": response.SetName,
+			})
+
+		createMetric("number_of_members",
+			"The number of replica set members.",
+			float64(len(response.Hosts)+len(response.Arbiters)), map[string]string{
+				"set": response.SetName,
+			})
+	}
+
+	return metrics
 }
 
 func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {

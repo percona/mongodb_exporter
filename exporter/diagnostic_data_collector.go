@@ -69,9 +69,8 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 	if res.Err() != nil {
-		if isArbiter, _ := isArbiter(d.ctx, client); isArbiter {
-			return
-		}
+		logger.Errorf("failed to run command: getDiagnosticData: %s", res.Err())
+		logger.Warn("cannot run getDiagnosticData, some metrics might be unavailable.")
 	}
 
 	if err := res.Decode(&m); err != nil {
@@ -85,6 +84,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	m, ok := m["data"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
+
 		logger.Errorf("cannot decode getDiagnosticData: %s", err)
 	}
 
@@ -102,7 +102,13 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if d.compatibleMode {
-		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
+		if isArbiter, _ := isArbiter(d.ctx, client); isArbiter {
+			if hm := helloMetrics(d.ctx, client, logger); hm != nil {
+				metrics = append(metrics, hm...)
+			}
+		} else {
+			metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
+		}
 
 		if cem, err := cacheEvictedTotalMetric(m); err == nil {
 			metrics = append(metrics, cem)

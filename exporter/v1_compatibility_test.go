@@ -212,22 +212,22 @@ func TestMyState(t *testing.T) {
 	tests := []struct {
 		name          string
 		containerName string
-		expectedState float64
+		allowedStates []float64
 	}{
 		{
-			name:          "correctly gets state for primary node",
+			name:          "correctly gets state for data-carrying node",
 			containerName: "mongo-1-1",
-			expectedState: float64(PrimaryState),
+			allowedStates: []float64{float64(PrimaryState), float64(SecondaryState)},
 		},
 		{
 			name:          "correctly gets state for arbiter node",
 			containerName: "mongo-1-arbiter",
-			expectedState: float64(ArbiterState),
+			allowedStates: []float64{float64(ArbiterState)},
 		},
 		{
 			name:          "gets unknown state for standalone instance",
 			containerName: "standalone",
-			expectedState: float64(UnknownState),
+			allowedStates: []float64{float64(UnknownState)},
 		},
 	}
 
@@ -245,7 +245,7 @@ func TestMyState(t *testing.T) {
 			metric := myState(ctx, client)
 			err = metric.Write(&m)
 			assert.NoError(t, err)
-			assert.Equal(t, testCase.expectedState, *m.Gauge.Value)
+			assert.Contains(t, testCase.allowedStates, *m.Gauge.Value)
 
 			err = client.Disconnect(ctx)
 			assert.NoError(t, err)

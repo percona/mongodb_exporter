@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -72,10 +71,9 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	return TestClient(ctx, port, t)
 }
 
-// GetImageNameForDefault returns image name and version of running
-// default test mongo container.
-func GetImageNameForDefault() (string, string, error) {
-	di, err := InspectContainer("mongo-1-1")
+// GetImageNameForDefault returns image name and version of a running test container
+func GetImageNameForContainer(containerName string) (string, string, error) {
+	di, err := InspectContainer(containerName)
 	if err != nil {
 		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
 	}
@@ -185,6 +183,5 @@ func PortForContainer(name string) (string, error) {
 		return "", errors.Wrapf(err, "cannot get error for container %q (empty ports list)", name)
 	}
 
-	log.Println(ports[0].HostPort)
 	return ports[0].HostPort, nil
 }
