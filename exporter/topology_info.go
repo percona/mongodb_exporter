@@ -193,8 +193,6 @@ func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
 		return "", err
 	}
 
-	fmt.Printf("\n\n\n\n\n %+v \n\n %+v \n\n\n\n\n", shards, cmdOpts)
-
 	if walkTo(cmdOpts, []string{"parsed", "sharding", "configDB"}) != nil {
 		return "mongos", nil
 	}
