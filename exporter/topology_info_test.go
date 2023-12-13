@@ -137,6 +137,5 @@ func TestGetClusterRole(t *testing.T) {
 		nodeType, err := getClusterRole(ctx, client)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.want, nodeType, fmt.Sprintf("container name: %s, port: %s", tc.containerName, port))
-
 	}
 }
