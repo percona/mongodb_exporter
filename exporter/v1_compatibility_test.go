@@ -263,6 +263,7 @@ func TestMyState(t *testing.T) {
 func TestHelloMetrics(t *testing.T) {
 	t.Parallel()
 	t.Run("correctly gets member count from arbiter node", func(t *testing.T) {
+		t.Parallel()
 		containerName := "mongo-1-arbiter"
 
 		logger := logrus.New()
@@ -278,6 +279,7 @@ func TestHelloMetrics(t *testing.T) {
 			if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_number_of_members"`) {
 				err = m.Write(&rsMembers)
 				assert.NoError(t, err)
+
 				break
 			}
 		}
