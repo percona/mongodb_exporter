@@ -259,3 +259,32 @@ func TestMyState(t *testing.T) {
 		})
 	}
 }
+
+func TestHelloMetrics(t *testing.T) {
+	t.Parallel()
+	t.Run("correctly gets member count from arbiter node", func(t *testing.T) {
+		containerName := "mongo-1-arbiter"
+
+		logger := logrus.New()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer(containerName)
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+		metrics := helloMetrics(ctx, client, logger)
+		var rsMembers dto.Metric
+		for _, m := range metrics {
+			if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_number_of_members"`) {
+				err = m.Write(&rsMembers)
+				assert.NoError(t, err)
+				break
+			}
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, float64(4), *rsMembers.Gauge.Value)
+
+		err = client.Disconnect(ctx)
+		assert.NoError(t, err)
+	})
+}
