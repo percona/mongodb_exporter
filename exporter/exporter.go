@@ -68,6 +68,7 @@ type Opts struct {
 	EnableIndexStats         bool
 	EnableCollStats          bool
 	EnableProfile            bool
+	EnableSharded            bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -163,6 +164,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableIndexStats = true
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
+		e.opts.EnableSharded = true
 	}
 
 	// arbiter only have isMaster privileges
@@ -175,6 +177,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableIndexStats = false
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
+		e.opts.EnableSharded = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -228,6 +231,12 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
+	}
+
+	// sharded is supported only by mongos.
+	if e.opts.EnableSharded && nodeType == typeMongos && requestOpts.EnableSharded {
+		sc := newShardedCollector(ctx, client, e.opts.Logger, topologyInfo)
+		registry.MustRegister(sc)
 	}
 
 	return registry
