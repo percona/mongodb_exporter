@@ -8,6 +8,10 @@ services:
         command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16
         networks:
             - rs1
+        depends_on:
+          - "mongo-1-2"
+          - "mongo-1-3"
+          - "mongo-1-arbiter"
 
     mongo-1-2:
         container_name: "mongo-1-2"
