@@ -24,7 +24,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -33,9 +32,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	port, err := tu.PortForContainer("mongo-1-arbiter")
-	require.NoError(t, err)
-	client := tu.TestClient(ctx, port, t)
+	client := tu.DefaultTestClient(ctx, t)
 
 	ti := labelsGetterMock{}
 
@@ -58,7 +55,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 		"mongodb_ok",
 		"mongodb_mongod_replset_number_of_members",
 	}
-	err = testutil.CollectAndCompare(c, expected, filter...)
+	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
 

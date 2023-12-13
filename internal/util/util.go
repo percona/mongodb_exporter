@@ -42,6 +42,7 @@ func MyState(ctx context.Context, client *mongo.Client) (int, error) {
 	return int(status.MyState), nil
 }
 
+// GetHelloResponse returns the hello response from a Mongo instance.
 func GetHelloResponse(ctx context.Context, client *mongo.Client) (*proto.HelloResponse, error) {
 	var hello proto.HelloResponse
 	err := client.Database("admin").RunCommand(ctx, bson.M{"hello": 1}).Decode(&hello)

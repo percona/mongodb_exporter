@@ -136,6 +136,7 @@ type ShardIdentity struct {
 	ConfigsvrConnectionString string             `bson:"configsvrConnectionString"`
 }
 
+// HelloResponse represents the response from a Mongo `hello` command
 type HelloResponse struct {
 	ArbiterOnly bool     `bson:"arbiterOnly"`
 	Arbiters    []string `bson:"arbiters"`

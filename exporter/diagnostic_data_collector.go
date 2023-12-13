@@ -102,13 +102,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if d.compatibleMode {
-		if isArbiter, _ := isArbiter(d.ctx, client); isArbiter {
-			if hm := helloMetrics(d.ctx, client, logger); hm != nil {
-				metrics = append(metrics, hm...)
-			}
-		} else {
-			metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
-		}
+		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
 
 		if cem, err := cacheEvictedTotalMetric(m); err == nil {
 			metrics = append(metrics, cem)

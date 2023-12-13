@@ -71,7 +71,7 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	return TestClient(ctx, port, t)
 }
 
-// GetImageNameForDefault returns image name and version of a running test container
+// GetImageNameForContainer returns image name and version of a running test container.
 func GetImageNameForContainer(containerName string) (string, string, error) {
 	di, err := InspectContainer(containerName)
 	if err != nil {

@@ -813,10 +813,16 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metrics = append(metrics, engine)
 	}
 	metrics = append(metrics, serverVersion(buildInfo))
-	metrics = append(metrics, myState(ctx, client))
 
-	if rm := replSetMetrics(m); rm != nil {
-		metrics = append(metrics, rm...)
+	if isArbiter, _ := isArbiter(ctx, client); isArbiter {
+		if hm := helloMetrics(ctx, client, l); hm != nil {
+			metrics = append(metrics, hm...)
+		}
+	} else {
+		metrics = append(metrics, myState(ctx, client))
+		if rm := replSetMetrics(m); rm != nil {
+			metrics = append(metrics, rm...)
+		}
 	}
 
 	if opLogMetrics, err := oplogStatus(ctx, client); err != nil {

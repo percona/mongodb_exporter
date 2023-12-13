@@ -209,6 +209,7 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 // myState should always return a metric. If there is no connection, the value
 // should be the MongoDB unknown state = 6
 func TestMyState(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		containerName string
@@ -234,6 +235,7 @@ func TestMyState(t *testing.T) {
 	for _, tt := range tests {
 		testCase := tt
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 

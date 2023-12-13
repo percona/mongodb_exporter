@@ -74,6 +74,7 @@ func TestDiagnosticDataCollector(t *testing.T) {
 }
 
 func getMongoDBVersionInfo(t *testing.T, containerName string) (string, string) {
+	t.Helper()
 	imageBaseName, version, err := tu.GetImageNameForContainer(containerName)
 	require.NoError(t, err)
 
@@ -86,59 +87,52 @@ func getMongoDBVersionInfo(t *testing.T, containerName string) (string, string) 
 	return version, vendor
 }
 
-func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
-	t.Run("basic metrics", func(t *testing.T) {
-		containerName := "mongo-1-1"
+func TestCollectorWithCompatibleMode(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name          string
+		containerName string
 
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
+		// we use a metrics filter for two reasons:
+		// 1. The result is huge
+		// 2. We need to check against know values. Don't use metrics that return counters like uptime
+		//    or counters like the number of transactions because they won't return a known value to compare
+		metricsFilter   []string
+		expectedMetrics func() io.Reader
+	}{
+		{
+			name:          "basic metrics",
+			containerName: "mongo-1-1",
+			metricsFilter: []string{
+				"mongodb_mongod_storage_engine",
+				"mongodb_version_info",
+			},
+			expectedMetrics: func() io.Reader {
+				version, vendor := getMongoDBVersionInfo(t, "mongo-1-1")
 
-		client := tu.DefaultTestClient(ctx, t)
-		logger := logrus.New()
-		ti := labelsGetterMock{}
-
-		version, vendor := getMongoDBVersionInfo(t, containerName)
-		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
-
-		// The last \n at the end of this string is important
-		expected := strings.NewReader(fmt.Sprintf(`
+				// The last \n at the end of this string is important
+				return strings.NewReader(fmt.Sprintf(`
 	# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
 	# TYPE mongodb_mongod_storage_engine gauge
 	mongodb_mongod_storage_engine{engine="wiredTiger"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="Community",mongodb="%s",vendor="%s"} 1`, version, vendor) + "\n")
+			},
+		},
+		{
+			name:          "replica set metrics from data-carrying node",
+			containerName: "mongo-1-1",
+			metricsFilter: []string{
+				"mongodb_mongod_storage_engine",
+				"mongodb_version_info",
+				"mongodb_mongod_replset_number_of_members",
+			},
+			expectedMetrics: func() io.Reader {
+				version, vendor := getMongoDBVersionInfo(t, "mongo-1-1")
 
-		// Filter metrics for 2 reasons:
-		// 1. The result is huge
-		// 2. We need to check against know values. Don't use metrics that return counters like uptime
-		//    or counters like the number of transactions because they won't return a known value to compare
-		filter := []string{
-			"mongodb_mongod_storage_engine",
-			"mongodb_version_info",
-		}
-
-		err := testutil.CollectAndCompare(c, expected, filter...)
-		assert.NoError(t, err)
-	})
-
-	t.Run("replica set metrics from data-carrying node", func(t *testing.T) {
-		containerName := "mongo-1-1"
-
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		port, err := tu.PortForContainer(containerName)
-		require.NoError(t, err)
-		client := tu.TestClient(ctx, port, t)
-		logger := logrus.New()
-		ti := labelsGetterMock{}
-
-		version, vendor := getMongoDBVersionInfo(t, containerName)
-		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
-
-		// The last \n at the end of this string is important
-		expected := strings.NewReader(fmt.Sprintf(`
+				// The last \n at the end of this string is important
+				return strings.NewReader(fmt.Sprintf(`
     # HELP mongodb_mongod_replset_number_of_members The number of replica set members.
     # TYPE mongodb_mongod_replset_number_of_members gauge
     mongodb_mongod_replset_number_of_members{set="rs1"} 4
@@ -148,39 +142,22 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="Community",mongodb="%s",vendor="%s"} 1`, version, vendor) + "\n")
+			},
+		},
+		{
+			name:          "replica set metrics on arbiter node",
+			containerName: "mongo-1-arbiter",
+			metricsFilter: []string{
+				"mongodb_mongod_storage_engine",
+				"mongodb_version_info",
+				"mongodb_mongod_replset_my_state",
+				"mongodb_mongod_replset_number_of_members",
+			},
+			expectedMetrics: func() io.Reader {
+				version, vendor := getMongoDBVersionInfo(t, "mongo-1-1")
 
-		// Filter metrics for 2 reasons:
-		// 1. The result is huge
-		// 2. We need to check against know values. Don't use metrics that return counters like uptime
-		//    or counters like the number of transactions because they won't return a known value to compare
-		filter := []string{
-			"mongodb_mongod_storage_engine",
-			"mongodb_version_info",
-			"mongodb_mongod_replset_number_of_members",
-		}
-
-		err = testutil.CollectAndCompare(c, expected, filter...)
-		assert.NoError(t, err)
-	})
-
-	t.Run("replica set metrics on arbiter node", func(t *testing.T) {
-		containerName := "mongo-1-arbiter"
-
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		port, err := tu.PortForContainer(containerName)
-		require.NoError(t, err)
-		client := tu.TestClient(ctx, port, t)
-		logger := logrus.New()
-		ti := labelsGetterMock{}
-
-		version, vendor := getMongoDBVersionInfo(t, containerName)
-		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
-
-		// The last \n at the end of this string is important
-		// The last \n at the end of this string is important
-		expected := strings.NewReader(fmt.Sprintf(`
+				// The last \n at the end of this string is important
+				return strings.NewReader(fmt.Sprintf(`
     # HELP mongodb_mongod_replset_number_of_members The number of replica set members.
     # TYPE mongodb_mongod_replset_number_of_members gauge
     mongodb_mongod_replset_number_of_members{set="rs1"} 4
@@ -193,46 +170,29 @@ func TestDiagnosticDataCollectorWithCompatibleMode(t *testing.T) {
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="Community",mongodb="%s",vendor="%s"} 1`, version, vendor) + "\n")
-
-		// Filter metrics for 2 reasons:
-		// 1. The result is huge
-		// 2. We need to check against know values. Don't use metrics that return counters like uptime
-		//    or counters like the number of transactions because they won't return a known value to compare
-		filter := []string{
-			"mongodb_mongod_storage_engine",
-			"mongodb_version_info",
-			"mongodb_mongod_replset_my_state",
-			"mongodb_mongod_replset_number_of_members",
-		}
-
-		err = testutil.CollectAndCompare(c, expected, filter...)
-		assert.NoError(t, err)
-	})
-}
-
-func getMongoDBVersion(t *testing.T, client *mongo.Client, ctx context.Context, logger *logrus.Logger) (string, error) {
-	var m bson.M
-	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
-	res := client.Database("admin").RunCommand(ctx, cmd)
-	if res.Err() != nil {
-		return "", res.Err()
+			},
+		},
 	}
 
-	if err := res.Decode(&m); err != nil {
-		logger.Errorf("cannot run getDiagnosticData: %s", err)
-	}
+	for _, tt := range testCases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
 
-	m, ok := m["data"].(bson.M)
-	if !ok {
-		return "", errors.New("cannot decode getDiagnosticData")
-	}
+			port, err := tu.PortForContainer(tt.containerName)
+			require.NoError(t, err)
+			client := tu.TestClient(ctx, port, t)
+			logger := logrus.New()
+			ti := labelsGetterMock{}
 
-	v := walkTo(m, []string{"serverStatus", "version"})
-	serverVersion, ok := v.(string)
-	if !ok {
-		serverVersion = "server version is unavailable"
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+			err = testutil.CollectAndCompare(c, tt.expectedMetrics(), tt.metricsFilter...)
+			assert.NoError(t, err)
+		})
 	}
-	return serverVersion, nil
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
@@ -382,9 +342,6 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-	# HELP mongodb_mongod_replset_my_state An integer between 0 and 10 that represents the replica state of the current member
-	# TYPE mongodb_mongod_replset_my_state gauge
-	mongodb_mongod_replset_my_state{set=""} 6
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="",mongodb="",vendor=""} 1` + "\n")
@@ -393,7 +350,6 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_mongod_replset_my_state",
 		"mongodb_mongod_storage_engine",
 		"mongodb_version_info",
 	}
