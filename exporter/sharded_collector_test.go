@@ -28,6 +28,7 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
+//nolint:paralleltest
 func TestShardedCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

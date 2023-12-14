@@ -86,7 +86,7 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 		split := strings.Split(namespace, ".")
 		database := split[0]
 		collection := ""
-		if len(split) >= 2 {
+		if len(split) >= 2 { //nolint:gomnd
 			collection = strings.Join(split[1:], ".")
 		}
 
