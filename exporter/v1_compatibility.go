@@ -815,7 +815,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	metrics = append(metrics, serverVersion(buildInfo))
 
 	if isArbiter, _ := isArbiter(ctx, client); isArbiter {
-		if hm := helloMetrics(ctx, client, l); hm != nil {
+		if hm := myRole(ctx, client, l); hm != nil {
 			metrics = append(metrics, hm...)
 		}
 	} else {
@@ -926,11 +926,11 @@ func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	return metric
 }
 
-// helloMetrics returns "fallback" metrics based on the response from Mongo's hello command.
-func helloMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
-	response, err := util.GetHelloResponse(ctx, client)
+// myRole returns metrics based on the role of the mongo instance.
+func myRole(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+	response, err := util.MyRole(ctx, client)
 	if err != nil {
-		l.Errorf("cannot get hello response: %s", err)
+		l.Errorf("cannot get role of the running instance: %s", err)
 		return nil
 	}
 

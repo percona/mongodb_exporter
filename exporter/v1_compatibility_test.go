@@ -260,7 +260,7 @@ func TestMyState(t *testing.T) {
 	}
 }
 
-func TestHelloMetrics(t *testing.T) {
+func TestMyRole(t *testing.T) {
 	t.Parallel()
 	t.Run("correctly gets member count from arbiter node", func(t *testing.T) {
 		t.Parallel()
@@ -273,7 +273,7 @@ func TestHelloMetrics(t *testing.T) {
 		port, err := tu.PortForContainer(containerName)
 		require.NoError(t, err)
 		client := tu.TestClient(ctx, port, t)
-		metrics := helloMetrics(ctx, client, logger)
+		metrics := myRole(ctx, client, logger)
 		var rsMembers dto.Metric
 		for _, m := range metrics {
 			if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_number_of_members"`) {

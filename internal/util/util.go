@@ -42,15 +42,15 @@ func MyState(ctx context.Context, client *mongo.Client) (int, error) {
 	return int(status.MyState), nil
 }
 
-// GetHelloResponse returns the hello response from a Mongo instance.
-func GetHelloResponse(ctx context.Context, client *mongo.Client) (*proto.HelloResponse, error) {
-	var hello proto.HelloResponse
-	err := client.Database("admin").RunCommand(ctx, bson.M{"hello": 1}).Decode(&hello)
+// MyRole returns the role of the mongo instance.
+func MyRole(ctx context.Context, client *mongo.Client) (*proto.HelloResponse, error) {
+	var role proto.HelloResponse
+	err := client.Database("admin").RunCommand(ctx, bson.M{"hello": 1}).Decode(&role)
 	if err != nil {
 		return nil, err
 	}
 
-	return &hello, nil
+	return &role, nil
 }
 
 func ReplicasetConfig(ctx context.Context, client *mongo.Client) (*proto.ReplicasetConfig, error) {
