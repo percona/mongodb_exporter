@@ -17,7 +17,6 @@ package exporter
 
 import (
 	"context"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,15 +32,16 @@ func TestShardedCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := tu.DefaultTestClient(ctx, t)
+	client := tu.DefaultTestClientMongoS(ctx, t)
 	c := newShardedCollector(ctx, client, logrus.New(), false)
 
 	expected := strings.NewReader(`
-	# HELP mongodb_sharded_chunks_info_count sharded chunks info.
-	# TYPE mongodb_sharded_chunks_info_count counter
-	mongodb_sharded_chunks_info_count ` + strconv.Itoa(1) + "\n")
+	# HELP mongodb_sharded_collection_chunks_count sharded collection chunks.
+	# TYPE mongodb_sharded_collection_chunks_count counter
+	mongodb_sharded_collection_chunks_count{collection="system.sessions",database="config",shard="rs1"} 512
+    mongodb_sharded_collection_chunks_count{collection="system.sessions",database="config",shard="rs2"} 512` + "\n")
 	filter := []string{
-		"mongodb_sharded_chunks_info_count",
+		"mongodb_sharded_collection_chunks_count",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
