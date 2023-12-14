@@ -74,6 +74,8 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 // DefaultTestClientMongoS returns the mongos MongoDB connection used for tests. It is a direct
 // connection to the mongos server.
 func DefaultTestClientMongoS(ctx context.Context, t *testing.T) *mongo.Client {
+	t.Helper()
+
 	port, err := PortForContainer("mongos")
 	require.NoError(t, err)
 
