@@ -17,7 +17,6 @@ package exporter
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -72,7 +71,6 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debug("$sharded metrics for config.chunks")
 	debugResult(logger, chunks)
 
-	fmt.Println(chunks)
 	for _, c := range chunks {
 		var ok bool
 		var id, namespace string
