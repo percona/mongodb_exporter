@@ -904,15 +904,9 @@ func serverVersion(bi buildInfo) prometheus.Metric { //nolint:ireturn
 }
 
 func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
-	state, err := util.MyState(ctx, client)
+	id, state, err := util.MyState(ctx, client)
 	if err != nil {
 		state = UnknownState
-	}
-
-	var id string
-	rs, err := util.ReplicasetConfig(ctx, client)
-	if err == nil {
-		id = rs.Config.ID
 	}
 
 	name := "mongodb_mongod_replset_my_state"

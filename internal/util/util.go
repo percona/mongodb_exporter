@@ -31,15 +31,15 @@ const (
 	ErrNotPrimaryOrSecondary = int32(13436)
 )
 
-func MyState(ctx context.Context, client *mongo.Client) (int, error) {
+func MyState(ctx context.Context, client *mongo.Client) (string, int, error) {
 	var status proto.ReplicaSetStatus
 
 	err := client.Database("admin").RunCommand(ctx, bson.M{"replSetGetStatus": 1}).Decode(&status)
 	if err != nil {
-		return 0, err
+		return "", 0, err
 	}
 
-	return int(status.MyState), nil
+	return status.Set, int(status.MyState), nil
 }
 
 // MyRole returns the role of the mongo instance.
