@@ -90,7 +90,7 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 			collection = strings.Join(split[1:], ".")
 		}
 
-		prefix := "sharded chunks"
+		prefix := "sharded collection chunks"
 		labels := make(map[string]string)
 		labels["database"] = database
 		labels["collection"] = collection
