@@ -31,6 +31,7 @@ const (
 	ErrNotPrimaryOrSecondary = int32(13436)
 )
 
+// MyState returns the replica set and the instance's state if available.
 func MyState(ctx context.Context, client *mongo.Client) (string, int, error) {
 	var status proto.ReplicaSetStatus
 

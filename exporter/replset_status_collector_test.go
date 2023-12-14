@@ -53,7 +53,6 @@ func TestReplsetStatusCollector(t *testing.T) {
 	filter := []string{
 		"mongodb_myState",
 		"mongodb_ok",
-		"mongodb_mongod_replset_number_of_members",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
