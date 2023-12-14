@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,14 +34,15 @@ func TestShardedCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
+	c := newShardedCollector(ctx, client, logrus.New(), false)
 
-	ti := labelsGetterMock{}
-	c := newShardedCollector(ctx, client, logrus.New(), ti)
-
-	// The last \n at the end of this string is important
-	expected := strings.NewReader(`` + "\n")
-
-	filter := []string{}
+	expected := strings.NewReader(`
+	# HELP mongodb_sharded_chunks_info_count sharded chunks info.
+	# TYPE mongodb_sharded_chunks_info_count counter
+	mongodb_sharded_chunks_info_count ` + strconv.Itoa(1) + "\n")
+	filter := []string{
+		"mongodb_sharded_chunks_info_count",
+	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }

@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,17 +27,17 @@ import (
 )
 
 type shardedCollector struct {
-	ctx          context.Context
-	base         *baseCollector
-	topologyInfo labelsGetter
+	ctx        context.Context
+	base       *baseCollector
+	compatible bool
 }
 
 // newShardedCollector creates collector collecting metrics about chunks for sharded Mongo.
-func newShardedCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, topology labelsGetter) *shardedCollector {
+func newShardedCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatibleMode bool) *shardedCollector {
 	return &shardedCollector{
-		ctx:          ctx,
-		base:         newBaseCollector(client, logger),
-		topologyInfo: topology,
+		ctx:        ctx,
+		base:       newBaseCollector(client, logger),
+		compatible: compatibleMode,
 	}
 }
 
@@ -71,20 +72,33 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debug("$sharded metrics for config.chunks")
 	debugResult(logger, chunks)
 
+	fmt.Println(chunks)
 	for _, c := range chunks {
-		namespace := c["ns"].(string)
-		split := strings.SplitN(namespace, ".", 1)
+		var ok bool
+		var id, namespace string
+		if id, ok = c["_id"].(string); !ok {
+			logger.Warning("$sharded chunk with wrong ID found")
+			continue
+		}
+		if namespace, ok = c["ns"].(string); !ok {
+			logger.Warning("not valid namespace in $sharded chunk")
+			continue
+		}
+
+		split := strings.Split(namespace, ".")
 		database := split[0]
 		collection := ""
 		if len(split) >= 2 {
-			collection = split[1]
+			collection = strings.Join(split[1:], ".")
 		}
-		prefix := "sharded"
-		labels := d.topologyInfo.baseLabels()
+
+		prefix := "sharded chunks"
+		labels := make(map[string]string)
 		labels["database"] = database
 		labels["collection"] = collection
+		labels["shard"] = id
 
-		for _, metric := range makeMetrics(prefix, c, labels, true) {
+		for _, metric := range makeMetrics(prefix, c, labels, d.compatible) {
 			ch <- metric
 		}
 	}

@@ -233,9 +233,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(rsgsc)
 	}
 
-	// sharded is supported only by mongos.
-	if e.opts.EnableSharded && nodeType == typeMongos && requestOpts.EnableSharded {
-		sc := newShardedCollector(ctx, client, e.opts.Logger, topologyInfo)
+	if e.opts.EnableSharded && requestOpts.EnableSharded {
+		sc := newShardedCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
 	}
 
@@ -313,6 +312,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableCollStats = true
 			case "profile":
 				requestOpts.EnableProfile = true
+			case "sharded":
+				requestOpts.EnableSharded = true
 			}
 		}
 
