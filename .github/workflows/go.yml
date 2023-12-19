@@ -40,5 +40,10 @@ jobs:
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
           sleep 10
+          docker exec -it mongos bash
+          mongo
+          use admin
+          sh.status()
+          exit && exit
           make test-race
           make test-cluster-clean
