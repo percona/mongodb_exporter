@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -54,10 +55,12 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	logger := d.base.logger
 
-	aggregation := bson.D{
-		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}, "ns": bson.M{"$first": "$ns"}}},
+	aggregation := bson.A{
+		bson.M{"$group": bson.M{"_id": "$shard", "cnt": bson.M{"$sum": 1}}},
+		bson.M{"$project": bson.M{"_id": 0, "shard": "$_id", "nChunks": "$cnt"}},
+		bson.M{"$sort": bson.M{"shard": 1}},
 	}
-	cur, err := client.Database("config").Collection("chunks").Aggregate(context.Background(), mongo.Pipeline{aggregation})
+	cur, err := client.Database("config").Collection("chunks").Aggregate(context.Background(), aggregation)
 	if err != nil {
 		logger.Errorf("cannot get $sharded cursor for collection config.chunks: %s", err)
 	}
@@ -72,9 +75,10 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 	debugResult(logger, chunks)
 
 	for _, c := range chunks {
+		fmt.Println(c)
 		var ok bool
 		var id, namespace string
-		if id, ok = c["_id"].(string); !ok {
+		if id, ok = c["shard"].(string); !ok {
 			logger.Warning("$sharded chunk with wrong ID found")
 			continue
 		}
