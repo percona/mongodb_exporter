@@ -22,6 +22,7 @@ jobs:
         image:
           - mongo:4.4
           - mongo:5.0
+          - mongo:6.0
           - percona/percona-server-mongodb:4.4
           - percona/percona-server-mongodb:5.0
 
@@ -39,7 +40,7 @@ jobs:
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
-          sleep 100
-          docker exec --tty mongos mongo --quiet --port 27017 --eval "sh.status()"
+          sleep 10
+          docker exec --tty mongos mongosh --quiet --port 17000 --eval "sh.status()"
           make test-race
           make test-cluster-clean
