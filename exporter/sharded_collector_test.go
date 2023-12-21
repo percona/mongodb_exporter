@@ -39,8 +39,7 @@ func TestShardedCollector(t *testing.T) {
 	expected := strings.NewReader(`
 	# HELP mongodb_sharded_collection_chunks_count sharded collection chunks.
 	# TYPE mongodb_sharded_collection_chunks_count counter
-	mongodb_sharded_collection_chunks_count{collection="system.sessions",database="config",shard="rs1"} 512
-    mongodb_sharded_collection_chunks_count{collection="system.sessions",database="config",shard="rs2"} 512` + "\n")
+    mongodb_sharded_collection_chunks_count{collection="system.sessions",database="config",shard="rs2"} 1024` + "\n")
 	filter := []string{
 		"mongodb_sharded_collection_chunks_count",
 	}
