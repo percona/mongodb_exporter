@@ -22,8 +22,10 @@ jobs:
         image:
           - mongo:4.4
           - mongo:5.0
+          - mongo:6.0
           - percona/percona-server-mongodb:4.4
           - percona/percona-server-mongodb:5.0
+          - percona/percona-server-mongodb:6.0
 
     runs-on: ubuntu-latest
 
@@ -39,6 +41,6 @@ jobs:
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
-          sleep 10
+          sleep 120
           make test-race
           make test-cluster-clean
