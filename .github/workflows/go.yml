@@ -41,6 +41,6 @@ jobs:
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
-          sleep 60
+          sleep 120
           make test-race
           make test-cluster-clean
