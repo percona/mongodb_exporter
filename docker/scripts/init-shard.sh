@@ -17,7 +17,7 @@ mongodb33=`getent hosts ${MONGO33} | awk '{ print $1 }'`
 port=${PORT:-27017}
 
 echo "Waiting for startup.."
-until mongo --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
+until mongosh --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
   printf '.'
   sleep 1
 done
@@ -25,8 +25,9 @@ done
 echo "Started.."
 
 echo init-shard.sh time now: `date +"%T" `
-mongo --host ${mongodb1}:${port} <<EOF
+mongosh --host ${mongodb1}:${port} <<EOF
    sh.addShard( "${RS1}/${mongodb11}:${PORT1},${mongodb12}:${PORT2},${mongodb13}:${PORT3}" );
    sh.addShard( "${RS2}/${mongodb21}:${PORT1},${mongodb22}:${PORT2},${mongodb23}:${PORT3}" );
+   sh.shardCollection( "test.shard", { last_name: "hashed" }, false, { numInitialChunks: 500, collation: { locale: "simple" }} );
    sh.status();
 EOF

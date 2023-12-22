@@ -61,7 +61,7 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 		logger.Errorf("cannot get database names: %s", err)
 	}
 	for _, database := range databaseNames {
-		cursor := client.Database(database).Collection("collections")
+		cursor := client.Database("config").Collection("collections")
 		if err != nil {
 			logger.Errorf("cannot get collections :%s", err)
 			continue

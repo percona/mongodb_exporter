@@ -8,7 +8,7 @@ arbiter=`getent hosts ${ARBITER} | awk '{ print $1 }'`
 port=${PORT:-27017}
 
 echo "Waiting for startup.."
-until mongo --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
+until mongosh --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
   printf '.'
   sleep 1
 done
@@ -20,7 +20,7 @@ echo setup.sh time now: `date +"%T" `
 
 function cnf_servers() {
     echo "setup cnf servers"
-    mongo --host ${mongodb1}:${port} <<EOF
+    mongosh --host ${mongodb1}:${port} <<EOF
     var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,
@@ -47,7 +47,7 @@ EOF
 
 function general_servers() {
     echo "setup servers"
-    mongo --host ${mongodb1}:${port} <<EOF
+    mongosh --host ${mongodb1}:${port} <<EOF
     var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,
