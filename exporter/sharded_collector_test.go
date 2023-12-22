@@ -36,22 +36,34 @@ func TestShardedCollector(t *testing.T) {
 	client := tu.DefaultTestClientMongoS(ctx, t)
 	c := newShardedCollector(ctx, client, logrus.New(), false)
 
-	// c.Collect()
-	// count := testutil.CollectAndCount(c, "mongodb_sharded_collection_chunks_count")
-
 	reg := prometheus.NewPedanticRegistry()
 	if err := reg.Register(c); err != nil {
 		panic(fmt.Errorf("registering collector failed: %w", err))
 	}
-	expected := "xxx"
-	got, _ := reg.Gather()
-	for _, v := range got {
-		if v.GetName() != "mongodb_sharded_collection_chunks_count" {
+
+	expected := []map[string]string{
+		{"collection": "shard", "database": "test", "shard": "rs1"},
+		{"collection": "shard", "database": "test", "shard": "rs2"},
+	}
+
+	got, err := reg.Gather()
+	assert.NoError(t, err)
+	res := []map[string]string{}
+	for _, r := range got {
+		if r.GetName() != "mongodb_sharded_collection_chunks_count" {
 			continue
 		}
-		for _, vv := range v.Metric {
-			fmt.Println(vv.Label)
+		for _, m := range r.Metric {
+			row := make(map[string]string)
+			fmt.Println(m.GetCounter().String())
+			for _, l := range m.GetLabel() {
+				row[l.GetName()] = l.GetValue()
+			}
+
+			res = append(res, row)
 		}
 	}
-	assert.Equal(t, expected, got[0].String())
+	for _, v := range expected {
+		assert.Contains(t, res, v)
+	}
 }
