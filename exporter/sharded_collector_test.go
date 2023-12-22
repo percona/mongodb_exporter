@@ -17,10 +17,11 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -35,6 +36,22 @@ func TestShardedCollector(t *testing.T) {
 	client := tu.DefaultTestClientMongoS(ctx, t)
 	c := newShardedCollector(ctx, client, logrus.New(), false)
 
-	count := testutil.CollectAndCount(c, "mongodb_sharded_collection_chunks_count")
-	assert.GreaterOrEqual(t, count, 2)
+	// c.Collect()
+	// count := testutil.CollectAndCount(c, "mongodb_sharded_collection_chunks_count")
+
+	reg := prometheus.NewPedanticRegistry()
+	if err := reg.Register(c); err != nil {
+		panic(fmt.Errorf("registering collector failed: %w", err))
+	}
+	expected := "xxx"
+	got, _ := reg.Gather()
+	for _, v := range got {
+		if v.GetName() != "mongodb_sharded_collection_chunks_count" {
+			continue
+		}
+		for _, vv := range v.Metric {
+			fmt.Println(vv.Label)
+		}
+	}
+	assert.Equal(t, expected, got[0].String())
 }
