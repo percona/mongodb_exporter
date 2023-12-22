@@ -55,7 +55,6 @@ func TestShardedCollector(t *testing.T) {
 		}
 		for _, m := range r.Metric {
 			row := make(map[string]string)
-			fmt.Println(m.GetCounter().String())
 			for _, l := range m.GetLabel() {
 				row[l.GetName()] = l.GetValue()
 			}
