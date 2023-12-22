@@ -52,6 +52,7 @@ services:
             - MONGO3=mongo-1-3
             - ARBITER=mongo-1-arbiter
             - RS=rs1
+            - VERSION=${TEST_MONGODB_IMAGE}
         entrypoint: [ "/scripts/setup.sh" ]
 
     mongo-2-2:
@@ -105,6 +106,7 @@ services:
             - MONGO3=mongo-2-3
             - ARBITER=mongo-2-arbiter
             - RS=rs2
+            - VERSION=${TEST_MONGODB_IMAGE}
         entrypoint: [ "/scripts/setup.sh" ]
 
     # Config servers
@@ -151,6 +153,7 @@ services:
             - MONGO3=mongo-cnf-3
             - RS=cnf-serv
             - PORT=27017
+            - VERSION=${TEST_MONGODB_IMAGE}
         entrypoint: [ "/scripts/setup.sh","cnf_servers" ]
 
     mongos:
@@ -197,6 +200,7 @@ services:
             - PORT1=27017
             - PORT2=27017
             - PORT3=27017
+            - VERSION=${TEST_MONGODB_IMAGE}
         entrypoint: [ "/scripts/init-shard.sh" ]
         restart: on-failure:20
 

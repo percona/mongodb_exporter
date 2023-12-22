@@ -41,7 +41,7 @@ jobs:
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
-          sleep 30
+          sleep 60
           docker exec --tty mongos mongosh --quiet --port 27017 --eval "sh.status()"
           make test-race
           make test-cluster-clean

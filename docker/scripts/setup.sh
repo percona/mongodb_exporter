@@ -1,5 +1,15 @@
 #!/bin/bash 
 
+readarray -d . -t verarr <<< "${VERSION}"
+readarray -d : -t version <<< "${verarr[0]}"
+echo "Mongo version: ${version[1]}"
+
+mongoShell=mongo
+if [ ${version[1]} -gt 4 ]
+then
+    mongoShell=mongosh
+fi
+
 mongodb1=`getent hosts ${MONGO1} | awk '{ print $1 }'`
 mongodb2=`getent hosts ${MONGO2} | awk '{ print $1 }'`
 mongodb3=`getent hosts ${MONGO3} | awk '{ print $1 }'`
@@ -8,7 +18,7 @@ arbiter=`getent hosts ${ARBITER} | awk '{ print $1 }'`
 port=${PORT:-27017}
 
 echo "Waiting for startup.."
-until mongosh --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
+until mongoShell --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
   printf '.'
   sleep 1
 done
@@ -20,7 +30,7 @@ echo setup.sh time now: `date +"%T" `
 
 function cnf_servers() {
     echo "setup cnf servers"
-    mongosh --host ${mongodb1}:${port} <<EOF
+    mongoShell --host ${mongodb1}:${port} <<EOF
     var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,
@@ -47,7 +57,7 @@ EOF
 
 function general_servers() {
     echo "setup servers"
-    mongosh --host ${mongodb1}:${port} <<EOF
+    mongoShell --host ${mongodb1}:${port} <<EOF
     var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,
