@@ -42,8 +42,8 @@ func TestShardedCollector(t *testing.T) {
 	}
 
 	expected := []map[string]string{
-		{"collection": "system.sessions", "database": "config", "shard": "rs1"},
-		{"collection": "system.sessions", "database": "config", "shard": "rs2"},
+		{"collection": "shard", "database": "test", "shard": "rs1"},
+		{"collection": "shard", "database": "test", "shard": "rs2"},
 	}
 
 	got, err := reg.Gather()

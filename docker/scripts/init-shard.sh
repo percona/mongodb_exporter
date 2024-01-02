@@ -37,5 +37,9 @@ echo init-shard.sh time now: `date +"%T" `
 mongosh --host ${mongodb1}:${port} <<EOF
    sh.addShard( "${RS1}/${mongodb11}:${PORT1},${mongodb12}:${PORT2},${mongodb13}:${PORT3}" );
    sh.addShard( "${RS2}/${mongodb21}:${PORT1},${mongodb22}:${PORT2},${mongodb23}:${PORT3}" );
+   use test;
+   db.createCollection("shard");
+   sh.enableSharding("test");
+   sh.shardCollection( "test.shard", { id: "hashed" }, false, { numInitialChunks: 500, collation: { locale: "simple" }} );
    sh.status();
 EOF
