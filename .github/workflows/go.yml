@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Prep
 
     strategy:
       fail-fast: false
@@ -41,6 +41,6 @@ jobs:
       - name: Test
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
-          sleep 120
+          sleep 1000
           make test-race
           make test-cluster-clean
