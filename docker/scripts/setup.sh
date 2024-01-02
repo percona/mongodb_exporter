@@ -4,10 +4,10 @@ readarray -d . -t verarr <<< "${VERSION}"
 readarray -d : -t version <<< "${verarr[0]}"
 echo "Mongo version: ${version[1]}"
 
-mongoShell=mongo
+alias mongoShell="mongo"
 if [ ${version[1]} -gt 4 ]
 then
-    mongoShell=mongosh
+  alias mongoShell="mongosh"
 fi
 
 mongodb1=`getent hosts ${MONGO1} | awk '{ print $1 }'`

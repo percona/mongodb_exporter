@@ -4,10 +4,10 @@ readarray -d . -t verarr <<< "${VERSION}"
 readarray -d : -t version <<< "${verarr[0]}"
 echo "Mongo version: ${version[1]}"
 
-mongoShell=mongo
+alias mongoShell="mongo"
 if [ ${version[1]} -gt 4 ]
 then
-    mongoShell=mongosh
+  alias mongoShell="mongosh"
 fi
 
 mongodb1=`getent hosts ${MONGOS} | awk '{ print $1 }'`
@@ -38,6 +38,5 @@ echo init-shard.sh time now: `date +"%T" `
 mongoShell --host ${mongodb1}:${port} <<EOF
    sh.addShard( "${RS1}/${mongodb11}:${PORT1},${mongodb12}:${PORT2},${mongodb13}:${PORT3}" );
    sh.addShard( "${RS2}/${mongodb21}:${PORT1},${mongodb22}:${PORT2},${mongodb23}:${PORT3}" );
-   sh.shardCollection( "test.shard", { last_name: "hashed" }, false, { numInitialChunks: 500, collation: { locale: "simple" }} );
    sh.status();
 EOF
