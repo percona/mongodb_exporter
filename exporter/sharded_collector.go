@@ -61,69 +61,24 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 		logger.Errorf("cannot get database names: %s", err)
 	}
 	for _, database := range databaseNames {
-		cursor := client.Database("config").Collection("collections")
-		if err != nil {
-			logger.Errorf("cannot get collections :%s", err)
-			continue
-		}
-
-		rs, err := cursor.Find(d.ctx, bson.M{"_id": bson.M{"$regex": fmt.Sprintf("^%s.", database), "$options": "i"}})
-		if err != nil {
-			logger.Errorf("cannot find _id starting with \"%s.\":%s", database, err)
-			continue
-		}
-
-		var decoded []bson.M
-		err = rs.All(d.ctx, &decoded)
-		if err != nil {
-			logger.Errorf("cannot decode collections:%s", err)
-			continue
-		}
-
-		for _, row := range decoded {
-			if len(row) == 0 {
-				continue
-			}
-
+		collections := d.getCollectionsForDBName(database)
+		for _, row := range collections {
 			var ok bool
 			if _, ok = row["_id"]; !ok {
 				continue
 			}
-			rowID := row["_id"].(string)
-
-			var chunksMatchPredicate bson.M
-			if _, ok := row["timestamp"]; ok {
-				if uuid, ok := row["uuid"]; ok {
-					chunksMatchPredicate = bson.M{"uuid": uuid}
-				}
-			} else {
-				if id, ok := row["_id"]; ok {
-					chunksMatchPredicate = bson.M{"_id": id}
-				}
-			}
-
-			aggregation := bson.A{
-				bson.M{"$match": chunksMatchPredicate},
-				bson.M{"$group": bson.M{"_id": "$shard", "cnt": bson.M{"$sum": 1}}},
-				bson.M{"$project": bson.M{"_id": 0, "shard": "$_id", "nChunks": "$cnt"}},
-				bson.M{"$sort": bson.M{"shard": 1}},
-			}
-
-			cur, err := client.Database("config").Collection("chunks").Aggregate(context.Background(), aggregation)
-			if err != nil {
-				logger.Errorf("cannot get $sharded cursor for collection config.chunks: %s", err)
+			var rowID string
+			if rowID, ok = row["_id"].(string); !ok {
 				continue
 			}
 
-			var chunks []bson.M
-			err = cur.All(context.Background(), &chunks)
-			if err != nil {
-				logger.Errorf("cannot decode $sharded for collection config.chunks: %s", err)
-				continue
-			}
-
+			chunks := d.getChunksForCollection(row)
 			for _, c := range chunks {
-				if dropped, ok := c["dropped"]; ok && dropped.(bool) {
+				if _, ok = c["dropped"]; !ok {
+					continue
+				}
+				var dropped bool
+				if dropped, ok = c["dropped"].(bool); !ok || dropped {
 					continue
 				}
 
@@ -131,18 +86,96 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 				labels := make(map[string]string)
 				labels["database"] = database
 				labels["collection"] = strings.Replace(rowID, fmt.Sprintf("%s.", database), "", 1)
-				labels["shard"] = c["shard"].(string)
+
+				if _, ok = c["shard"]; !ok {
+					continue
+				}
+				var shard string
+				if shard, ok = c["shard"].(string); !ok {
+					continue
+				}
+				labels["shard"] = shard
 
 				logger.Debug("$sharded metrics for config.chunks")
 				debugResult(logger, primitive.M{database: c})
 
-				m := primitive.M{"count": c["nChunks"].(int32)}
+				if _, ok = c["nChunks"]; !ok {
+					continue
+				}
+				var chunks int32
+				if chunks, ok = c["nChunks"].(int32); !ok {
+					continue
+				}
+				m := primitive.M{"count": chunks}
 				for _, metric := range makeMetrics(prefix, m, labels, d.compatible) {
 					ch <- metric
 				}
 			}
 		}
 	}
+}
+
+func (d *shardedCollector) getCollectionsForDBName(database string) []primitive.M {
+	client := d.base.client
+	logger := d.base.logger
+
+	cursor := client.Database("config").Collection("collections")
+	rs, err := cursor.Find(d.ctx, bson.M{"_id": bson.M{"$regex": fmt.Sprintf("^%s.", database), "$options": "i"}})
+	if err != nil {
+		logger.Errorf("cannot find _id starting with \"%s.\":%s", database, err)
+		return nil
+	}
+
+	var decoded []bson.M
+	err = rs.All(d.ctx, &decoded)
+	if err != nil {
+		logger.Errorf("cannot decode collections:%s", err)
+		return nil
+	}
+
+	return decoded
+}
+
+func (d *shardedCollector) getChunksForCollection(row primitive.M) []bson.M {
+	if len(row) == 0 {
+		return nil
+	}
+
+	var chunksMatchPredicate bson.M
+	if _, ok := row["timestamp"]; ok {
+		if uuid, ok := row["uuid"]; ok {
+			chunksMatchPredicate = bson.M{"uuid": uuid}
+		}
+	} else {
+		if id, ok := row["_id"]; ok {
+			chunksMatchPredicate = bson.M{"_id": id}
+		}
+	}
+
+	aggregation := bson.A{
+		bson.M{"$match": chunksMatchPredicate},
+		bson.M{"$group": bson.M{"_id": "$shard", "cnt": bson.M{"$sum": 1}}},
+		bson.M{"$project": bson.M{"_id": 0, "shard": "$_id", "nChunks": "$cnt"}},
+		bson.M{"$sort": bson.M{"shard": 1}},
+	}
+
+	client := d.base.client
+	logger := d.base.logger
+
+	cur, err := client.Database("config").Collection("chunks").Aggregate(context.Background(), aggregation)
+	if err != nil {
+		logger.Errorf("cannot get $sharded cursor for collection config.chunks: %s", err)
+		return nil
+	}
+
+	var chunks []bson.M
+	err = cur.All(context.Background(), &chunks)
+	if err != nil {
+		logger.Errorf("cannot decode $sharded for collection config.chunks: %s", err)
+		return nil
+	}
+
+	return chunks
 }
 
 var _ prometheus.Collector = (*shardedCollector)(nil)
