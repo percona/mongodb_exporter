@@ -55,6 +55,7 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 
 	client := d.base.client
 	logger := d.base.logger
+	prefix := "sharded collection chunks"
 
 	databaseNames, err := client.ListDatabaseNames(d.ctx, bson.D{})
 	if err != nil {
@@ -82,7 +83,6 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 					continue
 				}
 
-				prefix := "sharded collection chunks"
 				labels := make(map[string]string)
 				labels["database"] = database
 				labels["collection"] = strings.Replace(rowID, fmt.Sprintf("%s.", database), "", 1)
@@ -106,8 +106,7 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 				if chunks, ok = c["nChunks"].(int32); !ok {
 					continue
 				}
-				m := primitive.M{"count": chunks}
-				for _, metric := range makeMetrics(prefix, m, labels, d.compatible) {
+				for _, metric := range makeMetrics(prefix, primitive.M{"count": chunks}, labels, d.compatible) {
 					ch <- metric
 				}
 			}
