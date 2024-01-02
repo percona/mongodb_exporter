@@ -4,10 +4,9 @@ readarray -d . -t verarr <<< "${VERSION}"
 readarray -d : -t version <<< "${verarr[0]}"
 echo "Mongo version: ${version[1]}"
 
-alias mongoShell="mongo"
-if [ ${version[1]} -gt 4 ]
+if ((${version[1]} < 4))
 then
-  alias mongoShell="mongosh"
+  echo -e 'mongo' > /usr/bin/mongosh && chmod +x /usr/bin/mongosh
 fi
 
 mongodb1=`getent hosts ${MONGOS} | awk '{ print $1 }'`
@@ -27,7 +26,7 @@ mongodb33=`getent hosts ${MONGO33} | awk '{ print $1 }'`
 port=${PORT:-27017}
 
 echo "Waiting for startup.."
-until mongoShell --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
+until mongosh --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
   printf '.'
   sleep 1
 done
@@ -35,7 +34,7 @@ done
 echo "Started.."
 
 echo init-shard.sh time now: `date +"%T" `
-mongoShell --host ${mongodb1}:${port} <<EOF
+mongosh --host ${mongodb1}:${port} <<EOF
    sh.addShard( "${RS1}/${mongodb11}:${PORT1},${mongodb12}:${PORT2},${mongodb13}:${PORT3}" );
    sh.addShard( "${RS2}/${mongodb21}:${PORT1},${mongodb22}:${PORT2},${mongodb23}:${PORT3}" );
    sh.status();
