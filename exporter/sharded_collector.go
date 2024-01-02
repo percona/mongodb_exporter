@@ -64,6 +64,10 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 	for _, database := range databaseNames {
 		collections := d.getCollectionsForDBName(database)
 		for _, row := range collections {
+			if len(row) == 0 {
+				continue
+			}
+
 			var ok bool
 			if _, ok = row["_id"]; !ok {
 				continue
@@ -89,12 +93,10 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 
 func (d *shardedCollector) getInfoForChunk(c primitive.M, database, rowID string) (map[string]string, int32, bool) {
 	var ok bool
-	if _, ok = c["dropped"]; !ok {
-		return nil, 0, ok
-	}
-	var dropped bool
-	if dropped, ok = c["dropped"].(bool); !ok || dropped {
-		return nil, 0, false
+	if _, ok = c["dropped"]; ok {
+		if dropped, ok := c["dropped"].(bool); ok && dropped {
+			return nil, 0, false
+		}
 	}
 
 	labels := make(map[string]string)
@@ -147,10 +149,6 @@ func (d *shardedCollector) getCollectionsForDBName(database string) []primitive.
 }
 
 func (d *shardedCollector) getChunksForCollection(row primitive.M) []bson.M {
-	if len(row) == 0 {
-		return nil
-	}
-
 	var chunksMatchPredicate bson.M
 	if _, ok := row["timestamp"]; ok {
 		if uuid, ok := row["uuid"]; ok {
