@@ -75,35 +75,8 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 
 			chunks := d.getChunksForCollection(row)
 			for _, c := range chunks {
-				if _, ok = c["dropped"]; !ok {
-					continue
-				}
-				var dropped bool
-				if dropped, ok = c["dropped"].(bool); !ok || dropped {
-					continue
-				}
-
-				labels := make(map[string]string)
-				labels["database"] = database
-				labels["collection"] = strings.Replace(rowID, fmt.Sprintf("%s.", database), "", 1)
-
-				if _, ok = c["shard"]; !ok {
-					continue
-				}
-				var shard string
-				if shard, ok = c["shard"].(string); !ok {
-					continue
-				}
-				labels["shard"] = shard
-
-				logger.Debug("$sharded metrics for config.chunks")
-				debugResult(logger, primitive.M{database: c})
-
-				if _, ok = c["nChunks"]; !ok {
-					continue
-				}
-				var chunks int32
-				if chunks, ok = c["nChunks"].(int32); !ok {
+				labels, chunks, success := d.getInfoForChunk(c, database, rowID)
+				if !success {
 					continue
 				}
 				for _, metric := range makeMetrics(prefix, primitive.M{"count": chunks}, labels, d.compatible) {
@@ -112,6 +85,44 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
+}
+
+func (d *shardedCollector) getInfoForChunk(c primitive.M, database, rowID string) (map[string]string, int32, bool) {
+	var ok bool
+	if _, ok = c["dropped"]; !ok {
+		return nil, 0, ok
+	}
+	var dropped bool
+	if dropped, ok = c["dropped"].(bool); !ok || dropped {
+		return nil, 0, false
+	}
+
+	labels := make(map[string]string)
+	labels["database"] = database
+	labels["collection"] = strings.Replace(rowID, fmt.Sprintf("%s.", database), "", 1)
+
+	if _, ok = c["shard"]; !ok {
+		return nil, 0, ok
+	}
+	var shard string
+	if shard, ok = c["shard"].(string); !ok {
+		return nil, 0, ok
+	}
+	labels["shard"] = shard
+
+	logger := d.base.logger
+	logger.Debug("$sharded metrics for config.chunks")
+	debugResult(logger, primitive.M{database: c})
+
+	if _, ok = c["nChunks"]; !ok {
+		return nil, 0, ok
+	}
+	var chunks int32
+	if chunks, ok = c["nChunks"].(int32); !ok {
+		return nil, 0, ok
+	}
+
+	return labels, chunks, true
 }
 
 func (d *shardedCollector) getCollectionsForDBName(database string) []primitive.M {
