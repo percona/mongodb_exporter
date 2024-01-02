@@ -4,7 +4,7 @@ readarray -d . -t verarr <<< "${VERSION}"
 readarray -d : -t version <<< "${verarr[0]}"
 echo "Mongo version: ${version[1]}"
 
-if ((${version[1]} < 4))
+if ((${version[1]} <= 4))
 then
   echo -e 'mongo' > /usr/bin/mongosh && chmod +x /usr/bin/mongosh
 fi
