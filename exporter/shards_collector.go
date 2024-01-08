@@ -99,10 +99,6 @@ func (d *shardsCollector) getInfoForChunk(c primitive.M, database, rowID string)
 		}
 	}
 
-	labels := make(map[string]string)
-	labels["database"] = database
-	labels["collection"] = strings.Replace(rowID, fmt.Sprintf("%s.", database), "", 1)
-
 	if _, ok = c["shard"]; !ok {
 		return nil, 0, ok
 	}
@@ -110,11 +106,6 @@ func (d *shardsCollector) getInfoForChunk(c primitive.M, database, rowID string)
 	if shard, ok = c["shard"].(string); !ok {
 		return nil, 0, ok
 	}
-	labels["shard"] = shard
-
-	logger := d.base.logger
-	logger.Debug("$shards metrics for config.chunks")
-	debugResult(logger, primitive.M{database: c})
 
 	if _, ok = c["nChunks"]; !ok {
 		return nil, 0, ok
@@ -123,6 +114,15 @@ func (d *shardsCollector) getInfoForChunk(c primitive.M, database, rowID string)
 	if chunks, ok = c["nChunks"].(int32); !ok {
 		return nil, 0, ok
 	}
+
+	labels := make(map[string]string)
+	labels["database"] = database
+	labels["collection"] = strings.Replace(rowID, fmt.Sprintf("%s.", database), "", 1)
+	labels["shard"] = shard
+
+	logger := d.base.logger
+	logger.Debug("$shards metrics for config.chunks")
+	debugResult(logger, primitive.M{database: c})
 
 	return labels, chunks, true
 }
