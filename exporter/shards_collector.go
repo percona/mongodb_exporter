@@ -141,7 +141,7 @@ func (d *shardsCollector) getCollectionsForDBName(database string) []primitive.M
 	var decoded []bson.M
 	err = rs.All(d.ctx, &decoded)
 	if err != nil {
-		logger.Errorf("cannot decode collections:%s", err)
+		logger.Errorf("cannot decode collections: %s", err)
 		return nil
 	}
 
