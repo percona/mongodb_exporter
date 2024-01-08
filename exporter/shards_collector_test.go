@@ -29,12 +29,12 @@ import (
 )
 
 //nolint:paralleltest
-func TestShardedCollector(t *testing.T) {
+func TestShardsCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
-	c := newShardedCollector(ctx, client, logrus.New(), false)
+	c := newShardsCollector(ctx, client, logrus.New(), false)
 
 	reg := prometheus.NewPedanticRegistry()
 	if err := reg.Register(c); err != nil {
@@ -50,7 +50,7 @@ func TestShardedCollector(t *testing.T) {
 	assert.NoError(t, err)
 	res := []map[string]string{}
 	for _, r := range got {
-		if r.GetName() != "mongodb_sharded_collection_chunks_count" {
+		if r.GetName() != "mongodb_shards_collection_chunks_count" {
 			continue
 		}
 		for _, m := range r.Metric {

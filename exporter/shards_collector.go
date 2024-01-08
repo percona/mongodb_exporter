@@ -27,35 +27,35 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type shardedCollector struct {
+type shardsCollector struct {
 	ctx        context.Context
 	base       *baseCollector
 	compatible bool
 }
 
-// newShardedCollector creates collector collecting metrics about chunks for sharded Mongo.
-func newShardedCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatibleMode bool) *shardedCollector {
-	return &shardedCollector{
+// newShardsCollector creates collector collecting metrics about chunks for shards Mongo.
+func newShardsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatibleMode bool) *shardsCollector {
+	return &shardsCollector{
 		ctx:        ctx,
 		base:       newBaseCollector(client, logger),
 		compatible: compatibleMode,
 	}
 }
 
-func (d *shardedCollector) Describe(ch chan<- *prometheus.Desc) {
+func (d *shardsCollector) Describe(ch chan<- *prometheus.Desc) {
 	d.base.Describe(d.ctx, ch, d.collect)
 }
 
-func (d *shardedCollector) Collect(ch chan<- prometheus.Metric) {
+func (d *shardsCollector) Collect(ch chan<- prometheus.Metric) {
 	d.base.Collect(ch)
 }
 
-func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
-	defer measureCollectTime(ch, "mongodb", "sharded")()
+func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
+	defer measureCollectTime(ch, "mongodb", "shards")()
 
 	client := d.base.client
 	logger := d.base.logger
-	prefix := "sharded collection chunks"
+	prefix := "shards collection chunks"
 
 	databaseNames, err := client.ListDatabaseNames(d.ctx, bson.D{})
 	if err != nil {
@@ -91,7 +91,7 @@ func (d *shardedCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (d *shardedCollector) getInfoForChunk(c primitive.M, database, rowID string) (map[string]string, int32, bool) {
+func (d *shardsCollector) getInfoForChunk(c primitive.M, database, rowID string) (map[string]string, int32, bool) {
 	var ok bool
 	if _, ok = c["dropped"]; ok {
 		if dropped, ok := c["dropped"].(bool); ok && dropped {
@@ -113,7 +113,7 @@ func (d *shardedCollector) getInfoForChunk(c primitive.M, database, rowID string
 	labels["shard"] = shard
 
 	logger := d.base.logger
-	logger.Debug("$sharded metrics for config.chunks")
+	logger.Debug("$shards metrics for config.chunks")
 	debugResult(logger, primitive.M{database: c})
 
 	if _, ok = c["nChunks"]; !ok {
@@ -127,7 +127,7 @@ func (d *shardedCollector) getInfoForChunk(c primitive.M, database, rowID string
 	return labels, chunks, true
 }
 
-func (d *shardedCollector) getCollectionsForDBName(database string) []primitive.M {
+func (d *shardsCollector) getCollectionsForDBName(database string) []primitive.M {
 	client := d.base.client
 	logger := d.base.logger
 
@@ -148,7 +148,7 @@ func (d *shardedCollector) getCollectionsForDBName(database string) []primitive.
 	return decoded
 }
 
-func (d *shardedCollector) getChunksForCollection(row primitive.M) []bson.M {
+func (d *shardsCollector) getChunksForCollection(row primitive.M) []bson.M {
 	var chunksMatchPredicate bson.M
 	if _, ok := row["timestamp"]; ok {
 		if uuid, ok := row["uuid"]; ok {
@@ -172,18 +172,18 @@ func (d *shardedCollector) getChunksForCollection(row primitive.M) []bson.M {
 
 	cur, err := client.Database("config").Collection("chunks").Aggregate(context.Background(), aggregation)
 	if err != nil {
-		logger.Errorf("cannot get $sharded cursor for collection config.chunks: %s", err)
+		logger.Errorf("cannot get $shards cursor for collection config.chunks: %s", err)
 		return nil
 	}
 
 	var chunks []bson.M
 	err = cur.All(context.Background(), &chunks)
 	if err != nil {
-		logger.Errorf("cannot decode $sharded for collection config.chunks: %s", err)
+		logger.Errorf("cannot decode $shards for collection config.chunks: %s", err)
 		return nil
 	}
 
 	return chunks
 }
 
-var _ prometheus.Collector = (*shardedCollector)(nil)
+var _ prometheus.Collector = (*shardsCollector)(nil)

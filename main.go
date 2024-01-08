@@ -57,7 +57,7 @@ type GlobalFlags struct {
 	EnableIndexStats         bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
 	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 	EnableProfile            bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
-	EnableSharded            bool `help:"Enable collecting metrics from sharded Mongo about chunks" name:"collector.sharded"`
+	EnableShards             bool `help:"Enable collecting metrics from shards Mongo about chunks" name:"collector.shards"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
@@ -153,7 +153,7 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		EnableIndexStats:         opts.EnableIndexStats,
 		EnableCollStats:          opts.EnableCollStats,
 		EnableProfile:            opts.EnableProfile,
-		EnableSharded:            opts.EnableSharded,
+		EnableShards:             opts.EnableShards,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 

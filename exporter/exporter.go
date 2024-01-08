@@ -68,7 +68,7 @@ type Opts struct {
 	EnableIndexStats         bool
 	EnableCollStats          bool
 	EnableProfile            bool
-	EnableSharded            bool
+	EnableShards             bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -164,7 +164,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableIndexStats = true
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
-		e.opts.EnableSharded = true
+		e.opts.EnableShards = true
 	}
 
 	// arbiter only have isMaster privileges
@@ -177,7 +177,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableIndexStats = false
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
-		e.opts.EnableSharded = false
+		e.opts.EnableShards = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -233,8 +233,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(rsgsc)
 	}
 
-	if e.opts.EnableSharded && requestOpts.EnableSharded {
-		sc := newShardedCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
+	if e.opts.EnableShards && requestOpts.EnableShards {
+		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
 	}
 
@@ -312,8 +312,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableCollStats = true
 			case "profile":
 				requestOpts.EnableProfile = true
-			case "sharded":
-				requestOpts.EnableSharded = true
+			case "shards":
+				requestOpts.EnableShards = true
 			}
 		}
 
