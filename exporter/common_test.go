@@ -64,7 +64,7 @@ func TestListDatabases(t *testing.T) {
 	defer cleanupDB(ctx, client)
 
 	t.Run("Empty filter in list", func(t *testing.T) {
-		want := []string{"test", "testdb01", "testdb02"}
+		want := []string{"testdb01", "testdb02"}
 		allDBs, err := databases(ctx, client, nil, systemDBs)
 		assert.NoError(t, err)
 		assert.Equal(t, want, allDBs)
@@ -96,7 +96,7 @@ func TestListCollections(t *testing.T) {
 	defer cleanupDB(ctx, client)
 
 	t.Run("Basic test", func(t *testing.T) {
-		want := []string{"admin", "config", "local", "test", "testdb01", "testdb02"}
+		want := []string{"admin", "config", "local", "testdb01", "testdb02"}
 		allDBs, err := databases(ctx, client, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, want, allDBs)
@@ -127,7 +127,6 @@ func TestListCollections(t *testing.T) {
 
 	t.Run("Empty namespaces list", func(t *testing.T) {
 		wantNS := map[string][]string{
-			"test":     {"shard"},
 			"testdb01": {"col01", "col02", "colxx", "colyy"},
 			"testdb02": {"col01", "col02", "colxx", "colyy"},
 		}
@@ -139,7 +138,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("Count basic", func(t *testing.T) {
 		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, 9, count)
+		assert.Equal(t, 8, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {
