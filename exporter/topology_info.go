@@ -128,7 +128,7 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 	t.labels[labelClusterID] = cid
 
 	// Standalone instances or mongos instances won't have a replicaset state
-	state, err := util.MyState(ctx, t.client)
+	_, state, err := util.MyState(ctx, t.client)
 	if err == nil {
 		t.labels[labelReplicasetState] = fmt.Sprintf("%d", state)
 	}
