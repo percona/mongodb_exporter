@@ -95,8 +95,3 @@ case $1 in
         shift
         ;;
 esac
-    *)
-        general_servers
-        shift
-        ;;
-esac
