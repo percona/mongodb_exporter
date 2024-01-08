@@ -57,7 +57,6 @@ func TestProfileCollector(t *testing.T) {
 	mongodb_profile_slow_query_count{database="admin"} 0
 	mongodb_profile_slow_query_count{database="config"} 0
 	mongodb_profile_slow_query_count{database="local"} 0
-	mongodb_profile_slow_query_count{database="test"} 0
 	mongodb_profile_slow_query_count{database="testdb"} 0` +
 		"\n")
 
