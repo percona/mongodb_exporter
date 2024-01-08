@@ -1,17 +1,12 @@
 #!/bin/bash 
 # `mongosh` is used starting from MongoDB 5.x
 MONGODB_CLIENT="mongosh --quiet"
-if [ -z "${VERSION}" ]; then
-  echo ""
-  echo "Missing MongoDB version in the [mongodb-version] input. Received value: ${VERSION}"
-  echo ""
-
-  exit 2
-fi
-if [ "`echo ${VERSION} | cut -c 1`" = "4" ]; then
+PARSED=(${VERSION//:/ })
+MONGODB_VERSION=${PARSED[1]}
+if [ "`echo ${MONGODB_VERSION} | cut -c 1`" = "4" ]; then
   MONGODB_CLIENT="mongo"
 fi
-echo "MongoDB client and version: ${MONGODB_CLIENT} ${VERSION}"
+echo "MongoDB client and version: ${MONGODB_CLIENT} ${MONGODB_VERSION}"
 
 mongodb1=`getent hosts ${MONGOS} | awk '{ print $1 }'`
 
