@@ -1,12 +1,17 @@
 #!/bin/bash 
-readarray -d . -t verarr <<< "${VERSION}"
-readarray -d : -t version <<< "${verarr[0]}"
-echo "Mongo version: ${version[1]}"
+# `mongosh` is used starting from MongoDB 5.x
+MONGODB_CLIENT="mongosh --quiet"
+if [ -z "${VERSION}" ]; then
+  echo ""
+  echo "Missing MongoDB version in the [mongodb-version] input. Received value: ${VERSION}"
+  echo ""
 
-if ((${version[1]} <= 4))
-then
-  echo -e 'mongo' > /usr/bin/mongosh && chmod +x /usr/bin/mongosh
+  exit 2
 fi
+if [ "`echo ${VERSION} | cut -c 1`" = "4" ]; then
+  MONGODB_CLIENT="mongo"
+fi
+echo "MongoDB client and version: ${MONGODB_CLIENT} ${VERSION}"
 
 mongodb1=`getent hosts ${MONGO1} | awk '{ print $1 }'`
 mongodb2=`getent hosts ${MONGO2} | awk '{ print $1 }'`
@@ -16,7 +21,7 @@ arbiter=`getent hosts ${ARBITER} | awk '{ print $1 }'`
 port=${PORT:-27017}
 
 echo "Waiting for startup.."
-until mongosh --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
+until ${MONGODB_CLIENT} --host ${mongodb1}:${port} --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' &>/dev/null; do
   printf '.'
   sleep 1
 done
@@ -28,7 +33,7 @@ echo setup.sh time now: `date +"%T" `
 
 function cnf_servers() {
     echo "setup cnf servers on ${MONGO1}(${mongodb1}:${port})"
-    mongosh --host ${mongodb1}:${port} <<EOF
+    ${MONGODB_CLIENT} --host ${mongodb1}:${port} <<EOF
     var cfg = {
         "_id": "${RS}",
         "version": 1,
@@ -56,7 +61,7 @@ EOF
 
 function general_servers() {
     echo "setup servers on ${MONGO1}(${mongodb1}:${port})"
-    mongosh --host ${mongodb1}:${port} <<EOF
+    ${MONGODB_CLIENT} --host ${mongodb1}:${port} <<EOF
     var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,
