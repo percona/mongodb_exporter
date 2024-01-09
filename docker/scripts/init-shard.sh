@@ -3,10 +3,14 @@
 MONGODB_CLIENT="mongosh --quiet"
 PARSED=(${VERSION//:/ })
 MONGODB_VERSION=${PARSED[1]}
+MONGODB_VENDOR=${PARSED[0]}
 if [ "`echo ${MONGODB_VERSION} | cut -c 1`" = "4" ]; then
   MONGODB_CLIENT="mongo"
 fi
-echo "MongoDB client and version: ${MONGODB_CLIENT} ${MONGODB_VERSION}"
+if [ "`echo ${MONGODB_VERSION} | cut -c 1`" = "5" ] && [ ${MONGODB_VENDOR} == "percona/percona-server-mongodb" ]; then
+  MONGODB_CLIENT="mongo"
+fi
+echo "MongoDB vendor, client and version: ${MONGODB_VENDOR} ${MONGODB_CLIENT} ${MONGODB_VERSION}"
 
 mongodb1=`getent hosts ${MONGOS} | awk '{ print $1 }'`
 
