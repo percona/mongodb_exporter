@@ -46,7 +46,7 @@ func MyState(ctx context.Context, client *mongo.Client) (string, int, error) {
 // MyRole returns the role of the mongo instance.
 func MyRole(ctx context.Context, client *mongo.Client) (*proto.HelloResponse, error) {
 	var role proto.HelloResponse
-	err := client.Database("admin").RunCommand(ctx, bson.M{"hello": 1}).Decode(&role)
+	err := client.Database("admin").RunCommand(ctx, bson.M{"isMaster": 1}).Decode(&role)
 	if err != nil {
 		return nil, err
 	}
