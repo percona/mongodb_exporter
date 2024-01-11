@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // Package tu has Test Util functions
 package tu
@@ -21,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -50,6 +48,8 @@ const (
 	MongoDBStandAlonePort = "27017"
 	// MongoDBConfigServer1Port MongoDB config server primary Port.
 	MongoDBConfigServer1Port = "17009"
+	// MongoDBStandAloneEncryptedPort MongoDB standalone encrypted instance Port.
+	MongoDBStandAloneEncryptedPort = "27027"
 )
 
 // GetenvDefault gets a variable from the environment and returns its value or the
@@ -67,6 +67,7 @@ func GetenvDefault(key, defaultValue string) string {
 func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	port, err := PortForContainer("mongo-1-1")
 	require.NoError(t, err)
+
 	return TestClient(ctx, port, t)
 }
 
@@ -103,6 +104,7 @@ func GetImageNameForDefault() (string, string, error) {
 			break
 		}
 	}
+
 	return imageBaseName, version, nil
 }
 
@@ -138,7 +140,7 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 
 // LoadJSON loads a file and returns the result of unmarshaling it into a bson.M structure.
 func LoadJSON(filename string) (bson.M, error) {
-	buf, err := ioutil.ReadFile(filepath.Clean(filename))
+	buf, err := os.ReadFile(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
 	}

@@ -14,14 +14,18 @@
 |--web.listen-address|Address to listen on for web interface and telemetry|--web.listen-address=":9216"|
 |--web.telemetry-path|Metrics expose path|--web.telemetry-path="/metrics"|
 |--web.config|Path to the file having Prometheus TLS config for basic auth|--web.config=STRING|
+|--web.timeout-offset|Offset to subtract from the timeout in seconds|--web.timeout-offset=1|
 |--log.level|Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]|--log.level="error"|
 |--collector.diagnosticdata|Enable collecting metrics from getDiagnosticData|
 |--collector.replicasetstatus|Enable collecting metrics from replSetGetStatus|
 |--collector.dbstats|Enable collecting metrics from dbStats||
 |--collector.topmetrics|Enable collecting metrics from top admin command|
+|--collector.currentopmetrics|Enable collecting metrics from currentop admin command|
 |--collector.indexstats|Enable collecting metrics from $indexStats|
 |--collector.collstats|Enable collecting metrics from $collStats|
 |--collect-all|Enable all collectors. Same as specifying all --collector.\<name\>|
 |--collector.collstats-limit=0|Disable collstats, dbstats, topmetrics and indexstats collector if there are more than \<n\> collections. 0=No limit|
+|--collector.profile-time-ts=30|Set time for scrape slow queries| This interval must be synchronized with the Prometheus scrape interval|
+|--collector.profile|Enable collecting metrics from profile|
 |--metrics.overridedescendingindex| Enable descending index name override to replace -1 with _DESC ||
 |--version|Show version and exit|

@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -28,49 +29,38 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
-func TestReplsetStatusCollector(t *testing.T) {
+func TestGetEncryptionInfo(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := tu.DefaultTestClient(ctx, t)
+	client := tu.TestClient(ctx, tu.MongoDBStandAloneEncryptedPort, t)
+	t.Cleanup(func() {
+		err := client.Disconnect(ctx)
+		assert.NoError(t, err)
+	})
+	logger := logrus.New()
+	logger.Out = io.Discard // disable logs in tests
 
 	ti := labelsGetterMock{}
 
-	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti)
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-	# HELP mongodb_myState myState
-	# TYPE mongodb_myState untyped
-	mongodb_myState 1
-	# HELP mongodb_ok ok
-	# TYPE mongodb_ok untyped
-	mongodb_ok 1` + "\n")
-	// Filter metrics for 2 reasons:
-	// 1. The result is huge
-	// 2. We need to check against know values. Don't use metrics that return counters like uptime
-	//    or counters like the number of transactions because they won't return a known value to compare
+	# HELP mongodb_security_encryption_enabled Shows that encryption is enabled
+	# TYPE mongodb_security_encryption_enabled gauge
+	mongodb_security_encryption_enabled{type="localKeyFile"} 1
+	# HELP mongodb_version_info The server version
+	# TYPE mongodb_version_info gauge
+	mongodb_version_info{edition="Community",mongodb="5.0.13-11",vendor="Percona"} 1` + "\n")
+
 	filter := []string{
-		"mongodb_myState",
-		"mongodb_ok",
+		"mongodb_security_encryption_enabled",
+		"mongodb_version_info",
 	}
+
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
-}
-
-func TestReplsetStatusCollectorNoSharding(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
-
-	ti := labelsGetterMock{}
-
-	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti)
-
-	// Replication set metrics should not be generated for unsharded server
-	count := testutil.CollectAndCount(c)
-
-	metaMetricCount := 1
-	assert.Equal(t, metaMetricCount, count, "Mismatch in metric count for collector run on unsharded server")
 }

@@ -1,30 +1,31 @@
 // mongodb_exporter
 // Copyright (C) 2022 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package main
 
 import (
 	"testing"
+
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBuildExporter(t *testing.T) {
 	opts := GlobalFlags{
 		CollStatsNamespaces:   "c1,c2,c3",
 		IndexStatsCollections: "i1,i2,i3",
-		URI:                   "mongodb://usr:pwd@127.0.0.1/",
 		GlobalConnPool:        false, // to avoid testing the connection
 		WebListenAddress:      "localhost:12345",
 		WebTelemetryPath:      "/mymetrics",
@@ -35,6 +36,80 @@ func TestBuildExporter(t *testing.T) {
 
 		CompatibleMode: true,
 	}
+	log := logrus.New()
+	buildExporter(opts, "mongodb://usr:pwd@127.0.0.1/", log)
+}
 
-	buildExporter(opts)
+func TestBuildURI(t *testing.T) {
+	tests := []struct {
+		situation   string
+		origin      string
+		newUser     string
+		newPassword string
+		expect      string
+	}{
+		{
+			situation:   "uri with prefix and auth, and auth supplied in opt.User/Password",
+			origin:      "mongodb://usr:pwd@127.0.0.1",
+			newUser:     "xxx",
+			newPassword: "yyy",
+			expect:      "mongodb://usr:pwd@127.0.0.1",
+		},
+		{
+			situation:   "uri with prefix and auth, no auth supplied in opt.User/Password",
+			origin:      "mongodb://usr:pwd@127.0.0.1",
+			newUser:     "",
+			newPassword: "",
+			expect:      "mongodb://usr:pwd@127.0.0.1",
+		},
+		{
+			situation:   "uri with no prefix and auth, and auth supplied in opt.User/Password",
+			origin:      "usr:pwd@127.0.0.1",
+			newUser:     "xxx",
+			newPassword: "yyy",
+			expect:      "mongodb://usr:pwd@127.0.0.1",
+		},
+		{
+			situation:   "uri with no prefix and auth, no auth supplied in opt.User/Password",
+			origin:      "usr:pwd@127.0.0.1",
+			newUser:     "",
+			newPassword: "",
+			expect:      "mongodb://usr:pwd@127.0.0.1",
+		},
+		{
+			situation:   "uri with prefix and no auth, and auth supplied in opt.User/Password",
+			origin:      "mongodb://127.0.0.1",
+			newUser:     "xxx",
+			newPassword: "yyy",
+			expect:      "mongodb://xxx:yyy@127.0.0.1",
+		},
+		{
+			situation:   "uri with prefix and no auth, no auth supplied in opt.User/Password",
+			origin:      "mongodb://127.0.0.1",
+			newUser:     "",
+			newPassword: "",
+			expect:      "mongodb://127.0.0.1",
+		},
+		{
+			situation:   "uri with no prefix and no auth, and auth supplied in opt.User/Password",
+			origin:      "127.0.0.1",
+			newUser:     "xxx",
+			newPassword: "yyy",
+			expect:      "mongodb://xxx:yyy@127.0.0.1",
+		},
+		{
+			situation:   "uri with no prefix and no auth, no auth supplied in opt.User/Password",
+			origin:      "127.0.0.1",
+			newUser:     "",
+			newPassword: "",
+			expect:      "mongodb://127.0.0.1",
+		},
+	}
+	for _, tc := range tests {
+		newUri := buildURI(tc.origin, tc.newUser, tc.newPassword)
+		// t.Logf("Origin: %s", tc.origin)
+		// t.Logf("Expect: %s", tc.expect)
+		// t.Logf("Result: %s", newUri)
+		assert.Equal(t, newUri, tc.expect)
+	}
 }

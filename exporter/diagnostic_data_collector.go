@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
@@ -24,6 +23,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+)
+
+const (
+	kmipEncryption         = "kmip"
+	vaultEncryption        = "vault"
+	localKeyFileEncryption = "localKeyFile"
 )
 
 type diagnosticDataCollector struct {
@@ -54,7 +59,7 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
-	defer prometheus.MeasureCollectTime(ch, "mongodb", "diagnostic_data")()
+	defer measureCollectTime(ch, "mongodb", "diagnostic_data")()
 
 	var m bson.M
 
@@ -89,6 +94,13 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 	metrics = append(metrics, locksMetrics(logger, m)...)
 
+	securityMetric, err := d.getSecurityMetricFromLineOptions(client)
+	if err != nil {
+		logger.Errorf("cannot decode getCmdLineOtpions: %s", err)
+	} else if securityMetric != nil {
+		metrics = append(metrics, securityMetric)
+	}
+
 	if d.compatibleMode {
 		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
 
@@ -109,6 +121,68 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	for _, metric := range metrics {
 		ch <- metric
 	}
+}
+
+func (d *diagnosticDataCollector) getSecurityMetricFromLineOptions(client *mongo.Client) (prometheus.Metric, error) {
+	var cmdLineOpionsBson bson.M
+	cmdLineOptions := bson.D{{Key: "getCmdLineOpts", Value: "1"}}
+	resCmdLineOptions := client.Database("admin").RunCommand(d.ctx, cmdLineOptions)
+	if resCmdLineOptions.Err() != nil {
+		return nil, errors.Wrap(resCmdLineOptions.Err(), "cannot execute getCmdLineOpts command")
+	}
+	if err := resCmdLineOptions.Decode(&cmdLineOpionsBson); err != nil {
+		return nil, errors.Wrap(err, "cannot parse response of the getCmdLineOpts command")
+	}
+
+	if cmdLineOpionsBson == nil || cmdLineOpionsBson["parsed"] == nil {
+		return nil, errors.New("cmdlined options is empty")
+	}
+	parsedOptions, ok := cmdLineOpionsBson["parsed"].(bson.M)
+	if !ok {
+		return nil, errors.New("cannot cast parsed options to BSON")
+	}
+	securityOptions, ok := parsedOptions["security"].(bson.M)
+	if !ok {
+		return nil, nil
+	}
+
+	metric, err := d.retrieveSecurityEncryptionMetric(securityOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return metric, nil
+}
+
+func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetric(securityOptions bson.M) (prometheus.Metric, error) {
+	_, ok := securityOptions["enableEncryption"]
+	if !ok {
+		return nil, nil
+	}
+
+	var encryptionType string
+	_, ok = securityOptions["kmip"]
+	if ok {
+		encryptionType = kmipEncryption
+	}
+	_, ok = securityOptions["vault"]
+	if ok {
+		encryptionType = vaultEncryption
+	}
+	_, ok = securityOptions["encryptionKeyFile"]
+	if ok {
+		encryptionType = localKeyFileEncryption
+	}
+
+	labels := map[string]string{"type": encryptionType}
+	desc := prometheus.NewDesc("mongodb_security_encryption_enabled", "Shows that encryption is enabled",
+		nil, labels)
+	metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, float64(1))
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create metric mongodb_security_encryption_enabled")
+	}
+
+	return metric, nil
 }
 
 // check interface.

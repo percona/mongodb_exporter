@@ -1,0 +1,42 @@
+name: Lint
+
+on:
+  schedule:
+    # run every Sunday
+    - cron: '0 13 * * 0'
+  push:
+    branches:
+      - main
+      - release-0.1x
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+*
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint Check
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: ${{ github.workspace }}/go.mod
+
+      - name: Initialize dependencies and linters
+        run: make init
+
+      - name: Diff
+        run: |
+          make format
+          git diff --exit-code
+      - name: Run checks/linters
+        run: |
+          # use GITHUB_TOKEN because only it has access to GitHub Checks API
+          bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
+          bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
+          make check-license
