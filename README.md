@@ -129,7 +129,7 @@ Usage example: `db.setProfilingLevel(2)`
 |2|The profiler collects data for all operations.|
 
 #### Enabling shards metrics gathering
-When compatibility mode is enabled by the `--collector.shards`, the exporter will expose all new metrics about sharded Mongo. 
+When is enabled by the `--collector.shards`, the exporter will expose all new metrics about sharded Mongo. 
 Example, if shards collector is enabled:
 ```
 # HELP mongodb_shards_collection_chunks_count sharded collection chunks.
