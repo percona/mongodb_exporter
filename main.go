@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -166,20 +167,43 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 }
 
 func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
-	servers := make([]*exporter.Exporter, len(opts.URI))
-
-	for serverIdx := range opts.URI {
-		URI := opts.URI[serverIdx]
-
-		if !strings.HasPrefix(URI, "mongodb") {
-			log.Debugf("Prepending mongodb:// to the URI %s", URI)
-			URI = "mongodb://" + URI
-		}
-
-		servers[serverIdx] = buildExporter(opts, URI, log)
+	URIs := parseURIList(opts.URI)
+	servers := make([]*exporter.Exporter, len(URIs))
+	for serverIdx := range URIs {
+		servers[serverIdx] = buildExporter(opts, URIs[serverIdx], log)
 	}
 
 	return servers
+}
+
+func parseURIList(uriList []string) []string {
+	var URIs []string
+
+	// If server URI is prefixed with mongodb, then every next URI in line not prefixed with mongodb is a part of cluster
+	// Otherwise treat it as a standalone server
+	realURI := ""
+	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
+
+	for idx := range uriList {
+		URI := uriList[idx]
+
+		if !matchRegexp.MatchString(URI) {
+			if realURI == "" {
+				URIs = append(URIs, "mongodb://"+URI)
+			} else {
+				realURI = realURI + "," + URI
+			}
+		} else {
+			if realURI != "" {
+				URIs = append(URIs, realURI)
+			}
+			realURI = URI
+		}
+		if idx == len(uriList)-1 && realURI != "" {
+			URIs = append(URIs, realURI)
+		}
+	}
+	return URIs
 }
 
 func buildURI(uri string, user string, password string) string {

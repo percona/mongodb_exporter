@@ -91,9 +91,13 @@ You can run the exporter specifying multiple URIs, devided by a comma in --mongo
 ```sh
 --mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin,mongodb://user2:pass2@127.0.0.1:27018/admin
 ```
-In this case you can use the **/scrape** endpoint with the **target** parameter to retreive the specified tartget's metrics.  When querying the data you can use just mongodb://host:port in the targer parameter without other parameters and, of course without host credentials
+In this case you can use the **/scrape** endpoint with the **target** parameter to retreive the specified tartget's metrics.  When querying the data you can use just mongodb://host:port in the target parameter without other parameters and, of course without host credentials
 ```sh
 GET /scrape?target=mongodb://127.0.0.1:27018
+```
+If your URI is prefixed by mongodb:// or mongodb+srv:// schema, any host not prefixed by it after comma is being treated as part of a cluster rather then as a standalone host. Thus clusters and standalone hosts can be combined like this:
+```
+--mongodb.uri=mongodb+srv://user:pass@host1:27017,host2:27017,host3:27017/admin,mongodb://user2:pass2@host4:27018/admin
 ```
 
 
