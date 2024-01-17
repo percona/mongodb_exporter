@@ -62,7 +62,9 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 		return nil, errors.Wrap(err, "cannot get the list of collections for discovery")
 	}
 
-	return collections, nil
+	filteredCollections := filterSystemCollections(collections)
+
+	return filteredCollections, nil
 }
 
 // databases returns the list of databases matching the filters.
@@ -198,6 +200,22 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 	}
 
 	return namespaces, nil
+}
+
+func filterSystemCollections(cols []string) []string {
+	systemCollections := map[string]bool{
+		"system.profile": true,
+	}
+
+	filtered := make([]string, 0, len(cols))
+	for _, col := range cols {
+		if systemCollections[col] {
+			continue
+		}
+		filtered = append(filtered, col)
+	}
+
+	return filtered
 }
 
 func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includeNamespaces []string, filterInCollections []string) (int, error) {
