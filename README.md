@@ -137,7 +137,7 @@ Example, if shards collector is enabled:
 mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs1"} 250
 mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs2"} 250
 ```
-You can see shards names, it's collection, database and count.
+You can see shard name, it's collection, database and count.
 
 #### Cluster role labels
 The exporter sets some topology labels in all metrics.
