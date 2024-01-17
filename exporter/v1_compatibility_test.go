@@ -29,6 +29,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
@@ -162,7 +163,7 @@ func TestSumMetrics(t *testing.T) {
 	for _, tt := range tests {
 		testCase := tt
 
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			buf, err := os.ReadFile(filepath.Join("testdata/", "get_diagnostic_data.json"))
 			assert.NoError(t, err)
 
@@ -208,23 +209,84 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 // myState should always return a metric. If there is no connection, the value
 // should be the MongoDB unknown state = 6
 func TestMyState(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	t.Parallel()
+	tests := []struct {
+		name          string
+		containerName string
+		allowedStates []float64
+	}{
+		{
+			name:          "correctly gets state for data-carrying node",
+			containerName: "mongo-1-1",
+			allowedStates: []float64{float64(PrimaryState), float64(SecondaryState)},
+		},
+		{
+			name:          "correctly gets state for arbiter node",
+			containerName: "mongo-1-arbiter",
+			allowedStates: []float64{float64(ArbiterState)},
+		},
+		{
+			name:          "gets unknown state for standalone instance",
+			containerName: "standalone",
+			allowedStates: []float64{float64(UnknownState)},
+		},
+	}
 
-	client := tu.DefaultTestClient(ctx, t)
+	for _, tt := range tests {
+		testCase := tt
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
 
-	var m dto.Metric
+			port, err := tu.PortForContainer(testCase.containerName)
+			require.NoError(t, err)
+			client := tu.TestClient(ctx, port, t)
+			var m dto.Metric
 
-	metric := myState(ctx, client)
-	err := metric.Write(&m)
-	assert.NoError(t, err)
-	assert.NotEqual(t, float64(UnknownState), *m.Gauge.Value)
+			metric := myState(ctx, client)
+			err = metric.Write(&m)
+			assert.NoError(t, err)
+			assert.Contains(t, testCase.allowedStates, *m.Gauge.Value)
 
-	err = client.Disconnect(ctx)
-	assert.NoError(t, err)
+			err = client.Disconnect(ctx)
+			assert.NoError(t, err)
 
-	metric = myState(ctx, client)
-	err = metric.Write(&m)
-	assert.NoError(t, err)
-	assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+			metric = myState(ctx, client)
+			err = metric.Write(&m)
+			assert.NoError(t, err)
+			assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+		})
+	}
+}
+
+func TestMyRole(t *testing.T) {
+	t.Parallel()
+	t.Run("correctly gets member count from arbiter node", func(t *testing.T) {
+		t.Parallel()
+		containerName := "mongo-1-arbiter"
+
+		logger := logrus.New()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer(containerName)
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+		metrics := myRole(ctx, client, logger)
+		var rsMembers dto.Metric
+		for _, m := range metrics {
+			if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_number_of_members"`) {
+				err = m.Write(&rsMembers)
+				assert.NoError(t, err)
+
+				break
+			}
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, float64(4), *rsMembers.Gauge.Value)
+
+		err = client.Disconnect(ctx)
+		assert.NoError(t, err)
+	})
 }
