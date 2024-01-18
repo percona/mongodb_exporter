@@ -55,7 +55,7 @@ func TestTopologyLabels(t *testing.T) {
 			containerName: "mongo-cnf-1",
 			want: map[string]string{
 				labelReplicasetName:  "cnf-serv",
-				labelReplicasetState: "2",
+				labelReplicasetState: "1",
 				labelClusterRole:     "configsvr",
 				labelClusterID:       "f",
 			},
