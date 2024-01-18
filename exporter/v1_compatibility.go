@@ -35,9 +35,18 @@ import (
 )
 
 const (
-	// UnknownState is the values for an unknown rs state.
-	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
+	// PrimaryState is the state of the primary node in a replica set.
+	// See: https://docs.mongodb.com/manual/reference/replica-states/
+	PrimaryState = 1
+
+	// SecondaryState is the state of a secondary node in a replica set.
+	SecondaryState = 2
+
+	// UnknownState is the state of an unknown node in a replica set.
 	UnknownState = 6
+
+	// ArbiterState is the state of an arbiter in a replica set.
+	ArbiterState = 7
 
 	// EnterpriseEdition shows that MongoDB is Enterprise edition.
 	EnterpriseEdition = "Enterprise"
@@ -813,10 +822,16 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		}
 	}
 	metrics = append(metrics, serverVersion(buildInfo))
-	metrics = append(metrics, myState(ctx, client))
 
-	if mm := replSetMetrics(m); mm != nil {
-		metrics = append(metrics, mm...)
+	if isArbiter, _ := isArbiter(ctx, client); isArbiter {
+		if hm := myRole(ctx, client, l); hm != nil {
+			metrics = append(metrics, hm...)
+		}
+	} else {
+		metrics = append(metrics, myState(ctx, client))
+		if rm := replSetMetrics(m); rm != nil {
+			metrics = append(metrics, rm...)
+		}
 	}
 
 	if nodeType != typeMongos {
@@ -900,15 +915,9 @@ func serverVersion(bi buildInfo) prometheus.Metric { //nolint:ireturn
 }
 
 func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
-	state, err := util.MyState(ctx, client)
+	id, state, err := util.MyState(ctx, client)
 	if err != nil {
 		state = UnknownState
-	}
-
-	var id string
-	rs, err := util.ReplicasetConfig(ctx, client)
-	if err == nil {
-		id = rs.Config.ID
 	}
 
 	name := "mongodb_mongod_replset_my_state"
@@ -920,6 +929,38 @@ func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(state))
 
 	return metric
+}
+
+// myRole returns metrics based on the role of the mongo instance.
+func myRole(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+	response, err := util.MyRole(ctx, client)
+	if err != nil {
+		l.Errorf("cannot get role of the running instance: %s", err)
+		return nil
+	}
+
+	var metrics []prometheus.Metric
+	if response.ArbiterOnly {
+		createMetric := func(name, help string, value float64, labels map[string]string) {
+			const prefix = "mongodb_mongod_replset_"
+			d := prometheus.NewDesc(prefix+name, help, nil, labels)
+			metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value))
+		}
+
+		createMetric("my_state",
+			"An integer between 0 and 10 that represents the replica state of the current member",
+			float64(ArbiterState), map[string]string{
+				"set": response.SetName,
+			})
+
+		createMetric("number_of_members",
+			"The number of replica set members.",
+			float64(len(response.Hosts)+len(response.Arbiters)), map[string]string{
+				"set": response.SetName,
+			})
+	}
+
+	return metrics
 }
 
 func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {

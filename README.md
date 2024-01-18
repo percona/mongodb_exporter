@@ -128,6 +128,17 @@ Usage example: `db.setProfilingLevel(2)`
 |1| The profiler collects data for operations that take longer than the value of `slowms` or that match a filter.<br> When a filter is set: <ul><li> The `slowms` and `sampleRate` options are not used for profiling.</li><li>The profiler only captures operations that match the filter.</li></ul>
 |2|The profiler collects data for all operations.|
 
+#### Enabling shards metrics gathering
+When shard metrics collection is enabled by `--collector.shards`, the exporter will expose metrics related to sharded Mongo. 
+Example, if shards collector is enabled:
+```
+# HELP mongodb_shards_collection_chunks_count sharded collection chunks.
+# TYPE mongodb_shards_collection_chunks_count counter
+mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs1"} 250
+mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs2"} 250
+```
+You can see shard name, it's collection, database and count.
+
 #### Cluster role labels
 The exporter sets some topology labels in all metrics.
 The labels are:
