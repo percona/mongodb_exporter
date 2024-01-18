@@ -41,6 +41,7 @@ const (
 	typeMongos      mongoDBNodeType = "mongos"
 	typeMongod      mongoDBNodeType = "mongod"
 	typeShardServer mongoDBNodeType = "shardsvr"
+	typeArbiter     mongoDBNodeType = "arbiter"
 	typeOther       mongoDBNodeType = ""
 )
 
@@ -114,14 +115,14 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 		t.labels[labelReplicasetName] = rs.Config.ID
 	}
 
-	isArbiter, err := isArbiter(ctx, t.client)
+	nodeType, err := getNodeType(ctx, t.client)
 	if err != nil {
 		return err
 	}
 
 	cid, err := util.ClusterID(ctx, t.client)
 	if err != nil {
-		if !isArbiter { // arbiters don't have a cluster ID
+		if nodeType != typeArbiter { // arbiters don't have a cluster ID
 			return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting cluster ID: %s", err)
 		}
 	}
@@ -136,26 +137,14 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 	return nil
 }
 
-func isArbiter(ctx context.Context, client *mongo.Client) (bool, error) {
-	doc := struct {
-		ArbiterOnly bool `bson:"arbiterOnly"`
-	}{}
-
-	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&doc); err != nil {
-		return false, errors.Wrap(err, "cannot check if the instance is an arbiter")
-	}
-
-	return doc.ArbiterOnly, nil
-}
-
 func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, error) {
 	md := proto.MasterDoc{}
 	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
 		return "", err
 	}
 
-	if md.SetName != nil || md.Hosts != nil {
-		return typeShardServer, nil
+	if md.ArbiterOnly {
+		return typeArbiter, nil
 	} else if md.Msg == typeIsDBGrid {
 		// isdbgrid is always the msg value when calling isMaster on a mongos
 		// see http://docs.mongodb.org/manual/core/sharded-cluster-query-router/

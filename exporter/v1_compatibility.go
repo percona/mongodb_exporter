@@ -814,7 +814,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		}).Errorf("Cannot get node type: %s", err)
 	}
 
-	if nodeType == typeMongod {
+	if nodeType == typeMongod || nodeType == typeArbiter {
 		if engine, err := storageEngine(m); err != nil {
 			l.Errorf("cannot retrieve engine type: %s", err)
 		} else {
@@ -823,8 +823,8 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	}
 	metrics = append(metrics, serverVersion(buildInfo))
 
-	if isArbiter, _ := isArbiter(ctx, client); isArbiter {
-		if hm := myRole(ctx, client, l); hm != nil {
+	if nodeType == typeArbiter {
+		if hm := arbiterMetrics(ctx, client, l); hm != nil {
 			metrics = append(metrics, hm...)
 		}
 	} else {
@@ -931,8 +931,8 @@ func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	return metric
 }
 
-// myRole returns metrics based on the role of the mongo instance.
-func myRole(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+// arbiterMetrics returns metrics for mongoDB arbiter instances.
+func arbiterMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
 	response, err := util.MyRole(ctx, client)
 	if err != nil {
 		l.Errorf("cannot get role of the running instance: %s", err)
@@ -940,25 +940,23 @@ func myRole(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prome
 	}
 
 	var metrics []prometheus.Metric
-	if response.ArbiterOnly {
-		createMetric := func(name, help string, value float64, labels map[string]string) {
-			const prefix = "mongodb_mongod_replset_"
-			d := prometheus.NewDesc(prefix+name, help, nil, labels)
-			metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value))
-		}
-
-		createMetric("my_state",
-			"An integer between 0 and 10 that represents the replica state of the current member",
-			float64(ArbiterState), map[string]string{
-				"set": response.SetName,
-			})
-
-		createMetric("number_of_members",
-			"The number of replica set members.",
-			float64(len(response.Hosts)+len(response.Arbiters)), map[string]string{
-				"set": response.SetName,
-			})
+	createMetric := func(name, help string, value float64, labels map[string]string) {
+		const prefix = "mongodb_mongod_replset_"
+		d := prometheus.NewDesc(prefix+name, help, nil, labels)
+		metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value))
 	}
+
+	createMetric("my_state",
+		"An integer between 0 and 10 that represents the replica state of the current member",
+		float64(ArbiterState), map[string]string{
+			"set": response.SetName,
+		})
+
+	createMetric("number_of_members",
+		"The number of replica set members.",
+		float64(len(response.Hosts)+len(response.Arbiters)), map[string]string{
+			"set": response.SetName,
+		})
 
 	return metrics
 }
