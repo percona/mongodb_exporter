@@ -807,10 +807,19 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		l.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
 	}
 
-	if engine, err := storageEngine(m); err != nil {
-		l.Errorf("cannot retrieve engine type: %s", err)
-	} else {
-		metrics = append(metrics, engine)
+	nodeType, err := getNodeType(ctx, client)
+	if err != nil {
+		l.WithFields(logrus.Fields{
+			"component": "diagnosticDataCollector",
+		}).Errorf("Cannot get node type: %s", err)
+	}
+
+	if nodeType == typeMongod {
+		if engine, err := storageEngine(m); err != nil {
+			l.Errorf("cannot retrieve engine type: %s", err)
+		} else {
+			metrics = append(metrics, engine)
+		}
 	}
 	metrics = append(metrics, serverVersion(buildInfo))
 
@@ -825,10 +834,12 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		}
 	}
 
-	if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
-		l.Warnf("cannot create metrics for oplog: %s", err)
-	} else {
-		metrics = append(metrics, opLogMetrics...)
+	if nodeType != typeMongos {
+		if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
+			l.Warnf("cannot create metrics for oplog: %s", err)
+		} else {
+			metrics = append(metrics, opLogMetrics...)
+		}
 	}
 
 	return metrics
