@@ -185,26 +185,24 @@ func parseURIList(uriList []string) []string {
 	// Otherwise treat it as a standalone server
 	realURI := ""
 	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
-
-	for idx := range uriList {
-		URI := uriList[idx]
-
-		if !matchRegexp.MatchString(URI) {
+	for _, URI := range uriList {
+		if matchRegexp.MatchString(URI) {
+			if realURI != "" {
+				URIs = append(URIs, realURI)
+			}
+			realURI = URI
+		} else {
 			if realURI == "" {
 				URIs = append(URIs, "mongodb://"+URI)
 			} else {
 				realURI = realURI + "," + URI
 			}
-		} else {
-			if realURI != "" {
-				URIs = append(URIs, realURI)
-			}
-			realURI = URI
-		}
-		if idx == len(uriList)-1 && realURI != "" {
-			URIs = append(URIs, realURI)
 		}
 	}
+	if realURI != "" {
+		URIs = append(URIs, realURI)
+	}
+
 	return URIs
 }
 
