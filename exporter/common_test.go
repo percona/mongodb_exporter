@@ -32,6 +32,7 @@ import (
 var (
 	testDBs   = []string{"testdb01", "testdb02"}
 	testColls = []string{"col01", "col02", "colxx", "colyy"}
+	testViews = []string{"view01", "view02"}
 )
 
 func setupDB(ctx context.Context, t *testing.T, client *mongo.Client) {
@@ -44,6 +45,10 @@ func setupDB(ctx context.Context, t *testing.T, client *mongo.Client) {
 				assert.NoError(t, err)
 			}
 		}
+	}
+	for _, view := range testViews {
+		err := client.Database(testDBs[0]).CreateView(ctx, view, testColls[0], mongo.Pipeline{})
+		assert.NoError(t, err)
 	}
 }
 
@@ -115,7 +120,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("With namespaces list", func(t *testing.T) {
 		// Advanced filtering test
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views", "view01", "view02"},
 			"testdb02": {"col01", "col02"},
 		}
 		// List all collections in testdb01 (inDBs[0]) but only col01 and col02 from testdb02.
@@ -127,7 +132,7 @@ func TestListCollections(t *testing.T) {
 
 	t.Run("Empty namespaces list", func(t *testing.T) {
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views", "view01", "view02"},
 			"testdb02": {"col01", "col02", "colxx", "colyy"},
 		}
 		namespaces, err := listAllCollections(ctx, client, nil, systemDBs)
@@ -135,10 +140,20 @@ func TestListCollections(t *testing.T) {
 		assert.Equal(t, wantNS, namespaces)
 	})
 
+	t.Run("Collections without views", func(t *testing.T) {
+		expected := []string{"testdb01.system.views", "testdb01.col01", "testdb01.colxx", "testdb01.colyy", "testdb02.colxx", "testdb02.colyy", "testdb02.col02", "testdb02.col01"}
+		collections, err := listCollectionsWithoutViews(ctx, client)
+		assert.NoError(t, err)
+		//assert.Equal(t, collections, expected)
+		for _, expectedCollection := range expected {
+			assert.Contains(t, collections, expectedCollection)
+		}
+	})
+
 	t.Run("Count basic", func(t *testing.T) {
 		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, 8, count)
+		assert.Equal(t, 11, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {

@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -151,6 +152,30 @@ func unique(slice []string) []string {
 	}
 
 	return list
+}
+
+func listCollectionsWithoutViews(ctx context.Context, client *mongo.Client) ([]string, error) {
+	dbs, err := databases(ctx, client, nil, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot make the list of databases to list all collections")
+	}
+
+	var res []string
+	for _, db := range dbs {
+		if db == "" {
+			continue
+		}
+
+		collections, err := client.Database(db).ListCollectionNames(ctx, bson.M{"type": "collection"})
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("cannot get the list of collections from database %s", db))
+		}
+		for _, collection := range collections {
+			res = append(res, fmt.Sprintf("%s.%s", db, collection))
+		}
+	}
+
+	return res, nil
 }
 
 func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
