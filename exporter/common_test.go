@@ -143,7 +143,6 @@ func TestListCollections(t *testing.T) {
 		expected := []string{"testdb01.system.views", "testdb01.col01", "testdb01.colxx", "testdb01.colyy", "testdb02.colxx", "testdb02.colyy", "testdb02.col02", "testdb02.col01"}
 		collections, err := listCollectionsWithoutViews(ctx, client)
 		assert.NoError(t, err)
-		//assert.Equal(t, collections, expected)
 		for _, expectedCollection := range expected {
 			assert.Contains(t, collections, expectedCollection)
 		}
