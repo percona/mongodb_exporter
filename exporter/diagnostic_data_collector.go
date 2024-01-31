@@ -69,9 +69,8 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 	if res.Err() != nil {
-		if isArbiter, _ := isArbiter(d.ctx, client); isArbiter {
-			return
-		}
+		logger.Errorf("failed to run command: getDiagnosticData: %s", res.Err())
+		logger.Warn("cannot run getDiagnosticData, some metrics might be unavailable.")
 	}
 
 	if err := res.Decode(&m); err != nil {
@@ -85,6 +84,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	m, ok := m["data"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
+
 		logger.Errorf("cannot decode getDiagnosticData: %s", err)
 	}
 

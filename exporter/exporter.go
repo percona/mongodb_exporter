@@ -68,6 +68,7 @@ type Opts struct {
 	EnableIndexStats         bool
 	EnableCollStats          bool
 	EnableProfile            bool
+	EnableShards             bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -137,11 +138,6 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
 	}
 
-	isArbiter, err := isArbiter(ctx, client)
-	if err != nil {
-		e.logger.Errorf("Registry - Cannot get arbiterOnly to check if this is arbiter role : %s", err)
-	}
-
 	// Enable collectors like collstats and indexstats depending on the number of collections
 	// present in the database.
 	limitsOk := false
@@ -163,10 +159,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableIndexStats = true
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
+		e.opts.EnableShards = true
 	}
 
 	// arbiter only have isMaster privileges
-	if isArbiter {
+	if nodeType == typeArbiter {
 		e.opts.EnableDBStats = false
 		e.opts.EnableDBStatsFreeStorage = false
 		e.opts.EnableCollStats = false
@@ -175,6 +172,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableIndexStats = false
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
+		e.opts.EnableShards = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -228,6 +226,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
+	}
+
+	if e.opts.EnableShards && requestOpts.EnableShards {
+		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
+		registry.MustRegister(sc)
 	}
 
 	return registry
@@ -304,6 +307,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableCollStats = true
 			case "profile":
 				requestOpts.EnableProfile = true
+			case "shards":
+				requestOpts.EnableShards = true
 			}
 		}
 

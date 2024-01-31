@@ -16,13 +16,31 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
+func TestParseURIList(t *testing.T) {
+	t.Parallel()
+	tests := map[string][]string{
+		"mongodb://server": {"mongodb://server"},
+		"mongodb+srv://server1,server2,mongodb://server3,server4,server5": {"mongodb+srv://server1,server2", "mongodb://server3,server4,server5"},
+		"server1":                 {"mongodb://server1"},
+		"server1,server2,server3": {"mongodb://server1", "mongodb://server2", "mongodb://server3"},
+		"mongodb.server,server2":  {"mongodb://mongodb.server", "mongodb://server2"},
+		"standalone,mongodb://server1,server2,mongodb+srv://server3,server4,mongodb://server5": {"mongodb://standalone", "mongodb://server1,server2", "mongodb+srv://server3,server4", "mongodb://server5"},
+	}
+	for test, expected := range tests {
+		actual := parseURIList(strings.Split(test, ","))
+		assert.Equal(t, expected, actual)
+	}
+}
+
 func TestBuildExporter(t *testing.T) {
+	t.Parallel()
 	opts := GlobalFlags{
 		CollStatsNamespaces:   "c1,c2,c3",
 		IndexStatsCollections: "i1,i2,i3",
@@ -41,6 +59,7 @@ func TestBuildExporter(t *testing.T) {
 }
 
 func TestBuildURI(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		situation   string
 		origin      string

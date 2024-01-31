@@ -91,9 +91,13 @@ You can run the exporter specifying multiple URIs, devided by a comma in --mongo
 ```sh
 --mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin,mongodb://user2:pass2@127.0.0.1:27018/admin
 ```
-In this case you can use the **/scrape** endpoint with the **target** parameter to retreive the specified tartget's metrics.  When querying the data you can use just mongodb://host:port in the targer parameter without other parameters and, of course without host credentials
+In this case you can use the **/scrape** endpoint with the **target** parameter to retreive the specified tartget's metrics.  When querying the data you can use just mongodb://host:port in the target parameter without other parameters and, of course without host credentials
 ```sh
 GET /scrape?target=mongodb://127.0.0.1:27018
+```
+If your URI is prefixed by mongodb:// or mongodb+srv:// schema, any host not prefixed by it after comma is being treated as part of a cluster rather then as a standalone host. Thus clusters and standalone hosts can be combined like this:
+```
+--mongodb.uri=mongodb+srv://user:pass@host1:27017,host2:27017,host3:27017/admin,mongodb://user2:pass2@host4:27018/admin
 ```
 
 
@@ -127,6 +131,17 @@ Usage example: `db.setProfilingLevel(2)`
 |0| The profiler is off and does not collect any data. This is the default profiler level.|
 |1| The profiler collects data for operations that take longer than the value of `slowms` or that match a filter.<br> When a filter is set: <ul><li> The `slowms` and `sampleRate` options are not used for profiling.</li><li>The profiler only captures operations that match the filter.</li></ul>
 |2|The profiler collects data for all operations.|
+
+#### Enabling shards metrics gathering
+When shard metrics collection is enabled by `--collector.shards`, the exporter will expose metrics related to sharded Mongo. 
+Example, if shards collector is enabled:
+```
+# HELP mongodb_shards_collection_chunks_count sharded collection chunks.
+# TYPE mongodb_shards_collection_chunks_count counter
+mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs1"} 250
+mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs2"} 250
+```
+You can see shard name, it's collection, database and count.
 
 #### Cluster role labels
 The exporter sets some topology labels in all metrics.
