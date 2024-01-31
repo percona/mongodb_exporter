@@ -77,7 +77,14 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		collections = fromMapToSlice(namespaces)
 	}
 
-	for _, dbCollection := range collections {
+	onlyCollections, err := filterCollectionsWithoutViews(d.ctx, client, collections)
+	if err != nil {
+		logger.Errorf("cannot list collections: %s", err.Error())
+
+		return
+	}
+
+	for _, dbCollection := range onlyCollections {
 		parts := strings.Split(dbCollection, ".")
 		if len(parts) < 2 { //nolint:gomnd
 			continue

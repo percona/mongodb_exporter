@@ -178,6 +178,35 @@ func listCollectionsWithoutViews(ctx context.Context, client *mongo.Client) ([]s
 	return res, nil
 }
 
+func isInArray(array []string, item string) bool {
+	for _, i := range array {
+		if item == i {
+			return true
+		}
+	}
+
+	return false
+}
+
+func filterCollectionsWithoutViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
+	var filteredCollections []string
+	onlyCollections, err := listCollectionsWithoutViews(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, collection := range collections {
+		fmt.Println(collection)
+		if !isInArray(onlyCollections, collection) {
+			continue
+		}
+
+		filteredCollections = append(filteredCollections, collection)
+	}
+
+	return filteredCollections, nil
+}
+
 func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
 	namespaces := make(map[string][]string)
 

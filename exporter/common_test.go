@@ -21,11 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-
-	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 //nolint:gochecknoglobals
@@ -186,4 +185,19 @@ func TestSplitNamespace(t *testing.T) {
 		assert.Equal(t, tc.wantDatabase, db)
 		assert.Equal(t, tc.wantCollection, coll)
 	}
+}
+
+func TestFilterCollectionsWithoutViews(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	setupDB(ctx, t, client)
+	defer cleanupDB(ctx, client)
+
+	expected := []string{"testdb01.col01", "testdb01.system.views"}
+	filtered, err := filterCollectionsWithoutViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
+	assert.NoError(t, err)
+	assert.Equal(t, expected, filtered)
 }
