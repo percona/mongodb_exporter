@@ -196,7 +196,6 @@ func filterCollectionsWithoutViews(ctx context.Context, client *mongo.Client, co
 	}
 
 	for _, collection := range collections {
-		fmt.Println(collection)
 		if !isInArray(onlyCollections, collection) {
 			continue
 		}
