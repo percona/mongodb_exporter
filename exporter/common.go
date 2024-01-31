@@ -189,12 +189,12 @@ func isInArray(array []string, item string) bool {
 }
 
 func filterCollectionsWithoutViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
-	var filteredCollections []string
 	onlyCollections, err := listCollectionsWithoutViews(ctx, client)
 	if err != nil {
 		return nil, err
 	}
 
+	filteredCollections := []string{}
 	for _, collection := range collections {
 		if !isInArray(onlyCollections, collection) {
 			continue
