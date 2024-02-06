@@ -68,14 +68,14 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
+		onlyCollections, err := filterCollectionsWithoutViews(d.ctx, client, collections)
 		if err != nil {
-			logger.Errorf("cannot auto discover databases and collections")
+			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
 
-		collections = fromMapToSlice(namespaces)
+		collections = onlyCollections
 	}
 
 	for _, dbCollection := range collections {

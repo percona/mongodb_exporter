@@ -67,24 +67,17 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
+		onlyCollections, err := filterCollectionsWithoutViews(d.ctx, client, collections)
 		if err != nil {
 			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
 
-		collections = fromMapToSlice(namespaces)
+		collections = onlyCollections
 	}
 
-	onlyCollections, err := filterCollectionsWithoutViews(d.ctx, client, collections)
-	if err != nil {
-		logger.Errorf("cannot list collections: %s", err.Error())
-
-		return
-	}
-
-	for _, dbCollection := range onlyCollections {
+	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
 		if len(parts) < 2 { //nolint:gomnd
 			continue

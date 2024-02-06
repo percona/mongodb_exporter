@@ -154,13 +154,13 @@ func unique(slice []string) []string {
 	return list
 }
 
-func listCollectionsWithoutViews(ctx context.Context, client *mongo.Client) ([]string, error) {
+func listCollectionsWithoutViews(ctx context.Context, client *mongo.Client) (map[string]struct{}, error) {
 	dbs, err := databases(ctx, client, nil, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot make the list of databases to list all collections")
 	}
 
-	var res []string
+	res := make(map[string]struct{})
 	for _, db := range dbs {
 		if db == "" {
 			continue
@@ -171,21 +171,11 @@ func listCollectionsWithoutViews(ctx context.Context, client *mongo.Client) ([]s
 			return nil, errors.Wrap(err, fmt.Sprintf("cannot get the list of collections from database %s", db))
 		}
 		for _, collection := range collections {
-			res = append(res, fmt.Sprintf("%s.%s", db, collection))
+			res[fmt.Sprintf("%s.%s", db, collection)] = struct{}{}
 		}
 	}
 
 	return res, nil
-}
-
-func isInArray(array []string, item string) bool {
-	for _, i := range array {
-		if item == i {
-			return true
-		}
-	}
-
-	return false
 }
 
 func filterCollectionsWithoutViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
@@ -196,8 +186,8 @@ func filterCollectionsWithoutViews(ctx context.Context, client *mongo.Client, co
 
 	filteredCollections := []string{}
 	for _, collection := range collections {
-		if !isInArray(onlyCollections, collection) {
-			continue
+		if _, ok := onlyCollections[collection]; !ok {
+			return nil, fmt.Errorf("collection/namespace %s is view. Cannot be used for collstats/indexstats", collection)
 		}
 
 		filteredCollections = append(filteredCollections, collection)
