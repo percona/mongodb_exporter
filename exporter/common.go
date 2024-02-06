@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -161,6 +162,13 @@ func checkCollectionsForViews(ctx context.Context, client *mongo.Client, collect
 	onlyCollections, err := listAllCollections(ctx, client, nil, nil, true)
 	if err != nil {
 		return nil, err
+	}
+
+	converted := make(map[string]struct{})
+	for db, collections := range onlyCollections {
+		for _, collection := range collections {
+			converted[fmt.Sprintf("%s.%s", db, collection)] = struct{}{}
+		}
 	}
 
 	filteredCollections := []string{}
