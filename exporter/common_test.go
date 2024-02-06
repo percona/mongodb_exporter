@@ -110,7 +110,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("Filter in databases", func(t *testing.T) {
 		want := []string{"col01", "col02", "colxx"}
 		inNameSpaces := []string{testDBs[0] + ".col0", testDBs[0] + ".colx"}
-		colls, err := listCollections(ctx, client, testDBs[0], inNameSpaces)
+		colls, err := listCollections(ctx, client, testDBs[0], inNameSpaces, true)
 		sort.Strings(colls)
 
 		assert.NoError(t, err)
@@ -120,39 +120,40 @@ func TestListCollections(t *testing.T) {
 	t.Run("With namespaces list", func(t *testing.T) {
 		// Advanced filtering test
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views", "view01", "view02"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views"},
 			"testdb02": {"col01", "col02"},
 		}
 		// List all collections in testdb01 (inDBs[0]) but only col01 and col02 from testdb02.
 		filterInNameSpaces := []string{testDBs[0], testDBs[1] + ".col01", testDBs[1] + ".col02"}
-		namespaces, err := listAllCollections(ctx, client, filterInNameSpaces, systemDBs)
+		namespaces, err := listAllCollections(ctx, client, filterInNameSpaces, systemDBs, true)
 		assert.NoError(t, err)
 		assert.Equal(t, wantNS, namespaces)
 	})
 
 	t.Run("Empty namespaces list", func(t *testing.T) {
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views", "view01", "view02"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views"},
 			"testdb02": {"col01", "col02", "colxx", "colyy"},
 		}
-		namespaces, err := listAllCollections(ctx, client, nil, systemDBs)
+		namespaces, err := listAllCollections(ctx, client, nil, systemDBs, true)
 		assert.NoError(t, err)
 		assert.Equal(t, wantNS, namespaces)
 	})
 
-	t.Run("Collections without views", func(t *testing.T) {
-		expected := []string{"testdb01.system.views", "testdb01.col01", "testdb01.colxx", "testdb01.colyy", "testdb02.colxx", "testdb02.colyy", "testdb02.col02", "testdb02.col01"}
-		collections, err := listCollectionsWithoutViews(ctx, client)
-		assert.NoError(t, err)
-		for _, expectedCollection := range expected {
-			assert.Contains(t, collections, expectedCollection)
+	t.Run("Collections with views", func(t *testing.T) {
+		wantNS := map[string][]string{
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views", "view01", "view02"},
+			"testdb02": {"col01", "col02", "colxx", "colyy"},
 		}
+		namespaces, err := listAllCollections(ctx, client, nil, systemDBs, false)
+		assert.NoError(t, err)
+		assert.Equal(t, wantNS, namespaces)
 	})
 
 	t.Run("Count basic", func(t *testing.T) {
 		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, 11, count)
+		assert.Equal(t, 9, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {
