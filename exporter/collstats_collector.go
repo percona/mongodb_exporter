@@ -61,20 +61,27 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	defer measureCollectTime(ch, "mongodb", "collstats")()
 
-	collections := d.collections
-
 	client := d.base.client
 	logger := d.base.logger
 
+	collections, err := filterCollectionsWithoutViews(d.ctx, client, d.collections)
+	if err != nil {
+		logger.Errorf("cannot list collections: %s", err.Error())
+
+		return
+	}
+
 	if d.discoveringMode {
-		onlyCollections, err := filterCollectionsWithoutViews(d.ctx, client, collections)
+		onlyCollections, err := listCollectionsWithoutViews(d.ctx, client)
 		if err != nil {
 			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
 
-		collections = onlyCollections
+		for collection := range onlyCollections {
+			collections = append(collections, collection)
+		}
 	}
 
 	for _, dbCollection := range collections {
@@ -132,17 +139,6 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
-}
-
-func fromMapToSlice(databases map[string][]string) []string {
-	var collections []string
-	for db, cols := range databases {
-		for _, value := range cols {
-			collections = append(collections, db+"."+value)
-		}
-	}
-
-	return collections
 }
 
 var _ prometheus.Collector = (*collstatsCollector)(nil)
