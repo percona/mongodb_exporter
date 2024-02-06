@@ -197,8 +197,14 @@ func TestFilterCollectionsWithoutViews(t *testing.T) {
 	setupDB(ctx, t, client)
 	defer cleanupDB(ctx, client)
 
-	expected := []string{"testdb01.col01", "testdb01.system.views"}
-	filtered, err := filterCollectionsWithoutViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
-	assert.NoError(t, err)
-	assert.Equal(t, expected, filtered)
+	t.Run("Views in provided collection list (should fail)", func(t *testing.T) {
+		_, err := filterCollectionsWithoutViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
+		assert.Error(t, err, "collection/namespace testdb01.view01 is view and annot be used for collstats/indexstats")
+	})
+
+	t.Run("No Views in provided collection list", func(t *testing.T) {
+		filtered, err := filterCollectionsWithoutViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views"})
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"testdb01.col01", "testdb01.system.views"}, filtered)
+	})
 }

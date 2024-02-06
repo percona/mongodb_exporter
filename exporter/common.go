@@ -187,7 +187,7 @@ func filterCollectionsWithoutViews(ctx context.Context, client *mongo.Client, co
 	filteredCollections := []string{}
 	for _, collection := range collections {
 		if _, ok := onlyCollections[collection]; !ok {
-			return nil, errors.Errorf("collection/namespace %s is view. Cannot be used for collstats/indexstats", collection)
+			return nil, errors.Errorf("collection/namespace %s is view and cannot be used for collstats/indexstats", collection)
 		}
 
 		filteredCollections = append(filteredCollections, collection)
