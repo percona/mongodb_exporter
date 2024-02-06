@@ -65,7 +65,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	logger := d.base.logger
 
-	collections, err := filterCollectionsWithoutViews(d.ctx, client, d.collections)
+	collections, err := checkCollectionsForViews(d.ctx, client, d.collections)
 	if err != nil {
 		logger.Errorf("cannot list collections: %s", err.Error())
 

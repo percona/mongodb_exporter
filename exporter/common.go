@@ -178,7 +178,7 @@ func listCollectionsWithoutViews(ctx context.Context, client *mongo.Client) (map
 	return res, nil
 }
 
-func filterCollectionsWithoutViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
+func checkCollectionsForViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
 	onlyCollections, err := listCollectionsWithoutViews(ctx, client)
 	if err != nil {
 		return nil, err
