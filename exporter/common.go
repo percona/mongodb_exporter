@@ -158,14 +158,14 @@ func unique(slice []string) []string {
 	return list
 }
 
-func checkCollectionsForViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
-	onlyCollections, err := listAllCollections(ctx, client, nil, nil, true)
+func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
+	onlyCollectionsNamespaces, err := listAllCollections(ctx, client, nil, nil, true)
 	if err != nil {
 		return nil, err
 	}
 
 	converted := make(map[string]struct{})
-	for db, collections := range onlyCollections {
+	for db, collections := range onlyCollectionsNamespaces {
 		for _, collection := range collections {
 			converted[fmt.Sprintf("%s.%s", db, collection)] = struct{}{}
 		}
@@ -174,7 +174,7 @@ func checkCollectionsForViews(ctx context.Context, client *mongo.Client, collect
 	filteredCollections := []string{}
 	for _, collection := range collections {
 		if _, ok := converted[collection]; !ok {
-			return nil, errors.Errorf("collection/namespace %s is a view and cannot be used for collstats/indexstats", collection)
+			return nil, errors.Errorf("namespace %s is a view and cannot be used for collstats/indexstats", collection)
 		}
 
 		filteredCollections = append(filteredCollections, collection)

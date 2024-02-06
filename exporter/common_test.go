@@ -189,7 +189,7 @@ func TestSplitNamespace(t *testing.T) {
 }
 
 //nolint:paralleltest
-func TestCheckCollectionsForViews(t *testing.T) {
+func TestCheckNamespacesForViews(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -199,12 +199,12 @@ func TestCheckCollectionsForViews(t *testing.T) {
 	defer cleanupDB(ctx, client)
 
 	t.Run("Views in provided collection list (should fail)", func(t *testing.T) {
-		_, err := checkCollectionsForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
-		assert.Error(t, err, "collection/namespace testdb01.view01 is view and annot be used for collstats/indexstats")
+		_, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
+		assert.Error(t, err, "namespace testdb01.view01 is view and annot be used for collstats/indexstats")
 	})
 
 	t.Run("No Views in provided collection list", func(t *testing.T) {
-		filtered, err := checkCollectionsForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views"})
+		filtered, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views"})
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"testdb01.col01", "testdb01.system.views"}, filtered)
 	})

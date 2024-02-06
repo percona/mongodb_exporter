@@ -65,7 +65,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	logger := d.base.logger
 
-	collections, err := checkCollectionsForViews(d.ctx, client, d.collections)
+	collections, err := checkNamespacesForViews(d.ctx, client, d.collections)
 	if err != nil {
 		logger.Errorf("cannot list collections: %s", err.Error())
 
@@ -73,15 +73,15 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if d.discoveringMode {
-		onlyCollections, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
+		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
 			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
 
-		for collection := range onlyCollections {
-			collections = append(collections, collection)
+		for collectionNamespace := range onlyCollectionsNamespaces {
+			collections = append(collections, collectionNamespace)
 		}
 	}
 
