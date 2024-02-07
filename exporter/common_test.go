@@ -200,7 +200,7 @@ func TestCheckNamespacesForViews(t *testing.T) {
 
 	t.Run("Views in provided collection list (should fail)", func(t *testing.T) {
 		_, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
-		assert.Error(t, err, "namespace testdb01.view01 is view and annot be used for collstats/indexstats")
+		assert.Error(t, err, "namespace testdb01.view01 is view and cannot be used for collstats/indexstats")
 	})
 
 	t.Run("No Views in provided collection list", func(t *testing.T) {
