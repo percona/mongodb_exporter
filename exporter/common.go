@@ -257,3 +257,14 @@ func splitNamespace(ns string) (database, collection string) {
 
 	return parts[0], strings.Join(parts[1:], ".")
 }
+
+func fromMapToSlice(databases map[string][]string) []string {
+	var collections []string
+	for db, cols := range databases {
+		for _, value := range cols {
+			collections = append(collections, db+"."+value)
+		}
+	}
+
+	return collections
+}

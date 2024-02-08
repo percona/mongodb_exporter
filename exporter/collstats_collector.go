@@ -79,9 +79,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			return
 		}
 
-		for collectionNamespace := range onlyCollectionsNamespaces {
-			collections = append(collections, collectionNamespace)
-		}
+		collections = fromMapToSlice(onlyCollectionsNamespaces)
 	}
 
 	for _, dbCollection := range collections {
