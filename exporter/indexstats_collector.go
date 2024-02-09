@@ -62,20 +62,27 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	defer measureCollectTime(ch, "mongodb", "indexstats")()
 
-	collections := d.collections
-
-	logger := d.base.logger
 	client := d.base.client
+	logger := d.base.logger
 
+	var collections []string
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
+		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
-			logger.Errorf("cannot auto discover databases and collections")
+			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
 
-		collections = fromMapToSlice(namespaces)
+		collections = fromMapToSlice(onlyCollectionsNamespaces)
+	} else {
+		var err error
+		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
+		if err != nil {
+			logger.Errorf("cannot list collections: %s", err.Error())
+
+			return
+		}
 	}
 
 	for _, dbCollection := range collections {
