@@ -65,13 +65,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	logger := d.base.logger
 
-	collections, err := checkNamespacesForViews(d.ctx, client, d.collections)
-	if err != nil {
-		logger.Errorf("cannot list collections: %s", err.Error())
-
-		return
-	}
-
+	var collections []string
 	if d.discoveringMode {
 		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
@@ -81,6 +75,14 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 		}
 
 		collections = fromMapToSlice(onlyCollectionsNamespaces)
+	} else {
+		var err error
+		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
+		if err != nil {
+			logger.Errorf("cannot list collections: %s", err.Error())
+
+			return
+		}
 	}
 
 	for _, dbCollection := range collections {
