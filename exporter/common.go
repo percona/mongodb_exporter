@@ -173,6 +173,10 @@ func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collecti
 
 	filteredCollections := []string{}
 	for _, collection := range removeEmptyStrings(collections) {
+		if len(strings.Split(collection, ".")) < 2 { //nolint:gomnd
+			continue
+		}
+
 		if _, ok := namespaces[collection]; !ok {
 			return nil, errors.Errorf("namespace %s is a view and cannot be used for collstats/indexstats", collection)
 		}
