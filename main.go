@@ -215,7 +215,7 @@ func buildURI(uri string, user string, password string) string {
 		// add user and pass to the uri
 		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
 	}
-	if !strings.HasPrefix(uri, "mongodb") {
+	if !strings.HasPrefix(uri, "mongodb://") {
 		uri = "mongodb://" + uri
 	}
 

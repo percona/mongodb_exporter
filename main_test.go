@@ -123,6 +123,20 @@ func TestBuildURI(t *testing.T) {
 			newPassword: "",
 			expect:      "mongodb://127.0.0.1",
 		},
+		{
+			situation:   "uri with no prefix and no auth, auth supplied in opt.User/Password, and user prefixed with mongodb",
+			origin:      "127.0.0.1",
+			newUser:     "mongodbxxx",
+			newPassword: "yyy",
+			expect:      "mongodb://mongodbxxx:yyy@127.0.0.1",
+		},
+		{
+			situation:   "uri with prefix and no auth, auth supplied in opt.User/Password, and user prefixed with mongodb",
+			origin:      "mongodb://127.0.0.1",
+			newUser:     "mongodbxxx",
+			newPassword: "yyy",
+			expect:      "mongodb://mongodbxxx:yyy@127.0.0.1",
+		},
 	}
 	for _, tc := range tests {
 		newUri := buildURI(tc.origin, tc.newUser, tc.newPassword)
