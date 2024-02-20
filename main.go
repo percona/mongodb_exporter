@@ -207,17 +207,26 @@ func parseURIList(uriList []string) []string {
 }
 
 func buildURI(uri string, user string, password string) string {
+
+	prefix := "mongodb://" // default prefix
+	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
+
+	// Split the uri prefix if there is any
+	if matchRegexp.MatchString(uri) {
+		uriArray := strings.SplitN(uri, "://", 2)
+		prefix = uriArray[0] + "://"
+		uri = uriArray[1]
+	}
+
 	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
 	// DO concat a new uri with user and pass arguments value
 	if !strings.Contains(uri, "@") && user != "" && password != "" {
-		// trim mongodb:// prefix to handle user and pass logic
-		uri = strings.TrimPrefix(uri, "mongodb://")
 		// add user and pass to the uri
 		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
 	}
-	if !strings.HasPrefix(uri, "mongodb://") {
-		uri = "mongodb://" + uri
-	}
+
+	// add back prefix after adding the user and pass
+	uri = prefix + uri
 
 	return uri
 }
