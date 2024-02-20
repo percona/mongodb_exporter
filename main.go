@@ -207,7 +207,6 @@ func parseURIList(uriList []string) []string {
 }
 
 func buildURI(uri string, user string, password string) string {
-
 	prefix := "mongodb://" // default prefix
 	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
 
