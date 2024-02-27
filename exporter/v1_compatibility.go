@@ -999,8 +999,8 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return []prometheus.Metric{headMetric, tailMetric}, nil
 }
 
-func replSetMetrics(m bson.M) []prometheus.Metric {
-	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
+func replSetMetrics(d bson.M) []prometheus.Metric {
+	replSetGetStatus, ok := d["replSetGetStatus"].(bson.M)
 	if !ok {
 		return nil
 	}
@@ -1021,7 +1021,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 	for _, m := range repl.Members {
 		if m.StateStr == "PRIMARY" {
 			primaryOpTime = m.OptimeDate.Time()
-			gotPrimary = !primaryOpTime.IsZero()
+			gotPrimary = primaryOpTime.Unix() != 0
 
 			break
 		}
@@ -1044,12 +1044,11 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 			"name":  m.Name,
 			"state": m.StateStr,
 			"set":   repl.Set,
+			"self":  "0",
 		}
 		if m.Self {
-			createMetric("my_name", "The replica state name of the current member.", 1, map[string]string{
-				"name": m.Name,
-				"set":  repl.Set,
-			})
+			labels["self"] = "1"
+			createMetric("my_name", "The replica state name of the current member.", 1, labels)
 		}
 
 		if !m.ElectionTime.IsZero() {
@@ -1057,7 +1056,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 				"The timestamp the node was elected as replica leader",
 				float64(m.ElectionTime.T), labels)
 		}
-		if t := m.OptimeDate.Time(); gotPrimary && !t.IsZero() && m.StateStr != "PRIMARY" {
+		if t := m.OptimeDate.Time(); gotPrimary && t.Unix() != 0 && m.StateStr != "PRIMARY" {
 			val := math.Abs(float64(t.Unix() - primaryOpTime.Unix()))
 			createMetric("member_replication_lag",
 				"The replication lag that this member has with the primary.",
