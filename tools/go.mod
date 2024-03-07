@@ -1,13 +1,13 @@
 module github.com/percona/mongodb_exporter/tools
 
-go 1.21
+go 1.21.7
 
-toolchain go1.21.2
+toolchain go1.22.0
 
 require (
 	github.com/daixiang0/gci v0.12.1
 	github.com/golangci/golangci-lint v1.56.2
-	github.com/reviewdog/reviewdog v0.17.0
+	github.com/reviewdog/reviewdog v0.17.1
 	mvdan.cc/gofumpt v0.6.0
 )
 
@@ -191,7 +191,7 @@ require (
 	github.com/ultraware/whitespace v0.1.0 // indirect
 	github.com/uudashr/gocognit v1.1.2 // indirect
 	github.com/vvakame/sdlog v1.2.0 // indirect
-	github.com/xanzy/go-gitlab v0.96.0 // indirect
+	github.com/xanzy/go-gitlab v0.97.0 // indirect
 	github.com/xen0n/gosmopolitan v1.2.2 // indirect
 	github.com/yagipy/maintidx v1.0.0 // indirect
 	github.com/yeya24/promlinter v0.2.0 // indirect
