@@ -57,6 +57,7 @@ type Opts struct {
 	GlobalConnPool         bool
 	ProfileTimeTS          int
 	TimeoutOffset          int
+	CurrentOpSlowTime      string
 
 	CollectAll               bool
 	EnableDBStats            bool
@@ -203,9 +204,9 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(cc)
 	}
 
-	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableCurrentopMetrics {
+	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableCurrentopMetrics && e.opts.CurrentOpSlowTime != "" {
 		coc := newCurrentopCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
+			e.opts.CompatibleMode, topologyInfo, e.opts.CurrentOpSlowTime)
 		registry.MustRegister(coc)
 	}
 
