@@ -164,9 +164,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableProfile = true
 		e.opts.EnableShards = true
 
-		// todo(@idoqo): should we enable PBM collector if all collectors are enabled?
-		// It is possible that people want to use the exporter as a standalone (without a PBM installation),
-		// so we may want to leave it out in the meantime.
+		e.opts.EnablePBMMetrics = true
 	}
 
 	// arbiter only have isMaster privileges
