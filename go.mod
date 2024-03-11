@@ -4,13 +4,12 @@ go 1.22
 
 toolchain go1.22.0
 
-replace github.com/percona/percona-backup-mongodb => ../percona-backup-mongodb
-
 require (
 	github.com/AlekSi/pointer v1.2.0
 	github.com/alecthomas/kong v0.8.1
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/percona/exporter_shared v0.7.4
+	github.com/percona/percona-backup-mongodb v1.8.1-0.20240304171032-f7258a35a441
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.6.0
@@ -20,8 +19,6 @@ require (
 	github.com/stretchr/testify v1.9.0
 	go.mongodb.org/mongo-driver v1.13.0
 )
-
-require github.com/percona/percona-backup-mongodb v1.8.1-0.20240304171032-f7258a35a441
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.9.0 // indirect
