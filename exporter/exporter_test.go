@@ -201,7 +201,9 @@ func TestMongoS(t *testing.T) {
 }
 
 func TestArbiterCollectors(t *testing.T) {
+	t.Parallel()
 	t.Run("diagnostic data collector is not registered", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		container := "mongo-1-arbiter"
 		hostname := "127.0.0.1"
@@ -227,7 +229,7 @@ func TestArbiterCollectors(t *testing.T) {
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
 		res := r.Unregister(rsgsc)
-		assert.Equal(t, false, res)
+		assert.False(t, res)
 		err = client.Disconnect(ctx)
 		assert.NoError(t, err)
 	})
