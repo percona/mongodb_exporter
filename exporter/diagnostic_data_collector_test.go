@@ -237,9 +237,14 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 }
 
-func TestDiagnosticErrorLogs(t *testing.T) {
+func TestDiagnosticDataErrors(t *testing.T) {
 	t.Parallel()
-	t.Run("authenticated arbiter", func(t *testing.T) {
+	type log struct {
+		message string
+		level   uint32
+	}
+
+	t.Run("authenticated arbiter fails to get metric", func(t *testing.T) {
 		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
@@ -258,7 +263,106 @@ func TestDiagnosticErrorLogs(t *testing.T) {
 		_ = helpers.CollectMetrics(c)
 
 		assert.NotEmpty(t, hook.Entries)
-		assert.Equal(t, "cannot run getDiagnosticData on arbiter node, some metrics might be unavailable", hook.LastEntry().Message)
+		expected := "failed to run command: getDiagnosticData"
+		assert.True(
+			t,
+			strings.HasPrefix(hook.LastEntry().Message, expected),
+			"'%s' has no prefix: '%s'",
+			hook.LastEntry().Message,
+			expected)
+	})
+
+	t.Run("unauthenticated arbiter has no error in logs", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongo-1-arbiter")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		logger, hook := logrustest.NewNullLogger()
+		ti := newTopologyInfo(ctx, client, logger)
+		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+		reg := prometheus.NewRegistry()
+		err = reg.Register(c)
+		require.NoError(t, err)
+		_ = helpers.CollectMetrics(c)
+
+		var errorLogs []log
+		for _, entry := range hook.Entries {
+			if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
+				errorLogs = append(errorLogs, log{
+					message: entry.Message,
+					level:   uint32(entry.Level),
+				})
+			}
+		}
+
+		assert.Empty(t, errorLogs)
+	})
+
+	t.Run("authenticated data node has no error in logs", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongo-1-1")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		logger, hook := logrustest.NewNullLogger()
+		ti := newTopologyInfo(ctx, client, logger)
+		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+		reg := prometheus.NewRegistry()
+		err = reg.Register(c)
+		require.NoError(t, err)
+		_ = helpers.CollectMetrics(c)
+
+		var errorLogs []log
+		for _, entry := range hook.Entries {
+			if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
+				errorLogs = append(errorLogs, log{
+					message: entry.Message,
+					level:   uint32(entry.Level),
+				})
+			}
+		}
+
+		assert.Empty(t, errorLogs)
+	})
+
+	t.Run("mongos node has no error in logs", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongos")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		logger, hook := logrustest.NewNullLogger()
+		ti := newTopologyInfo(ctx, client, logger)
+		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+		reg := prometheus.NewRegistry()
+		err = reg.Register(c)
+		require.NoError(t, err)
+		_ = helpers.CollectMetrics(c)
+
+		var errorLogs []log
+		for _, entry := range hook.Entries {
+			if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
+				errorLogs = append(errorLogs, log{
+					message: entry.Message,
+					level:   uint32(entry.Level),
+				})
+			}
+		}
+
+		assert.Empty(t, errorLogs)
 	})
 }
 

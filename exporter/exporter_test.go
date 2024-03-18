@@ -30,7 +30,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -198,41 +197,6 @@ func TestMongoS(t *testing.T) {
 		err = client.Disconnect(ctx)
 		assert.NoError(t, err)
 	}
-}
-
-func TestArbiterCollectors(t *testing.T) {
-	t.Parallel()
-	t.Run("diagnostic data collector is not registered", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		container := "mongo-1-arbiter"
-		hostname := "127.0.0.1"
-		port, err := tu.PortForContainer(container)
-		require.NoError(t, err)
-
-		exporterOpts := &Opts{
-			Logger:               logrus.New(),
-			URI:                  fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, port)),
-			DirectConnect:        true,
-			GlobalConnPool:       false,
-			EnableDiagnosticData: true,
-		}
-
-		client, err := connect(ctx, exporterOpts)
-		assert.NoError(t, err)
-
-		e := New(exporterOpts)
-
-		rsgsc := newDiagnosticDataCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, new(labelsGetterMock))
-
-		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
-
-		res := r.Unregister(rsgsc)
-		assert.False(t, res)
-		err = client.Disconnect(ctx)
-		assert.NoError(t, err)
-	})
 }
 
 func TestMongoUp(t *testing.T) {
