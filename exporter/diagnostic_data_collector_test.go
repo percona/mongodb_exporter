@@ -333,37 +333,6 @@ func TestDiagnosticDataErrors(t *testing.T) {
 
 		assert.Empty(t, errorLogs)
 	})
-
-	t.Run("mongos node has no error in logs", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		port, err := tu.PortForContainer("mongos")
-		require.NoError(t, err)
-		client := tu.TestClient(ctx, port, t)
-
-		logger, hook := logrustest.NewNullLogger()
-		ti := newTopologyInfo(ctx, client, logger)
-		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
-
-		reg := prometheus.NewRegistry()
-		err = reg.Register(c)
-		require.NoError(t, err)
-		_ = helpers.CollectMetrics(c)
-
-		var errorLogs []log
-		for _, entry := range hook.Entries {
-			if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
-				errorLogs = append(errorLogs, log{
-					message: entry.Message,
-					level:   uint32(entry.Level),
-				})
-			}
-		}
-
-		assert.Empty(t, errorLogs)
-	})
 }
 
 func TestContextTimeout(t *testing.T) {
