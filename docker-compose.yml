@@ -64,9 +64,14 @@ services:
     mongo-2-2:
         container_name: "mongo-2-2"
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        environment:
+            - MONGO_INITDB_ROOT_USERNAME=${TEST_MONGODB_USERNAME:-admin}
+            - MONGO_INITDB_ROOT_PASSWORD=${TEST_MONGODB_PASSWORD:-admin}
         ports:
             - "${TEST_MONGODB_S2_PRIMARY_PORT:-17004}:27017"
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16
+        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/secret/keyfile
+        volumes:
+            - ./docker/secret:/secret
         networks:
             - rs2
 
@@ -75,7 +80,9 @@ services:
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_S2_SECONDARY1_PORT:-17005}:27017"
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16
+        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/secret/keyfile
+        volumes:
+            - ./docker/secret:/secret
         networks:
             - rs2
 
@@ -84,7 +91,9 @@ services:
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_S2_SECONDARY2_PORT:-17006}:27017"
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16
+        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/secret/keyfile
+        volumes:
+            - ./docker/secret:/secret
         networks:
             - rs2
 
@@ -93,7 +102,9 @@ services:
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_S2_ARBITER:-17012}:27017"
-        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16
+        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/secret/keyfile
+        volumes:
+            - ./docker/secret:/secret
         networks:
             - rs2
 
@@ -114,6 +125,8 @@ services:
             - ARBITER=mongo-2-arbiter
             - RS=rs2
             - VERSION=${TEST_MONGODB_IMAGE}
+            - MONGO_INITDB_ROOT_USERNAME=${TEST_MONGODB_USERNAME:-admin}
+            - MONGO_INITDB_ROOT_PASSWORD=${TEST_MONGODB_PASSWORD:-admin}
         entrypoint: [ "/scripts/setup.sh" ]
         networks:
             - rs2

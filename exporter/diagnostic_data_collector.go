@@ -66,6 +66,18 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
+	nodeType, err := getNodeType(d.ctx, client)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"component": "diagnosticDataCollector",
+		}).Errorf("Cannot get node type: %s", err)
+	}
+
+	if nodeType == typeArbiter {
+		logger.Warn("cannot run getDiagnosticData on arbiter node, some metrics might be unavailable")
+		return
+	}
+
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 	if res.Err() != nil {
@@ -108,12 +120,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			metrics = append(metrics, cem)
 		}
 
-		nodeType, err := getNodeType(d.ctx, client)
-		if err != nil {
-			logger.WithFields(logrus.Fields{
-				"component": "diagnosticDataCollector",
-			}).Errorf("Cannot get node type to check if this is a mongos: %s", err)
-		} else if nodeType == typeMongos {
+		if nodeType == typeMongos {
 			metrics = append(metrics, mongosMetrics(d.ctx, client, logger)...)
 		}
 	}

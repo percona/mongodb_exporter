@@ -174,6 +174,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
 		e.opts.EnableShards = false
+		e.opts.EnableDiagnosticData = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
