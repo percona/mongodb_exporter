@@ -29,6 +29,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -234,6 +235,29 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	for _, want := range filters {
 		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
 	}
+}
+
+func TestDiagnosticErrorLogs(t *testing.T) {
+	t.Run("authenticated arbiter", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongo-2-arbiter")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		logger, hook := logrustest.NewNullLogger()
+		ti := newTopologyInfo(ctx, client, logger)
+		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+		reg := prometheus.NewRegistry()
+		err = reg.Register(c)
+		require.NoError(t, err)
+		_ = helpers.CollectMetrics(c)
+
+		assert.NotEmpty(t, hook.Entries)
+		assert.Equal(t, "cannot run getDiagnosticData on arbiter node, some metrics might be unavailable", hook.LastEntry().Message)
+	})
 }
 
 func TestContextTimeout(t *testing.T) {
