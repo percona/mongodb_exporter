@@ -1228,16 +1228,19 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metr
 		Stopped bool `bson:"stopped"`
 	}
 	var bs bss
-	enabled := 0
+	enabled := 1
 
 	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
-	if err != nil {
-		return nil, err
-	}
 
-	if !bs.Stopped {
-		enabled = 1
-	}
+        if err != nil {
+                if err != mongo.ErrNoDocuments {
+                        return nil, err
+                }
+        } else {
+                if bs.Stopped {
+                        enabled = 0
+                }
+        }
 
 	name := "mongodb_mongos_sharding_balancer_enabled"
 	help := "Balancer is enabled"
