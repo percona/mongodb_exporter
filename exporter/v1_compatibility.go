@@ -1231,24 +1231,17 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metr
 	enabled := 1
 
 	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
-
-        if err != nil {
-                if err != mongo.ErrNoDocuments {
-                        return nil, err
-                }
-        } else {
-                if bs.Stopped {
-                        enabled = 0
-                }
-        }
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	} else if bs.Stopped {
+		enabled = 0
+	}
 
 	name := "mongodb_mongos_sharding_balancer_enabled"
 	help := "Balancer is enabled"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
-	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
-
-	return metric, nil
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
 }
 
 func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
