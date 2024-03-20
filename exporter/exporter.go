@@ -318,6 +318,7 @@ func (e *Exporter) Handler() http.Handler {
 		}
 
 		if client != nil && e.getTotalCollectionsCount() <= 0 {
+			// TODO: PMM-12522 find other places where we can use list databases and collections
 			count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 			if err == nil {
 				e.lock.Lock()

@@ -40,7 +40,7 @@ type dbstatsCollector struct {
 func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string, freeStorage bool) *dbstatsCollector {
 	return &dbstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "dbstats"})),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
@@ -65,6 +65,7 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
+	// TODO: PMM-12522 find other places where we can use list databases and collections
 	dbNames, err := databases(d.ctx, client, d.databaseFilter, nil)
 	if err != nil {
 		logger.Errorf("Failed to get database names: %s", err)

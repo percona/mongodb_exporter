@@ -716,7 +716,7 @@ func lockMetrics() []lockMetric {
 // This function reads the human readable list from lockMetrics() and creates a slice of metrics
 // ready to be exposed, taking the value for each metric from th provided bson.M structure from
 // getDiagnosticData.
-func locksMetrics(logger *logrus.Logger, m bson.M) []prometheus.Metric {
+func locksMetrics(logger *logrus.Entry, m bson.M) []prometheus.Metric {
 	metrics := lockMetrics()
 	res := make([]prometheus.Metric, 0, len(metrics))
 
@@ -782,7 +782,7 @@ func specialMetricDefinitions() []specialMetric {
 	}
 }
 
-func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Logger) []prometheus.Metric {
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Entry) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
 	for _, def := range specialMetricDefinitions() {
@@ -845,7 +845,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	return metrics
 }
 
-func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Logger) (buildInfo, error) {
+func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Entry) (buildInfo, error) {
 	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
 	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
 
@@ -932,7 +932,7 @@ func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 }
 
 // arbiterMetrics returns metrics for mongoDB arbiter instances.
-func arbiterMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+func arbiterMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
 	response, err := util.MyRole(ctx, client)
 	if err != nil {
 		l.Errorf("cannot get role of the running instance: %s", err)
@@ -1087,7 +1087,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 	return metrics
 }
 
-func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
 	if metric, err := databasesTotalPartitioned(ctx, client); err != nil {
@@ -1141,6 +1141,7 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, ms...)
 	}
 
+	// TODO: PMM-12522 find other places where we can use list databases and collections
 	metrics = append(metrics, dbstatsMetrics(ctx, client, l)...)
 
 	if metric, err := shardingShardsTotal(ctx, client); err != nil {
@@ -1342,7 +1343,7 @@ type ShardingChangelogStats struct {
 	Items *[]ShardingChangelogSummary
 }
 
-func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Logger) ([]prometheus.Metric, error) {
+func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Entry) ([]prometheus.Metric, error) {
 	var metrics []prometheus.Metric
 
 	coll := client.Database("config").Collection("changelog")
@@ -1414,7 +1415,7 @@ type buildInfo struct {
 	Vendor  string
 }
 
-func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Logger) *databaseStatList {
+func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Entry) *databaseStatList {
 	dbStatList := &databaseStatList{}
 	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
@@ -1436,7 +1437,7 @@ func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Lo
 	return dbStatList
 }
 
-func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
 	var metrics []prometheus.Metric
 
 	dbStatList := getDatabaseStatList(ctx, client, l)

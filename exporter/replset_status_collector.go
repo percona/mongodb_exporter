@@ -41,7 +41,7 @@ type replSetGetStatusCollector struct {
 func newReplicationSetStatusCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *replSetGetStatusCollector {
 	return &replSetGetStatusCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "replset_status"})),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,

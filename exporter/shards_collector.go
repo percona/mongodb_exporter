@@ -37,7 +37,7 @@ type shardsCollector struct {
 func newShardsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatibleMode bool) *shardsCollector {
 	return &shardsCollector{
 		ctx:        ctx,
-		base:       newBaseCollector(client, logger),
+		base:       newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "shards"})),
 		compatible: compatibleMode,
 	}
 }
@@ -57,6 +57,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	prefix := "shards collection chunks"
 
+	// TODO: PMM-12522 find other places where we can use list databases and collections
 	databaseNames, err := client.ListDatabaseNames(d.ctx, bson.D{})
 	if err != nil {
 		logger.Errorf("cannot get database names: %s", err)
