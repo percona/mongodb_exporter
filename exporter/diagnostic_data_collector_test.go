@@ -237,102 +237,76 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestDiagnosticDataErrors(t *testing.T) {
-	t.Parallel()
 	type log struct {
 		message string
 		level   uint32
 	}
 
-	t.Run("authenticated arbiter fails to get metric", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
+	type testCase struct {
+		name            string
+		containerName   string
+		expectedMessage string
+	}
 
-		port, err := tu.PortForContainer("mongo-2-arbiter")
-		require.NoError(t, err)
-		client := tu.TestClient(ctx, port, t)
+	cases := []testCase{
+		{
+			name:            "authenticated arbiter fails to get metric",
+			containerName:   "mongo-2-arbiter",
+			expectedMessage: "failed to run command: getDiagnosticData",
+		},
+		{
+			name:          "authenticated data node has no error in logs",
+			containerName: "mongo-1-1",
+		},
+		{
+			name:          "unauthenticated arbiter has no error in logs",
+			containerName: "mongo-1-arbiter",
+		},
+	}
 
-		logger, hook := logrustest.NewNullLogger()
-		ti := newTopologyInfo(ctx, client, logger)
-		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
 
-		reg := prometheus.NewRegistry()
-		err = reg.Register(c)
-		require.NoError(t, err)
-		_ = helpers.CollectMetrics(c)
+			port, err := tu.PortForContainer(tc.containerName)
+			require.NoError(t, err)
+			client := tu.TestClient(ctx, port, t)
 
-		assert.NotEmpty(t, hook.Entries)
-		expected := "failed to run command: getDiagnosticData"
-		assert.True(
-			t,
-			strings.HasPrefix(hook.LastEntry().Message, expected),
-			"'%s' has no prefix: '%s'",
-			hook.LastEntry().Message,
-			expected)
-	})
+			logger, hook := logrustest.NewNullLogger()
+			ti := newTopologyInfo(ctx, client, logger)
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
 
-	t.Run("unauthenticated arbiter has no error in logs", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
+			reg := prometheus.NewRegistry()
+			err = reg.Register(c)
+			require.NoError(t, err)
+			_ = helpers.CollectMetrics(c)
 
-		port, err := tu.PortForContainer("mongo-1-arbiter")
-		require.NoError(t, err)
-		client := tu.TestClient(ctx, port, t)
-
-		logger, hook := logrustest.NewNullLogger()
-		ti := newTopologyInfo(ctx, client, logger)
-		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
-
-		reg := prometheus.NewRegistry()
-		err = reg.Register(c)
-		require.NoError(t, err)
-		_ = helpers.CollectMetrics(c)
-
-		var errorLogs []log
-		for _, entry := range hook.Entries {
-			if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
-				errorLogs = append(errorLogs, log{
-					message: entry.Message,
-					level:   uint32(entry.Level),
-				})
+			var errorLogs []log
+			for _, entry := range hook.Entries {
+				if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
+					errorLogs = append(errorLogs, log{
+						message: entry.Message,
+						level:   uint32(entry.Level),
+					})
+				}
 			}
-		}
 
-		assert.Empty(t, errorLogs)
-	})
-
-	t.Run("authenticated data node has no error in logs", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		port, err := tu.PortForContainer("mongo-1-1")
-		require.NoError(t, err)
-		client := tu.TestClient(ctx, port, t)
-
-		logger, hook := logrustest.NewNullLogger()
-		ti := newTopologyInfo(ctx, client, logger)
-		c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
-
-		reg := prometheus.NewRegistry()
-		err = reg.Register(c)
-		require.NoError(t, err)
-		_ = helpers.CollectMetrics(c)
-
-		var errorLogs []log
-		for _, entry := range hook.Entries {
-			if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
-				errorLogs = append(errorLogs, log{
-					message: entry.Message,
-					level:   uint32(entry.Level),
-				})
+			if tc.expectedMessage == "" {
+				assert.Empty(t, errorLogs)
+			} else {
+				require.NotEmpty(t, errorLogs)
+				assert.True(
+					t,
+					strings.HasPrefix(hook.LastEntry().Message, tc.expectedMessage),
+					"'%s' has no prefix: '%s'",
+					hook.LastEntry().Message,
+					tc.expectedMessage)
 			}
-		}
-
-		assert.Empty(t, errorLogs)
-	})
+		})
+	}
 }
 
 func TestContextTimeout(t *testing.T) {
