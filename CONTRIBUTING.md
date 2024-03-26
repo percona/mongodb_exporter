@@ -91,16 +91,22 @@ It will install `goimports`, `goreleaser`, `golangci-lint` and `reviewdog`.
 
 The testing sandbox starts `n` MongoDB instances as follows:
 
-- 3 Instances for shard 1 at ports 17001, 17002, 17003
-- 3 instances for shard 2 at ports 17004, 17005, 17006
+- 3 Instances for shard 1 at ports 17001, 17002, 17003 (with no authentication)
+- 3 instances for shard 2 at ports 17004, 17005, 17006 (with authentication enabled)
 - 3 config servers at ports 17007, 17008, 17009
 - 1 mongos server at port 17000
 - 1 stand alone instance at port 27017
 
-All instances are currently running without user and password so for example, to connect to the **mongos** you can just use:
+To connect to the **mongos** on shard 1, you can use:
 
 ```
 mongo mongodb://127.0.0.1:17001/admin
+```
+
+To connect to the **mongos** on shard 2 (with authentication enabled), you can use:
+
+```
+mongo mongodb://admin:admin@127.0.0.1:17001/admin
 ```
 
 The sandbox can be started using the provided Makefile using: `make test-cluster` and it can be stopped using `make test-cluster-clean`.

@@ -66,39 +66,46 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
+	nodeType, err := getNodeType(d.ctx, client)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"component": "diagnosticDataCollector",
+		}).Errorf("Cannot get node type: %s", err)
+	}
+
+	var metrics []prometheus.Metric
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 	if res.Err() != nil {
-		logger.Errorf("failed to run command: getDiagnosticData: %s", res.Err())
-		logger.Warn("cannot run getDiagnosticData, some metrics might be unavailable.")
-	}
+		logger.Warnf("failed to run command: getDiagnosticData, some metrics might be unavailable %s", res.Err())
+	} else {
+		if err := res.Decode(&m); err != nil {
+			logger.Errorf("cannot run getDiagnosticData: %s", err)
+		}
 
-	if err := res.Decode(&m); err != nil {
-		logger.Errorf("cannot run getDiagnosticData: %s", err)
-	}
+		if m == nil || m["data"] == nil {
+			logger.Error("cannot run getDiagnosticData: response is empty")
+		}
 
-	if m == nil || m["data"] == nil {
-		logger.Error("cannot run getDiagnosticData: response is empty")
-	}
+		var ok bool
+		m, ok = m["data"].(bson.M)
+		if !ok {
+			err = errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
+			logger.Errorf("cannot decode getDiagnosticData: %s", err)
+		}
 
-	m, ok := m["data"].(bson.M)
-	if !ok {
-		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
+		logger.Debug("getDiagnosticData result")
+		debugResult(logger, m)
 
-		logger.Errorf("cannot decode getDiagnosticData: %s", err)
-	}
+		metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
+		metrics = append(metrics, locksMetrics(logger, m)...)
 
-	logger.Debug("getDiagnosticData result")
-	debugResult(logger, m)
-
-	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
-	metrics = append(metrics, locksMetrics(logger, m)...)
-
-	securityMetric, err := d.getSecurityMetricFromLineOptions(client)
-	if err != nil {
-		logger.Errorf("cannot decode getCmdLineOtpions: %s", err)
-	} else if securityMetric != nil {
-		metrics = append(metrics, securityMetric)
+		securityMetric, err := d.getSecurityMetricFromLineOptions(client)
+		if err != nil {
+			logger.Errorf("failed to run command: getCmdLineOptions: %s", err)
+		} else if securityMetric != nil {
+			metrics = append(metrics, securityMetric)
+		}
 	}
 
 	if d.compatibleMode {
@@ -108,12 +115,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			metrics = append(metrics, cem)
 		}
 
-		nodeType, err := getNodeType(d.ctx, client)
-		if err != nil {
-			logger.WithFields(logrus.Fields{
-				"component": "diagnosticDataCollector",
-			}).Errorf("Cannot get node type to check if this is a mongos: %s", err)
-		} else if nodeType == typeMongos {
+		if nodeType == typeMongos {
 			metrics = append(metrics, mongosMetrics(d.ctx, client, logger)...)
 		}
 	}

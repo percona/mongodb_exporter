@@ -815,9 +815,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 	}
 
 	if nodeType == typeMongod || nodeType == typeArbiter {
-		if engine, err := storageEngine(m); err != nil {
-			l.Errorf("cannot retrieve engine type: %s", err)
-		} else {
+		if engine, err := storageEngine(m); err == nil {
 			metrics = append(metrics, engine)
 		}
 	}
@@ -832,13 +830,13 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		if rm := replSetMetrics(m); rm != nil {
 			metrics = append(metrics, rm...)
 		}
-	}
 
-	if nodeType != typeMongos {
-		if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
-			l.Warnf("cannot create metrics for oplog: %s", err)
-		} else {
-			metrics = append(metrics, opLogMetrics...)
+		if nodeType != typeMongos {
+			if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
+				l.Warnf("cannot create metrics for oplog: %s", err)
+			} else {
+				metrics = append(metrics, opLogMetrics...)
+			}
 		}
 	}
 
