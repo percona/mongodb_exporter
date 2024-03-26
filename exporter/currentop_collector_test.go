@@ -60,8 +60,9 @@ func TestCurrentopCollector(t *testing.T) {
 	}()
 
 	ti := labelsGetterMock{}
+	st := "0s"
 
-	c := newCurrentopCollector(ctx, client, logrus.New(), false, ti)
+	c := newCurrentopCollector(ctx, client, logrus.New(), false, ti, st)
 
 	// Filter metrics by reason:
 	// 1. The result will be different on different hardware

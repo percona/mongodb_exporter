@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,23 +29,25 @@ import (
 )
 
 type currentopCollector struct {
-	ctx            context.Context
-	base           *baseCollector
-	compatibleMode bool
-	topologyInfo   labelsGetter
+	ctx               context.Context
+	base              *baseCollector
+	compatibleMode    bool
+	topologyInfo      labelsGetter
+	currentopslowtime string
 }
 
 var ErrInvalidOrMissingInprogEntry = errors.New("invalid or missing inprog entry in currentop results")
 
 // newCurrentopCollector creates a collector for being processed queries.
 func newCurrentopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger,
-	compatible bool, topology labelsGetter,
+	compatible bool, topology labelsGetter, currentOpSlowTime string,
 ) *currentopCollector {
 	return &currentopCollector{
-		ctx:            ctx,
-		base:           newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "currentop"})),
-		compatibleMode: compatible,
-		topologyInfo:   topology,
+		ctx:               ctx,
+		base:              newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "currentop"})),
+		compatibleMode:    compatible,
+		topologyInfo:      topology,
+		currentopslowtime: currentOpSlowTime,
 	}
 }
 
@@ -61,6 +64,12 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 	logger := d.base.logger
 	client := d.base.client
+	slowtime, err := time.ParseDuration(d.currentopslowtime)
+	if err != nil {
+		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		return
+	}
+	slowtimems := slowtime.Microseconds()
 
 	// Get all requests that are being processed except system requests (admin and local).
 	cmd := bson.D{
@@ -68,6 +77,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 		{Key: "active", Value: true},
 		{Key: "microsecs_running", Value: bson.D{
 			{Key: "$exists", Value: true},
+			{Key: "$gte", Value: slowtimems},
 		}},
 		{Key: "op", Value: bson.D{{Key: "$ne", Value: ""}}},
 		{Key: "ns", Value: bson.D{

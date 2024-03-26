@@ -68,6 +68,8 @@ type GlobalFlags struct {
 
 	ProfileTimeTS int `name:"collector.profile-time-ts" help:"Set time for scrape slow queries." default:"30"`
 
+	CurrentOpSlowTime string `name:"collector.currentopmetrics-slow-time" help:"Set minimum time for registration queries." default:"1m"`
+
 	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections" negatable:""`
 	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" negatable:""`
 	Version         bool `name:"version" help:"Show version and exit"`
@@ -158,9 +160,10 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 
-		CollStatsLimit: opts.CollStatsLimit,
-		CollectAll:     opts.CollectAll,
-		ProfileTimeTS:  opts.ProfileTimeTS,
+		CollStatsLimit:    opts.CollStatsLimit,
+		CollectAll:        opts.CollectAll,
+		ProfileTimeTS:     opts.ProfileTimeTS,
+		CurrentOpSlowTime: opts.CurrentOpSlowTime,
 	}
 
 	e := exporter.New(exporterOpts)
