@@ -35,7 +35,7 @@ type generalCollector struct {
 func newGeneralCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *generalCollector {
 	return &generalCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "general"})),
 	}
 }
 
@@ -52,7 +52,7 @@ func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
 	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
 }
 
-func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {
+func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Entry) prometheus.Metric {
 	var value float64
 
 	if client != nil {

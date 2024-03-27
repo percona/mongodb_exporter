@@ -23,8 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func debugResult(log *logrus.Logger, m interface{}) {
-	if !log.IsLevelEnabled(logrus.DebugLevel) {
+func debugResult(log *logrus.Entry, m interface{}) {
+	if !log.Logger.IsLevelEnabled(logrus.DebugLevel) {
 		return
 	}
 

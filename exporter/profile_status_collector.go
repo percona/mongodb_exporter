@@ -41,7 +41,7 @@ func newProfileCollector(ctx context.Context, client *mongo.Client, logger *logr
 ) *profileCollector {
 	return &profileCollector{
 		ctx:            ctx,
-		base:           newBaseCollector(client, logger),
+		base:           newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "profile"})),
 		compatibleMode: compatible,
 		topologyInfo:   topology,
 		profiletimets:  profileTimeTS,
@@ -63,6 +63,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	timeScrape := d.profiletimets
 
+	// TODO: PMM-12522 find other places where we can use list databases and collections
 	databases, err := databases(d.ctx, client, nil, nil)
 	if err != nil {
 		errors.Wrap(err, "cannot get the database names list")

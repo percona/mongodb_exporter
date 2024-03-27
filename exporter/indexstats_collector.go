@@ -41,7 +41,7 @@ type indexstatsCollector struct {
 func newIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery, overrideDescendingIndex bool, topology labelsGetter, collections []string) *indexstatsCollector {
 	return &indexstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "indexstats"})),
 
 		discoveringMode:         discovery,
 		topologyInfo:            topology,
@@ -67,6 +67,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 	var collections []string
 	if d.discoveringMode {
+		// TODO: PMM-12522 find other places where we can use list databases and collections
 		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
 			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
@@ -77,6 +78,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 		collections = fromMapToSlice(onlyCollectionsNamespaces)
 	} else {
 		var err error
+		// TODO: PMM-12522 find other places where we can use list databases and collections
 		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
 		if err != nil {
 			logger.Errorf("cannot list collections: %s", err.Error())

@@ -43,7 +43,7 @@ type diagnosticDataCollector struct {
 func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *diagnosticDataCollector {
 	return &diagnosticDataCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "diagnostic_data"})),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
