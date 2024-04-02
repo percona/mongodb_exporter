@@ -1128,8 +1128,8 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, ms...)
 	}
 
-	if metric, err := chunksBalanced(ctx, client); err != nil {
-		l.Debugf("cannot create metric for chunks balanced: %s", err)
+	if metric, err := chunksBalancerRunning(ctx, client); err != nil {
+		l.Debugf("cannot create metric for chunks balancer running: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
@@ -1199,7 +1199,7 @@ func shardedCollectionsTotal(ctx context.Context, client *mongo.Client) (prometh
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(collCount))
 }
 
-func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+func chunksBalancerRunning(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	var m struct {
 		InBalancerRound bool `bson:"inBalancerRound"`
 	}
@@ -1216,7 +1216,7 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 		value = 1
 	}
 
-	name := "mongodb_mongos_sharding_chunks_is_balanced"
+	name := "mongodb_mongos_sharding_chunks_is_balancer_running"
 	help := "Shards are balanced"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
@@ -1225,16 +1225,18 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 
 func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	type bss struct {
-		Stopped bool `bson:"stopped"`
+		Mode string `bson:"mode"`
 	}
 	var bs bss
-	enabled := 1
+	enabled := 0
 
-	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
-	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+	cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
+	err := client.Database("admin").RunCommand(ctx, cmd).Decode(&bs)
+
+	if err != nil {
 		return nil, err
-	} else if bs.Stopped {
-		enabled = 0
+	} else if bs.Mode == "full" {
+		enabled = 1
 	}
 
 	name := "mongodb_mongos_sharding_balancer_enabled"
