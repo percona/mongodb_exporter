@@ -209,6 +209,7 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 func TestMongosMetrics(t *testing.T) {
 	t.Parallel()
 	t.Run("test mongodb_mongos_sharding_chunks_is_balancer_running metric", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
