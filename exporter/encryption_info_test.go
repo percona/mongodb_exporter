@@ -54,7 +54,7 @@ func TestGetEncryptionInfo(t *testing.T) {
 	mongodb_security_encryption_enabled{type="localKeyFile"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
-	mongodb_version_info{edition="Community",mongodb="5.0.13-11",vendor="Percona"} 1` + "\n")
+	mongodb_version_info{edition="Community",mongodb="5.0.23-20",vendor="Percona"} 1` + "\n")
 
 	filter := []string{
 		"mongodb_security_encryption_enabled",
