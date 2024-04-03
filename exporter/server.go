@@ -16,12 +16,15 @@
 package exporter
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
@@ -32,10 +35,12 @@ type ServerMap map[string]http.Handler
 
 // ServerOpts is the options for the main http handler
 type ServerOpts struct {
-	Path             string
-	MultiTargetPath  string
-	WebListenAddress string
-	TLSConfigPath    string
+	Path                   string
+	MultiTargetPath        string
+	OverallTargetPath      string
+	WebListenAddress       string
+	TLSConfigPath          string
+	DisableDefaultRegistry bool
 }
 
 // Runs the main web-server
@@ -51,6 +56,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	defaultExporter := exporters[0]
 	mux.Handle(opts.Path, defaultExporter.Handler())
 	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap))
+	mux.HandleFunc(opts.OverallTargetPath, OverallTargetsHandler(exporters, log))
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
@@ -94,6 +100,59 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 			}
 		}
 		http.Error(w, "Unable to find target", http.StatusNotFound)
+	}
+}
+
+func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(10)*time.Second)
+		defer cancel()
+
+		var gatherers prometheus.Gatherers
+		gatherers = append(gatherers, prometheus.DefaultGatherer)
+
+		for _, e := range exporters {
+			client, err := e.getClient(ctx)
+			if err != nil {
+				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
+			}
+
+			// Close client after usage.
+			if !e.opts.GlobalConnPool {
+				defer func() {
+					if client != nil {
+						err := client.Disconnect(ctx)
+						if err != nil {
+							logger.Errorf("Cannot disconnect client: %v", err)
+						}
+					}
+				}()
+			}
+
+			var ti *topologyInfo
+			if client != nil {
+				// Topology can change between requests, so we need to get it every time.
+				ti = newTopologyInfo(ctx, client, e.logger)
+			}
+
+			hostlabels := prometheus.Labels{
+				"instance": e.opts.HostName,
+			}
+
+			registry := NewGathererWrapper(e.makeRegistry(ctx, client, ti, *e.opts), hostlabels)
+			gatherers = append(gatherers, registry)
+
+		}
+
+		// Delegate http serving to Prometheus client library, which will call collector.Collect.
+		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
+			ErrorHandling: promhttp.ContinueOnError,
+			ErrorLog:      logger,
+		})
+
+		h.ServeHTTP(w, r)
+
 	}
 }
 
