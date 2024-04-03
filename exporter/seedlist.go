@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Converts mongodb+srv URI to flat connection string
+// GetSeedListFromSRV converts mongodb+srv URI to flat connection string.
 func GetSeedListFromSRV(uri string, log *logrus.Logger) string {
 	uriParsed, err := url.Parse(uri)
 	if err != nil {
