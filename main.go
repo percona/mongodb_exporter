@@ -140,6 +140,12 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 	log.Debugf("Connection URI: %s", uri)
 
 	uriParsed, _ := url.Parse(uri)
+	var nodeName string
+	if uriParsed.Port() != "" {
+		nodeName = net.JoinHostPort(uriParsed.Hostname(), uriParsed.Port())
+	} else {
+		nodeName = uriParsed.Host
+	}
 
 	exporterOpts := &exporter.Opts{
 		CollStatsNamespaces:   strings.Split(opts.CollStatsNamespaces, ","),
@@ -148,7 +154,7 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		IndexStatsCollections: strings.Split(opts.IndexStatsCollections, ","),
 		Logger:                log,
 		URI:                   uri,
-		HostName:              net.JoinHostPort(uriParsed.Hostname(), uriParsed.Port()),
+		HostName:              nodeName,
 		GlobalConnPool:        opts.GlobalConnPool,
 		DirectConnect:         opts.DirectConnect,
 		ConnectTimeoutMS:      opts.ConnectTimeoutMS,
@@ -178,17 +184,17 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 	return e
 }
 
-func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
-	URIs := parseURIList(opts.URI, opts.SplitCluster)
+func buildServers(opts GlobalFlags, logger *logrus.Logger) []*exporter.Exporter {
+	URIs := parseURIList(opts.URI, logger, opts.SplitCluster)
 	servers := make([]*exporter.Exporter, len(URIs))
 	for serverIdx := range URIs {
-		servers[serverIdx] = buildExporter(opts, URIs[serverIdx], log)
+		servers[serverIdx] = buildExporter(opts, URIs[serverIdx], logger)
 	}
 
 	return servers
 }
 
-func parseURIList(uriList []string, extractSrv bool) []string {
+func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []string {
 	var URIs []string
 
 	// If server URI is prefixed with mongodb scheme string, then every next URI in line not prefixed
@@ -206,7 +212,10 @@ func parseURIList(uriList []string, extractSrv bool) []string {
 				realURI = URI
 			} else {
 				// There can be only one host in SRV connection string
-				// Extract seed list from SRV connection string
+				if splitCluster {
+					// In splitCluster mode we extract seed list from SRV connection string
+					URI = exporter.GetSeedListFromSRV(URI, logger)
+				}
 				URIs = append(URIs, URI)
 			}
 		} else {
@@ -221,6 +230,31 @@ func parseURIList(uriList []string, extractSrv bool) []string {
 		URIs = append(URIs, realURI)
 	}
 
+	if splitCluster {
+		// In this mode we split cluster strings into separate targets
+		separateURIs := []string{}
+		for _, hosturl := range URIs {
+			urlParsed, err := url.Parse(hosturl)
+			if err != nil {
+				logger.Fatal("Failed to parse URI %s: %v", hosturl, err)
+			}
+			for _, host := range strings.Split(urlParsed.Host, ",") {
+				targetUri := "mongodb://"
+				if urlParsed.User != nil {
+					targetUri += urlParsed.User.String() + "@"
+				}
+				targetUri += host
+				if urlParsed.Path != "" {
+					targetUri += urlParsed.Path
+				}
+				if urlParsed.RawQuery != "" {
+					targetUri += "?" + urlParsed.RawQuery
+				}
+				separateURIs = append(separateURIs, targetUri)
+			}
+		}
+		return separateURIs
+	}
 	return URIs
 }
 
