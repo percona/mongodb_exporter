@@ -1,7 +1,6 @@
 package exporter
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"testing"
@@ -77,8 +76,6 @@ func TestGetSeedListFromSRV(t *testing.T) {
 
 	for uri, expected := range tests {
 		actual := GetSeedListFromSRV(uri, log)
-		fmt.Println(actual)
 		assert.Equal(t, expected, actual)
 	}
-
 }

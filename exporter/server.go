@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -105,13 +106,23 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 
 func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
+		// To support also older ones vmagents.
+		if err != nil {
+			seconds = 10
+		}
 
 		var gatherers prometheus.Gatherers
 		gatherers = append(gatherers, prometheus.DefaultGatherer)
 
+		filters := r.URL.Query()["collect[]"]
+
 		for _, e := range exporters {
-			ctx, cancel := context.WithTimeout(r.Context(), time.Duration(10)*time.Second)
+			ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds-e.opts.TimeoutOffset)*time.Second)
 			defer cancel()
+
+			requestOpts := GetRequestOpts(filters, e.opts)
+
 			client, err := e.getClient(ctx)
 			if err != nil {
 				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
@@ -136,10 +147,10 @@ func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.Ha
 			}
 
 			hostlabels := prometheus.Labels{
-				"instance": e.opts.HostName,
+				"instance": e.opts.NodeName,
 			}
 
-			registry := NewGathererWrapper(e.makeRegistry(ctx, client, ti, *e.opts), hostlabels)
+			registry := NewGathererWrapper(e.makeRegistry(ctx, client, ti, requestOpts), hostlabels)
 			gatherers = append(gatherers, registry)
 
 		}

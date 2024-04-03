@@ -77,7 +77,7 @@ type Opts struct {
 	Logger                *logrus.Logger
 
 	URI      string
-	HostName string
+	NodeName string
 }
 
 var (
@@ -284,36 +284,7 @@ func (e *Exporter) Handler() http.Handler {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
 		defer cancel()
 
-		filters := r.URL.Query()["collect[]"]
-
-		requestOpts := Opts{}
-
-		if len(filters) == 0 {
-			requestOpts = *e.opts
-		}
-
-		for _, filter := range filters {
-			switch filter {
-			case "diagnosticdata":
-				requestOpts.EnableDiagnosticData = true
-			case "replicasetstatus":
-				requestOpts.EnableReplicasetStatus = true
-			case "dbstats":
-				requestOpts.EnableDBStats = true
-			case "topmetrics":
-				requestOpts.EnableTopMetrics = true
-			case "currentopmetrics":
-				requestOpts.EnableCurrentopMetrics = true
-			case "indexstats":
-				requestOpts.EnableIndexStats = true
-			case "collstats":
-				requestOpts.EnableCollStats = true
-			case "profile":
-				requestOpts.EnableProfile = true
-			case "shards":
-				requestOpts.EnableShards = true
-			}
-		}
+		requestOpts := GetRequestOpts(r.URL.Query()["collect[]"], e.opts)
 
 		client, err = e.getClient(ctx)
 		if err != nil {
@@ -364,6 +335,40 @@ func (e *Exporter) Handler() http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
+
+	requestOpts := Opts{}
+
+	if len(filters) == 0 {
+		requestOpts = *defaultOpts
+	}
+
+	for _, filter := range filters {
+		switch filter {
+		case "diagnosticdata":
+			requestOpts.EnableDiagnosticData = true
+		case "replicasetstatus":
+			requestOpts.EnableReplicasetStatus = true
+		case "dbstats":
+			requestOpts.EnableDBStats = true
+		case "topmetrics":
+			requestOpts.EnableTopMetrics = true
+		case "currentopmetrics":
+			requestOpts.EnableCurrentopMetrics = true
+		case "indexstats":
+			requestOpts.EnableIndexStats = true
+		case "collstats":
+			requestOpts.EnableCollStats = true
+		case "profile":
+			requestOpts.EnableProfile = true
+		case "shards":
+			requestOpts.EnableShards = true
+		}
+	}
+
+	return requestOpts
 }
 
 func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
