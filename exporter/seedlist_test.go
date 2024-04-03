@@ -21,7 +21,7 @@ func TestGetSeedListFromSRV(t *testing.T) {
 	tests := map[string]string{
 		"mongodb+srv://server.example.com":                                         "mongodb://mongo1.example.com:17001,mongo2.example.com:17002,mongo3.example.com:17003/?authSource=admin",
 		"mongodb+srv://user:pass@server.example.com?replicaSet=rs0&authSource=db0": "mongodb://user:pass@mongo1.example.com:17001,mongo2.example.com:17002,mongo3.example.com:17003/?authSource=db0&replicaSet=rs0",
-		"mongodb+srv://google.com":                                                 "mongodb+srv://google.com",
+		"mongodb+srv://unexistent.com":                                             "mongodb+srv://unexistent.com",
 	}
 
 	for uri, expected := range tests {
