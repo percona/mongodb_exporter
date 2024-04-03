@@ -76,6 +76,8 @@ func TestMultiTarget(t *testing.T) {
 }
 
 func TestOverallHandler(t *testing.T) {
+	t.Parallel()
+
 	opts := []*Opts{
 		{
 			NodeName:         "standalone",
@@ -117,10 +119,11 @@ func TestOverallHandler(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/", nil)
-	http.HandlerFunc(OverallTargetsHandler(exporters, logger))(rr, req)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	OverallTargetsHandler(exporters, logger)(rr, req)
 	res := rr.Result()
 	resBody, _ := io.ReadAll(res.Body)
+	res.Body.Close()
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 

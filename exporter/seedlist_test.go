@@ -12,10 +12,15 @@ import (
 )
 
 func TestGetSeedListFromSRV(t *testing.T) {
+	// Can't run in parallel because it patches the net.DefaultResolver
+
 	log := logrus.New()
 	srv := tu.SetupFakeResolver()
 
-	defer srv.Close()
+	defer func(t *testing.T) {
+		err := srv.Close()
+		assert.NoError(t, err)
+	}(t)
 	defer mockdns.UnpatchNet(net.DefaultResolver)
 
 	tests := map[string]string{

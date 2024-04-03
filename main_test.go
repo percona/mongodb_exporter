@@ -62,6 +62,8 @@ func TestParseURIList(t *testing.T) {
 }
 
 func TestSplitCluster(t *testing.T) {
+	// Can't run in parallel because it patches the net.DefaultResolver
+
 	tests := map[string][]string{
 		"mongodb://server": {"mongodb://server"},
 		"mongodb://user:pass@server1,server2/admin?replicaSet=rs1,mongodb://server3,server4,server5": {
@@ -85,7 +87,10 @@ func TestSplitCluster(t *testing.T) {
 
 	srv := tu.SetupFakeResolver()
 
-	defer srv.Close()
+	defer func(t *testing.T) {
+		err := srv.Close()
+		assert.NoError(t, err)
+	}(t)
 	defer mockdns.UnpatchNet(net.DefaultResolver)
 
 	for test, expected := range tests {

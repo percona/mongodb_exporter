@@ -197,8 +197,9 @@ func buildServers(opts GlobalFlags, logger *logrus.Logger) []*exporter.Exporter 
 func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []string {
 	var URIs []string
 
-	// If server URI is prefixed with mongodb scheme string, then every next URI in line not prefixed
-	// with mongodb scheme string is a part of cluster. Otherwise treat it as a standalone server
+	// If server URI is prefixed with mongodb scheme string, then every next URI in
+	// line not prefixed with mongodb scheme string is a part of cluster. Otherwise
+	// treat it as a standalone server
 	realURI := ""
 	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
 	for _, URI := range uriList {
@@ -214,7 +215,7 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 			} else {
 				// There can be only one host in SRV connection string
 				if splitCluster {
-					// In splitCluster mode we get srv connection string from DNS SRV recors
+					// In splitCluster mode we get srv connection string from SRV recors
 					URI = exporter.GetSeedListFromSRV(URI, logger)
 				}
 				URIs = append(URIs, URI)
@@ -223,7 +224,7 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 			if realURI == "" {
 				URIs = append(URIs, "mongodb://"+URI)
 			} else {
-				realURI = realURI + "," + URI
+				realURI += "," + URI
 			}
 		}
 	}
@@ -240,18 +241,18 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 				logger.Fatal(fmt.Sprintf("Failed to parse URI %s: %v", hosturl, err))
 			}
 			for _, host := range strings.Split(urlParsed.Host, ",") {
-				targetUri := "mongodb://"
+				targetURI := "mongodb://"
 				if urlParsed.User != nil {
-					targetUri += urlParsed.User.String() + "@"
+					targetURI += urlParsed.User.String() + "@"
 				}
-				targetUri += host
+				targetURI += host
 				if urlParsed.Path != "" {
-					targetUri += urlParsed.Path
+					targetURI += urlParsed.Path
 				}
 				if urlParsed.RawQuery != "" {
-					targetUri += "?" + urlParsed.RawQuery
+					targetURI += "?" + urlParsed.RawQuery
 				}
-				separateURIs = append(separateURIs, targetUri)
+				separateURIs = append(separateURIs, targetURI)
 			}
 		}
 		return separateURIs

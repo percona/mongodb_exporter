@@ -16,6 +16,7 @@
 package exporter
 
 import (
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 )
@@ -38,12 +39,14 @@ func NewGathererWrapper(gs prometheus.Gatherer, labels prometheus.Labels) *Gathe
 func (g *GathererWrapped) Gather() ([]*io_prometheus_client.MetricFamily, error) {
 	metrics, err := g.originalGatherer.Gather()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to gather metrics")
 	}
 
 	for _, metric := range metrics {
-		for _, m := range metric.Metric {
+		for _, m := range metric.GetMetric() {
 			for k, v := range g.labels {
+				v := v
+				k := k
 				m.Label = append(m.Label, &io_prometheus_client.LabelPair{
 					Name:  &k,
 					Value: &v,
