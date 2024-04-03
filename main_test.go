@@ -16,25 +16,80 @@
 package main
 
 import (
+	"net"
 	"strings"
 	"testing"
 
+	"github.com/foxcpp/go-mockdns"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestParseURIList(t *testing.T) {
 	t.Parallel()
 	tests := map[string][]string{
 		"mongodb://server": {"mongodb://server"},
-		"mongodb+srv://server1,server2,mongodb://server3,server4,server5": {"mongodb+srv://server1,server2", "mongodb://server3,server4,server5"},
-		"server1":                 {"mongodb://server1"},
-		"server1,server2,server3": {"mongodb://server1", "mongodb://server2", "mongodb://server3"},
-		"mongodb.server,server2":  {"mongodb://mongodb.server", "mongodb://server2"},
-		"standalone,mongodb://server1,server2,mongodb+srv://server3,server4,mongodb://server5": {"mongodb://standalone", "mongodb://server1,server2", "mongodb+srv://server3,server4", "mongodb://server5"},
+		"mongodb+srv://server1,server2,mongodb://server3,server4,server5": {
+			"mongodb+srv://server1",
+			"mongodb://server2",
+			"mongodb://server3,server4,server5",
+		},
+		"server1": {"mongodb://server1"},
+		"server1,server2,server3": {
+			"mongodb://server1",
+			"mongodb://server2",
+			"mongodb://server3",
+		},
+		"mongodb.server,server2": {
+			"mongodb://mongodb.server",
+			"mongodb://server2",
+		},
+		"standalone,mongodb://server1,server2,mongodb+srv://server3,server4,mongodb://server5": {
+			"mongodb://standalone",
+			"mongodb://server1,server2",
+			"mongodb+srv://server3",
+			"mongodb://server4",
+			"mongodb://server5",
+		},
 	}
+	logger := logrus.New()
 	for test, expected := range tests {
-		actual := parseURIList(strings.Split(test, ","))
+		actual := parseURIList(strings.Split(test, ","), logger, false)
+		assert.Equal(t, expected, actual)
+	}
+}
+
+func TestSplitCluster(t *testing.T) {
+	tests := map[string][]string{
+		"mongodb://server": {"mongodb://server"},
+		"mongodb://user:pass@server1,server2/admin?replicaSet=rs1,mongodb://server3,server4,server5": {
+			"mongodb://user:pass@server1/admin?replicaSet=rs1",
+			"mongodb://user:pass@server2/admin?replicaSet=rs1",
+			"mongodb://server3",
+			"mongodb://server4",
+			"mongodb://server5",
+		},
+		"mongodb://server1,mongodb://user:pass@server2,server3?arg=1&arg2=2,mongodb+srv://user:pass@server.example.com/db?replicaSet=rs1": {
+			"mongodb://server1",
+			"mongodb://user:pass@server2?arg=1&arg2=2",
+			"mongodb://user:pass@server3?arg=1&arg2=2",
+			"mongodb://user:pass@mongo1.example.com:17001/db?authSource=admin&replicaSet=rs1",
+			"mongodb://user:pass@mongo2.example.com:17002/db?authSource=admin&replicaSet=rs1",
+			"mongodb://user:pass@mongo3.example.com:17003/db?authSource=admin&replicaSet=rs1",
+		},
+	}
+
+	logger := logrus.New()
+
+	srv := tu.SetupFakeResolver()
+
+	defer srv.Close()
+	defer mockdns.UnpatchNet(net.DefaultResolver)
+
+	for test, expected := range tests {
+		actual := parseURIList(strings.Split(test, ","), logger, true)
 		assert.Equal(t, expected, actual)
 	}
 }

@@ -129,7 +129,6 @@ func (e *Exporter) getTotalCollectionsCount() int {
 }
 
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
-
 	registry := prometheus.NewRegistry()
 
 	gc := newGeneralCollector(ctx, client, e.opts.Logger)
@@ -348,7 +347,6 @@ func (e *Exporter) Handler() http.Handler {
 }
 
 func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
-
 	requestOpts := Opts{}
 
 	if len(filters) == 0 {

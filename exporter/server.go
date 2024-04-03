@@ -162,7 +162,6 @@ func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.Ha
 		})
 
 		h.ServeHTTP(w, r)
-
 	}
 }
 

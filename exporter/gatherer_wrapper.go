@@ -36,7 +36,6 @@ func NewGathererWrapper(gs prometheus.Gatherer, labels prometheus.Labels) *Gathe
 
 // Gather implements prometheus.Gatherer interface.
 func (g *GathererWrapped) Gather() ([]*io_prometheus_client.MetricFamily, error) {
-
 	metrics, err := g.originalGatherer.Gather()
 	if err != nil {
 		return nil, err

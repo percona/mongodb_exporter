@@ -211,6 +211,7 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 			if realURI != "" {
 				// Add the previous host buffer to the url list as we met the scheme part
 				URIs = append(URIs, realURI)
+				realURI = ""
 			}
 			if matches[1] == "" {
 				realURI = URI
@@ -240,7 +241,7 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 		for _, hosturl := range URIs {
 			urlParsed, err := url.Parse(hosturl)
 			if err != nil {
-				logger.Fatal("Failed to parse URI %s: %v", hosturl, err)
+				logger.Fatal(fmt.Sprintf("Failed to parse URI %s: %v", hosturl, err))
 			}
 			for _, host := range strings.Split(urlParsed.Host, ",") {
 				targetUri := "mongodb://"
