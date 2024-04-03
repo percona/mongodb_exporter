@@ -238,6 +238,9 @@ func SetupFakeResolver() *mockdns.Server {
 		"mongo3.example.com.": {
 			A: []string{"127.0.0.1"},
 		},
+		"unexistent.com.": {
+			A: []string{"127.0.0.1"},
+		},
 	}
 
 	srv, _ := mockdns.NewServer(testZone, true)
