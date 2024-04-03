@@ -156,7 +156,7 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		IndexStatsCollections: strings.Split(opts.IndexStatsCollections, ","),
 		Logger:                log,
 		URI:                   uri,
-		HostName:              nodeName,
+		NodeName:              nodeName,
 		GlobalConnPool:        opts.GlobalConnPool,
 		DirectConnect:         opts.DirectConnect,
 		ConnectTimeoutMS:      opts.ConnectTimeoutMS,
@@ -209,7 +209,7 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 		matches := matchRegexp.FindStringSubmatch(URI)
 		if matches != nil {
 			if realURI != "" {
-				// Add previous host buffer to the url list as we met the scheme part
+				// Add the previous host buffer to the url list as we met the scheme part
 				URIs = append(URIs, realURI)
 			}
 			if matches[1] == "" {
@@ -217,7 +217,7 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 			} else {
 				// There can be only one host in SRV connection string
 				if splitCluster {
-					// In splitCluster mode we extract seed list from SRV connection string
+					// In splitCluster mode we get srv connection string from DNS SRV recors
 					URI = exporter.GetSeedListFromSRV(URI, logger)
 				}
 				URIs = append(URIs, URI)
