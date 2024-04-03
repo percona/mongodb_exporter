@@ -106,13 +106,12 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(10)*time.Second)
-		defer cancel()
-
 		var gatherers prometheus.Gatherers
 		gatherers = append(gatherers, prometheus.DefaultGatherer)
 
 		for _, e := range exporters {
+			ctx, cancel := context.WithTimeout(r.Context(), time.Duration(10)*time.Second)
+			defer cancel()
 			client, err := e.getClient(ctx)
 			if err != nil {
 				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
