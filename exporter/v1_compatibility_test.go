@@ -209,6 +209,10 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 func TestMongosMetrics(t *testing.T) {
 	t.Parallel()
 	t.Run("test mongodb_mongos_sharding_chunks_is_balancer_running metric", func(t *testing.T) {
+		type bss struct {
+			Mode string `bson:"mode"`
+		}
+
 		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
@@ -217,9 +221,7 @@ func TestMongosMetrics(t *testing.T) {
 		require.NoError(t, err)
 		client := tu.TestClient(ctx, port, t)
 
-		bs := struct {
-			Mode string `bson:"mode"`
-		}{}
+		var bs bss
 		cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
 		err = client.Database("admin").RunCommand(ctx, cmd).Decode(&bs)
 		require.NoError(t, err)
@@ -237,7 +239,7 @@ func TestMongosMetrics(t *testing.T) {
 		if bs.Mode == "full" {
 			expected = 1
 		}
-		assert.Equal(t, float64(expected), *m.Gauge.Value)
+		assert.Equal(t, float64(expected), m.GetGauge().GetValue())
 	})
 }
 
