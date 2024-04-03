@@ -18,6 +18,7 @@ func TestGetSeedListFromSRV(t *testing.T) {
 	srv := tu.SetupFakeResolver()
 
 	defer func(t *testing.T) {
+		t.Helper()
 		err := srv.Close()
 		assert.NoError(t, err)
 	}(t)

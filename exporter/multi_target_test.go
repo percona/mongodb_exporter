@@ -123,7 +123,8 @@ func TestOverallHandler(t *testing.T) {
 	OverallTargetsHandler(exporters, logger)(rr, req)
 	res := rr.Result()
 	resBody, _ := io.ReadAll(res.Body)
-	res.Body.Close()
+	err := res.Body.Close()
+	assert.NoError(t, err)
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
