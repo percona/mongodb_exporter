@@ -346,6 +346,7 @@ func (e *Exporter) Handler() http.Handler {
 	})
 }
 
+// Makes exporter.Opts structure from request filters and default options.
 func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 	requestOpts := Opts{}
 

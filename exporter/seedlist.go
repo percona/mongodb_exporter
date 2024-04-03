@@ -1,14 +1,15 @@
 package exporter
 
 import (
-	"fmt"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
+// Converts mongodb+srv URI to flat connection string
 func GetSeedListFromSRV(uri string, log *logrus.Logger) string {
 	uriParsed, err := url.Parse(uri)
 	if err != nil {
@@ -36,7 +37,7 @@ func GetSeedListFromSRV(uri string, log *logrus.Logger) string {
 		log.Errorf("Multiple TXT records found for %s, thus were not applied", cname)
 	}
 	if len(txtRecords) == 1 {
-		// We take connection paramters from the TXT record
+		// We take connection parameters from the TXT record
 		uriParams, err := url.ParseQuery(txtRecords[0])
 		if err != nil {
 			log.Errorf("Failed to parse TXT record %s: %v", txtRecords[0], err)
@@ -52,13 +53,13 @@ func GetSeedListFromSRV(uri string, log *logrus.Logger) string {
 	// Build final connection URI
 	servers := make([]string, len(srvRecords))
 	for i, srv := range srvRecords {
-		servers[i] = net.JoinHostPort(strings.TrimSuffix(srv.Target, "."), fmt.Sprint(srv.Port))
+		servers[i] = net.JoinHostPort(strings.TrimSuffix(srv.Target, "."), strconv.FormatUint(uint64(srv.Port), 10))
 	}
 	uri = "mongodb://"
 	if uriParsed.User != nil {
 		uri += uriParsed.User.String() + "@"
 	}
-	uri = uri + strings.Join(servers, ",")
+	uri += strings.Join(servers, ",")
 	if uriParsed.Path != "" {
 		uri += uriParsed.Path
 	} else {

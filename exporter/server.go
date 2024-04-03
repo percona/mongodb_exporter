@@ -104,6 +104,8 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 	}
 }
 
+// Handler to scrape all the targets in one request
+// Adds instance label to each metric
 func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
@@ -152,7 +154,6 @@ func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.Ha
 
 			registry := NewGathererWrapper(e.makeRegistry(ctx, client, ti, requestOpts), hostlabels)
 			gatherers = append(gatherers, registry)
-
 		}
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
