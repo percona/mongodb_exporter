@@ -79,7 +79,8 @@ type Opts struct {
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
 
-	URI string
+	URI      string
+	HostName string
 }
 
 var (
@@ -128,6 +129,7 @@ func (e *Exporter) getTotalCollectionsCount() int {
 }
 
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
+
 	registry := prometheus.NewRegistry()
 
 	gc := newGeneralCollector(ctx, client, e.opts.Logger)
