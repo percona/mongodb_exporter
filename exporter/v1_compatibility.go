@@ -1217,7 +1217,7 @@ func chunksBalancerRunning(ctx context.Context, client *mongo.Client) (prometheu
 	}
 
 	name := "mongodb_mongos_sharding_chunks_is_balancer_running"
-	help := "Shards are balanced"
+	help := "Shard balancer is running"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
