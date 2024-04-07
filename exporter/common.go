@@ -32,6 +32,7 @@ import (
 var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
 
 func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string, skipViews bool) ([]string, error) {
+	opts := &options.ListCollectionsOptions{NameOnly: pointer.ToBool(true), AuthorizedCollections: pointer.ToBool(true)}
 	filter := bson.D{} // Default=empty -> list all collections
 
 	// if there is a filter with the list of collections we want, create a filter like
@@ -62,7 +63,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 		filter = append(filter, primitive.E{Key: "type", Value: "collection"})
 	}
 
-	collections, err := client.Database(database).ListCollectionNames(ctx, filter)
+	collections, err := client.Database(database).ListCollectionNames(ctx, filter, opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot get the list of collections for discovery")
 	}
