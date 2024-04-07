@@ -104,7 +104,7 @@ test-race: env              ## Run all tests with race flag.
 	go test -race -v -timeout 30s ./...
 
 test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
-	chmod 400 ./docker/secret/keyfile && docker compose up -d
+	chmod 600 ./docker/secret/keyfile && docker compose up -d
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
 	docker compose down --remove-orphans
