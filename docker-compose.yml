@@ -72,7 +72,7 @@ services:
             - MONGO_INITDB_ROOT_PASSWORD=${TEST_MONGODB_PASSWORD:-admin}
         ports:
             - "${TEST_MONGODB_S2_PRIMARY_PORT:-17004}:27017"
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
+        command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
 
@@ -84,7 +84,7 @@ services:
                 TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_SECONDARY1_PORT:-17005}:27017"
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
+        command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
 
@@ -96,7 +96,7 @@ services:
                 TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_SECONDARY2_PORT:-17006}:27017"
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
+        command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
 
@@ -108,7 +108,7 @@ services:
                 TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_ARBITER:-17012}:27017"
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
+        command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
 
