@@ -63,76 +63,52 @@ services:
 
     mongo-2-2:
         container_name: "mongo-2-2"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        build:
+            dockerfile: ./docker/mongodb-auth.dockerfile
+            args:
+                TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         environment:
             - MONGO_INITDB_ROOT_USERNAME=${TEST_MONGODB_USERNAME:-admin}
             - MONGO_INITDB_ROOT_PASSWORD=${TEST_MONGODB_PASSWORD:-admin}
         ports:
             - "${TEST_MONGODB_S2_PRIMARY_PORT:-17004}:27017"
-        entrypoint:
-            - bash
-            - -c
-            - |
-                chmod 400 /secret/keyfile
-                chown 999:999 /secret/keyfile
-                exec docker-entrypoint.sh $$@
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/secret/keyfile
-        volumes:
-            - ./docker/secret:/secret
+        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
 
     mongo-2-3:
         container_name: "mongo-2-3"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        build:
+            dockerfile: ./docker/mongodb-auth.dockerfile
+            args:
+                TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_SECONDARY1_PORT:-17005}:27017"
-        entrypoint:
-            - bash
-            - -c
-            - |
-                chmod 400 /secret/keyfile
-                chown 999:999 /secret/keyfile
-                exec docker-entrypoint.sh $$@
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/secret/keyfile
-        volumes:
-            - ./docker/secret:/secret
+        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
 
     mongo-2-1:
         container_name: "mongo-2-1"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        build:
+            dockerfile: ./docker/mongodb-auth.dockerfile
+            args:
+                TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_SECONDARY2_PORT:-17006}:27017"
-        entrypoint:
-            - bash
-            - -c
-            - |
-                chmod 400 /secret/keyfile
-                chown 999:999 /secret/keyfile
-                exec docker-entrypoint.sh $$@
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/secret/keyfile
-        volumes:
-            - ./docker/secret:/secret
+        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
 
     mongo-2-arbiter:
         container_name: "mongo-2-arbiter"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        build:
+            dockerfile: ./docker/mongodb-auth.dockerfile
+            args:
+                TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_ARBITER:-17012}:27017"
-        entrypoint:
-            - bash
-            - -c
-            - |
-                chmod 400 /secret/keyfile
-                chown 999:999 /secret/keyfile
-                exec docker-entrypoint.sh $$@
-        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/secret/keyfile
-        volumes:
-            - ./docker/secret:/secret
+        command: mongod --replSet rs2 --shardsvr --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
 
@@ -263,7 +239,7 @@ services:
     standalone-encrypted:
         user: root
         container_name: "standalone-encrypted"
-        image: percona/percona-server-mongodb:5.0.23-20-arm64
+        image: percona/percona-server-mongodb:5.0.13-11
         ports:
             - "${TEST_MONGODB_STANDALONE_ENCRYPTED_PORT:-27027}:27017"
         volumes:
