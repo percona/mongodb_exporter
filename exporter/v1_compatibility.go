@@ -1235,7 +1235,8 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metr
 
 	if err != nil {
 		return nil, err
-	} else if bs.Mode == "full" {
+	}
+	if bs.Mode == "full" {
 		enabled = 1
 	}
 

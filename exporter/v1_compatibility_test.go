@@ -238,7 +238,7 @@ func TestMongosMetrics(t *testing.T) {
 		if bs.Mode == "full" {
 			expected = 1
 		}
-		assert.Equal(t, float64(expected), m.GetGauge().GetValue())
+		assert.Equal(t, float64(expected), m.GetGauge().GetValue()) //nolint
 	})
 }
 
