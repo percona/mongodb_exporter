@@ -235,7 +235,6 @@ func TestMongosMetrics(t *testing.T) {
 		assert.NoError(t, err)
 
 		expected := 0
-		t.Logf("%+v", bs.Mode)
 		if bs.Mode == "full" {
 			expected = 1
 		}
