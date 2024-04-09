@@ -42,10 +42,3 @@ jobs:
           sleep 10
           make test-race
           make test-cluster-clean
-
-      - name: Get logs on failure
-        if: ${{ failure() }}
-        run: |
-          docker logs mongo-2-2
-          docker logs mongo-2-1
-          docker logs mongo-2-arbiter
