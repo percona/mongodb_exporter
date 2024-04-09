@@ -239,6 +239,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 //nolint:funlen
 func TestDiagnosticDataErrors(t *testing.T) {
+	t.Parallel()
 	type log struct {
 		message string
 		level   uint32
@@ -257,17 +258,21 @@ func TestDiagnosticDataErrors(t *testing.T) {
 			expectedMessage: "failed to run command: getDiagnosticData",
 		},
 		{
-			name:          "authenticated data node has no error in logs",
-			containerName: "mongo-1-1",
+			name:            "authenticated data node has no error in logs",
+			containerName:   "mongo-1-1",
+			expectedMessage: "",
 		},
 		{
-			name:          "unauthenticated arbiter has no error in logs",
-			containerName: "mongo-1-arbiter",
+			name:            "unauthenticated arbiter has no error in logs",
+			containerName:   "mongo-1-arbiter",
+			expectedMessage: "",
 		},
 	}
 
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
