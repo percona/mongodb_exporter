@@ -1232,7 +1232,6 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metr
 
 	cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
 	err := client.Database("admin").RunCommand(ctx, cmd).Decode(&bs)
-
 	if err != nil {
 		return nil, err
 	}
