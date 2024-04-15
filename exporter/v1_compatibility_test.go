@@ -205,6 +205,42 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 	assert.Equal(t, want, nm)
 }
 
+func TestMongosMetrics(t *testing.T) {
+	t.Parallel()
+	t.Run("test mongodb_mongos_sharding_chunks_is_balancer_running metric", func(t *testing.T) {
+		type bss struct {
+			Mode string `bson:"mode"`
+		}
+
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongos")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		var bs bss
+		cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
+		err = client.Database("admin").RunCommand(ctx, cmd).Decode(&bs)
+		require.NoError(t, err)
+
+		var metric prometheus.Metric
+		var m dto.Metric
+		metric, err = balancerEnabled(ctx, client)
+		assert.NoError(t, err)
+
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+
+		expected := 0
+		if bs.Mode == "full" {
+			expected = 1
+		}
+		assert.Equal(t, float64(expected), m.GetGauge().GetValue()) //nolint
+	})
+}
+
 // myState should always return a metric. If there is no connection, the value
 // should be the MongoDB unknown state = 6
 func TestMyState(t *testing.T) {
