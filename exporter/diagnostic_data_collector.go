@@ -102,6 +102,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if d.compatibleMode {
+		logger.Debug("running special metrics for compatibility mode")
 		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
 
 		if cem, err := cacheEvictedTotalMetric(m); err == nil {
@@ -114,6 +115,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 				"component": "diagnosticDataCollector",
 			}).Errorf("Cannot get node type to check if this is a mongos: %s", err)
 		} else if nodeType == typeMongos {
+			logger.Debug("running special metrics for mongos")
 			metrics = append(metrics, mongosMetrics(d.ctx, client, logger)...)
 		}
 	}

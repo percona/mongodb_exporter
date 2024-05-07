@@ -1090,51 +1090,43 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
+	l.Debugf("databasesTotalPartitioned")
 	if metric, err := databasesTotalPartitioned(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
+	l.Debugf("databasesTotalUnpartitioned")
 	if metric, err := databasesTotalUnpartitioned(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
+	l.Debugf("shardedCollectionsTotal")
 	if metric, err := shardedCollectionsTotal(ctx, client); err != nil {
 		l.Debugf("cannot create metric for collections total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
+	l.Debugf("balancerEnabled")
 	if metric, err := balancerEnabled(ctx, client); err != nil {
 		l.Debugf("cannot create metric for balancer is enabled: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	metric, err := chunksTotal(ctx, client)
-	if err != nil {
-		l.Debugf("cannot create metric for chunks total: %s", err)
-	} else {
-		metrics = append(metrics, metric)
-	}
-
-	ms, err := chunksTotalPerShard(ctx, client)
-	if err != nil {
-		l.Debugf("cannot create metric for chunks total per shard: %s", err)
-	} else {
-		metrics = append(metrics, ms...)
-	}
-
+	l.Debugf("chunksBalanced")
 	if metric, err := chunksBalanced(ctx, client); err != nil {
 		l.Debugf("cannot create metric for chunks balanced: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	ms, err = changelog10m(ctx, client, l)
+	l.Debugf("shardingShardsTotal")
+	ms, err := changelog10m(ctx, client, l)
 	if err != nil {
 		l.Errorf("cannot create metric for changelog: %s", err)
 	} else {
@@ -1142,14 +1134,17 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) [
 	}
 
 	// TODO: PMM-12522 find other places where we can use list databases and collections
+	l.Debugf("dbstatsMetrics")
 	metrics = append(metrics, dbstatsMetrics(ctx, client, l)...)
 
+	l.Debugf("shardingShardsTotal")
 	if metric, err := shardingShardsTotal(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
+	l.Debugf("shardingShardsDrainingTotal")
 	if metric, err := shardingShardsDrainingTotal(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
 	} else {
@@ -1243,57 +1238,6 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metr
 
 	d := prometheus.NewDesc(name, help, nil, nil)
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
-}
-
-func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
-	n, err := client.Database("config").Collection("chunks").CountDocuments(ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-
-	name := "mongodb_mongos_sharding_chunks_total"
-	help := "Total number of chunks"
-
-	d := prometheus.NewDesc(name, help, nil, nil)
-	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
-}
-
-func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
-	aggregation := bson.D{
-		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
-	}
-
-	cursor, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
-	if err != nil {
-		return nil, err
-	}
-
-	var shards []bson.M
-	if err = cursor.All(ctx, &shards); err != nil {
-		return nil, err
-	}
-
-	metrics := make([]prometheus.Metric, 0, len(shards))
-
-	for _, shard := range shards {
-		help := "Total number of chunks per shard"
-		labels := map[string]string{"shard": shard["_id"].(string)}
-
-		d := prometheus.NewDesc("mongodb_mongos_sharding_shard_chunks_total", help, nil, labels)
-		val, ok := shard["count"].(int32)
-		if !ok {
-			continue
-		}
-
-		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(val))
-		if err != nil {
-			continue
-		}
-
-		metrics = append(metrics, metric)
-	}
-
-	return metrics, nil
 }
 
 func shardingShardsTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {

@@ -253,7 +253,6 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		case map[string]interface{}:
 			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
 		case primitive.A:
-			v = []interface{}(v)
 			res = append(res, processSlice(prefix, k, v, labels, compatibleMode)...)
 		case []interface{}:
 			continue
