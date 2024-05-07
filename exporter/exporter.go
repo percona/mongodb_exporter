@@ -70,7 +70,6 @@ type Opts struct {
 	EnableCollStats          bool
 	EnableProfile            bool
 	EnableShards             bool
-	EnableChunks             bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -231,11 +230,6 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	if e.opts.EnableShards && requestOpts.EnableShards {
-		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
-		registry.MustRegister(sc)
-	}
-
-	if (e.opts.EnableShards || e.opts.EnableChunks) && requestOpts.EnableChunks {
 		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
 	}
