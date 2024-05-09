@@ -1118,7 +1118,6 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) [
 		metrics = append(metrics, metric)
 	}
 
-
 	l.Debugf("chunksBalancerRunning")
 	if metric, err := chunksBalancerRunning(ctx, client); err != nil {
 		l.Debugf("cannot create metric for chunks balancer running: %s", err)
