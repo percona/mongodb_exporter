@@ -222,7 +222,7 @@ func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, 
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
 }
 
-func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) { //nolint:ireturn
+func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
 	aggregation := bson.D{
 		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
 	}
