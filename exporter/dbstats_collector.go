@@ -65,7 +65,6 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
-	// TODO: PMM-12522 find other places where we can use list databases and collections
 	dbNames, err := databases(d.ctx, client, d.databaseFilter, nil)
 	if err != nil {
 		logger.Errorf("Failed to get database names: %s", err)

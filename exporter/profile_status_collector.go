@@ -19,7 +19,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -63,10 +62,9 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	timeScrape := d.profiletimets
 
-	// TODO: PMM-12522 find other places where we can use list databases and collections
 	databases, err := databases(d.ctx, client, nil, nil)
 	if err != nil {
-		errors.Wrap(err, "cannot get the database names list")
+		logger.Warnf("cannot get databases: %s", err)
 		return
 	}
 
@@ -80,7 +78,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	for _, db := range databases {
 		res, err := client.Database(db).Collection("system.profile").CountDocuments(d.ctx, cmd)
 		if err != nil {
-			errors.Wrapf(err, "cannot read system.profile")
+			logger.Warnf("cannot get profile count for database %s: %s", db, err)
 			break
 		}
 		labels["database"] = db

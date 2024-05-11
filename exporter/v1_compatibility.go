@@ -827,15 +827,13 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		if hm := arbiterMetrics(ctx, client, l); hm != nil {
 			metrics = append(metrics, hm...)
 		}
-	} else {
+	} else if nodeType != typeMongos {
 		metrics = append(metrics, myState(ctx, client))
 		if rm := replSetMetrics(m); rm != nil {
 			metrics = append(metrics, rm...)
 		}
-	}
-
-	if nodeType != typeMongos {
-		if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
+		opLogMetrics, err := oplogStatus(ctx, client)
+		if err != nil {
 			l.Warnf("cannot create metrics for oplog: %s", err)
 		} else {
 			metrics = append(metrics, opLogMetrics...)
@@ -1133,7 +1131,6 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) [
 		metrics = append(metrics, ms...)
 	}
 
-	// TODO: PMM-12522 find other places where we can use list databases and collections
 	l.Debugf("dbstatsMetrics")
 	metrics = append(metrics, dbstatsMetrics(ctx, client, l)...)
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -62,7 +63,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debugf("chunksTotal")
 	metric, err := chunksTotal(ctx, client)
 	if err != nil {
-		logger.Debugf("cannot create metric for chunks total: %s", err)
+		logger.Warnf("cannot create metric for chunks total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
@@ -70,7 +71,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debugf("chunksTotalPerShard")
 	ms, err := chunksTotalPerShard(ctx, client)
 	if err != nil {
-		logger.Debugf("cannot create metric for chunks total per shard: %s", err)
+		logger.Warnf("cannot create metric for chunks total per shard: %s", err)
 	} else {
 		metrics = append(metrics, ms...)
 	}
@@ -208,10 +209,10 @@ func (d *shardsCollector) getChunksForCollection(row primitive.M) []bson.M {
 	return chunks
 }
 
-func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) { //nolint:ireturn
 	n, err := client.Database("config").Collection("chunks").CountDocuments(ctx, bson.M{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get total number of chunks")
 	}
 
 	name := "mongodb_mongos_sharding_chunks_total"
@@ -221,26 +222,30 @@ func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, 
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
 }
 
-func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
+func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) { //nolint:ireturn
 	aggregation := bson.D{
 		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
 	}
 
 	cursor, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get $shards cursor for collection config.chunks")
 	}
 
 	var shards []bson.M
 	if err = cursor.All(ctx, &shards); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot get $shards for collection config.chunks")
 	}
 
 	metrics := make([]prometheus.Metric, 0, len(shards))
 
 	for _, shard := range shards {
 		help := "Total number of chunks per shard"
-		labels := map[string]string{"shard": shard["_id"].(string)}
+		id, ok := shard["_id"].(string)
+		if !ok {
+			continue
+		}
+		labels := map[string]string{"shard": id}
 
 		d := prometheus.NewDesc("mongodb_mongos_sharding_shard_chunks_total", help, nil, labels)
 		val, ok := shard["count"].(int32)
