@@ -52,7 +52,7 @@ func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
 	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
 }
 
-func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Entry) prometheus.Metric {
+func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Entry) prometheus.Metric { //nolint:ireturn
 	var value float64
 
 	if client != nil {

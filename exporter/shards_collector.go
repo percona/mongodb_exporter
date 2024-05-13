@@ -60,7 +60,6 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 	ctx := d.ctx
 
 	metrics := make([]prometheus.Metric, 0)
-	logger.Debugf("chunksTotal")
 	metric, err := chunksTotal(ctx, client)
 	if err != nil {
 		logger.Warnf("cannot create metric for chunks total: %s", err)
@@ -68,7 +67,6 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 		metrics = append(metrics, metric)
 	}
 
-	logger.Debugf("chunksTotalPerShard")
 	ms, err := chunksTotalPerShard(ctx, client)
 	if err != nil {
 		logger.Warnf("cannot create metric for chunks total per shard: %s", err)

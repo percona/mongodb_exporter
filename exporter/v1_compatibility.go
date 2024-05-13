@@ -1088,42 +1088,36 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
-	l.Debugf("databasesTotalPartitioned")
 	if metric, err := databasesTotalPartitioned(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	l.Debugf("databasesTotalUnpartitioned")
 	if metric, err := databasesTotalUnpartitioned(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	l.Debugf("shardedCollectionsTotal")
 	if metric, err := shardedCollectionsTotal(ctx, client); err != nil {
 		l.Debugf("cannot create metric for collections total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	l.Debugf("balancerEnabled")
 	if metric, err := balancerEnabled(ctx, client); err != nil {
 		l.Debugf("cannot create metric for balancer is enabled: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	l.Debugf("chunksBalancerRunning")
 	if metric, err := chunksBalancerRunning(ctx, client); err != nil {
 		l.Debugf("cannot create metric for chunks balancer running: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	l.Debugf("shardingShardsTotal")
 	ms, err := changelog10m(ctx, client, l)
 	if err != nil {
 		l.Errorf("cannot create metric for changelog: %s", err)
@@ -1131,17 +1125,14 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) [
 		metrics = append(metrics, ms...)
 	}
 
-	l.Debugf("dbstatsMetrics")
 	metrics = append(metrics, dbstatsMetrics(ctx, client, l)...)
 
-	l.Debugf("shardingShardsTotal")
 	if metric, err := shardingShardsTotal(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	l.Debugf("shardingShardsDrainingTotal")
 	if metric, err := shardingShardsDrainingTotal(ctx, client); err != nil {
 		l.Debugf("cannot create metric for database total: %s", err)
 	} else {

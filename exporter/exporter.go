@@ -267,7 +267,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	return client, nil
 }
 
-// Handler returns a http.Handler that serves metrics. Can be used instead of
+// Handler returns an http.Handler that serves metrics. Can be used instead of
 // run for hooking up custom HTTP servers.
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
