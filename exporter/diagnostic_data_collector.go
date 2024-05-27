@@ -81,6 +81,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	} else {
 		if err := res.Decode(&m); err != nil {
 			logger.Errorf("cannot run getDiagnosticData: %s", err)
+			return
 		}
 
 		if m == nil || m["data"] == nil {
@@ -106,13 +107,28 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 		} else if securityMetric != nil {
 			metrics = append(metrics, securityMetric)
 		}
+
+		if d.compatibleMode {
+			metrics = append(metrics, specialMetrics(d.ctx, client, m, nodeType, logger)...)
+
+			if cem, err := cacheEvictedTotalMetric(m); err == nil {
+				metrics = append(metrics, cem)
+			}
+		}
 	}
 
 	if d.compatibleMode {
-		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
+		buildInfo, err := retrieveMongoDBBuildInfo(d.ctx, client, logger)
+		if err != nil {
+			logger.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
+		}
 
-		if cem, err := cacheEvictedTotalMetric(m); err == nil {
-			metrics = append(metrics, cem)
+		metrics = append(metrics, serverVersion(buildInfo))
+
+		if nodeType == typeArbiter {
+			if hm := arbiterMetrics(d.ctx, client, logger); hm != nil {
+				metrics = append(metrics, hm...)
+			}
 		}
 
 		if nodeType == typeMongos {
