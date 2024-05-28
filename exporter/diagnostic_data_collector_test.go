@@ -253,9 +253,9 @@ func TestDiagnosticDataErrors(t *testing.T) {
 
 	cases := []testCase{
 		{
-			name:            "authenticated arbiter fails to get metric",
+			name:            "authenticated arbiter has warning about missing metrics",
 			containerName:   "mongo-2-arbiter",
-			expectedMessage: "failed to run command: getDiagnosticData",
+			expectedMessage: "some metrics might be unavailable on arbiter nodes",
 		},
 		{
 			name:            "authenticated data node has no error in logs",
@@ -263,9 +263,9 @@ func TestDiagnosticDataErrors(t *testing.T) {
 			expectedMessage: "",
 		},
 		{
-			name:            "unauthenticated arbiter has no error in logs",
+			name:            "unauthenticated arbiter has warning about missing metrics",
 			containerName:   "mongo-1-arbiter",
-			expectedMessage: "",
+			expectedMessage: "some metrics might be unavailable on arbiter nodes",
 		},
 	}
 
