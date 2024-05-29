@@ -782,7 +782,7 @@ func specialMetricDefinitions() []specialMetric {
 	}
 }
 
-func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Entry) []prometheus.Metric {
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeType mongoDBNodeType, l *logrus.Entry) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
 	for _, def := range specialMetricDefinitions() {
@@ -802,18 +802,6 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metrics = append(metrics, metric)
 	}
 
-	buildInfo, err := retrieveMongoDBBuildInfo(ctx, client, l)
-	if err != nil {
-		l.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
-	}
-
-	nodeType, err := getNodeType(ctx, client)
-	if err != nil {
-		l.WithFields(logrus.Fields{
-			"component": "diagnosticDataCollector",
-		}).Errorf("Cannot get node type: %s", err)
-	}
-
 	if nodeType == typeMongod || nodeType == typeArbiter {
 		if engine, err := storageEngine(m); err != nil {
 			l.Errorf("cannot retrieve engine type: %s", err)
@@ -821,22 +809,19 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 			metrics = append(metrics, engine)
 		}
 	}
-	metrics = append(metrics, serverVersion(buildInfo))
 
-	if nodeType == typeArbiter {
-		if hm := arbiterMetrics(ctx, client, l); hm != nil {
-			metrics = append(metrics, hm...)
-		}
-	} else if nodeType != typeMongos {
+	if nodeType != typeArbiter {
 		metrics = append(metrics, myState(ctx, client))
 		if rm := replSetMetrics(m); rm != nil {
 			metrics = append(metrics, rm...)
 		}
-		opLogMetrics, err := oplogStatus(ctx, client)
-		if err != nil {
-			l.Warnf("cannot create metrics for oplog: %s", err)
-		} else {
-			metrics = append(metrics, opLogMetrics...)
+
+		if nodeType != typeMongos {
+			if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
+				l.Warnf("cannot create metrics for oplog: %s", err)
+			} else {
+				metrics = append(metrics, opLogMetrics...)
+			}
 		}
 	}
 
