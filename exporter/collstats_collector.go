@@ -40,7 +40,7 @@ type collstatsCollector struct {
 func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible, discovery bool, topology labelsGetter, collections []string) *collstatsCollector {
 	return &collstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "collstats"})),
 
 		compatibleMode:  compatible,
 		discoveringMode: discovery,
@@ -79,7 +79,6 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
 		if err != nil {
 			logger.Errorf("cannot list collections: %s", err.Error())
-
 			return
 		}
 	}

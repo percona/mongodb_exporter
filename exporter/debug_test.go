@@ -55,7 +55,7 @@ func TestDebug(t *testing.T) {
   }
 }` + "\n"
 
-	debugResult(log, m)
+	debugResult(log.WithField("component", "test"), m)
 	assert.NoError(t, w.Close())
 	out, _ := io.ReadAll(r)
 

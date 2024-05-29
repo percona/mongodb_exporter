@@ -26,14 +26,14 @@ import (
 
 type baseCollector struct {
 	client *mongo.Client
-	logger *logrus.Logger
+	logger *logrus.Entry
 
 	lock         sync.Mutex
 	metricsCache []prometheus.Metric
 }
 
 // newBaseCollector creates a skeletal collector, which is used to create other collectors.
-func newBaseCollector(client *mongo.Client, logger *logrus.Logger) *baseCollector {
+func newBaseCollector(client *mongo.Client, logger *logrus.Entry) *baseCollector {
 	return &baseCollector{
 		client: client,
 		logger: logger,
