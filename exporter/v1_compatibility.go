@@ -782,11 +782,7 @@ func specialMetricDefinitions() []specialMetric {
 	}
 }
 
-<<<<<<< PMM-12989-arbiter-error-logs
-func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeType mongoDBNodeType, l *logrus.Logger) []prometheus.Metric {
-=======
-func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Entry) []prometheus.Metric {
->>>>>>> main
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeType mongoDBNodeType, l *logrus.Entry) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
 	for _, def := range specialMetricDefinitions() {
@@ -814,20 +810,11 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		}
 	}
 
-<<<<<<< PMM-12989-arbiter-error-logs
 	if nodeType != typeArbiter {
-=======
-	if nodeType == typeArbiter {
-		if hm := arbiterMetrics(ctx, client, l); hm != nil {
-			metrics = append(metrics, hm...)
-		}
-	} else if nodeType != typeMongos {
->>>>>>> main
 		metrics = append(metrics, myState(ctx, client))
 		if rm := replSetMetrics(m); rm != nil {
 			metrics = append(metrics, rm...)
 		}
-<<<<<<< PMM-12989-arbiter-error-logs
 
 		if nodeType != typeMongos {
 			if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
@@ -835,13 +822,6 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 			} else {
 				metrics = append(metrics, opLogMetrics...)
 			}
-=======
-		opLogMetrics, err := oplogStatus(ctx, client)
-		if err != nil {
-			l.Warnf("cannot create metrics for oplog: %s", err)
-		} else {
-			metrics = append(metrics, opLogMetrics...)
->>>>>>> main
 		}
 	}
 
