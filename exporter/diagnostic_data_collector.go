@@ -88,45 +88,45 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	var metrics []prometheus.Metric
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
-	if nodeType != typeArbiter {
-		if res.Err() != nil {
+	if res.Err() != nil {
+		if nodeType != typeArbiter {
 			logger.Warnf("failed to run command: getDiagnosticData, some metrics might be unavailable %s", res.Err())
-		} else {
-			if err := res.Decode(&m); err != nil {
-				logger.Errorf("cannot run getDiagnosticData: %s", err)
-				return
-			}
+		}
+	} else {
+		if err := res.Decode(&m); err != nil {
+			logger.Errorf("cannot run getDiagnosticData: %s", err)
+			return
+		}
 
-			if m == nil || m["data"] == nil {
-				logger.Error("cannot run getDiagnosticData: response is empty")
-			}
+		if m == nil || m["data"] == nil {
+			logger.Error("cannot run getDiagnosticData: response is empty")
+		}
 
-			var ok bool
-			m, ok = m["data"].(bson.M)
-			if !ok {
-				err = errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
-				logger.Errorf("cannot decode getDiagnosticData: %s", err)
-			}
+		var ok bool
+		m, ok = m["data"].(bson.M)
+		if !ok {
+			err = errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
+			logger.Errorf("cannot decode getDiagnosticData: %s", err)
+		}
 
-			logger.Debug("getDiagnosticData result")
-			debugResult(logger, m)
+		logger.Debug("getDiagnosticData result")
+		debugResult(logger, m)
 
-			metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
-			metrics = append(metrics, locksMetrics(logger, m)...)
+		metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
+		metrics = append(metrics, locksMetrics(logger, m)...)
 
-			securityMetric, err := d.getSecurityMetricFromLineOptions(client)
-			if err != nil {
-				logger.Errorf("failed to run command: getCmdLineOptions: %s", err)
-			} else if securityMetric != nil {
-				metrics = append(metrics, securityMetric)
-			}
+		securityMetric, err := d.getSecurityMetricFromLineOptions(client)
+		if err != nil {
+			logger.Errorf("failed to run command: getCmdLineOptions: %s", err)
+		} else if securityMetric != nil {
+			metrics = append(metrics, securityMetric)
+		}
 
-			if d.compatibleMode {
-				metrics = append(metrics, specialMetrics(d.ctx, client, m, nodeType, logger)...)
+		if d.compatibleMode {
+			metrics = append(metrics, specialMetrics(d.ctx, client, m, nodeType, logger)...)
 
-				if cem, err := cacheEvictedTotalMetric(m); err == nil {
-					metrics = append(metrics, cem)
-				}
+			if cem, err := cacheEvictedTotalMetric(m); err == nil {
+				metrics = append(metrics, cem)
 			}
 		}
 	}
