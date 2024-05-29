@@ -19,7 +19,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -41,7 +40,7 @@ func newProfileCollector(ctx context.Context, client *mongo.Client, logger *logr
 ) *profileCollector {
 	return &profileCollector{
 		ctx:            ctx,
-		base:           newBaseCollector(client, logger),
+		base:           newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "profile"})),
 		compatibleMode: compatible,
 		topologyInfo:   topology,
 		profiletimets:  profileTimeTS,
@@ -65,7 +64,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 
 	databases, err := databases(d.ctx, client, nil, nil)
 	if err != nil {
-		errors.Wrap(err, "cannot get the database names list")
+		logger.Warnf("cannot get databases: %s", err)
 		return
 	}
 
@@ -79,7 +78,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	for _, db := range databases {
 		res, err := client.Database(db).Collection("system.profile").CountDocuments(d.ctx, cmd)
 		if err != nil {
-			errors.Wrapf(err, "cannot read system.profile")
+			logger.Warnf("cannot get profile count for database %s: %s", db, err)
 			break
 		}
 		labels["database"] = db

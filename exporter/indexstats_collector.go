@@ -41,7 +41,7 @@ type indexstatsCollector struct {
 func newIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery, overrideDescendingIndex bool, topology labelsGetter, collections []string) *indexstatsCollector {
 	return &indexstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "indexstats"})),
 
 		discoveringMode:         discovery,
 		topologyInfo:            topology,

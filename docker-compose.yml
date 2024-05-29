@@ -5,7 +5,7 @@ services:
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_S1_PRIMARY_PORT:-17001}:27017"
-        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16
+        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16  --bind_ip 0.0.0.0
         networks:
             - rs1
         depends_on:
@@ -18,7 +18,7 @@ services:
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_S1_SECONDARY1_PORT:-17002}:27017"
-        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16
+        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16  --bind_ip 0.0.0.0
         networks:
             - rs1
 
@@ -27,7 +27,7 @@ services:
         image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
         ports:
             - "${TEST_MONGODB_S1_SECONDARY2_PORT:-17003}:27017"
-        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16
+        command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16  --bind_ip 0.0.0.0
         networks:
             - rs1
 
@@ -209,6 +209,9 @@ services:
             - "mongos"
         networks:
             - mongo-shard
+            - rs1
+            - rs2
+            - cnf-serv
         volumes:
             - ./docker/scripts:/scripts
         environment:

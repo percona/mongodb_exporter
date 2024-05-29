@@ -55,7 +55,7 @@ func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logge
 
 	return &diagnosticDataCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "diagnostic_data"})),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
@@ -132,12 +132,17 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if d.compatibleMode {
+<<<<<<< PMM-12989-arbiter-error-logs
 		buildInfo, err := retrieveMongoDBBuildInfo(d.ctx, client, logger)
 		if err != nil {
 			logger.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
 		}
 
 		metrics = append(metrics, serverVersion(buildInfo))
+=======
+		logger.Debug("running special metrics for compatibility mode")
+		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
+>>>>>>> main
 
 		if nodeType == typeArbiter {
 			if hm := arbiterMetrics(d.ctx, client, logger); hm != nil {
@@ -145,7 +150,17 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			}
 		}
 
+<<<<<<< PMM-12989-arbiter-error-logs
 		if nodeType == typeMongos {
+=======
+		nodeType, err := getNodeType(d.ctx, client)
+		if err != nil {
+			logger.WithFields(logrus.Fields{
+				"component": "diagnosticDataCollector",
+			}).Errorf("Cannot get node type to check if this is a mongos: %s", err)
+		} else if nodeType == typeMongos {
+			logger.Debug("running special metrics for mongos")
+>>>>>>> main
 			metrics = append(metrics, mongosMetrics(d.ctx, client, logger)...)
 		}
 	}
