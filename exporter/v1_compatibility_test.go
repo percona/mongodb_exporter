@@ -108,7 +108,9 @@ func TestAddLocksMetrics(t *testing.T) {
 	err = json.Unmarshal(buf, &m)
 	assert.NoError(t, err)
 
-	metrics := locksMetrics(logrus.New(), m)
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+  metrics := locksMetrics(logger.WithField("component", "test"), m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
@@ -302,13 +304,15 @@ func TestArbiterMetrics(t *testing.T) {
 		containerName := "mongo-1-arbiter"
 
 		logger := logrus.New()
+		logger.SetLevel(logrus.DebugLevel)
+
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
 		port, err := tu.PortForContainer(containerName)
 		require.NoError(t, err)
 		client := tu.TestClient(ctx, port, t)
-		metrics := arbiterMetrics(ctx, client, logger)
+		metrics := arbiterMetrics(ctx, client, logger.WithField("component", "test"))
 		var rsMembers dto.Metric
 		for _, m := range metrics {
 			if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_number_of_members"`) {

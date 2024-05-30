@@ -44,7 +44,7 @@ func newCurrentopCollector(ctx context.Context, client *mongo.Client, logger *lo
 ) *currentopCollector {
 	return &currentopCollector{
 		ctx:               ctx,
-		base:              newBaseCollector(client, logger),
+		base:              newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "currentop"})),
 		compatibleMode:    compatible,
 		topologyInfo:      topology,
 		currentopslowtime: currentOpSlowTime,
