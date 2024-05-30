@@ -110,7 +110,7 @@ func TestAddLocksMetrics(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
-  metrics := locksMetrics(logger.WithField("component", "test"), m)
+	metrics := locksMetrics(logger.WithField("component", "test"), m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
