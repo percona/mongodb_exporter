@@ -16,6 +16,10 @@ Currently, these metric sources are implemented:
 - replSetGetStatus
 - serverStatus
 
+## Supported MongoDB versions
+
+The exporter works with Percona Server for MongoDB and MongoDB Community or Enterprise Edition versions 4.4 and newer. Older versions might also work but are not tested anymore.
+
 ## Info on Percona MongoDB exporter versions
 
 The old 0.1x.y version (ex `master` branch) has been moved to the `release-0.1x` branch.
