@@ -29,6 +29,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
@@ -108,7 +109,9 @@ func TestAddLocksMetrics(t *testing.T) {
 	assert.NoError(t, err)
 
 	var metrics []prometheus.Metric
-	metrics = locksMetrics(logrus.New(), m)
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	metrics = locksMetrics(logger.WithField("component", "test"), m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
@@ -162,7 +165,7 @@ func TestSumMetrics(t *testing.T) {
 	for _, tt := range tests {
 		testCase := tt
 
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			buf, err := os.ReadFile(filepath.Join("testdata/", "get_diagnostic_data.json"))
 			assert.NoError(t, err)
 
@@ -205,26 +208,125 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 	assert.Equal(t, want, nm)
 }
 
+func TestMongosMetrics(t *testing.T) {
+	t.Parallel()
+	t.Run("test mongodb_mongos_sharding_chunks_is_balancer_running metric", func(t *testing.T) {
+		type bss struct {
+			Mode string `bson:"mode"`
+		}
+
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongos")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		var bs bss
+		cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
+		err = client.Database("admin").RunCommand(ctx, cmd).Decode(&bs)
+		require.NoError(t, err)
+
+		var metric prometheus.Metric
+		var m dto.Metric
+		metric, err = balancerEnabled(ctx, client)
+		assert.NoError(t, err)
+
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+
+		expected := 0
+		if bs.Mode == "full" {
+			expected = 1
+		}
+		assert.Equal(t, float64(expected), m.GetGauge().GetValue()) //nolint
+	})
+}
+
 // myState should always return a metric. If there is no connection, the value
 // should be the MongoDB unknown state = 6
 func TestMyState(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	t.Parallel()
+	tests := []struct {
+		name          string
+		containerName string
+		allowedStates []float64
+	}{
+		{
+			name:          "correctly gets state for data-carrying node",
+			containerName: "mongo-1-1",
+			allowedStates: []float64{float64(PrimaryState), float64(SecondaryState)},
+		},
+		{
+			name:          "correctly gets state for arbiter node",
+			containerName: "mongo-1-arbiter",
+			allowedStates: []float64{float64(ArbiterState)},
+		},
+		{
+			name:          "gets unknown state for standalone instance",
+			containerName: "standalone",
+			allowedStates: []float64{float64(UnknownState)},
+		},
+	}
 
-	client := tu.DefaultTestClient(ctx, t)
+	for _, tt := range tests {
+		testCase := tt
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
 
-	var m dto.Metric
+			port, err := tu.PortForContainer(testCase.containerName)
+			require.NoError(t, err)
+			client := tu.TestClient(ctx, port, t)
+			var m dto.Metric
 
-	metric := myState(ctx, client)
-	err := metric.Write(&m)
-	assert.NoError(t, err)
-	assert.NotEqual(t, float64(UnknownState), *m.Gauge.Value)
+			metric := myState(ctx, client)
+			err = metric.Write(&m)
+			assert.NoError(t, err)
+			assert.Contains(t, testCase.allowedStates, *m.Gauge.Value)
 
-	err = client.Disconnect(ctx)
-	assert.NoError(t, err)
+			err = client.Disconnect(ctx)
+			assert.NoError(t, err)
 
-	metric = myState(ctx, client)
-	err = metric.Write(&m)
-	assert.NoError(t, err)
-	assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+			metric = myState(ctx, client)
+			err = metric.Write(&m)
+			assert.NoError(t, err)
+			assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+		})
+	}
+}
+
+func TestArbiterMetrics(t *testing.T) {
+	t.Parallel()
+	t.Run("correctly gets member count from arbiter node", func(t *testing.T) {
+		t.Parallel()
+		containerName := "mongo-1-arbiter"
+
+		logger := logrus.New()
+		logger.SetLevel(logrus.DebugLevel)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer(containerName)
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+		metrics := arbiterMetrics(ctx, client, logger.WithField("component", "test"))
+		var rsMembers dto.Metric
+		for _, m := range metrics {
+			if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_number_of_members"`) {
+				err = m.Write(&rsMembers)
+				assert.NoError(t, err)
+
+				break
+			}
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, float64(4), *rsMembers.Gauge.Value)
+
+		err = client.Disconnect(ctx)
+		assert.NoError(t, err)
+	})
 }
