@@ -4,6 +4,7 @@ MONGODB_CLIENT="mongosh --quiet"
 PARSED=(${VERSION//:/ })
 MONGODB_VERSION=${PARSED[1]}
 MONGODB_VENDOR=${PARSED[0]}
+
 if [ "`echo ${MONGODB_VERSION} | cut -c 1`" = "4" ]; then
   MONGODB_CLIENT="mongo"
 fi
@@ -16,6 +17,9 @@ mongodb1=`getent hosts ${MONGO1} | awk '{ print $1 }'`
 mongodb2=`getent hosts ${MONGO2} | awk '{ print $1 }'`
 mongodb3=`getent hosts ${MONGO3} | awk '{ print $1 }'`
 arbiter=`getent hosts ${ARBITER} | awk '{ print $1 }'`
+
+username=${MONGO_INITDB_ROOT_USERNAME}
+password=${MONGO_INITDB_ROOT_PASSWORD}
 
 port=${PORT:-27017}
 
@@ -60,7 +64,11 @@ EOF
 
 function general_servers() {
     echo "setup servers on ${MONGO1}(${mongodb1}:${port})"
-    ${MONGODB_CLIENT} --host ${mongodb1}:${port} <<EOF
+    command="${MONGODB_CLIENT} --host ${mongodb1}:${port}"
+    if [[ -n "$username" && -n "$password" ]]; then
+      command="${MONGODB_CLIENT} --host ${mongodb1}:${port} -u ${username} -p ${password}"
+    fi
+    ${command} <<EOF
     var cfg = {
         "_id": "${RS}",
         "protocolVersion": 1,

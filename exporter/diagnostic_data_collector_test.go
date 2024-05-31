@@ -29,6 +29,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -233,6 +234,83 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	sort.Strings(filters)
 	for _, want := range filters {
 		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
+	}
+}
+
+//nolint:funlen
+func TestDiagnosticDataErrors(t *testing.T) {
+	t.Parallel()
+	type log struct {
+		message string
+		level   uint32
+	}
+
+	type testCase struct {
+		name            string
+		containerName   string
+		expectedMessage string
+	}
+
+	cases := []testCase{
+		{
+			name:            "authenticated arbiter has warning about missing metrics",
+			containerName:   "mongo-2-arbiter",
+			expectedMessage: "some metrics might be unavailable on arbiter nodes",
+		},
+		{
+			name:            "authenticated data node has no error in logs",
+			containerName:   "mongo-1-1",
+			expectedMessage: "",
+		},
+		{
+			name:            "unauthenticated arbiter has warning about missing metrics",
+			containerName:   "mongo-1-arbiter",
+			expectedMessage: "some metrics might be unavailable on arbiter nodes",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			port, err := tu.PortForContainer(tc.containerName)
+			require.NoError(t, err)
+			client := tu.TestClient(ctx, port, t)
+
+			logger, hook := logrustest.NewNullLogger()
+			ti := newTopologyInfo(ctx, client, logger)
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+			reg := prometheus.NewRegistry()
+			err = reg.Register(c)
+			require.NoError(t, err)
+			_ = helpers.CollectMetrics(c)
+
+			var errorLogs []log
+			for _, entry := range hook.Entries {
+				if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
+					errorLogs = append(errorLogs, log{
+						message: entry.Message,
+						level:   uint32(entry.Level),
+					})
+				}
+			}
+
+			if tc.expectedMessage == "" {
+				assert.Empty(t, errorLogs)
+			} else {
+				require.NotEmpty(t, errorLogs)
+				assert.True(
+					t,
+					strings.HasPrefix(hook.LastEntry().Message, tc.expectedMessage),
+					"'%s' has no prefix: '%s'",
+					hook.LastEntry().Message,
+					tc.expectedMessage)
+			}
+		})
 	}
 }
 

@@ -40,7 +40,7 @@ type dbstatsCollector struct {
 func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string, freeStorage bool) *dbstatsCollector {
 	return &dbstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "dbstats"})),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
