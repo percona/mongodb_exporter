@@ -7,3 +7,5 @@ build
 dist
 mongodb_exporter
 .DS_Store
+docker/pbm/backups/*
+!docker/pbm/backups/.gitkeep
