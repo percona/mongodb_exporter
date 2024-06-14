@@ -34,7 +34,7 @@ type topCollector struct {
 	topologyInfo   labelsGetter
 }
 
-var ErrInvalidOrMissingTotalsEntry = fmt.Errorf("Invalid or misssing totals entry in top results")
+var ErrInvalidOrMissingTotalsEntry = fmt.Errorf("invalid or misssing totals entry in top results")
 
 func newTopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool,
 	topology labelsGetter,
