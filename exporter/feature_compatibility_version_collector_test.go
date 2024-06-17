@@ -17,10 +17,12 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -45,17 +47,30 @@ func TestFCVCollector(t *testing.T) {
 		return time.Date(2024, 0o6, 14, 0o0, 0o0, 0o0, 0o0, time.UTC)
 	}
 
+	sversion, _ := getMongoDBVersionInfo(t, "mongo-1-1")
+
+	v, err := version.NewVersion(sversion)
+	var mversion string
+
+	mmv := fmt.Sprintf("%d.%d", v.Segments()[0], v.Segments()[1])
+	switch {
+	case mmv == "5.0":
+		mversion = "4.4"
+	case mmv == "4.4":
+		mversion = "4.2"
+	}
+
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
 # TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} 4.2` +
+mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} ` + mversion +
 		"\n")
 
 	filter := []string{
 		"mongodb_fcv_featureCompatibilityVersion",
 	}
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 
 	// Less than 5 seconds, it should return the last scraped values.
@@ -66,7 +81,7 @@ mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} 4.2` 
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
 # TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} 4.2` +
+mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} ` + mversion +
 		"\n")
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
@@ -78,7 +93,7 @@ mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} 4.2` 
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
 # TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:06"} 4.2` +
+mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:06"} ` + mversion +
 		"\n")
 
 	err = testutil.CollectAndCompare(c, expected, filter...)
