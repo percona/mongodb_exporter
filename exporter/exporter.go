@@ -70,6 +70,9 @@ type Opts struct {
 	EnableCollStats          bool
 	EnableProfile            bool
 	EnableShards             bool
+	EnableFCV                bool // Feature Compatibility Version.
+
+	FCVInterval time.Duration
 
 	EnableOverrideDescendingIndex bool
 
@@ -161,6 +164,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
 		e.opts.EnableShards = true
+		e.opts.EnableFCV = true
 	}
 
 	// arbiter only have isMaster privileges
@@ -232,6 +236,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	if e.opts.EnableShards && nodeType == typeMongos && requestOpts.EnableShards {
 		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
+	}
+
+	if e.opts.EnableFCV {
+		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger, e.opts.FCVInterval)
+		registry.MustRegister(fcvc)
 	}
 
 	return registry
@@ -310,6 +319,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableProfile = true
 			case "shards":
 				requestOpts.EnableShards = true
+			case "fcv":
+				requestOpts.EnableFCV = true
 			}
 		}
 
