@@ -74,7 +74,7 @@ func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 	defer d.lock.Unlock()
 
 	if d.lastScrape.Add(d.scrapeInterval).Before(d.now()) {
-		cmd := bson.D{{"getParameter", 1}, {"featureCompatibilityVersion", 1}}
+		cmd := bson.D{{Key: "getParameter", Value: 1}, {Key: "featureCompatibilityVersion", Value: 1}}
 		res := d.base.client.Database("admin").RunCommand(d.ctx, cmd)
 
 		m := make(map[string]interface{})
