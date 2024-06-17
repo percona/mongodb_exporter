@@ -21,10 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestFCVCollector(t *testing.T) {
@@ -41,7 +42,7 @@ func TestFCVCollector(t *testing.T) {
 
 	c := newFeatureCompatibilityCollector(ctx, client, logrus.New(), interval)
 	c.now = func() time.Time {
-		return time.Date(2024, 06, 14, 00, 00, 00, 00, time.UTC)
+		return time.Date(2024, 0o6, 14, 0o0, 0o0, 0o0, 0o0, time.UTC)
 	}
 
 	// The last \n at the end of this string is important
@@ -59,7 +60,7 @@ mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} 4.2` 
 
 	// Less than 5 seconds, it should return the last scraped values.
 	c.now = func() time.Time {
-		return time.Date(2024, 06, 14, 00, 00, 04, 00, time.UTC)
+		return time.Date(2024, 0o6, 14, 0o0, 0o0, 0o4, 0o0, time.UTC)
 	}
 
 	expected = strings.NewReader(`
@@ -72,7 +73,7 @@ mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} 4.2` 
 
 	// After more than 5 seconds there should be a new scrape.
 	c.now = func() time.Time {
-		return time.Date(2024, 06, 14, 00, 00, 06, 00, time.UTC)
+		return time.Date(2024, 0o6, 14, 0o0, 0o0, 0o6, 0o0, time.UTC)
 	}
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
