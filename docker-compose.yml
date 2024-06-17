@@ -2,7 +2,7 @@ version: '3.8'
 services:
     mongo-1-1:
         container_name: "mongo-1-1"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_S1_PRIMARY_PORT:-17001}:27017"
         command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16  --bind_ip 0.0.0.0
@@ -15,7 +15,7 @@ services:
 
     mongo-1-2:
         container_name: "mongo-1-2"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_S1_SECONDARY1_PORT:-17002}:27017"
         command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16  --bind_ip 0.0.0.0
@@ -24,7 +24,7 @@ services:
 
     mongo-1-3:
         container_name: "mongo-1-3"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_S1_SECONDARY2_PORT:-17003}:27017"
         command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16  --bind_ip 0.0.0.0
@@ -33,7 +33,7 @@ services:
 
     mongo-1-arbiter:
         container_name: "mongo-1-arbiter"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_S1_ARBITER:-17011}:27017"
         command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16
@@ -42,7 +42,7 @@ services:
 
     mongo-rs1-setup:
         container_name: "mongo-rs1-setup"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         depends_on:
             - "mongo-1-1"
             - "mongo-1-2"
@@ -114,7 +114,7 @@ services:
 
     mongo-rs2-setup:
         container_name: "mongo-rs2-setup"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         depends_on:
             - "mongo-2-1"
             - "mongo-2-2"
@@ -138,7 +138,7 @@ services:
     # Config servers
     mongo-cnf-2:
         container_name: "mongo-cnf-2"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_CONFIGSVR1_PORT:-17007}:27017"
         command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16
@@ -147,7 +147,7 @@ services:
 
     mongo-cnf-3:
         container_name: "mongo-cnf-3"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_CONFIGSVR2_PORT:-17008}:27017"
         command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16
@@ -156,7 +156,7 @@ services:
 
     mongo-cnf-1:
         container_name: "mongo-cnf-1"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_CONFIGSVR3_PORT:-17009}:27017"
         command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16
@@ -168,7 +168,7 @@ services:
 
     mongo-cnf-setup:
         container_name: "mongo-cnf-setup"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         depends_on:
             - "mongo-cnf-1"
             - "mongo-cnf-2"
@@ -188,7 +188,7 @@ services:
 
     mongos:
         container_name: "mongos"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_MONGOS_PORT:-17000}:27017"
         networks:
@@ -204,7 +204,7 @@ services:
 
     mongo-shard-setup:
         container_name: "mongo-shard-setup"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         depends_on:
             - "mongos"
         networks:
@@ -234,7 +234,7 @@ services:
 
     standalone:
         container_name: "standalone"
-        image: ${TEST_MONGODB_IMAGE:-mongo:4.2}
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_STANDALONE_PORT:-27017}:27017"
         command: mongod --port 27017  --oplogSize 16
