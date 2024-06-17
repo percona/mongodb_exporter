@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -50,6 +51,7 @@ func TestFCVCollector(t *testing.T) {
 	sversion, _ := getMongoDBVersionInfo(t, "mongo-1-1")
 
 	v, err := version.NewVersion(sversion)
+	require.NoError(t, err)
 	var mversion string
 
 	mmv := fmt.Sprintf("%d.%d", v.Segments()[0], v.Segments()[1])
