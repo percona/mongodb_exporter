@@ -255,6 +255,10 @@ services:
             dockerfile: ./docker/mongodb-auth.dockerfile
             args:
                 TEST_MONGODB_IMAGE: mongo:4.4
+        ports:
+            - 27037:27017
+        expose:
+            -   "27017"
         environment:
             - MONGO_INITDB_ROOT_PASSWORD=pbm
             - MONGO_INITDB_ROOT_USERNAME=pbm
