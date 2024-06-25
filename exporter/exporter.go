@@ -73,6 +73,9 @@ type Opts struct {
 
 	EnableOverrideDescendingIndex bool
 
+	// Enable metrics for Percona Backup for MongoDB (PBM).
+	EnablePBMMetrics bool
+
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
 
@@ -161,6 +164,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
 		e.opts.EnableShards = true
+		e.opts.EnablePBMMetrics = true
 	}
 
 	// arbiter only have isMaster privileges
@@ -174,6 +178,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
 		e.opts.EnableShards = false
+		e.opts.EnablePBMMetrics = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -232,6 +237,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	if e.opts.EnableShards && nodeType == typeMongos && requestOpts.EnableShards {
 		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
+	}
+
+	if e.opts.EnablePBMMetrics && requestOpts.EnablePBMMetrics {
+		pbmc := newPbmCollector(ctx, client, requestOpts.URI, e.opts.Logger)
+		registry.MustRegister(pbmc)
 	}
 
 	return registry
@@ -310,6 +320,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableProfile = true
 			case "shards":
 				requestOpts.EnableShards = true
+			case "pbm":
+				requestOpts.EnablePBMMetrics = true
 			}
 		}
 
