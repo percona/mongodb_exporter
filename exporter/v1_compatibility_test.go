@@ -95,7 +95,7 @@ func TestMakeLockMetric(t *testing.T) {
 
 	// Fix description since labels don't have a specific order because they are stores in a map.
 	pd := p.Desc().String()
-	pd = strings.ReplaceAll(pd, "resource lock_mode", "lock_mode resource")
+	pd = strings.ReplaceAll(pd, "resource,lock_mode", "lock_mode,resource")
 
 	assert.Equal(t, want, pd)
 }
@@ -121,7 +121,7 @@ func TestAddLocksMetrics(t *testing.T) {
 		err := metric.Write(&m)
 		assert.NoError(t, err)
 
-		ms = strings.ReplaceAll(ms, "resource lock_mode", "lock_mode resource")
+		ms = strings.ReplaceAll(ms, "resource,lock_mode", "lock_mode,resource")
 		desc = append(desc, ms)
 	}
 
