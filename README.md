@@ -52,10 +52,10 @@ A docker image is available on the [official percona repository](https://hub.doc
 
 ```sh
 # with podman
-podman run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
+podman run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
 
 # with docker
-docker run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
+docker run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
 ```
 
 #### Permissions
