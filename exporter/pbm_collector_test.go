@@ -37,9 +37,9 @@ func TestPBMCollector(t *testing.T) {
 	port, err := tu.PortForContainer("standalone-backup")
 	require.NoError(t, err)
 	client := tu.TestClient(ctx, port, t)
-	mongoUri := "mongodb://pbm:pbm@localhost:27037" //nolint:gosec
+	mongoURI := "mongodb://pbm:pbm@localhost:27037" //nolint:gosec
 
-	c := newPbmCollector(ctx, client, mongoUri, logrus.New())
+	c := newPbmCollector(ctx, client, mongoURI, logrus.New())
 
 	filter := []string{
 		"mongodb_pbm_cluster_backup_configured",
