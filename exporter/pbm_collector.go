@@ -21,6 +21,7 @@ import (
 
 	"github.com/percona/percona-backup-mongodb/pbm/defs"
 	"github.com/percona/percona-backup-mongodb/sdk"
+	"github.com/percona/percona-backup-mongodb/sdk/cli"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -86,10 +87,64 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	metrics = append(metrics, pbmBackupsMetrics(p.ctx, pbmClient, logger)...)
+	metrics = append(metrics, p.pbmAgentMetrics(p.ctx, pbmClient, logger)...)
 
 	for _, metric := range metrics {
 		ch <- metric
 	}
+}
+
+func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
+	clusterStatus, err := cli.ClusterStatus(ctx, pbmClient, cli.RSConfGetter(p.mongoURI))
+	if err != nil {
+		l.Errorf("failed to get cluster status: %s", err.Error())
+		return nil
+	}
+
+	metrics := make([]prometheus.Metric, 0, len(clusterStatus))
+	createMetric := func(name, help string, value float64, labels map[string]string) {
+		const prefix = "mongodb_pbm_"
+		d := prometheus.NewDesc(prefix+name, help, nil, labels)
+		metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value))
+	}
+
+	for replsetName, nodes := range clusterStatus {
+		for _, node := range nodes {
+			switch {
+			case node.OK:
+				createMetric("agent_status",
+					"PBM Agent Status",
+					float64(0),
+					map[string]string{
+						"host":        node.Host,
+						"replica_set": replsetName,
+						"role":        string(node.Role),
+					})
+
+			case node.IsAgentLost():
+				createMetric("agent_status",
+					"PBM Agent Status",
+					float64(2),
+					map[string]string{
+						"host":        node.Host,
+						"replica_set": replsetName,
+						"role":        string(node.Role),
+					})
+
+			default: // !node.OK
+				createMetric("agent_status",
+					"PBM Agent Status",
+					float64(1),
+					map[string]string{
+						"host":        node.Host,
+						"replica_set": replsetName,
+						"role":        string(node.Role),
+					})
+			}
+		}
+	}
+
+	return metrics
 }
 
 func pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
@@ -99,7 +154,7 @@ func pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Ent
 		return nil
 	}
 
-	metrics := make([]prometheus.Metric, 0, 2*len(backupsList))
+	metrics := make([]prometheus.Metric, 0, len(backupsList))
 	createMetric := func(name, help string, value float64, labels map[string]string) {
 		const prefix = "mongodb_pbm_"
 		d := prometheus.NewDesc(prefix+name, help, nil, labels)
