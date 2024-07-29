@@ -34,6 +34,12 @@ type pbmCollector struct {
 	base     *baseCollector
 }
 
+const (
+	pbmAgentStatusOK    = 0
+	pbmAgentStatusError = 1
+	pbmAgentStatusLost  = 2
+)
+
 func newPbmCollector(ctx context.Context, client *mongo.Client, mongoURI string, logger *logrus.Logger) *pbmCollector {
 	return &pbmCollector{
 		ctx:      ctx,
@@ -114,7 +120,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 			case node.OK:
 				createMetric("agent_status",
 					"PBM Agent Status",
-					float64(0),
+					float64(pbmAgentStatusOK),
 					map[string]string{
 						"host":        node.Host,
 						"replica_set": replsetName,
@@ -124,7 +130,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 			case node.IsAgentLost():
 				createMetric("agent_status",
 					"PBM Agent Status",
-					float64(2),
+					float64(pbmAgentStatusLost),
 					map[string]string{
 						"host":        node.Host,
 						"replica_set": replsetName,
@@ -134,7 +140,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 			default: // !node.OK
 				createMetric("agent_status",
 					"PBM Agent Status",
-					float64(1),
+					float64(pbmAgentStatusError),
 					map[string]string{
 						"host":        node.Host,
 						"replica_set": replsetName,
