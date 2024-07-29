@@ -1,9 +1,25 @@
+// mongodb_exporter
+// Copyright (C) 2024 Percona LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package exporter
 
 import (
 	"context"
 	"time"
 
+	"github.com/percona/percona-backup-mongodb/pbm/defs"
 	"github.com/percona/percona-backup-mongodb/sdk"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -33,6 +49,12 @@ func (p *pbmCollector) Collect(ch chan<- prometheus.Metric) {
 	p.base.Collect(ch)
 }
 
+func createPBMMetric(name, help string, value float64, labels map[string]string) prometheus.Metric {
+	const prefix = "mongodb_pbm_"
+	d := prometheus.NewDesc(prefix+name, help, nil, labels)
+	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
+}
+
 func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	defer measureCollectTime(ch, "mongodb", "pbm")()
 
@@ -45,12 +67,6 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	createMetric := func(name, help string, value float64, labels map[string]string) {
-		const prefix = "mongodb_pbm_"
-		d := prometheus.NewDesc(prefix+name, help, nil, labels)
-		metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value))
-	}
-
 	pbmConfig, err := pbmClient.GetConfig(p.ctx)
 	if err != nil {
 		logger.Errorf("failed to get PBM configuration: %s", err.Error())
@@ -58,52 +74,59 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if pbmConfig != nil {
-		createMetric("cluster_backup_configured",
+		metrics = append(metrics, createPBMMetric("cluster_backup_configured",
 			"PBM backups are configured for the cluster",
-			float64(1), nil)
+			float64(1), nil))
+
+		if pbmConfig.PITR.Enabled {
+			metrics = append(metrics, createPBMMetric("cluster_pitr_backup_enabled",
+				"PBM PITR backups are enabled for the cluster",
+				float64(1), nil))
+		}
 	}
 
-	if pbmConfig.PITR.Enabled {
-		createMetric("cluster_pitr_backup_enabled",
-			"PBM PITR backups are enabled for the cluster",
-			float64(1), nil)
-	}
+	metrics = append(metrics, pbmBackupsMetrics(p.ctx, pbmClient, logger)...)
 
-	backupsList, err := pbmClient.GetAllBackups(p.ctx)
+	for _, metric := range metrics {
+		ch <- metric
+	}
+}
+
+func pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
+	var metrics []prometheus.Metric
+	backupsList, err := pbmClient.GetAllBackups(ctx)
 	if err != nil {
-		logger.Errorf("failed to get PBM backup list: %s", err.Error())
+		l.Errorf("failed to get PBM backup list: %s", err.Error())
+		return metrics
 	}
 
 	for _, backup := range backupsList {
-		createMetric("backup_size",
+		metrics = append(metrics, createPBMMetric("backup_size",
 			"Size of PBM backup",
 			float64(backup.Size), map[string]string{
 				"opid":   backup.OPID,
 				"status": string(backup.Status),
 				"name":   backup.Name,
-			})
+			}))
 
 		var endTime int64
-		switch backup.Status {
-		case "done", "canceled", "error", "down":
+		switch backup.Status { //nolint:exhaustive
+		case defs.StatusDone, defs.StatusCancelled, defs.StatusError, defs.StatusDown:
 			endTime = backup.LastTransitionTS
 		default:
 			endTime = time.Now().Unix()
 		}
 
 		duration := time.Unix(endTime-backup.StartTS, 0).Unix()
-		createMetric("backup_duration_seconds",
+		metrics = append(metrics, createPBMMetric("backup_duration_seconds",
 			"Duration of PBM backup",
 			float64(duration), map[string]string{
 				"opid":   backup.OPID,
 				"status": string(backup.Status),
 				"name":   backup.Name,
-			})
+			}))
 	}
-
-	for _, metric := range metrics {
-		ch <- metric
-	}
+	return metrics
 }
 
 var _ prometheus.Collector = (*pbmCollector)(nil)
