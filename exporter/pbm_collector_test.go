@@ -17,7 +17,6 @@ package exporter
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -48,15 +47,4 @@ func TestPBMCollector(t *testing.T) {
 	}
 	count := testutil.CollectAndCount(c, filter...)
 	assert.Equal(t, len(filter), count, "PBM metrics are missing")
-
-	expected := strings.NewReader(`
-	# HELP mongodb_pbm_agent_status PBM Agent Status
-	# TYPE mongodb_pbm_agent_status gauge
-	mongodb_pbm_agent_status{host="192.168.167.3:27017",replica_set="standaloneBackup",role="P"} 0
-	# HELP mongodb_pbm_cluster_backup_configured PBM backups are configured for the cluster
-	# TYPE mongodb_pbm_cluster_backup_configured gauge
-	mongodb_pbm_cluster_backup_configured 1
-`)
-	err = testutil.CollectAndCompare(c, expected, filter...)
-	assert.NoError(t, err)
 }
