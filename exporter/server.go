@@ -109,9 +109,10 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
-		// To support also older ones vmagents.
+		// To support older ones vmagents.
 		if err != nil {
 			seconds = 10
+			logger.Debug("Can't get X-Prometheus-Scrape-Timeout-Seconds header, using default value 10")
 		}
 
 		var gatherers prometheus.Gatherers
