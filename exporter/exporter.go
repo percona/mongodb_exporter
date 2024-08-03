@@ -283,7 +283,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
-		// To support also older ones vmagents.
+		// To support older ones vmagents.
 		if err != nil {
 			seconds = 10
 		}
