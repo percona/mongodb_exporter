@@ -227,13 +227,14 @@ func TestMongoUpMetric(t *testing.T) {
 	ctx := context.Background()
 
 	type testcase struct {
-		URI  string
-		Want int
+		URI         string
+		clusterRole string
+		Want        int
 	}
 
 	testCases := []testcase{
 		{URI: "mongodb://127.0.0.1:12345/admin", Want: 0},
-		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1, clusterRole: "mongod"},
 	}
 
 	for _, tc := range testCases {
@@ -257,10 +258,17 @@ func TestMongoUpMetric(t *testing.T) {
 		gc := newGeneralCollector(ctx, client, e.opts.Logger)
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
-		expected := strings.NewReader(`
+		/*expected := strings.NewReader(`
 		# HELP mongodb_up Whether MongoDB is up.
 		# TYPE mongodb_up gauge
-		mongodb_up ` + strconv.Itoa(tc.Want) + "\n")
+		mongodb_up {cluster_role="` + tc.clusterRole + "\"} " + strconv.Itoa(tc.Want) + "\n")
+
+		*/
+		expected := strings.NewReader(fmt.Sprintf(`
+		# HELP mongodb_up Whether MongoDB is up.
+		# TYPE mongodb_up gauge
+		mongodb_up {cluster_role="%s"} %s`, tc.clusterRole, strconv.Itoa(tc.Want)) + "\n")
+
 		filter := []string{
 			"mongodb_up",
 		}
