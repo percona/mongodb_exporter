@@ -39,18 +39,16 @@ type featureCompatibilityCollector struct {
 
 	now                  func() time.Time
 	lock                 *sync.Mutex
-	scrapeInterval       time.Duration
 	lastScrape           time.Time
 	lastCollectedMetrics primitive.M
 }
 
 // newProfileCollector creates a collector for being processed queries.
-func newFeatureCompatibilityCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, scrapeInterval time.Duration) *featureCompatibilityCollector {
+func newFeatureCompatibilityCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *featureCompatibilityCollector {
 	return &featureCompatibilityCollector{
 		ctx:                  ctx,
 		base:                 newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "featureCompatibility"})),
 		lock:                 &sync.Mutex{},
-		scrapeInterval:       scrapeInterval,
 		lastScrape:           time.Time{},
 		lastCollectedMetrics: primitive.M{},
 		now: func() time.Time {
@@ -73,27 +71,25 @@ func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	if d.lastScrape.Add(d.scrapeInterval).Before(d.now()) {
-		cmd := bson.D{{Key: "getParameter", Value: 1}, {Key: "featureCompatibilityVersion", Value: 1}}
-		res := d.base.client.Database("admin").RunCommand(d.ctx, cmd)
+	cmd := bson.D{{Key: "getParameter", Value: 1}, {Key: "featureCompatibilityVersion", Value: 1}}
+	res := d.base.client.Database("admin").RunCommand(d.ctx, cmd)
 
-		m := make(map[string]interface{})
-		if err := res.Decode(&m); err != nil {
+	m := make(map[string]interface{})
+	if err := res.Decode(&m); err != nil {
+		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		return
+	}
+
+	d.lastScrape = d.now()
+
+	rawValue := walkTo(m, []string{"featureCompatibilityVersion", "version"})
+	if rawValue != nil {
+		version, err := strconv.ParseFloat(fmt.Sprintf("%v", rawValue), 64)
+		if err != nil {
 			ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 			return
 		}
-
-		d.lastScrape = d.now()
-
-		rawValue := walkTo(m, []string{"featureCompatibilityVersion", "version"})
-		if rawValue != nil {
-			version, err := strconv.ParseFloat(fmt.Sprintf("%v", rawValue), 64)
-			if err != nil {
-				ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-				return
-			}
-			d.lastCollectedMetrics = primitive.M{"featureCompatibilityVersion": version}
-		}
+		d.lastCollectedMetrics = primitive.M{"featureCompatibilityVersion": version}
 	}
 
 	labels := map[string]string{"last_scrape": d.lastScrape.Format(time.DateTime)}

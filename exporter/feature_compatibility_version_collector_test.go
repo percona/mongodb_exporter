@@ -41,9 +41,7 @@ func TestFCVCollector(t *testing.T) {
 	database.Drop(ctx)       //nolint:errcheck
 	defer database.Drop(ctx) //nolint:errcheck
 
-	interval := 5 * time.Second
-
-	c := newFeatureCompatibilityCollector(ctx, client, logrus.New(), interval)
+	c := newFeatureCompatibilityCollector(ctx, client, logrus.New())
 	c.now = func() time.Time {
 		return time.Date(2024, 0o6, 14, 0o0, 0o0, 0o0, 0o0, time.UTC)
 	}

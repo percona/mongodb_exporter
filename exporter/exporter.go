@@ -72,8 +72,6 @@ type Opts struct {
 	EnableShards             bool
 	EnableFCV                bool // Feature Compatibility Version.
 
-	FCVInterval time.Duration
-
 	EnableOverrideDescendingIndex bool
 
 	IndexStatsCollections []string
@@ -239,7 +237,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	if e.opts.EnableFCV {
-		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger, e.opts.FCVInterval)
+		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger)
 		registry.MustRegister(fcvc)
 	}
 
