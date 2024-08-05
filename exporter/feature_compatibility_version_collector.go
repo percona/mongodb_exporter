@@ -92,7 +92,7 @@ func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 		d.lastCollectedMetrics = primitive.M{"featureCompatibilityVersion": version}
 	}
 
-	labels := map[string]string{"last_scrape": d.lastScrape.Format(time.DateTime)}
+	labels := map[string]string{}
 	for _, metric := range makeMetrics("fcv", d.lastCollectedMetrics, labels, compatibilityModeOff) {
 		ch <- metric
 	}

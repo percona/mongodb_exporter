@@ -64,7 +64,7 @@ func TestFCVCollector(t *testing.T) {
 	expected := strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
 # TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} ` + mversion +
+mongodb_fcv_featureCompatibilityVersion{} ` + mversion +
 		"\n")
 
 	filter := []string{
@@ -81,7 +81,7 @@ mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} ` + m
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
 # TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} ` + mversion +
+mongodb_fcv_featureCompatibilityVersion{} ` + mversion +
 		"\n")
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
@@ -93,7 +93,7 @@ mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:00"} ` + m
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
 # TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{last_scrape="2024-06-14 00:00:06"} ` + mversion +
+mongodb_fcv_featureCompatibilityVersion{} ` + mversion +
 		"\n")
 
 	err = testutil.CollectAndCompare(c, expected, filter...)
