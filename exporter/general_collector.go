@@ -54,16 +54,28 @@ func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
 
 func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Entry) prometheus.Metric { //nolint:ireturn
 	var value float64
+	var clusterRole mongoDBNodeType
 
 	if client != nil {
 		if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {
 			value = 1
 		} else {
-			log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err)
+			log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err.Error())
+		}
+
+		if nodeType, err := getNodeType(ctx, client); err != nil {
+			log.Errorf("failed to check mongo node type: %s", err.Error())
+		} else {
+			if nodeType == typeMongos {
+				clusterRole = typeMongos
+			} else {
+				clusterRole = typeMongod
+			}
 		}
 	}
 
-	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
+	labels := map[string]string{"cluster_role": string(clusterRole)}
+	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, labels)
 
 	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
 }

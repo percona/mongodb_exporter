@@ -59,10 +59,10 @@ func TestMultiTarget(t *testing.T) {
 	serverMap := buildServerMap(exporters, log)
 
 	expected := []string{
-		"mongodb_up 1\n",
-		"mongodb_up 1\n",
-		"mongodb_up 1\n",
-		"mongodb_up 0\n",
+		"mongodb_up{cluster_role=\"mongod\"} 1\n",
+		"mongodb_up{cluster_role=\"mongod\"} 1\n",
+		"mongodb_up{cluster_role=\"mongod\"} 1\n",
+		"mongodb_up{cluster_role=\"mongod\"} 0\n",
 	}
 
 	// Test all targets
