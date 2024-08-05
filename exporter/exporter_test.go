@@ -258,12 +258,6 @@ func TestMongoUpMetric(t *testing.T) {
 		gc := newGeneralCollector(ctx, client, e.opts.Logger)
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
-		/*expected := strings.NewReader(`
-		# HELP mongodb_up Whether MongoDB is up.
-		# TYPE mongodb_up gauge
-		mongodb_up {cluster_role="` + tc.clusterRole + "\"} " + strconv.Itoa(tc.Want) + "\n")
-
-		*/
 		expected := strings.NewReader(fmt.Sprintf(`
 		# HELP mongodb_up Whether MongoDB is up.
 		# TYPE mongodb_up gauge
