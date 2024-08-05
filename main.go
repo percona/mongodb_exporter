@@ -49,6 +49,7 @@ type GlobalFlags struct {
 	LogLevel              string   `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 	ConnectTimeoutMS      int      `name:"mongodb.connect-timeout-ms" help:"Connection timeout in milliseconds" default:"5000"`
 
+	EnableExporterMetrics    bool `name:"collector.exporter-metrics" help:"Enable collecting metrics about the exporter itself (process_*, go_*)" negatable:"" default:"True"`
 	EnableDiagnosticData     bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
 	EnableReplicasetStatus   bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
 	EnableDBStats            bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
@@ -147,6 +148,7 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		ConnectTimeoutMS:      opts.ConnectTimeoutMS,
 		TimeoutOffset:         opts.TimeoutOffset,
 
+		DisableDefaultRegistry:   !opts.EnableExporterMetrics,
 		EnableDiagnosticData:     opts.EnableDiagnosticData,
 		EnableReplicasetStatus:   opts.EnableReplicasetStatus,
 		EnableCurrentopMetrics:   opts.EnableCurrentopMetrics,
