@@ -62,7 +62,7 @@ func TestMultiTarget(t *testing.T) {
 		"mongodb_up{cluster_role=\"mongod\"} 1\n",
 		"mongodb_up{cluster_role=\"mongod\"} 1\n",
 		"mongodb_up{cluster_role=\"mongod\"} 1\n",
-		"mongodb_up{cluster_role=\"mongod\"} 0\n",
+		"mongodb_up{cluster_role=\"\"} 0\n",
 	}
 
 	// Test all targets
