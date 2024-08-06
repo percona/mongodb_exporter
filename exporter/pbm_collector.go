@@ -118,7 +118,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 
 	for replsetName, nodes := range clusterStatus {
 		for _, node := range nodes {
-			pbmStatusMetric := float64(1)
+			var pbmStatusMetric float64
 			switch {
 			case node.OK:
 				pbmStatusMetric = float64(pbmAgentStatusOK)
@@ -144,7 +144,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 	return metrics
 }
 
-func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
+func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric { //nolint:ireturn
 	backupsList, err := pbmClient.GetAllBackups(ctx)
 	if err != nil {
 		l.Errorf("failed to get PBM backup list: %s", err.Error())
@@ -164,7 +164,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 		)
 
 		var endTime int64
-		switch string(backup.Status) { //nolint:exhaustive
+		switch string(backup.Status) {
 		case statusDone, statusCancelled, statusError, statusDown:
 			endTime = backup.LastTransitionTS
 		default:
