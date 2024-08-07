@@ -17,10 +17,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/alecthomas/kong"
-	"github.com/sirupsen/logrus"
 	"regexp"
 	"strings"
+
+	"github.com/alecthomas/kong"
+	"github.com/sirupsen/logrus"
 
 	"github.com/percona/mongodb_exporter/exporter"
 )
