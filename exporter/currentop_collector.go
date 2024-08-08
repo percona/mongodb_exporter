@@ -66,6 +66,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	slowtime, err := time.ParseDuration(d.currentopslowtime)
 	if err != nil {
+		logger.Errorf("Failed to parse slowtime: %s", err)
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 		return
 	}
@@ -89,6 +90,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 	var r primitive.M
 	if err := res.Decode(&r); err != nil {
+		logger.Errorf("Failed to decode currentOp response: %s", err)
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 		return
 	}
@@ -99,9 +101,15 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	inprog, ok := r["inprog"].(primitive.A)
 
 	if !ok {
+		logger.Errorf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"])
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
 			ErrInvalidOrMissingInprogEntry)
 	}
+
+	labels := d.topologyInfo.baseLabels()
+	ln := []string{"opid", "op", "desc", "database", "collection", "ns"}
+	const name = "mongodb_currentop_query_uptime"
+	pd := prometheus.NewDesc(name, " mongodb_currentop_query_uptime currentop_query", ln, labels)
 
 	for _, bsonMap := range inprog {
 
@@ -137,18 +145,8 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		labels := d.topologyInfo.baseLabels()
-		labels["opid"] = strconv.Itoa(int(opid))
-		labels["op"] = op
-		labels["desc"] = desc
-		labels["database"] = db
-		labels["collection"] = collection
-		labels["ns"] = namespace
+		lv := []string{strconv.Itoa(int(opid)), op, desc, db, collection, namespace}
 
-		m := primitive.M{"uptime": microsecs_running}
-
-		for _, metric := range makeMetrics("currentop_query", m, labels, d.compatibleMode) {
-			ch <- metric
-		}
+		ch <- prometheus.MustNewConstMetric(pd, prometheus.GaugeValue, float64(microsecs_running), lv...)
 	}
 }
