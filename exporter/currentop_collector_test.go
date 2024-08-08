@@ -18,22 +18,19 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestCurrentopCollector(t *testing.T) {
-	// It seems like this test needs the queries to continue running so that current oplog is not empty.
-	// TODO: figure out how to restore this test.
-	//t.Skip()
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
