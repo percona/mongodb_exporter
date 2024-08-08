@@ -18,24 +18,23 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson"
-
-	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestCurrentopCollector(t *testing.T) {
 	// It seems like this test needs the queries to continue running so that current oplog is not empty.
 	// TODO: figure out how to restore this test.
-	t.Skip()
+	//t.Skip()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var wg sync.WaitGroup
@@ -43,20 +42,23 @@ func TestCurrentopCollector(t *testing.T) {
 	client := tu.DefaultTestClient(ctx, t)
 
 	database := client.Database("testdb")
-	database.Drop(ctx)
+	_ = database.Drop(ctx)
 
 	defer func() {
 		err := database.Drop(ctx)
 		assert.NoError(t, err)
 	}()
+	ch := make(chan struct{})
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 300; i++ {
-			coll := fmt.Sprintf("testcol_%02d", i)
-			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": 1, "f2": "2"})
+		coll := fmt.Sprintf("testcol_01")
+		for j := 0; j < 100; j++ {
+			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
 			assert.NoError(t, err)
 		}
+		ch <- struct{}{}
+		_, _ = database.Collection(coll).Find(ctx, bson.M{"$where": "function() {return sleep(100)}"})
 	}()
 
 	ti := labelsGetterMock{}
@@ -75,6 +77,10 @@ func TestCurrentopCollector(t *testing.T) {
 	filter := []string{
 		"mongodb_currentop_query_uptime",
 	}
+
+	<-ch
+
+	time.Sleep(1 * time.Second)
 
 	count := testutil.CollectAndCount(c, filter...)
 	assert.True(t, count > 0)
