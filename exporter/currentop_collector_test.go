@@ -17,7 +17,6 @@ package exporter
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -49,8 +48,8 @@ func TestCurrentopCollector(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		coll := fmt.Sprintf("testcol_01")
-		for j := 0; j < 100; j++ {
+		coll := "testcol_01"
+		for j := 0; j < 100; j++ { // nolint:intrange // false positive
 			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
 			assert.NoError(t, err)
 		}
