@@ -127,16 +127,16 @@ func (e *Exporter) getTotalCollectionsCount() int {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+	nodeType, err := getNodeType(ctx, client)
+	if err != nil {
+		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
+	}
+
+	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
 	registry.MustRegister(gc)
 
 	if client == nil {
 		return registry
-	}
-
-	nodeType, err := getNodeType(ctx, client)
-	if err != nil {
-		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
 	}
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
