@@ -105,6 +105,8 @@ test-race: env              ## Run all tests with race flag.
 
 test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
 	docker compose up --build -d
+	./docker/scripts/setup-pbm.sh
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
 	docker compose down --remove-orphans
+

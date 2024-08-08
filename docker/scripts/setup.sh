@@ -20,6 +20,7 @@ arbiter=`getent hosts ${ARBITER} | awk '{ print $1 }'`
 
 username=${MONGO_INITDB_ROOT_USERNAME}
 password=${MONGO_INITDB_ROOT_PASSWORD}
+backups_dir=${PBM_BACKUPS_DIR}
 
 port=${PORT:-27017}
 
