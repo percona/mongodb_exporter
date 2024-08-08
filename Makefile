@@ -109,5 +109,4 @@ test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MON
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
 	docker compose down --remove-orphans
-	rm -rf ./docker/pbm/backups/pbm/
 

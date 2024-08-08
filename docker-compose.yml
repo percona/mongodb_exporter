@@ -113,8 +113,8 @@ services:
             - PBM_MONGODB_URI=mongodb://admin:admin@mongo-2-1:27017
         volumes:
             - ./docker/pbm/config:/etc/config
-            - pbm-backups:/opt/backups
             - ./docker/scripts:/scripts
+            - pbm-backups:/opt/backups
         networks:
             - rs2
 
@@ -128,8 +128,8 @@ services:
             - PBM_MONGODB_URI=mongodb://admin:admin@mongo-2-2:27017
         volumes:
             - ./docker/pbm/config:/etc/config
-            - pbm-backups:/opt/backups
             - ./docker/scripts:/scripts
+            - pbm-backups:/opt/backups
         networks:
             - rs2
 
