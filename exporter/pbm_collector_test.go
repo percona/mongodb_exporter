@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,23 +29,38 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
+//nolint:paralleltest
 func TestPBMCollector(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	port, err := tu.PortForContainer("standalone-backup")
+	port, err := tu.PortForContainer("mongo-2-1")
 	require.NoError(t, err)
 	client := tu.TestClient(ctx, port, t)
-	mongoURI := "mongodb://pbm:pbm@localhost:27037" //nolint:gosec
+	mongoURI := "mongodb://admin:admin@localhost:17006" //nolint:gosec
 
 	c := newPbmCollector(ctx, client, mongoURI, logrus.New())
 
-	filter := []string{
-		"mongodb_pbm_cluster_backup_configured",
-		"mongodb_pbm_agent_status",
-	}
-	count := testutil.CollectAndCount(c, filter...)
-	assert.Equal(t, len(filter), count, "PBM metrics are missing")
+	t.Run("pbm configured metric", func(t *testing.T) {
+		filter := []string{
+			"mongodb_pbm_cluster_backup_configured",
+		}
+		expected := strings.NewReader(`
+		# HELP mongodb_pbm_cluster_backup_configured PBM backups are configured for the cluster
+		# TYPE mongodb_pbm_cluster_backup_configured gauge
+		mongodb_pbm_cluster_backup_configured 1` + "\n")
+		err = testutil.CollectAndCompare(c, expected, filter...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("pbm agent status metric", func(t *testing.T) {
+		filter := []string{
+			"mongodb_pbm_agent_status",
+		}
+		expectedLength := 4 // we expect 4 metrics for each member of the RS (1 primary, 2 secondaries, 1 arbiter).
+		count := testutil.CollectAndCount(c, filter...)
+		assert.Equal(t, expectedLength, count, "PBM metrics are missing")
+	})
 }

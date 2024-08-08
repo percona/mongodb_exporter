@@ -412,7 +412,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	assert.NoError(t, err)
 
 	logger := logrus.New()
-	logger.Out = io.Discard // diable logs in tests
+	logger.Out = io.Discard // disable logs in tests
 
 	ti := labelsGetterMock{}
 

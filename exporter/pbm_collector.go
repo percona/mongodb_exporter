@@ -72,6 +72,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	var metrics []prometheus.Metric
 	logger := p.base.logger
 
+	pbmEnabledMetric := 0
 	pbmClient, err := sdk.NewClient(p.ctx, p.mongoURI)
 	if err != nil {
 		logger.Errorf("failed to create PBM client: %s", err.Error())
@@ -81,26 +82,29 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	pbmConfig, err := pbmClient.GetConfig(p.ctx)
 	if err != nil {
 		logger.Errorf("failed to get PBM configuration: %s", err.Error())
-		return
 	}
 
 	if pbmConfig != nil {
-		metrics = append(metrics, createMetric("cluster_backup_configured",
-			"PBM backups are configured for the cluster",
-			float64(1), nil))
+		pbmEnabledMetric = 1
 
-		pitrEnabledMetric := float64(0)
+		pitrEnabledMetric := 0
 		if pbmConfig.PITR.Enabled {
 			pitrEnabledMetric = 1
 		}
 
 		metrics = append(metrics, createMetric("cluster_pitr_backup_enabled",
 			"PBM PITR backups are enabled for the cluster",
-			pitrEnabledMetric, nil))
+			float64(pitrEnabledMetric), nil))
 	}
 
-	metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, pbmClient, logger)...)
-	metrics = append(metrics, p.pbmAgentMetrics(p.ctx, pbmClient, logger)...)
+	metrics = append(metrics, createMetric("cluster_backup_configured",
+		"PBM backups are configured for the cluster",
+		float64(pbmEnabledMetric), nil))
+
+	if pbmEnabledMetric == 1 {
+		metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, pbmClient, logger)...)
+		metrics = append(metrics, p.pbmAgentMetrics(p.ctx, pbmClient, logger)...)
+	}
 
 	for _, metric := range metrics {
 		ch <- metric

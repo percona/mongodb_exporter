@@ -64,8 +64,6 @@ services:
         container_name: "mongo-2-2"
         build:
             dockerfile: ./docker/mongodb-auth.dockerfile
-            args:
-                TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         environment:
             - MONGO_INITDB_ROOT_USERNAME=${TEST_MONGODB_USERNAME:-admin}
             - MONGO_INITDB_ROOT_PASSWORD=${TEST_MONGODB_PASSWORD:-admin}
@@ -79,8 +77,6 @@ services:
         container_name: "mongo-2-3"
         build:
             dockerfile: ./docker/mongodb-auth.dockerfile
-            args:
-                TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_SECONDARY1_PORT:-17005}:27017"
         command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
@@ -91,8 +87,6 @@ services:
         container_name: "mongo-2-1"
         build:
             dockerfile: ./docker/mongodb-auth.dockerfile
-            args:
-                TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_SECONDARY2_PORT:-17006}:27017"
         command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
@@ -103,11 +97,54 @@ services:
         container_name: "mongo-2-arbiter"
         build:
             dockerfile: ./docker/mongodb-auth.dockerfile
-            args:
-                TEST_MONGODB_IMAGE: ${TEST_MONGODB_IMAGE}
         ports:
             - "${TEST_MONGODB_S2_ARBITER:-17012}:27017"
         command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
+        networks:
+            - rs2
+
+    pbm-mongo-2-1:
+        image: percona/percona-backup-mongodb:2.5.0-multi
+        container_name: "pbm-mongo-2-1"
+        restart: on-failure:5
+        depends_on:
+            -   mongo-2-1
+        environment:
+            - PBM_MONGODB_URI=mongodb://admin:admin@mongo-2-1:27017
+        volumes:
+            - ./docker/pbm/config:/etc/config
+            - pbm-backups:/opt/backups
+            - ./docker/scripts:/scripts
+        networks:
+            - rs2
+
+    pbm-mongo-2-2:
+        image: percona/percona-backup-mongodb:2.5.0-multi
+        container_name: "pbm-mongo-2-2"
+        restart: on-failure:5
+        depends_on:
+            -   mongo-2-2
+        environment:
+            - PBM_MONGODB_URI=mongodb://admin:admin@mongo-2-2:27017
+        volumes:
+            - ./docker/pbm/config:/etc/config
+            - pbm-backups:/opt/backups
+            - ./docker/scripts:/scripts
+        networks:
+            - rs2
+
+    pbm-mongo-2-3:
+        image: percona/percona-backup-mongodb:2.5.0-multi
+        container_name: "pbm-mongo-2-3"
+        restart: on-failure:5
+        depends_on:
+            -   mongo-2-3
+        environment:
+            - PBM_MONGODB_URI=mongodb://admin:admin@mongo-2-3:27017
+        volumes:
+            - ./docker/pbm/config:/etc/config
+            - ./docker/scripts:/scripts
+            - pbm-backups:/opt/backups
         networks:
             - rs2
 
@@ -249,40 +286,11 @@ services:
             - ./docker/scripts:/scripts
         command: /scripts/run-mongodb-encrypted.sh
 
-    standalone-backup:
-        container_name: "standalone-backup"
-        build:
-            dockerfile: ./docker/mongodb-auth.dockerfile
-            args:
-                TEST_MONGODB_IMAGE: mongo:4.4
-        ports:
-            - 27037:27017
-        expose:
-            -   "27017"
-        environment:
-            - MONGO_INITDB_ROOT_PASSWORD=pbm
-            - MONGO_INITDB_ROOT_USERNAME=pbm
-        command: [ "--replSet", "standaloneBackup", "--bind_ip_all", "--port", "27017", "--keyFile", "/opt/keyfile" ]
-        networks:
-        - standalone-backup
-
-    percona-backup-mongodb:
-        image: percona/percona-backup-mongodb:2.5.0-multi
-        container_name: "percona-backup-mongodb"
-        # We attempt to restart otherwise, PBM will exit since replication is not set up on mongo instance yet
-        restart: on-failure:5
-        environment:
-            - PBM_MONGODB_URI=mongodb://pbm:pbm@standalone-backup:27017
-        volumes:
-            - ./docker/pbm/config:/etc/config
-            - ./docker/pbm/backups:/opt/backups
-            - ./docker/scripts:/scripts
-        networks:
-        - standalone-backup
+volumes:
+    pbm-backups:
 
 networks:
     rs1:
     rs2:
     cnf-serv:
     mongo-shard:
-    standalone-backup:
