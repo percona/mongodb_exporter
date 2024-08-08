@@ -35,7 +35,8 @@ func TestGeneralCollector(t *testing.T) {
 		defer cancel()
 
 		client := tu.DefaultTestClient(ctx, t)
-		c := newGeneralCollector(ctx, client, logrus.New())
+		nodeType, _ := getNodeType(ctx, client)
+		c := newGeneralCollector(ctx, client, nodeType, logrus.New())
 
 		filter := []string{
 			"collector_scrape_time_ms",
@@ -60,7 +61,7 @@ func TestGeneralCollector(t *testing.T) {
 		expected = strings.NewReader(`
 	# HELP mongodb_up Whether MongoDB is up.
 	# TYPE mongodb_up gauge
-	mongodb_up {cluster_role=""} 0
+	mongodb_up {cluster_role="mongod"} 0
 	` + "\n")
 		filter = []string{
 			"mongodb_up",
@@ -76,7 +77,9 @@ func TestGeneralCollector(t *testing.T) {
 		port, err := tu.PortForContainer("mongos")
 		require.NoError(t, err)
 		client := tu.TestClient(ctx, port, t)
-		c := newGeneralCollector(ctx, client, logrus.New())
+
+		nodeType, _ := getNodeType(ctx, client)
+		c := newGeneralCollector(ctx, client, nodeType, logrus.New())
 
 		filter := []string{
 			"collector_scrape_time_ms",
@@ -101,7 +104,7 @@ func TestGeneralCollector(t *testing.T) {
 		expected = strings.NewReader(`
 	# HELP mongodb_up Whether MongoDB is up.
 	# TYPE mongodb_up gauge
-	mongodb_up {cluster_role=""} 0
+	mongodb_up {cluster_role="mongos"} 0
 	` + "\n")
 		filter = []string{
 			"mongodb_up",

@@ -214,8 +214,8 @@ func TestMongoUp(t *testing.T) {
 	assert.Error(t, err)
 
 	e := New(exporterOpts)
-
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+	nodeType, _ := getNodeType(ctx, client)
+	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
 
 	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
@@ -235,6 +235,10 @@ func TestMongoUpMetric(t *testing.T) {
 	testCases := []testcase{
 		{URI: "mongodb://127.0.0.1:12345/admin", Want: 0},
 		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_ARBITER_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_MONGOS_PORT", "27017")), Want: 1, clusterRole: "mongos"},
 	}
 
 	for _, tc := range testCases {
@@ -255,7 +259,8 @@ func TestMongoUpMetric(t *testing.T) {
 		}
 
 		e := New(exporterOpts)
-		gc := newGeneralCollector(ctx, client, e.opts.Logger)
+		nodeType, _ := getNodeType(ctx, client)
+		gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
 		expected := strings.NewReader(fmt.Sprintf(`

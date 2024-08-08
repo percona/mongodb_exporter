@@ -24,18 +24,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-// This collector is always enabled and it is not directly related to any particular MongoDB
-// command to gather stats.
+// This collector is always enabled and collects general MongoDB connectivity status.
 type generalCollector struct {
-	ctx  context.Context
-	base *baseCollector
+	ctx      context.Context
+	base     *baseCollector
+	nodeType mongoDBNodeType
 }
 
 // newGeneralCollector creates a collector for MongoDB connectivity status.
-func newGeneralCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *generalCollector {
+func newGeneralCollector(ctx context.Context, client *mongo.Client, nodeType mongoDBNodeType, logger *logrus.Logger) *generalCollector {
 	return &generalCollector{
-		ctx:  ctx,
-		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "general"})),
+		ctx:      ctx,
+		nodeType: nodeType,
+		base:     newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "general"})),
 	}
 }
 
@@ -49,10 +50,10 @@ func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
 
 func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
 	defer measureCollectTime(ch, "mongodb", "general")()
-	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
+	ch <- mongodbUpMetric(d.ctx, d.base.client, d.nodeType, d.base.logger)
 }
 
-func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Entry) prometheus.Metric { //nolint:ireturn
+func mongodbUpMetric(ctx context.Context, client *mongo.Client, nodeType mongoDBNodeType, log *logrus.Entry) prometheus.Metric { //nolint:ireturn
 	var value float64
 	var clusterRole mongoDBNodeType
 
@@ -63,14 +64,10 @@ func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Entr
 			log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err.Error())
 		}
 
-		if nodeType, err := getNodeType(ctx, client); err != nil {
-			log.Errorf("failed to check mongo node type: %s", err.Error())
+		if nodeType == typeMongos {
+			clusterRole = typeMongos
 		} else {
-			if nodeType == typeMongos {
-				clusterRole = typeMongos
-			} else {
-				clusterRole = typeMongod
-			}
+			clusterRole = typeMongod
 		}
 	}
 
