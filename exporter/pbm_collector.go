@@ -33,18 +33,20 @@ type pbmCollector struct {
 	base     *baseCollector
 }
 
-const (
-	pbmAgentStatusOK    = 0
-	pbmAgentStatusError = 1
-	pbmAgentStatusLost  = 2
+type pbmAgentStatus string
 
-	statusDown      = "down"
-	statusDone      = "done"
-	statusCancelled = "canceled"
-	statusError     = "error"
+const (
+	pbmAgentStatusOK    = iota
+	pbmAgentStatusError = iota
+	pbmAgentStatusLost  = iota
+
+	statusDown      pbmAgentStatus = "down"
+	statusDone      pbmAgentStatus = "done"
+	statusCancelled pbmAgentStatus = "canceled"
+	statusError     pbmAgentStatus = "error"
 )
 
-func createMetric(name, help string, value float64, labels map[string]string) prometheus.Metric {
+func createMetric(name, help string, value float64, labels map[string]string) prometheus.Metric { //nolint:ireturn
 	const prefix = "mongodb_pbm_"
 	d := prometheus.NewDesc(prefix+name, help, nil, labels)
 	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
@@ -168,7 +170,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 		)
 
 		var endTime int64
-		switch string(backup.Status) {
+		switch pbmAgentStatus(backup.Status) {
 		case statusDone, statusCancelled, statusError, statusDown:
 			endTime = backup.LastTransitionTS
 		default:
