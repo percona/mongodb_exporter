@@ -33,7 +33,7 @@ var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
 func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string) ([]string, error) {
 	filter := bson.D{} // Default=empty -> list all collections
 
-	// if there is a filter with the list of collections we want, create a filter like
+	// If there is a filter with the list of collections we want, create a filter like
 	// $or: {
 	//     {"$regex": "collection1"},
 	//     {"$regex": "collection2"},
@@ -57,9 +57,29 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 		}
 	}
 
-	collections, err := client.Database(database).ListCollectionNames(ctx, filter)
+	collectionsCursor, err := client.Database(database).ListCollections(ctx, filter)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot get the list of collections for discovery")
+		return nil, errors.Wrap(err, "cannot get collections for discovery")
+	}
+	defer collectionsCursor.Close(ctx)
+
+	var collections []string
+	for collectionsCursor.Next(ctx) {
+		var collInfo bson.M
+		if err := collectionsCursor.Decode(&collInfo); err != nil {
+			return nil, errors.Wrap(err, "cannot decode collection info")
+		}
+
+		// Check if the collection is a view
+		if collType, ok := collInfo["type"].(string); ok && collType != "view" {
+			if name, ok := collInfo["name"].(string); ok {
+				collections = append(collections, name)
+			}
+		}
+	}
+
+	if err := collectionsCursor.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating over collections")
 	}
 
 	return collections, nil
