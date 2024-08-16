@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,23 +29,25 @@ import (
 )
 
 type currentopCollector struct {
-	ctx            context.Context
-	base           *baseCollector
-	compatibleMode bool
-	topologyInfo   labelsGetter
+	ctx               context.Context
+	base              *baseCollector
+	compatibleMode    bool
+	topologyInfo      labelsGetter
+	currentopslowtime string
 }
 
 var ErrInvalidOrMissingInprogEntry = errors.New("invalid or missing inprog entry in currentop results")
 
 // newCurrentopCollector creates a collector for being processed queries.
 func newCurrentopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger,
-	compatible bool, topology labelsGetter,
+	compatible bool, topology labelsGetter, currentOpSlowTime string,
 ) *currentopCollector {
 	return &currentopCollector{
-		ctx:            ctx,
-		base:           newBaseCollector(client, logger),
-		compatibleMode: compatible,
-		topologyInfo:   topology,
+		ctx:               ctx,
+		base:              newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "currentop"})),
+		compatibleMode:    compatible,
+		topologyInfo:      topology,
+		currentopslowtime: currentOpSlowTime,
 	}
 }
 
@@ -61,6 +64,13 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 	logger := d.base.logger
 	client := d.base.client
+	slowtime, err := time.ParseDuration(d.currentopslowtime)
+	if err != nil {
+		logger.Errorf("Failed to parse slowtime: %s", err)
+		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		return
+	}
+	slowtimems := slowtime.Microseconds()
 
 	// Get all requests that are being processed except system requests (admin and local).
 	cmd := bson.D{
@@ -68,6 +78,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 		{Key: "active", Value: true},
 		{Key: "microsecs_running", Value: bson.D{
 			{Key: "$exists", Value: true},
+			{Key: "$gte", Value: slowtimems},
 		}},
 		{Key: "op", Value: bson.D{{Key: "$ne", Value: ""}}},
 		{Key: "ns", Value: bson.D{
@@ -79,6 +90,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 	var r primitive.M
 	if err := res.Decode(&r); err != nil {
+		logger.Errorf("Failed to decode currentOp response: %s", err)
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 		return
 	}
@@ -89,9 +101,15 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	inprog, ok := r["inprog"].(primitive.A)
 
 	if !ok {
+		logger.Errorf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"])
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
 			ErrInvalidOrMissingInprogEntry)
 	}
+
+	labels := d.topologyInfo.baseLabels()
+	ln := []string{"opid", "op", "desc", "database", "collection", "ns"}
+	const name = "mongodb_currentop_query_uptime"
+	pd := prometheus.NewDesc(name, " mongodb_currentop_query_uptime currentop_query", ln, labels)
 
 	for _, bsonMap := range inprog {
 
@@ -127,18 +145,8 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		labels := d.topologyInfo.baseLabels()
-		labels["opid"] = strconv.Itoa(int(opid))
-		labels["op"] = op
-		labels["desc"] = desc
-		labels["database"] = db
-		labels["collection"] = collection
-		labels["ns"] = namespace
+		lv := []string{strconv.Itoa(int(opid)), op, desc, db, collection, namespace}
 
-		m := primitive.M{"uptime": microsecs_running}
-
-		for _, metric := range makeMetrics("currentop_query", m, labels, d.compatibleMode) {
-			ch <- metric
-		}
+		ch <- prometheus.MustNewConstMetric(pd, prometheus.GaugeValue, float64(microsecs_running), lv...)
 	}
 }

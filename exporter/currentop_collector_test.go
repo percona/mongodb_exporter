@@ -17,7 +17,6 @@ package exporter
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -31,11 +30,7 @@ import (
 )
 
 func TestCurrentopCollector(t *testing.T) {
-	// It seems like this test needs the queries to continue running so that current oplog is not empty.
-	// TODO: figure out how to restore this test.
-	t.Skip()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var wg sync.WaitGroup
@@ -43,25 +38,29 @@ func TestCurrentopCollector(t *testing.T) {
 	client := tu.DefaultTestClient(ctx, t)
 
 	database := client.Database("testdb")
-	database.Drop(ctx)
+	_ = database.Drop(ctx)
 
 	defer func() {
 		err := database.Drop(ctx)
 		assert.NoError(t, err)
 	}()
+	ch := make(chan struct{})
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 300; i++ {
-			coll := fmt.Sprintf("testcol_%02d", i)
-			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": 1, "f2": "2"})
+		coll := "testcol_01"
+		for j := 0; j < 100; j++ { //nolint:intrange // false positive
+			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
 			assert.NoError(t, err)
 		}
+		ch <- struct{}{}
+		_, _ = database.Collection(coll).Find(ctx, bson.M{"$where": "function() {return sleep(100)}"})
 	}()
 
 	ti := labelsGetterMock{}
+	st := "0s"
 
-	c := newCurrentopCollector(ctx, client, logrus.New(), false, ti)
+	c := newCurrentopCollector(ctx, client, logrus.New(), false, ti, st)
 
 	// Filter metrics by reason:
 	// 1. The result will be different on different hardware
@@ -74,6 +73,10 @@ func TestCurrentopCollector(t *testing.T) {
 	filter := []string{
 		"mongodb_currentop_query_uptime",
 	}
+
+	<-ch
+
+	time.Sleep(1 * time.Second)
 
 	count := testutil.CollectAndCount(c, filter...)
 	assert.True(t, count > 0)

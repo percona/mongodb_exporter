@@ -71,10 +71,20 @@ func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	return TestClient(ctx, port, t)
 }
 
-// GetImageNameForDefault returns image name and version of running
-// default test mongo container.
-func GetImageNameForDefault() (string, string, error) {
-	di, err := InspectContainer("mongo-1-1")
+// DefaultTestClientMongoS returns the mongos MongoDB connection used for tests. It is a direct
+// connection to the mongos server.
+func DefaultTestClientMongoS(ctx context.Context, t *testing.T) *mongo.Client {
+	t.Helper()
+
+	port, err := PortForContainer("mongos")
+	require.NoError(t, err)
+
+	return TestClient(ctx, port, t)
+}
+
+// GetImageNameForContainer returns image name and version of a running test container.
+func GetImageNameForContainer(containerName string) (string, string, error) {
+	di, err := InspectContainer(containerName)
 	if err != nil {
 		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
 	}

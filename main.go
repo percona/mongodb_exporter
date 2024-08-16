@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -57,6 +58,7 @@ type GlobalFlags struct {
 	EnableIndexStats         bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
 	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 	EnableProfile            bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
+	EnableShards             bool `help:"Enable collecting metrics from sharded Mongo clusters about chunks" name:"collector.shards"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
@@ -65,6 +67,8 @@ type GlobalFlags struct {
 	CollStatsLimit int `name:"collector.collstats-limit" help:"Disable collstats, dbstats, topmetrics and indexstats collector if there are more than <n> collections. 0=No limit" default:"0"`
 
 	ProfileTimeTS int `name:"collector.profile-time-ts" help:"Set time for scrape slow queries." default:"30"`
+
+	CurrentOpSlowTime string `name:"collector.currentopmetrics-slow-time" help:"Set minimum time for registration queries." default:"1m"`
 
 	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections" negatable:""`
 	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" negatable:""`
@@ -152,12 +156,14 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		EnableIndexStats:         opts.EnableIndexStats,
 		EnableCollStats:          opts.EnableCollStats,
 		EnableProfile:            opts.EnableProfile,
+		EnableShards:             opts.EnableShards,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 
-		CollStatsLimit: opts.CollStatsLimit,
-		CollectAll:     opts.CollectAll,
-		ProfileTimeTS:  opts.ProfileTimeTS,
+		CollStatsLimit:    opts.CollStatsLimit,
+		CollectAll:        opts.CollectAll,
+		ProfileTimeTS:     opts.ProfileTimeTS,
+		CurrentOpSlowTime: opts.CurrentOpSlowTime,
 	}
 
 	e := exporter.New(exporterOpts)
@@ -166,34 +172,63 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 }
 
 func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
-	servers := make([]*exporter.Exporter, len(opts.URI))
-
-	for serverIdx := range opts.URI {
-		URI := opts.URI[serverIdx]
-
-		if !strings.HasPrefix(URI, "mongodb") {
-			log.Debugf("Prepending mongodb:// to the URI %s", URI)
-			URI = "mongodb://" + URI
-		}
-
-		servers[serverIdx] = buildExporter(opts, URI, log)
+	URIs := parseURIList(opts.URI)
+	servers := make([]*exporter.Exporter, len(URIs))
+	for serverIdx := range URIs {
+		servers[serverIdx] = buildExporter(opts, URIs[serverIdx], log)
 	}
 
 	return servers
 }
 
+func parseURIList(uriList []string) []string {
+	var URIs []string
+
+	// If server URI is prefixed with mongodb, then every next URI in line not prefixed with mongodb is a part of cluster
+	// Otherwise treat it as a standalone server
+	realURI := ""
+	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
+	for _, URI := range uriList {
+		if matchRegexp.MatchString(URI) {
+			if realURI != "" {
+				URIs = append(URIs, realURI)
+			}
+			realURI = URI
+		} else {
+			if realURI == "" {
+				URIs = append(URIs, "mongodb://"+URI)
+			} else {
+				realURI = realURI + "," + URI
+			}
+		}
+	}
+	if realURI != "" {
+		URIs = append(URIs, realURI)
+	}
+
+	return URIs
+}
+
 func buildURI(uri string, user string, password string) string {
+	prefix := "mongodb://" // default prefix
+	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
+
+	// Split the uri prefix if there is any
+	if matchRegexp.MatchString(uri) {
+		uriArray := strings.SplitN(uri, "://", 2)
+		prefix = uriArray[0] + "://"
+		uri = uriArray[1]
+	}
+
 	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
 	// DO concat a new uri with user and pass arguments value
 	if !strings.Contains(uri, "@") && user != "" && password != "" {
-		// trim mongodb:// prefix to handle user and pass logic
-		uri = strings.TrimPrefix(uri, "mongodb://")
 		// add user and pass to the uri
 		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
 	}
-	if !strings.HasPrefix(uri, "mongodb") {
-		uri = "mongodb://" + uri
-	}
+
+	// add back prefix after adding the user and pass
+	uri = prefix + uri
 
 	return uri
 }
