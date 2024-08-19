@@ -46,7 +46,7 @@ const (
 	statusError     pbmAgentStatus = "error"
 )
 
-func createMetric(name, help string, value float64, labels map[string]string) prometheus.Metric { //nolint:ireturn
+func createPBMMetric(name, help string, value float64, labels map[string]string) prometheus.Metric { //nolint:ireturn
 	const prefix = "mongodb_pbm_"
 	d := prometheus.NewDesc(prefix+name, help, nil, labels)
 	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
@@ -94,19 +94,17 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 			pitrEnabledMetric = 1
 		}
 
-		metrics = append(metrics, createMetric("cluster_pitr_backup_enabled",
+		metrics = append(metrics, createPBMMetric("cluster_pitr_backup_enabled",
 			"PBM PITR backups are enabled for the cluster",
 			float64(pitrEnabledMetric), nil))
-	}
 
-	metrics = append(metrics, createMetric("cluster_backup_configured",
-		"PBM backups are configured for the cluster",
-		float64(pbmEnabledMetric), nil))
-
-	if pbmEnabledMetric == 1 {
 		metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, pbmClient, logger)...)
 		metrics = append(metrics, p.pbmAgentMetrics(p.ctx, pbmClient, logger)...)
 	}
+
+	metrics = append(metrics, createPBMMetric("cluster_backup_configured",
+		"PBM backups are configured for the cluster",
+		float64(pbmEnabledMetric), nil))
 
 	for _, metric := range metrics {
 		ch <- metric
@@ -135,7 +133,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 			default: // !node.OK
 				pbmStatusMetric = float64(pbmAgentStatusError)
 			}
-			metrics = append(metrics, createMetric("agent_status",
+			metrics = append(metrics, createPBMMetric("agent_status",
 				"PBM Agent Status",
 				pbmStatusMetric,
 				map[string]string{
@@ -150,7 +148,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 	return metrics
 }
 
-func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric { //nolint:ireturn
+func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
 	backupsList, err := pbmClient.GetAllBackups(ctx)
 	if err != nil {
 		l.Errorf("failed to get PBM backup list: %s", err.Error())
@@ -160,7 +158,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 	metrics := make([]prometheus.Metric, 0, len(backupsList))
 
 	for _, backup := range backupsList {
-		metrics = append(metrics, createMetric("backup_size",
+		metrics = append(metrics, createPBMMetric("backup_size",
 			"Size of PBM backup",
 			float64(backup.Size), map[string]string{
 				"opid":   backup.OPID,
@@ -178,7 +176,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 		}
 
 		duration := time.Unix(endTime-backup.StartTS, 0).Unix()
-		metrics = append(metrics, createMetric("backup_duration_seconds",
+		metrics = append(metrics, createPBMMetric("backup_duration_seconds",
 			"Duration of PBM backup",
 			float64(duration), map[string]string{
 				"opid":   backup.OPID,
