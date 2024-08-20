@@ -77,7 +77,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	pbmEnabledMetric := 0
 	pbmClient, err := sdk.NewClient(p.ctx, p.mongoURI)
 	if err != nil {
-		logger.Errorf("failed to create PBM client: %s", err.Error())
+		logger.Errorf("failed to create PBM client from uri %s: %s", p.mongoURI, err.Error())
 		return
 	}
 
