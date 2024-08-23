@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/percona/percona-backup-mongodb/sdk"
@@ -53,6 +54,11 @@ func createPBMMetric(name, help string, value float64, labels map[string]string)
 }
 
 func newPbmCollector(ctx context.Context, client *mongo.Client, mongoURI string, logger *logrus.Logger) *pbmCollector {
+	// we can't get details of other cluster from PBM if directConnection is set to true,
+	// we re-write it if that option is set (e.g from PMM).
+	if strings.Contains(mongoURI, "directConnection=true") {
+		mongoURI = strings.ReplaceAll(mongoURI, "directConnection=true", "directConnection=false")
+	}
 	return &pbmCollector{
 		ctx:      ctx,
 		mongoURI: mongoURI,

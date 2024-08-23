@@ -39,7 +39,7 @@ func TestPBMCollector(t *testing.T) {
 	port, err := tu.PortForContainer("mongo-2-1")
 	require.NoError(t, err)
 	client := tu.TestClient(ctx, port, t)
-	mongoURI := "mongodb://admin:admin@localhost:17006" //nolint:gosec
+	mongoURI := "mongodb://admin:admin@172.30.0.2:27017/?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000" //nolint:gosec
 
 	c := newPbmCollector(ctx, client, mongoURI, logrus.New())
 
