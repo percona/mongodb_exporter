@@ -60,6 +60,7 @@ type GlobalFlags struct {
 	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 	EnableProfile            bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
 	EnableShards             bool `help:"Enable collecting metrics from sharded Mongo clusters about chunks" name:"collector.shards"`
+	EnablePBM                bool `help:"Enable collecting metrics from Percona Backup for MongoDB" name:"collector.pbm"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
@@ -159,6 +160,7 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		EnableCollStats:          opts.EnableCollStats,
 		EnableProfile:            opts.EnableProfile,
 		EnableShards:             opts.EnableShards,
+		EnablePBMMetrics:         opts.EnablePBM,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 
