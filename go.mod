@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.11.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
-	go.mongodb.org/mongo-driver v1.16.0
+	go.mongodb.org/mongo-driver v1.16.1
 )
 
 require github.com/percona/percona-backup-mongodb v1.8.1-0.20240814130653-5285f7975ff6
