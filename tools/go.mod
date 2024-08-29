@@ -8,7 +8,7 @@ require (
 	github.com/daixiang0/gci v0.13.4
 	github.com/golangci/golangci-lint v1.59.1
 	github.com/reviewdog/reviewdog v0.20.1
-	mvdan.cc/gofumpt v0.6.0
+	mvdan.cc/gofumpt v0.7.0
 )
 
 require (
