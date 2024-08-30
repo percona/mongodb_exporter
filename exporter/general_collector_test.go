@@ -30,7 +30,9 @@ import (
 )
 
 func TestGeneralCollector(t *testing.T) {
+	t.Parallel()
 	t.Run("mongod cluster role", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
@@ -71,6 +73,7 @@ func TestGeneralCollector(t *testing.T) {
 	})
 
 	t.Run("mongos cluster role", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
