@@ -81,8 +81,6 @@ type Opts struct {
 
 	URI      string
 	NodeName string
-	URI      string
-	NodeName string
 }
 
 var (
