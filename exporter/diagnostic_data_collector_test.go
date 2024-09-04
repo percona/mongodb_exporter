@@ -270,7 +270,6 @@ func TestDiagnosticDataErrors(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -412,7 +411,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	assert.NoError(t, err)
 
 	logger := logrus.New()
-	logger.Out = io.Discard // diable logs in tests
+	logger.Out = io.Discard // disable logs in tests
 
 	ti := labelsGetterMock{}
 

@@ -74,6 +74,9 @@ type Opts struct {
 
 	EnableOverrideDescendingIndex bool
 
+	// Enable metrics for Percona Backup for MongoDB (PBM).
+	EnablePBMMetrics bool
+
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
 
@@ -128,16 +131,16 @@ func (e *Exporter) getTotalCollectionsCount() int {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+	nodeType, err := getNodeType(ctx, client)
+	if err != nil {
+		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
+	}
+
+	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
 	registry.MustRegister(gc)
 
 	if client == nil {
 		return registry
-	}
-
-	nodeType, err := getNodeType(ctx, client)
-	if err != nil {
-		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
 	}
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
@@ -163,6 +166,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableProfile = true
 		e.opts.EnableShards = true
 		e.opts.EnableFCV = true
+		e.opts.EnablePBMMetrics = true
 	}
 
 	// arbiter only have isMaster privileges
@@ -176,6 +180,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
 		e.opts.EnableShards = false
+		e.opts.EnablePBMMetrics = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -239,6 +244,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	if e.opts.EnableFCV {
 		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger)
 		registry.MustRegister(fcvc)
+	}
+
+	if e.opts.EnablePBMMetrics && requestOpts.EnablePBMMetrics {
+		pbmc := newPbmCollector(ctx, client, e.opts.URI, e.opts.Logger)
+		registry.MustRegister(pbmc)
 	}
 
 	return registry
@@ -319,6 +329,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableShards = true
 			case "fcv":
 				requestOpts.EnableFCV = true
+			case "pbm":
+				requestOpts.EnablePBMMetrics = true
 			}
 		}
 
