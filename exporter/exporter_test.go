@@ -48,7 +48,7 @@ func (l labelsGetterMock) loadLabels(context.Context) error {
 
 //nolint:funlen
 func TestConnect(t *testing.T) {
-	hostname := "127.0.0.1"
+	hostname := "127.0.0.1" //nolint:goconst
 	ctx := context.Background()
 
 	ports := map[string]string{

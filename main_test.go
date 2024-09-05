@@ -58,7 +58,7 @@ func TestBuildExporter(t *testing.T) {
 	buildExporter(opts, "mongodb://usr:pwd@127.0.0.1/", log)
 }
 
-func TestBuildURI(t *testing.T) {
+func TestBuildURI(t *testing.T) { //nolint: funlen
 	t.Parallel()
 	tests := []struct {
 		situation   string
@@ -160,10 +160,10 @@ func TestBuildURI(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		newUri := buildURI(tc.origin, tc.newUser, tc.newPassword)
+		newURI := buildURI(tc.origin, tc.newUser, tc.newPassword)
 		// t.Logf("Origin: %s", tc.origin)
 		// t.Logf("Expect: %s", tc.expect)
-		// t.Logf("Result: %s", newUri)
-		assert.Equal(t, newUri, tc.expect)
+		// t.Logf("Result: %s", newURI)
+		assert.Equal(t, newURI, tc.expect)
 	}
 }

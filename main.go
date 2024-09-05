@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package main provides the entry point for the MongoDB exporter.
 package main
 
 import (
@@ -59,8 +60,8 @@ type GlobalFlags struct {
 	EnableIndexStats         bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
 	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 	EnableProfile            bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
-	EnableShards             bool `help:"Enable collecting metrics from sharded Mongo clusters about chunks" name:"collector.shards"`
-	EnablePBM                bool `help:"Enable collecting metrics from Percona Backup for MongoDB" name:"collector.pbm"`
+	EnableShards             bool `name:"collector.shards" help:"Enable collecting metrics from sharded Mongo clusters about chunks"`
+	EnablePBM                bool `name:"collector.pbm" help:"Enable collecting metrics from Percona Backup for MongoDB"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
@@ -83,7 +84,7 @@ func main() {
 		kong.Name("mongodb_exporter"),
 		kong.Description("MongoDB Prometheus exporter"),
 		kong.UsageOnError(),
-		kong.ConfigureHelp(kong.HelpOptions{
+		kong.ConfigureHelp(kong.HelpOptions{ //nolint:exhaustruct
 			Compact: true,
 		}),
 		kong.Vars{
@@ -91,10 +92,10 @@ func main() {
 		})
 
 	if opts.Version {
-		fmt.Println("mongodb_exporter - MongoDB Prometheus exporter")
-		fmt.Printf("Version: %s\n", version)
-		fmt.Printf("Commit: %s\n", commit)
-		fmt.Printf("Build date: %s\n", buildDate)
+		fmt.Println("mongodb_exporter - MongoDB Prometheus exporter") //nolint:forbidigo
+		fmt.Printf("Version: %s\n", version)                          //nolint:forbidigo
+		fmt.Printf("Commit: %s\n", commit)                            //nolint:forbidigo
+		fmt.Printf("Build date: %s\n", buildDate)                     //nolint:forbidigo
 		return
 	}
 

@@ -36,7 +36,7 @@ type currentopCollector struct {
 	currentopslowtime string
 }
 
-var ErrInvalidOrMissingInprogEntry = errors.New("invalid or missing inprog entry in currentop results")
+var errInvalidOrMissingInprogEntry = errors.New("invalid or missing inprog entry in currentop results")
 
 // newCurrentopCollector creates a collector for being processed queries.
 func newCurrentopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger,
@@ -102,8 +102,8 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 	if !ok {
 		logger.Errorf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"])
-		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
-			ErrInvalidOrMissingInprogEntry)
+		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(errInvalidOrMissingInprogEntry),
+			errInvalidOrMissingInprogEntry)
 	}
 
 	labels := d.topologyInfo.baseLabels()
@@ -139,7 +139,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 			logger.Errorf("Invalid type string assertion for 'desc': %T", bsonMapElement)
 			continue
 		}
-		microsecs_running, ok := bsonMapElement["microsecs_running"].(int64)
+		microsecsRunning, ok := bsonMapElement["microsecs_running"].(int64)
 		if !ok {
 			logger.Errorf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement)
 			continue

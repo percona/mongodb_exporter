@@ -17,13 +17,12 @@ package tu
 
 import "time"
 
-type HostPort struct {
+type hostPort struct {
 	HostIP   string `json:"HostIp"`
-	HostPort string `json:"HostPort"`
+	HostPort string `json:"hostPort"`
 }
 
-// nolint
-type DockerInspectOutput []struct {
+type dockerInspectOutput []struct {
 	ID      string    `json:"Id"`
 	Created time.Time `json:"Created"`
 	Path    string    `json:"Path"`
@@ -65,7 +64,7 @@ type DockerInspectOutput []struct {
 		PortBindings struct {
 			Two7017TCP []struct {
 				HostIP   string `json:"HostIp"`
-				HostPort string `json:"HostPort"`
+				HostPort string `json:"hostPort"`
 			} `json:"27017/tcp"`
 		} `json:"PortBindings"`
 		RestartPolicy struct {
@@ -191,7 +190,7 @@ type DockerInspectOutput []struct {
 		HairpinMode            bool                  `json:"HairpinMode"`
 		LinkLocalIPv6Address   string                `json:"LinkLocalIPv6Address"`
 		LinkLocalIPv6PrefixLen int                   `json:"LinkLocalIPv6PrefixLen"`
-		Ports                  map[string][]HostPort `json:"Ports"`
+		Ports                  map[string][]hostPort `json:"Ports"`
 		SandboxKey             string                `json:"SandboxKey"`
 		SecondaryIPAddresses   interface{}           `json:"SecondaryIPAddresses"`
 		SecondaryIPv6Addresses interface{}           `json:"SecondaryIPv6Addresses"`

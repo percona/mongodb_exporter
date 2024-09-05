@@ -131,6 +131,8 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
+	//nolint: godox
+	// TODO: extract to separate collector.
 	if d.compatibleMode {
 		buildInfo, err := retrieveMongoDBBuildInfo(d.ctx, client, logger)
 		if err != nil {

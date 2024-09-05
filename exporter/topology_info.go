@@ -53,9 +53,6 @@ type labelsGetter interface {
 // This is an object to make it posible to easily reload the labels in case of
 // disconnection from the db. Just call loadLabels when required.
 type topologyInfo struct {
-	// TODO: with https://jira.percona.com/browse/PMM-6435, replace this client pointer
-	// by a new connector, able to reconnect if needed. In case of reconnection, we should
-	// call loadLabels to refresh the labels because they might have changed
 	client *mongo.Client
 	logger *logrus.Entry
 	rw     sync.RWMutex
@@ -141,7 +138,7 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 	if client == nil {
 		return "", errors.New("cannot get mongo node type from an empty client")
 	}
-	md := proto.MasterDoc{}
+	md := proto.HelloResponse{}
 	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
 		return "", err
 	}

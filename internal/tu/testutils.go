@@ -84,7 +84,7 @@ func DefaultTestClientMongoS(ctx context.Context, t *testing.T) *mongo.Client {
 
 // GetImageNameForContainer returns image name and version of a running test container.
 func GetImageNameForContainer(containerName string) (string, string, error) {
-	di, err := InspectContainer(containerName)
+	di, err := inspectContainer(containerName)
 	if err != nil {
 		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
 	}
@@ -97,7 +97,7 @@ func GetImageNameForContainer(containerName string) (string, string, error) {
 
 	const numOfImageNameParts = 2
 	if len(split) != numOfImageNameParts {
-		return "", "", errors.New(fmt.Sprintf("image name is not correct: %s", di[0].Config.Image))
+		return "", "", fmt.Errorf("image name is not correct: %s", di[0].Config.Image)
 	}
 
 	imageBaseName, version := split[0], split[1]
@@ -158,16 +158,16 @@ func LoadJSON(filename string) (bson.M, error) {
 	var m bson.M
 	err = json.Unmarshal(buf, &m)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "cannot unmarshal file %q", filename)
 	}
 
 	return m, nil
 }
 
-func InspectContainer(name string) (DockerInspectOutput, error) {
-	var di DockerInspectOutput
+func inspectContainer(name string) (dockerInspectOutput, error) {
+	var di dockerInspectOutput
 
-	out, err := exec.Command("docker", "inspect", name).Output() //nolint:gosec
+	out, err := exec.Command("docker", "inspect", name).Output()
 	if err != nil {
 		return di, errors.Wrap(err, "cannot inspect docker container")
 	}
@@ -179,8 +179,9 @@ func InspectContainer(name string) (DockerInspectOutput, error) {
 	return di, nil
 }
 
+// PortForContainer returns the host port for a container.
 func PortForContainer(name string) (string, error) {
-	di, err := InspectContainer(name)
+	di, err := inspectContainer(name)
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot get error for container %q", name)
 	}

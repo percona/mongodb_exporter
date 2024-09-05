@@ -41,10 +41,9 @@ func TestTopCollector(t *testing.T) {
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
-	//filter := []string{
-	//	"mongodb_top_update_count",
-	//}
-	var filter []string
+	filter := []string{
+		"mongodb_top_update_count",
+	}
 	count := testutil.CollectAndCount(c, filter...)
 
 	/*

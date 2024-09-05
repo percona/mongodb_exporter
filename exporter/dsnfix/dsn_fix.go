@@ -13,7 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dsn_fix
+// Package dsnfix provides a workaround for the issue with the mongo-go-driver
+package dsnfix
 
 import (
 	"net/url"

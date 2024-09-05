@@ -38,7 +38,7 @@ func TestCurrentopCollector(t *testing.T) {
 	client := tu.DefaultTestClient(ctx, t)
 
 	database := client.Database("testdb")
-	_ = database.Drop(ctx)
+	_ = database.Drop(ctx) //nolint: errcheck
 
 	defer func() {
 		err := database.Drop(ctx)

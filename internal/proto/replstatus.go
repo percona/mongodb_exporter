@@ -20,20 +20,21 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type Optime struct {
-	Ts primitive.Timestamp `bson:"ts"` // The Timestamp of the last operation applied to this member of the replica set from the oplog.
+type optime struct {
+	TS primitive.Timestamp `bson:"ts"` // The Timestamp of the last operation applied to this member of the replica set from the oplog.
 	T  float64             `bson:"t"`  // The term in which the last applied operation was originally generated on the primary.
 }
 
-type StorageEngine struct {
+// storageEngine is a struct for storage engine.
+type storageEngine struct {
 	Name                  string `bson:"name"`
 	SupportCommittedReads bool   `bson:"supportsCommittedReads"`
 	ReadOnly              bool   `bson:"readOnly"`
 	Persistent            bool   `bson:"persistent"`
 }
 
-type Members struct {
-	Optime               map[string]Optime   `bson:"optimes"`              // See Optime struct
+type members struct {
+	Optime               map[string]optime   `bson:"optimes"`              // See Optime struct
 	OptimeDate           primitive.DateTime  `bson:"optimeDate"`           // The last entry from the oplog that this member applied.
 	InfoMessage          string              `bson:"infoMessage"`          // A message
 	ID                   int64               `bson:"_id"`                  // Server ID
@@ -51,21 +52,21 @@ type Members struct {
 	LastHeartbeatMessage string              `bson:"lastHeartbeatMessage"` // Contains a string representation of that message.
 	PingMs               *float64            `bson:"pingMs,omitempty"`     // Represents the number of milliseconds (ms) that a round-trip packet takes to travel between the remote member and the local instance.
 	Set                  string              `bson:"-"`
-	StorageEngine        StorageEngine
+	StorageEngine        storageEngine
 }
 
-// Struct for replSetGetStatus
+// ReplicaSetStatus is a struct for replSetGetStatus response.
 type ReplicaSetStatus struct {
 	Date                    primitive.DateTime `bson:"date"`                    // Current date
 	MyState                 float64            `bson:"myState"`                 // Integer between 0 and 10 that represents the replica state of the current member
 	Term                    float64            `bson:"term"`                    // The election count for the replica set, as known to this replica set member. Mongo 3.2+
 	HeartbeatIntervalMillis float64            `bson:"heartbeatIntervalMillis"` // The frequency in milliseconds of the heartbeats. 3.2+
-	Members                 []Members          `bson:"members"`                 //
+	Members                 []members          `bson:"members"`                 //
 	Ok                      float64            `bson:"ok"`                      //
 	Set                     string             `bson:"set"`                     // Replica set name
 }
 
-type Member struct {
+type member struct {
 	Host         string  `bson:"host"`
 	Votes        int32   `bson:"votes"`
 	ID           int32   `bson:"_id"`
@@ -77,22 +78,22 @@ type Member struct {
 	Tags         bson.M  `bson:"tags"`
 }
 
-type RSConfig struct {
+type rsConfig struct {
 	ID                                 string     `bson:"_id"`
 	ConfigServer                       bool       `bson:"configsvr"`
 	WriteConcernMajorityJournalDefault bool       `bson:"writeConcernMajorityJournalDefault"`
 	Version                            int32      `bson:"version"`
 	ProtocolVersion                    int64      `bson:"protocolVersion"`
-	Settings                           RSSettings `bson:"settings"`
-	Members                            []Member   `bson:"members"`
+	Settings                           rsSettings `bson:"settings"`
+	Members                            []member   `bson:"members"`
 }
 
-type LastErrorDefaults struct {
+type lastErrorDefaults struct {
 	W        interface{} `bson:"w"`
 	WTimeout int32       `bson:"wtimeout"`
 }
 
-type RSSettings struct {
+type rsSettings struct {
 	HeartbeatTimeoutSecs       int32              `bson:"heartbeatTimeoutSecs"`
 	ElectionTimeoutMillis      int32              `bson:"electionTimeoutMillis"`
 	CatchUpTimeoutMillis       int32              `bson:"catchUpTimeoutMillis"`
@@ -100,28 +101,30 @@ type RSSettings struct {
 	ChainingAllowed            bool               `bson:"chainingAllowed"`
 	HeartbeatIntervalMillis    int32              `bson:"heartbeatIntervalMillis"`
 	CatchUpTakeoverDelayMillis int32              `bson:"catchUpTakeoverDelayMillis"`
-	GetLastErrorDefaults       LastErrorDefaults  `bson:"getLastErrorDefaults"`
+	GetLastErrorDefaults       lastErrorDefaults  `bson:"getLastErrorDefaults"`
 	ReplicaSetID               primitive.ObjectID `bson:"replicaSetId"`
 }
 
-type Signature struct {
+type signature struct {
 	Hash  primitive.Binary `bson:"hash"`
 	KeyID int64            `bson:"keyId"`
 }
 
-type ClusterTime struct {
+type clusterTime struct {
 	ClusterTime primitive.Timestamp `bson:"clusterTime"`
-	Signature   Signature           `bson:"signature"`
+	Signature   signature           `bson:"signature"`
 }
 
+// ReplicasetConfig is a struct for replSetGetConfig response.
 type ReplicasetConfig struct {
-	Config              RSConfig            `bson:"config"`
+	Config              rsConfig            `bson:"config"`
 	OK                  float64             `bson:"ok"`
 	LastCommittedOpTime primitive.Timestamp `bson:"lastCommittedOpTime"`
-	ClusterTime         ClusterTime         `bson:"$clusterTime"`
+	ClusterTime         clusterTime         `bson:"$clusterTime"`
 	OperationTime       primitive.Timestamp `bson:"operationTime"`
 }
 
+// ConfigVersion is a struct for config.version collection.
 type ConfigVersion struct {
 	ID                   int32              `bson:"_id"`
 	MinCompatibleVersion int32              `bson:"minCompatibleVersion"`
@@ -129,24 +132,10 @@ type ConfigVersion struct {
 	ClusterID            primitive.ObjectID `bson:"clusterId"`
 }
 
+// ShardIdentity is a struct for system.version collection.
 type ShardIdentity struct {
 	ID                        string             `bson:"_id"`
 	ShardName                 string             `bson:"shardName"`
 	ClusterID                 primitive.ObjectID `bson:"clusterId"`
 	ConfigsvrConnectionString string             `bson:"configsvrConnectionString"`
-}
-
-// HelloResponse represents the response from a Mongo `hello` command.
-type HelloResponse struct {
-	ArbiterOnly bool     `bson:"arbiterOnly"`
-	Arbiters    []string `bson:"arbiters"`
-	Hosts       []string `bson:"hosts"`
-	IsMaster    bool     `bson:"ismaster"`
-	Me          string   `bson:"me"`
-	Ok          int      `bson:"ok"`
-	Primary     string   `bson:"primary"`
-	ReadOnly    bool     `bson:"readOnly"`
-	Secondary   bool     `bson:"secondary"`
-	SetName     string   `bson:"setName"`
-	SetVersion  int      `bson:"setVersion"`
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// measureCollectTime measures time taken for scrape by collector
+// measureCollectTime measures time taken for scrape by collector.
 func measureCollectTime(ch chan<- prometheus.Metric, exporter, collector string) func() {
 	startTime := time.Now()
 	timeToCollectDesc := prometheus.NewDesc(

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dsn_fix
+package dsnfix
 
 import (
 	"net/url"

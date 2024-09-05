@@ -37,7 +37,7 @@ func TestInspectContainer(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		di, err := InspectContainer(tc.containerName)
+		di, err := inspectContainer(tc.containerName)
 		assert.NoError(t, err)
 
 		ns := di[0].NetworkSettings.Ports["27017/tcp"][0].HostPort

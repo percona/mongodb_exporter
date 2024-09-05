@@ -345,7 +345,7 @@ func addTestData(ctx context.Context, client *mongo.Client, count int) error {
 		return errors.Wrap(err, "cannot start session to add test data")
 	}
 
-	if err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+	if err = mongo.WithSession(ctx, session, func(_ mongo.SessionContext) error {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 

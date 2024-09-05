@@ -54,7 +54,7 @@ func TestShardsCollector(t *testing.T) {
 		if r.GetName() != "mongodb_shards_collection_chunks_count" {
 			continue
 		}
-		for _, m := range r.Metric {
+		for _, m := range r.GetMetric() {
 			row := make(map[string]string)
 			for _, l := range m.GetLabel() {
 				row[l.GetName()] = l.GetValue()

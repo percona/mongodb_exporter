@@ -140,7 +140,7 @@ func TestSecondaryLag(t *testing.T) {
 	err = lag.Write(metric)
 	assert.NoError(t, err)
 	// Secondary is not exactly secondsBehind behind master
-	assert.True(t, *metric.Gauge.Value > 0)
+	assert.True(t, metric.GetGauge().GetValue() > 0)
 
 	rsConfOld.Config.Version = rsConf.Config.Version + 1
 	err = client.Database("admin").RunCommand(ctx, primitive.M{"replSetReconfig": rsConfOld.Config}).Decode(&replSetReconfig)

@@ -13,11 +13,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package proto represents the responses from a Mongo commands.
 package proto
 
-type MasterDoc struct {
-	SetName     interface{} `bson:"setName"`
-	Hosts       interface{} `bson:"hosts"`
-	Msg         string      `bson:"msg"`
-	ArbiterOnly bool        `bson:"arbiterOnly"`
+// HelloResponse represents the response from a Mongo `hello` and `isMaster` commands.
+type HelloResponse struct {
+	ArbiterOnly bool     `bson:"arbiterOnly"`
+	Arbiters    []string `bson:"arbiters"`
+	Hosts       []string `bson:"hosts"`
+	IsMaster    bool     `bson:"ismaster"`
+	Me          string   `bson:"me"`
+	Ok          int      `bson:"ok"`
+	Msg         string   `bson:"msg"`
+	Primary     string   `bson:"primary"`
+	ReadOnly    bool     `bson:"readOnly"`
+	Secondary   bool     `bson:"secondary"`
+	SetName     string   `bson:"setName"`
+	SetVersion  int      `bson:"setVersion"`
 }

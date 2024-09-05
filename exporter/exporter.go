@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint:gosec // Required for pprof.
 	"strconv"
 	"sync"
 	"time"
@@ -30,7 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
+	"github.com/percona/mongodb_exporter/exporter/dsnfix"
 )
 
 // Exporter holds Exporter methods and attributes.
@@ -127,7 +127,7 @@ func (e *Exporter) getTotalCollectionsCount() int {
 	return e.totalCollectionsCount
 }
 
-func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
+func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry { //nolint:gocyclo
 	registry := prometheus.NewRegistry()
 
 	nodeType, err := getNodeType(ctx, client)
@@ -279,7 +279,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 
 // Handler returns an http.Handler that serves metrics. Can be used instead of
 // run for hooking up custom HTTP servers.
-func (e *Exporter) Handler() http.Handler {
+func (e *Exporter) Handler() http.Handler { //nolint:gocognit
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
 		// To support also older ones vmagents.
@@ -377,7 +377,7 @@ func (e *Exporter) Handler() http.Handler {
 }
 
 func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
-	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
+	clientOpts, err := dsnfix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}

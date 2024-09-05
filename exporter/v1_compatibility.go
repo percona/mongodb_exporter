@@ -811,12 +811,12 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 	}
 
 	if nodeType != typeArbiter {
-		metrics = append(metrics, myState(ctx, client))
 		if rm := replSetMetrics(m); rm != nil {
 			metrics = append(metrics, rm...)
 		}
 
 		if nodeType != typeMongos {
+			metrics = append(metrics, myState(ctx, client))
 			if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
 				l.Warnf("cannot create metrics for oplog: %s", err)
 			} else {

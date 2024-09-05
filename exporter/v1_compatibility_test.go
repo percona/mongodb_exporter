@@ -245,7 +245,7 @@ func TestMongosMetrics(t *testing.T) {
 }
 
 // myState should always return a metric. If there is no connection, the value
-// should be the MongoDB unknown state = 6
+// should be the MongoDB unknown state = 6.
 func TestMyState(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -285,7 +285,7 @@ func TestMyState(t *testing.T) {
 			metric := myState(ctx, client)
 			err = metric.Write(&m)
 			assert.NoError(t, err)
-			assert.Contains(t, testCase.allowedStates, *m.Gauge.Value)
+			assert.Contains(t, testCase.allowedStates, m.GetGauge().GetValue())
 
 			err = client.Disconnect(ctx)
 			assert.NoError(t, err)
@@ -293,7 +293,7 @@ func TestMyState(t *testing.T) {
 			metric = myState(ctx, client)
 			err = metric.Write(&m)
 			assert.NoError(t, err)
-			assert.Equal(t, float64(UnknownState), *m.Gauge.Value)
+			assert.Equal(t, float64(UnknownState), m.GetGauge().GetValue())
 		})
 	}
 }
@@ -324,7 +324,7 @@ func TestArbiterMetrics(t *testing.T) {
 			}
 		}
 		assert.NoError(t, err)
-		assert.Equal(t, float64(4), *rsMembers.Gauge.Value)
+		assert.Equal(t, float64(4), rsMembers.GetGauge().GetValue())
 
 		err = client.Disconnect(ctx)
 		assert.NoError(t, err)

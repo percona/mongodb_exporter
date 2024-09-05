@@ -27,10 +27,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ServerMap stores http handlers for each host
+// ServerMap stores http handlers for each host.
 type ServerMap map[string]http.Handler
 
-// ServerOpts is the options for the main http handler
+// ServerOpts is the options for the main http handler.
 type ServerOpts struct {
 	Path             string
 	MultiTargetPath  string
@@ -38,7 +38,7 @@ type ServerOpts struct {
 	TLSConfigPath    string
 }
 
-// Runs the main web-server
+// RunWebServer Runs the main web-server.
 func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	mux := http.DefaultServeMux
 
@@ -52,7 +52,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	mux.Handle(opts.Path, defaultExporter.Handler())
 	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap))
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte(`<html>
             <head><title>MongoDB Exporter</title></head>
             <body>

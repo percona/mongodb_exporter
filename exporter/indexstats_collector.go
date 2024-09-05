@@ -87,7 +87,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
-		if len(parts) < 2 { //nolint:gomnd
+		if len(parts) < 2 { //nolint:mnd
 			continue
 		}
 

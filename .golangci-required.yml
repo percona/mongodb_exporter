@@ -10,6 +10,12 @@ linters-settings:
           - pkg: "errors"
             desc: Should be replaced by github.com/pkg/errors package
 
+  gci:
+    sections:
+      - standard # Captures all standard packages if they do not match another section.
+      - default # Contains all imports that could not be matched to another section type.
+      - prefix(github.com/percona/mongodb_exporter) # Groups all local imports.
+
 # The most valuable linters; they are required to pass for PR to be merged.
 linters:
   disable-all: true

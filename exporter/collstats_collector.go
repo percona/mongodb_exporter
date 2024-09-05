@@ -85,7 +85,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
-		if len(parts) < 2 { //nolint:gomnd
+		if len(parts) < 2 { //nolint:mnd
 			continue
 		}
 
@@ -94,7 +94,9 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		aggregation := bson.D{
 			{
-				Key: "$collStats", Value: bson.M{
+				Key: "$collStats",
+				Value: bson.M{
+					//nolint: godox
 					// TODO: PMM-9568 : Add support to handle histogram metrics
 					"latencyStats": bson.M{"histograms": false},
 					"storageStats": bson.M{"scale": 1},
@@ -103,7 +105,8 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		}
 		project := bson.D{
 			{
-				Key: "$project", Value: bson.M{
+				Key: "$project",
+				Value: bson.M{
 					"storageStats.wiredTiger":   0,
 					"storageStats.indexDetails": 0,
 				},
