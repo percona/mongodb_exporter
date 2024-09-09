@@ -138,6 +138,9 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 }
 
 func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, error) {
+	if client == nil {
+		return "", errors.New("cannot get mongo node type from an empty client")
+	}
 	md := proto.MasterDoc{}
 	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
 		return "", err
