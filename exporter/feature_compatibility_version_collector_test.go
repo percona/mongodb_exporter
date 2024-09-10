@@ -42,9 +42,6 @@ func TestFCVCollector(t *testing.T) {
 	defer database.Drop(ctx) //nolint:errcheck
 
 	c := newFeatureCompatibilityCollector(ctx, client, logrus.New())
-	c.now = func() time.Time {
-		return time.Date(2024, 0o6, 14, 0o0, 0o0, 0o0, 0o0, time.UTC)
-	}
 
 	sversion, _ := getMongoDBVersionInfo(t, "mongo-1-1")
 
@@ -73,11 +70,6 @@ mongodb_fcv_featureCompatibilityVersion{} ` + mversion +
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 
-	// Less than 5 seconds, it should return the last scraped values.
-	c.now = func() time.Time {
-		return time.Date(2024, 0o6, 14, 0o0, 0o0, 0o4, 0o0, time.UTC)
-	}
-
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
 # TYPE mongodb_fcv_featureCompatibilityVersion untyped
@@ -86,10 +78,6 @@ mongodb_fcv_featureCompatibilityVersion{} ` + mversion +
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 
-	// After more than 5 seconds there should be a new scrape.
-	c.now = func() time.Time {
-		return time.Date(2024, 0o6, 14, 0o0, 0o0, 0o6, 0o0, time.UTC)
-	}
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_featureCompatibilityVersion fcv.
 # TYPE mongodb_fcv_featureCompatibilityVersion untyped
