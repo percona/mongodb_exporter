@@ -59,29 +59,29 @@ func TestFCVCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_fcv_featureCompatibilityVersion fcv.
-# TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{} ` + mversion +
+# HELP mongodb_fcv_feature_compatibility_version fcv.
+# TYPE mongodb_fcv_feature_compatibility_version untyped
+mongodb_fcv_feature_compatibility_version{version="` + mmv + `"} ` + mversion +
 		"\n")
 
 	filter := []string{
-		"mongodb_fcv_featureCompatibilityVersion",
+		"mongodb_fcv_feature_compatibility_version",
 	}
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 
 	expected = strings.NewReader(`
-# HELP mongodb_fcv_featureCompatibilityVersion fcv.
-# TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{} ` + mversion +
+# HELP mongodb_fcv_feature_compatibility_version fcv.
+# TYPE mongodb_fcv_feature_compatibility_version untyped
+mongodb_fcv_feature_compatibility_version{version="` + mmv + `"} ` + mversion +
 		"\n")
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 
 	expected = strings.NewReader(`
-# HELP mongodb_fcv_featureCompatibilityVersion fcv.
-# TYPE mongodb_fcv_featureCompatibilityVersion untyped
-mongodb_fcv_featureCompatibilityVersion{} ` + mversion +
+# HELP mongodb_fcv_feature_compatibility_version fcv.
+# TYPE mongodb_fcv_feature_compatibility_version untyped
+mongodb_fcv_feature_compatibility_version{version="` + mmv + `"} ` + mversion +
 		"\n")
 
 	err = testutil.CollectAndCompare(c, expected, filter...)
