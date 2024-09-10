@@ -19,6 +19,7 @@ require (
 )
 
 require github.com/hashicorp/go-version v1.7.0
+
 require github.com/percona/percona-backup-mongodb v1.8.1-0.20240814130653-5285f7975ff6
 
 require (

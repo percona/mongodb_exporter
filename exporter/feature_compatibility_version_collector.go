@@ -18,42 +18,23 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"sync"
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-)
-
-const (
-	compatibilityModeOff = false // Only used in getDiagnosticData.
+	"strconv"
 )
 
 type featureCompatibilityCollector struct {
 	ctx  context.Context
 	base *baseCollector
-
-	now                  func() time.Time
-	lock                 *sync.Mutex
-	lastScrape           time.Time
-	lastCollectedMetrics primitive.M
 }
 
 // newProfileCollector creates a collector for being processed queries.
 func newFeatureCompatibilityCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *featureCompatibilityCollector {
 	return &featureCompatibilityCollector{
-		ctx:                  ctx,
-		base:                 newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "featureCompatibility"})),
-		lock:                 &sync.Mutex{},
-		lastScrape:           time.Time{},
-		lastCollectedMetrics: primitive.M{},
-		now: func() time.Time {
-			return time.Now()
-		},
+		ctx:  ctx,
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "featureCompatibility"})),
 	}
 }
 
@@ -68,9 +49,6 @@ func (d *featureCompatibilityCollector) Collect(ch chan<- prometheus.Metric) {
 func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 	defer measureCollectTime(ch, "mongodb", "profile")()
 
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	cmd := bson.D{{Key: "getParameter", Value: 1}, {Key: "featureCompatibilityVersion", Value: 1}}
 	res := d.base.client.Database("admin").RunCommand(d.ctx, cmd)
 
@@ -80,20 +58,16 @@ func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	d.lastScrape = d.now()
-
 	rawValue := walkTo(m, []string{"featureCompatibilityVersion", "version"})
 	if rawValue != nil {
-		version, err := strconv.ParseFloat(fmt.Sprintf("%v", rawValue), 64)
+		versionString := fmt.Sprintf("%v", rawValue)
+		version, err := strconv.ParseFloat(versionString, 64)
 		if err != nil {
 			ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 			return
 		}
-		d.lastCollectedMetrics = primitive.M{"featureCompatibilityVersion": version}
-	}
 
-	labels := map[string]string{}
-	for _, metric := range makeMetrics("fcv", d.lastCollectedMetrics, labels, compatibilityModeOff) {
-		ch <- metric
+		d := prometheus.NewDesc("mongodb_fcv_feature_compatibility_version", "Feature compatibility version", []string{"version"}, map[string]string{})
+		ch <- prometheus.MustNewConstMetric(d, prometheus.GaugeValue, version, versionString)
 	}
 }
