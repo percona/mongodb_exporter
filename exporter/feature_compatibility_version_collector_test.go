@@ -59,7 +59,7 @@ func TestFCVCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_fcv_feature_compatibility_version Feature compatibility version.
+# HELP mongodb_fcv_feature_compatibility_version Feature compatibility version
 # TYPE mongodb_fcv_feature_compatibility_version gauge
 mongodb_fcv_feature_compatibility_version{version="` + mversion + `"} ` + mversion +
 		"\n")
@@ -71,7 +71,7 @@ mongodb_fcv_feature_compatibility_version{version="` + mversion + `"} ` + mversi
 	assert.NoError(t, err)
 
 	expected = strings.NewReader(`
-# HELP mongodb_fcv_feature_compatibility_version Feature compatibility version.
+# HELP mongodb_fcv_feature_compatibility_version Feature compatibility version
 # TYPE mongodb_fcv_feature_compatibility_version gauge
 mongodb_fcv_feature_compatibility_version{version="` + mversion + `"} ` + mversion +
 		"\n")
@@ -79,7 +79,7 @@ mongodb_fcv_feature_compatibility_version{version="` + mversion + `"} ` + mversi
 	assert.NoError(t, err)
 
 	expected = strings.NewReader(`
-# HELP mongodb_fcv_feature_compatibility_version Feature compatibility version.
+# HELP mongodb_fcv_feature_compatibility_version Feature compatibility version
 # TYPE mongodb_fcv_feature_compatibility_version gauge
 mongodb_fcv_feature_compatibility_version{version="` + mversion + `"} ` + mversion +
 		"\n")
