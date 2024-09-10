@@ -61,7 +61,7 @@ func TestFCVCollector(t *testing.T) {
 	expected := strings.NewReader(`
 # HELP mongodb_fcv_feature_compatibility_version Feature compatibility version.
 # TYPE mongodb_fcv_feature_compatibility_version gauge
-mongodb_fcv_feature_compatibility_version{version="` + mmv + `"} ` + mversion +
+mongodb_fcv_feature_compatibility_version{version="` + mversion + `"} ` + mversion +
 		"\n")
 
 	filter := []string{
@@ -73,7 +73,7 @@ mongodb_fcv_feature_compatibility_version{version="` + mmv + `"} ` + mversion +
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_feature_compatibility_version Feature compatibility version.
 # TYPE mongodb_fcv_feature_compatibility_version gauge
-mongodb_fcv_feature_compatibility_version{version="` + mmv + `"} ` + mversion +
+mongodb_fcv_feature_compatibility_version{version="` + mversion + `"} ` + mversion +
 		"\n")
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
@@ -81,7 +81,7 @@ mongodb_fcv_feature_compatibility_version{version="` + mmv + `"} ` + mversion +
 	expected = strings.NewReader(`
 # HELP mongodb_fcv_feature_compatibility_version Feature compatibility version.
 # TYPE mongodb_fcv_feature_compatibility_version gauge
-mongodb_fcv_feature_compatibility_version{version="` + mmv + `"} ` + mversion +
+mongodb_fcv_feature_compatibility_version{version="` + mversion + `"} ` + mversion +
 		"\n")
 
 	err = testutil.CollectAndCompare(c, expected, filter...)
