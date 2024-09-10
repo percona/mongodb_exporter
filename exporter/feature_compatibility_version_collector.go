@@ -18,11 +18,12 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"strconv"
 )
 
 type featureCompatibilityCollector struct {
@@ -50,10 +51,15 @@ func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 	defer measureCollectTime(ch, "mongodb", "profile")()
 
 	cmd := bson.D{{Key: "getParameter", Value: 1}, {Key: "featureCompatibilityVersion", Value: 1}}
-	res := d.base.client.Database("admin").RunCommand(d.ctx, cmd)
+	client := d.base.client
+	if client == nil {
+		return
+	}
+	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
 	m := make(map[string]interface{})
 	if err := res.Decode(&m); err != nil {
+		d.base.logger.Errorf("Failed to decode featureCompatibilityVersion: %v", err)
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 		return
 	}
@@ -63,6 +69,7 @@ func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 		versionString := fmt.Sprintf("%v", rawValue)
 		version, err := strconv.ParseFloat(versionString, 64)
 		if err != nil {
+			d.base.logger.Errorf("Failed to parse featureCompatibilityVersion: %v", err)
 			ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 			return
 		}

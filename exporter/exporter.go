@@ -180,6 +180,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
 		e.opts.EnableShards = false
+		e.opts.EnableFCV = false
 		e.opts.EnablePBMMetrics = false
 	}
 
@@ -241,7 +242,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(sc)
 	}
 
-	if e.opts.EnableFCV {
+	if e.opts.EnableFCV && nodeType != typeMongos {
 		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger)
 		registry.MustRegister(fcvc)
 	}
