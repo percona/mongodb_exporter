@@ -63,4 +63,12 @@ func TestPBMCollector(t *testing.T) {
 		count := testutil.CollectAndCount(c, filter...)
 		assert.Equal(t, expectedLength, count, "PBM metrics are missing")
 	})
+
+	t.Run("pbm backup size metric", func(t *testing.T) {
+		filter := []string{
+			"mongodb_pbm_backup_size_bytes",
+		}
+		count := testutil.CollectAndCount(c, filter...)
+		assert.Greater(t, count, 0, "PBM metrics are missing")
+	})
 }
