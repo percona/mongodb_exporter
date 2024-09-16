@@ -164,7 +164,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 	metrics := make([]prometheus.Metric, 0, len(backupsList))
 
 	for _, backup := range backupsList {
-		metrics = append(metrics, createPBMMetric("backup_size",
+		metrics = append(metrics, createPBMMetric("backup_size_bytes",
 			"Size of PBM backup",
 			float64(backup.Size), map[string]string{
 				"opid":   backup.OPID,
