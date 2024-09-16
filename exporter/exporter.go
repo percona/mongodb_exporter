@@ -70,6 +70,7 @@ type Opts struct {
 	EnableCollStats          bool
 	EnableProfile            bool
 	EnableShards             bool
+	EnableFCV                bool // Feature Compatibility Version.
 
 	EnableOverrideDescendingIndex bool
 
@@ -164,6 +165,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
 		e.opts.EnableShards = true
+		e.opts.EnableFCV = true
 		e.opts.EnablePBMMetrics = true
 	}
 
@@ -178,6 +180,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
 		e.opts.EnableShards = false
+		e.opts.EnableFCV = false
 		e.opts.EnablePBMMetrics = false
 	}
 
@@ -237,6 +240,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	if e.opts.EnableShards && nodeType == typeMongos && requestOpts.EnableShards {
 		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
+	}
+
+	if e.opts.EnableFCV && nodeType != typeMongos {
+		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger)
+		registry.MustRegister(fcvc)
 	}
 
 	if e.opts.EnablePBMMetrics && requestOpts.EnablePBMMetrics {
@@ -320,6 +328,8 @@ func (e *Exporter) Handler() http.Handler {
 				requestOpts.EnableProfile = true
 			case "shards":
 				requestOpts.EnableShards = true
+			case "fcv":
+				requestOpts.EnableFCV = true
 			case "pbm":
 				requestOpts.EnablePBMMetrics = true
 			}
