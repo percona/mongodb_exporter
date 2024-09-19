@@ -70,6 +70,7 @@ type Opts struct {
 	EnableCollStats          bool
 	EnableProfile            bool
 	EnableShards             bool
+	EnableFCV                bool // Feature Compatibility Version.
 
 	EnableOverrideDescendingIndex bool
 
@@ -131,16 +132,16 @@ func (e *Exporter) getTotalCollectionsCount() int {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+	nodeType, err := getNodeType(ctx, client)
+	if err != nil {
+		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
+	}
+
+	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
 	registry.MustRegister(gc)
 
 	if client == nil {
 		return registry
-	}
-
-	nodeType, err := getNodeType(ctx, client)
-	if err != nil {
-		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
 	}
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
@@ -165,6 +166,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
 		e.opts.EnableShards = true
+		e.opts.EnableFCV = true
 		e.opts.EnablePBMMetrics = true
 	}
 
@@ -179,6 +181,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
 		e.opts.EnableShards = false
+		e.opts.EnableFCV = false
 		e.opts.EnablePBMMetrics = false
 	}
 
@@ -240,6 +243,11 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(sc)
 	}
 
+	if e.opts.EnableFCV && nodeType != typeMongos {
+		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger)
+		registry.MustRegister(fcvc)
+	}
+
 	if e.opts.EnablePBMMetrics && requestOpts.EnablePBMMetrics {
 		pbmc := newPbmCollector(ctx, client, e.opts.URI, e.opts.Logger)
 		registry.MustRegister(pbmc)
@@ -294,6 +302,37 @@ func (e *Exporter) Handler() http.Handler {
 		defer cancel()
 
 		requestOpts := GetRequestOpts(r.URL.Query()["collect[]"], e.opts)
+
+		if len(filters) == 0 {
+			requestOpts = *e.opts
+		}
+
+		for _, filter := range filters {
+			switch filter {
+			case "diagnosticdata":
+				requestOpts.EnableDiagnosticData = true
+			case "replicasetstatus":
+				requestOpts.EnableReplicasetStatus = true
+			case "dbstats":
+				requestOpts.EnableDBStats = true
+			case "topmetrics":
+				requestOpts.EnableTopMetrics = true
+			case "currentopmetrics":
+				requestOpts.EnableCurrentopMetrics = true
+			case "indexstats":
+				requestOpts.EnableIndexStats = true
+			case "collstats":
+				requestOpts.EnableCollStats = true
+			case "profile":
+				requestOpts.EnableProfile = true
+			case "shards":
+				requestOpts.EnableShards = true
+			case "fcv":
+				requestOpts.EnableFCV = true
+			case "pbm":
+				requestOpts.EnablePBMMetrics = true
+			}
+		}
 
 		client, err = e.getClient(ctx)
 		if err != nil {

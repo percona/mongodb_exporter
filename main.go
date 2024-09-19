@@ -61,6 +61,7 @@ type GlobalFlags struct {
 	EnableIndexStats         bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
 	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
 	EnableProfile            bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
+	EnableFCV                bool `name:"collector.fcv" help:"Enable Feature Compatibility Version collector"`
 	EnableShards             bool `help:"Enable collecting metrics from sharded Mongo clusters about chunks" name:"collector.shards"`
 	EnablePBM                bool `help:"Enable collecting metrics from Percona Backup for MongoDB" name:"collector.pbm"`
 
@@ -173,6 +174,7 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		EnableCollStats:          opts.EnableCollStats,
 		EnableProfile:            opts.EnableProfile,
 		EnableShards:             opts.EnableShards,
+		EnableFCV:                opts.EnableFCV,
 		EnablePBMMetrics:         opts.EnablePBM,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
