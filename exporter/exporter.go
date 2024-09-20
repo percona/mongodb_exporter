@@ -303,37 +303,6 @@ func (e *Exporter) Handler() http.Handler {
 
 		requestOpts := GetRequestOpts(r.URL.Query()["collect[]"], e.opts)
 
-		if len(filters) == 0 {
-			requestOpts = *e.opts
-		}
-
-		for _, filter := range filters {
-			switch filter {
-			case "diagnosticdata":
-				requestOpts.EnableDiagnosticData = true
-			case "replicasetstatus":
-				requestOpts.EnableReplicasetStatus = true
-			case "dbstats":
-				requestOpts.EnableDBStats = true
-			case "topmetrics":
-				requestOpts.EnableTopMetrics = true
-			case "currentopmetrics":
-				requestOpts.EnableCurrentopMetrics = true
-			case "indexstats":
-				requestOpts.EnableIndexStats = true
-			case "collstats":
-				requestOpts.EnableCollStats = true
-			case "profile":
-				requestOpts.EnableProfile = true
-			case "shards":
-				requestOpts.EnableShards = true
-			case "fcv":
-				requestOpts.EnableFCV = true
-			case "pbm":
-				requestOpts.EnablePBMMetrics = true
-			}
-		}
-
 		client, err = e.getClient(ctx)
 		if err != nil {
 			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
