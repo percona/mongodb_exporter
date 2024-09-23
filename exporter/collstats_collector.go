@@ -96,7 +96,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		if strings.HasPrefix(collection, "system.") {
 			continue
 		}
-		
+
 		aggregation := bson.D{
 			{
 				Key: "$collStats", Value: bson.M{
