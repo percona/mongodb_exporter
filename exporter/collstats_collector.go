@@ -92,6 +92,11 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		database := parts[0]
 		collection := strings.Join(parts[1:], ".") // support collections having a .
 
+		// exclude system collections
+		if strings.HasPrefix(collection, "system.") {
+			continue
+		}
+		
 		aggregation := bson.D{
 			{
 				Key: "$collStats", Value: bson.M{
