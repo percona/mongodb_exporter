@@ -48,7 +48,7 @@ func (d *featureCompatibilityCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
-	defer measureCollectTime(ch, "mongodb", "profile")()
+	defer measureCollectTime(ch, "mongodb", "fcv")()
 
 	cmd := bson.D{{Key: "getParameter", Value: 1}, {Key: "featureCompatibilityVersion", Value: 1}}
 	client := d.base.client
