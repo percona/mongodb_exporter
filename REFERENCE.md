@@ -30,5 +30,6 @@
 | --collector.profile               | Enable collecting metrics from profile                                                                                                                                        |
 | --collector.shards                | Enable collecting metrics related to Mongo shards                                                                                                                             |
 | --collector.pbm                   | Enable collecting metrics related to Percona Backup for MongoDB                                                                                                               |
+| --collector.fcv                   | Enable Feature Compatibility Version collector                                                                                                                                |
 | --metrics.overridedescendingindex | Enable descending index name override to replace -1 with _DESC                                                                                                                |
 | --version                         | Show version and exit                                                                                                                                                         |

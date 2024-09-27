@@ -1,3 +1,28 @@
+Release 0.41.1
+- Fix panic in v0.41.0 when fcv collector is enabled
+
+Release 0.41.0
+
+- Add extra label for replicaset metrics
+- Add information about supported MongoDB versions
+- Add command line flag to disable metrics about the exporter it-self
+- Add PBM metrics collector
+- Add cluster role label for mongodb_up
+- Add feature compatibility version collector
+- Migrate chunks metrics from v1 compatibility to shards collector
+- Correctly recognize arbiter nodes
+- Fix node type detection
+- Collstats, indexstats iterate only over collections, not views.
+- Fix case where users are prefixed with mongodb
+- Reconsider inclusion of opid in mongodb_currentop_query_uptime
+- List only authorized collections
+- Correctly evaluate balancer metrics
+- Reduce error logs from diagnostic data on arbiter nodes
+- Refactoring currentop_collector
+- Remove system colections from index stats
+- Update Go version
+- Update dependencies
+
 Release 0.40.0
 
 - Multi-target support
