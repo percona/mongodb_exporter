@@ -1,5 +1,5 @@
 Release 0.41.1
-- Fix panic in v0.41.0 when fcv collector is enabled
+- Fix panic (regression bug in v0.41.0) occuring when fcv collector is enabled
 
 Release 0.41.0
 
