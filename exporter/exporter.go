@@ -382,6 +382,8 @@ func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 			requestOpts.EnableProfile = true
 		case "shards":
 			requestOpts.EnableShards = true
+		case "fcv":
+			requestOpts.EnableFCV = true
 		case "pbm":
 			requestOpts.EnablePBMMetrics = true
 		}
