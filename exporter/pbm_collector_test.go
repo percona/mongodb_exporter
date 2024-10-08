@@ -41,7 +41,8 @@ func TestPBMCollector(t *testing.T) {
 	client := tu.TestClient(ctx, port, t)
 	mongoURI := "mongodb://admin:admin@127.0.0.1:17006/?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000" //nolint:gosec
 
-	c := newPbmCollector(ctx, client, mongoURI, logrus.New())
+	c, err := newPbmCollector(ctx, client, mongoURI, logrus.New())
+	require.NoError(t, err)
 
 	t.Run("pbm configured metric", func(t *testing.T) {
 		filter := []string{

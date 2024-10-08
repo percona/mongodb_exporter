@@ -288,21 +288,9 @@ func BenchmarkExporterRegistry(b *testing.B) {
 
 		e := New(exporterOpts)
 		for i := 0; i < b.N; i++ {
-			gc := newPbmCollector(ctx, client, mongoURI, e.opts.Logger)
+			_, err = newPbmCollector(ctx, client, mongoURI, e.opts.Logger)
+			assert.NotNil(b, err)
 			_ = e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
-
-			filter := []string{
-				"mongodb_pbm_cluster_backup_configured",
-			}
-			expected := strings.NewReader(`
-		# HELP mongodb_pbm_cluster_backup_configured PBM backups are configured for the cluster
-		# TYPE mongodb_pbm_cluster_backup_configured gauge
-		mongodb_pbm_cluster_backup_configured 1` + "\n")
-			err = testutil.CollectAndCompare(gc, expected, filter...)
-			assert.NotNil(b, err) // since PBM is not configured, we expect an error here.
-
-			//res := r.Unregister(gc)
-			//assert.Equal(b, true, res)
 		}
 		b.ReportAllocs()
 	})

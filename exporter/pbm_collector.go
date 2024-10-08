@@ -53,17 +53,28 @@ func createPBMMetric(name, help string, value float64, labels map[string]string)
 	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
 }
 
-func newPbmCollector(ctx context.Context, client *mongo.Client, mongoURI string, logger *logrus.Logger) *pbmCollector {
+func newPbmCollector(ctx context.Context, client *mongo.Client, mongoURI string, logger *logrus.Logger) (*pbmCollector, error) {
 	// we can't get details of other cluster from PBM if directConnection is set to true,
 	// we re-write it if that option is set (e.g from PMM).
 	if strings.Contains(mongoURI, "directConnection=true") {
 		mongoURI = strings.ReplaceAll(mongoURI, "directConnection=true", "directConnection=false")
 	}
+	pbmClient, err := sdk.NewClient(ctx, mongoURI)
+	if err != nil {
+		logger.Errorf("failed to initialize PBM client from uri %s: %s", mongoURI, err.Error())
+		return nil, err
+	}
+
+	_, err = pbmClient.GetConfig(ctx)
+	if err != nil {
+		logger.Errorf("failed to get PBM configuration during initialization: %s", err.Error())
+		return nil, err
+	}
 	return &pbmCollector{
 		ctx:      ctx,
 		mongoURI: mongoURI,
 		base:     newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "pbm"})),
-	}
+	}, nil
 }
 
 func (p *pbmCollector) Describe(ch chan<- *prometheus.Desc) {
