@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
@@ -256,4 +257,53 @@ func TestMongoUpMetric(t *testing.T) {
 			assert.Equal(t, true, res)
 		})
 	}
+}
+func BenchmarkExporterRegistry(b *testing.B) {
+	type testcase struct {
+		name string
+		URI  string
+	}
+
+	currentTC := testcase{name: "mongo-1-1", URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "27017"))}
+
+	b.Run("cluster without PBM config", func(b *testing.B) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		exporterOpts := &Opts{
+			Logger:           logrus.New(),
+			URI:              currentTC.URI,
+			ConnectTimeoutMS: 200,
+			DirectConnect:    true,
+			GlobalConnPool:   false,
+			CollectAll:       true,
+		}
+
+		client, err := connect(ctx, exporterOpts)
+		assert.NoError(b, err)
+		b.Cleanup(func() {
+			assert.NoError(b, client.Disconnect(ctx))
+		})
+
+		mongoURI := "mongodb://127.0.0.1:17001/?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000" //nolint:gosec
+
+		e := New(exporterOpts)
+		for i := 0; i < b.N; i++ {
+			gc := newPbmCollector(ctx, client, mongoURI, e.opts.Logger)
+			_ = e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+			filter := []string{
+				"mongodb_pbm_cluster_backup_configured",
+			}
+			expected := strings.NewReader(`
+		# HELP mongodb_pbm_cluster_backup_configured PBM backups are configured for the cluster
+		# TYPE mongodb_pbm_cluster_backup_configured gauge
+		mongodb_pbm_cluster_backup_configured 1` + "\n")
+			err = testutil.CollectAndCompare(gc, expected, filter...)
+			assert.NotNil(b, err) // since PBM is not configured, we expect an error here.
+
+			//res := r.Unregister(gc)
+			//assert.Equal(b, true, res)
+		}
+		b.ReportAllocs()
+	})
 }
