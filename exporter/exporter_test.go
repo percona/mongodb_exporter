@@ -18,6 +18,9 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"net"
 	"net/http"
@@ -26,11 +29,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
-
-	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -257,41 +255,4 @@ func TestMongoUpMetric(t *testing.T) {
 			assert.Equal(t, true, res)
 		})
 	}
-}
-func BenchmarkExporterRegistry(b *testing.B) {
-	type testcase struct {
-		name string
-		URI  string
-	}
-
-	currentTC := testcase{name: "mongo-1-1", URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "27017"))}
-
-	b.Run("cluster without PBM config", func(b *testing.B) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		exporterOpts := &Opts{
-			Logger:           logrus.New(),
-			URI:              currentTC.URI,
-			ConnectTimeoutMS: 200,
-			DirectConnect:    true,
-			GlobalConnPool:   false,
-			CollectAll:       true,
-		}
-
-		client, err := connect(ctx, exporterOpts)
-		assert.NoError(b, err)
-		b.Cleanup(func() {
-			assert.NoError(b, client.Disconnect(ctx))
-		})
-
-		mongoURI := "mongodb://127.0.0.1:17001/?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000" //nolint:gosec
-
-		e := New(exporterOpts)
-		for i := 0; i < b.N; i++ {
-			_, err = newPbmCollector(ctx, client, mongoURI, e.opts.Logger)
-			assert.NotNil(b, err)
-			_ = e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
-		}
-		b.ReportAllocs()
-	})
 }
