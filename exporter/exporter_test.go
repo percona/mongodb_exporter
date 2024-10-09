@@ -18,9 +18,6 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net"
 	"net/http"
@@ -29,6 +26,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
