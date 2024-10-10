@@ -249,14 +249,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	if e.opts.EnablePBMMetrics && requestOpts.EnablePBMMetrics {
-		pbmc, err := newPbmCollector(ctx, client, e.opts.URI, e.opts.Logger)
-		if err != nil {
-			e.logger.Errorf("Cannot create PBM collector: %v, collector will now be disabled.", err)
-			e.opts.EnablePBMMetrics = false
-			requestOpts.EnablePBMMetrics = false
-		} else {
-			registry.MustRegister(pbmc)
-		}
+		pbmc := newPbmCollector(ctx, client, e.opts.URI, e.opts.Logger)
+		registry.MustRegister(pbmc)
 	}
 
 	return registry
