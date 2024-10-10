@@ -95,7 +95,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 
 	pbmConfig, err := pbmClient.GetConfig(p.ctx)
 	if err != nil {
-		logger.Warnf("failed to get PBM configuration: %s", err.Error())
+		logger.Infof("failed to get PBM configuration: %s", err.Error())
 	}
 
 	if pbmConfig != nil {
