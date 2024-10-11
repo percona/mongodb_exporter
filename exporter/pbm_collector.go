@@ -86,10 +86,16 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 		logger.Errorf("failed to create PBM client from uri %s: %s", p.mongoURI, err.Error())
 		return
 	}
+	defer func() {
+		err := pbmClient.Close(p.ctx)
+		if err != nil {
+			logger.Errorf("failed to close PBM client: %v", err)
+		}
+	}()
 
 	pbmConfig, err := pbmClient.GetConfig(p.ctx)
 	if err != nil {
-		logger.Errorf("failed to get PBM configuration: %s", err.Error())
+		logger.Infof("failed to get PBM configuration: %s", err.Error())
 	}
 
 	if pbmConfig != nil {
