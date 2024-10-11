@@ -104,6 +104,19 @@ If your URI is prefixed by mongodb:// or mongodb+srv:// schema, any host not pre
 --mongodb.uri=mongodb+srv://user:pass@host1:27017,host2:27017,host3:27017/admin,mongodb://user2:pass2@host4:27018/admin
 ```
 
+You can use the --split-cluster option to split all cluster nodes into separate targets. This mode is useful when cluster nodes are defined as SRV records and the mongodb_exporter is running with mongodb+srv domain specified. In this case SRV records will be queried upon mongodb_exporter start and each cluster node can be queried using the **target** parameter of multitarget endpoint. 
+
+#### Overall targets request endpoint
+
+There is an overall targets endpoint **/scrapeall** that queries all the targets in one request. It can be used to store multiple node metrics without separate target requests. In this case, each node metric will have a **instance** label containing the node name as a host:port pair (or just host if no port was not specified). For example, for mongodb_exporter running with the options:
+```
+--mongodb.uri="mongodb://host1:27015,host2:27016" --split-cluster=true
+``` 
+we get metrics like this:
+```
+mongodb_up{instance="host1:27015"} 1
+mongodb_up{instance="host2:27016"} 1
+```
 
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.

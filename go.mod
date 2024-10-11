@@ -18,6 +18,8 @@ require (
 	go.mongodb.org/mongo-driver v1.17.1
 )
 
+require github.com/foxcpp/go-mockdns v1.1.0
+
 require github.com/hashicorp/go-version v1.7.0
 
 require github.com/percona/percona-backup-mongodb v1.8.1-0.20240814130653-5285f7975ff6
@@ -41,6 +43,7 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
+	github.com/miekg/dns v1.1.57 // indirect
 	github.com/minio/minio-go v6.0.14+incompatible // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mongodb/mongo-tools v0.0.0-20240723193119-837c2bc263f4 // indirect
@@ -64,6 +67,7 @@ require (
 	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/term v0.23.0 // indirect
 	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
