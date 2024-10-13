@@ -1,4 +1,5 @@
 dist: build
+version: 2
 builds:
   - binary: mongodb_exporter
     env:
@@ -6,6 +7,7 @@ builds:
     goos:
       - linux
       - darwin
+      - windows
     goarch:
       - amd64
       - arm
@@ -23,9 +25,9 @@ archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
     wrap_in_directory: true
 snapshot:
-  name_template: "{{ .ShortCommit }}"
+  version_template: "{{ .ShortCommit }}"
 changelog:
-  skip: true
+  use: github
 release:
   github:
     owner: percona
@@ -77,8 +79,9 @@ docker_manifests:
     image_templates:
     - ghcr.io/percona/mongodb_exporter:{{.Version}}-arm64v8
     - ghcr.io/percona/mongodb_exporter:{{.Version}}-amd64
+
 nfpms:
-  - file_name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
+  - file_name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{- if eq .Arch `amd64` }}64-bit{{- else }}{{ .Arch }}{{ end }}"
     homepage:  https://www.percona.com/
     description: MongoDB exporter for Prometheus
     maintainer: Percona
@@ -88,8 +91,6 @@ nfpms:
     - deb
     - rpm
     bindir: /usr/bin
-    replacements:
-      amd64: 64-bit
     scripts:
       postinstall: ".scripts/postinst"
     contents:
