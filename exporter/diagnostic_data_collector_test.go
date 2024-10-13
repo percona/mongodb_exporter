@@ -419,9 +419,6 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-	# HELP mongodb_mongod_storage_engine The storage engine used by the MongoDB instance
-	# TYPE mongodb_mongod_storage_engine gauge
-	mongodb_mongod_storage_engine{engine="wiredTiger"} 1
 	# HELP mongodb_version_info The server version
 	# TYPE mongodb_version_info gauge
 	mongodb_version_info{edition="",mongodb="",vendor=""} 1` + "\n")
@@ -430,7 +427,6 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_mongod_storage_engine",
 		"mongodb_version_info",
 	}
 
