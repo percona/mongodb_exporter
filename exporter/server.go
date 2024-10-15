@@ -26,7 +26,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promslog"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 )
@@ -80,7 +80,11 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 		WebListenAddresses: &[]string{opts.WebListenAddress},
 		WebConfigFile:      &opts.TLSConfigPath,
 	}
-	if err := web.ListenAndServe(server, flags, promlog.New(&promlog.Config{})); err != nil {
+	logLevel := &promslog.AllowedLevel{}
+	_ = logLevel.Set(log.Level.String())
+	if err := web.ListenAndServe(server, flags, promslog.New(&promslog.Config{ //nolint:exhaustivestruct
+		Level: logLevel,
+	})); err != nil {
 		log.Errorf("error starting server: %v", err)
 		os.Exit(1)
 	}
