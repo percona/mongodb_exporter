@@ -76,8 +76,9 @@ build:                      ## Compile using plain go build
 release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
 		-v ${PWD}:/go/src/github.com/user/repo \
+		-v /var/run/docker.sock:/var/run/docker.sock \
 		-w /go/src/github.com/user/repo \
-		goreleaser/goreleaser release --snapshot --skip-publish --rm-dist 
+		goreleaser/goreleaser release --snapshot --skip=publish --clean
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
