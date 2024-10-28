@@ -1,30 +1,33 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -62,8 +65,11 @@ func TestConnect(t *testing.T) {
 
 	t.Run("Connect without SSL", func(t *testing.T) {
 		for name, port := range ports {
-			dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, port)
-			client, err := connect(ctx, dsn, true)
+			exporterOpts := &Opts{
+				URI:           fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, port)),
+				DirectConnect: true,
+			}
+			client, err := connect(ctx, exporterOpts)
 			assert.NoError(t, err, name)
 			err = client.Disconnect(ctx)
 			assert.NoError(t, err, name)
@@ -94,7 +100,7 @@ func TestConnect(t *testing.T) {
 				res, err := http.Get(ts.URL) //nolint:noctx
 				assert.Nil(t, e.client)
 				assert.NoError(t, err)
-				g, err := ioutil.ReadAll(res.Body)
+				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
 				assert.NoError(t, err)
 				assert.NotEmpty(t, g)
@@ -128,7 +134,7 @@ func TestConnect(t *testing.T) {
 				res, err := http.Get(ts.URL) //nolint:noctx
 				assert.NotNil(t, e.client)
 				assert.NoError(t, err)
-				g, err := ioutil.ReadAll(res.Body)
+				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
 				assert.NoError(t, err)
 				assert.NotEmpty(t, g)
@@ -168,16 +174,16 @@ func TestMongoS(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		dsn := fmt.Sprintf("mongodb://%s:%s/admin", hostname, test.port)
-		client, err := connect(ctx, dsn, true)
-		assert.NoError(t, err)
-
 		exporterOpts := &Opts{
 			Logger:                 logrus.New(),
-			URI:                    dsn,
+			URI:                    fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, test.port)),
+			DirectConnect:          true,
 			GlobalConnPool:         false,
 			EnableReplicasetStatus: true,
 		}
+
+		client, err := connect(ctx, exporterOpts)
+		assert.NoError(t, err)
 
 		e := New(exporterOpts)
 
@@ -193,26 +199,61 @@ func TestMongoS(t *testing.T) {
 	}
 }
 
-func TestMongoUp(t *testing.T) {
+func TestMongoUpMetric(t *testing.T) {
 	ctx := context.Background()
 
-	dsn := "mongodb://127.0.0.1:123456/admin"
-	client, err := connect(ctx, dsn, true)
-	assert.Error(t, err)
-
-	exporterOpts := &Opts{
-		Logger:         logrus.New(),
-		URI:            dsn,
-		GlobalConnPool: false,
-		CollectAll:     true,
+	type testcase struct {
+		name        string
+		URI         string
+		clusterRole string
+		Want        int
 	}
 
-	e := New(exporterOpts)
+	testCases := []testcase{
+		{URI: "mongodb://127.0.0.1:12345/admin", Want: 0},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_ARBITER_PORT", "27017")), Want: 1, clusterRole: "arbiter"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_MONGOS_PORT", "27017")), Want: 1, clusterRole: "mongos"},
+	}
 
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+	for _, tc := range testCases {
+		t.Run(tc.clusterRole+"/"+tc.URI, func(t *testing.T) {
+			exporterOpts := &Opts{
+				Logger:           logrus.New(),
+				URI:              tc.URI,
+				ConnectTimeoutMS: 200,
+				DirectConnect:    true,
+				GlobalConnPool:   false,
+				CollectAll:       true,
+			}
 
-	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+			client, err := connect(ctx, exporterOpts)
+			if tc.Want == 1 {
+				assert.NoError(t, err, "Must be able to connect to %s", tc.URI)
+			} else {
+				assert.Error(t, err, "Must be unable to connect to %s", tc.URI)
+			}
 
-	res := r.Unregister(gc)
-	assert.Equal(t, true, res)
+			e := New(exporterOpts)
+			nodeType, _ := getNodeType(ctx, client)
+			gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
+			r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+			expected := strings.NewReader(fmt.Sprintf(`
+		# HELP mongodb_up Whether MongoDB is up.
+		# TYPE mongodb_up gauge
+		mongodb_up {cluster_role="%s"} %s`, tc.clusterRole, strconv.Itoa(tc.Want)) + "\n")
+
+			filter := []string{
+				"mongodb_up",
+			}
+			err = testutil.CollectAndCompare(gc, expected, filter...)
+			assert.NoError(t, err, "mongodb_up metric should be %d", tc.Want)
+
+			res := r.Unregister(gc)
+			assert.Equal(t, true, res)
+		})
+	}
 }

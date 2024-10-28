@@ -4,7 +4,7 @@
 [![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
 [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
-[![Discord](https://img.shields.io/discord/808660945513611334?style=flat)](http://per.co.na/discord)
+
 
 This is the new MongoDB exporter implementation that handles ALL metrics exposed by MongoDB monitoring commands.
 This new implementation loops over all the fields exposed in diagnostic commands and tries to get data from them.
@@ -15,6 +15,10 @@ Currently, these metric sources are implemented:
 - getDiagnosticData
 - replSetGetStatus
 - serverStatus
+
+## Supported MongoDB versions
+
+The exporter works with Percona Server for MongoDB and MongoDB Community or Enterprise Edition versions 4.4 and newer. Older versions might also work but are not tested anymore.
 
 ## Info on Percona MongoDB exporter versions
 
@@ -48,10 +52,10 @@ A docker image is available on the [official percona repository](https://hub.doc
 
 ```sh
 # with podman
-podman run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+podman run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
 
 # with docker
-docker run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+docker run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
 ```
 
 #### Permissions
@@ -71,14 +75,53 @@ Connecting user should have sufficient rights to query needed stats:
 More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
 
 #### Example
-```
+```sh
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001
+```
+
+#### MongoDB Authentication
+You can supply the mongodb user/password direct in the `--mongodb.uri=` like `--mongodb.uri=mongodb://user:pass@127.0.0.1:17001`, you can also supply the mongodb user/password with `--mongodb.user=`, `--mongodb.password=`
+but the user and password info will be leaked via `ps` or `top` command, for security issue, you can use `MONGODB_USER` and `MONGODB_PASSWORD` env variable to set user/password for given uri
+```sh
+MONGODB_USER=XXX MONGODB_PASSWORD=YYY mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+# or
+export MONGODB_USER=XXX
+export MONGODB_PASSWORD=YYY
+mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+```
+
+#### Multi-target support
+You can run the exporter specifying multiple URIs, devided by a comma in --mongodb.uri option or MONGODB_URI environment variable in order to monitor multiple mongodb instances with the a single mongodb_exporter instance.
+```sh
+--mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin,mongodb://user2:pass2@127.0.0.1:27018/admin
+```
+In this case you can use the **/scrape** endpoint with the **target** parameter to retreive the specified tartget's metrics.  When querying the data you can use just mongodb://host:port in the target parameter without other parameters and, of course without host credentials
+```sh
+GET /scrape?target=mongodb://127.0.0.1:27018
+```
+If your URI is prefixed by mongodb:// or mongodb+srv:// schema, any host not prefixed by it after comma is being treated as part of a cluster rather then as a standalone host. Thus clusters and standalone hosts can be combined like this:
+```
+--mongodb.uri=mongodb+srv://user:pass@host1:27017,host2:27017,host3:27017/admin,mongodb://user2:pass2@host4:27018/admin
+```
+
+You can use the --split-cluster option to split all cluster nodes into separate targets. This mode is useful when cluster nodes are defined as SRV records and the mongodb_exporter is running with mongodb+srv domain specified. In this case SRV records will be queried upon mongodb_exporter start and each cluster node can be queried using the **target** parameter of multitarget endpoint. 
+
+#### Overall targets request endpoint
+
+There is an overall targets endpoint **/scrapeall** that queries all the targets in one request. It can be used to store multiple node metrics without separate target requests. In this case, each node metric will have a **instance** label containing the node name as a host:port pair (or just host if no port was not specified). For example, for mongodb_exporter running with the options:
+```
+--mongodb.uri="mongodb://host1:27015,host2:27016" --split-cluster=true
+``` 
+we get metrics like this:
+```
+mongodb_up{instance="host1:27015"} 1
+mongodb_up{instance="host2:27016"} 1
 ```
 
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.
 Usage example: `--mongodb.collstats-colls=database1.collection1,database2.collection2`
-```
+```sh
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 #### Enabling compatibility mode.
@@ -95,6 +138,27 @@ HELP mongodb_mongod_wiredtiger_log_bytes_total mongodb_mongod_wiredtiger_log_byt
 # TYPE mongodb_mongod_wiredtiger_log_bytes_total untyped
 mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
 ```
+#### Enabling profile metrics gathering
+`--collector.profile` 
+To collect metrics, you need to enable the profiler in [MongoDB](https://www.mongodb.com/docs/manual/tutorial/manage-the-database-profiler/):
+Usage example: `db.setProfilingLevel(2)`
+
+|Level|Description|
+|-----|-----------|
+|0| The profiler is off and does not collect any data. This is the default profiler level.|
+|1| The profiler collects data for operations that take longer than the value of `slowms` or that match a filter.<br> When a filter is set: <ul><li> The `slowms` and `sampleRate` options are not used for profiling.</li><li>The profiler only captures operations that match the filter.</li></ul>
+|2|The profiler collects data for all operations.|
+
+#### Enabling shards metrics gathering
+When shard metrics collection is enabled by `--collector.shards`, the exporter will expose metrics related to sharded Mongo. 
+Example, if shards collector is enabled:
+```
+# HELP mongodb_shards_collection_chunks_count sharded collection chunks.
+# TYPE mongodb_shards_collection_chunks_count counter
+mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs1"} 250
+mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs2"} 250
+```
+You can see shard name, it's collection, database and count.
 
 #### Cluster role labels
 The exporter sets some topology labels in all metrics.

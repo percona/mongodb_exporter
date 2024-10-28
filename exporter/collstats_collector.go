@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
@@ -41,7 +40,7 @@ type collstatsCollector struct {
 func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible, discovery bool, topology labelsGetter, collections []string) *collstatsCollector {
 	return &collstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "collstats"})),
 
 		compatibleMode:  compatible,
 		discoveringMode: discovery,
@@ -60,22 +59,28 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
-	defer prometheus.MeasureCollectTime(ch, "mongodb", "collstats")()
-
-	collections := d.collections
+	defer measureCollectTime(ch, "mongodb", "collstats")()
 
 	client := d.base.client
 	logger := d.base.logger
 
+	var collections []string
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
+		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
 			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
 
-		collections = fromMapToSlice(namespaces)
+		collections = fromMapToSlice(onlyCollectionsNamespaces)
+	} else {
+		var err error
+		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
+		if err != nil {
+			logger.Errorf("cannot list collections: %s", err.Error())
+			return
+		}
 	}
 
 	for _, dbCollection := range collections {
@@ -86,6 +91,11 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		database := parts[0]
 		collection := strings.Join(parts[1:], ".") // support collections having a .
+
+		// exclude system collections
+		if strings.HasPrefix(collection, "system.") {
+			continue
+		}
 
 		aggregation := bson.D{
 			{
@@ -133,17 +143,6 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
-}
-
-func fromMapToSlice(databases map[string][]string) []string {
-	var collections []string
-	for db, cols := range databases {
-		for _, value := range cols {
-			collections = append(collections, db+"."+value)
-		}
-	}
-
-	return collections
 }
 
 var _ prometheus.Collector = (*collstatsCollector)(nil)

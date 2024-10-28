@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
@@ -42,9 +41,21 @@ type diagnosticDataCollector struct {
 
 // newDiagnosticDataCollector creates a collector for diagnostic information.
 func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *diagnosticDataCollector {
+	nodeType, err := getNodeType(ctx, client)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"component": "diagnosticDataCollector",
+		}).Errorf("Cannot get node type: %s", err)
+	}
+	if nodeType == typeArbiter {
+		logger.WithFields(logrus.Fields{
+			"component": "diagnosticDataCollector",
+		}).Warn("some metrics might be unavailable on arbiter nodes")
+	}
+
 	return &diagnosticDataCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "diagnostic_data"})),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
@@ -60,61 +71,81 @@ func (d *diagnosticDataCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
-	defer prometheus.MeasureCollectTime(ch, "mongodb", "diagnostic_data")()
+	defer measureCollectTime(ch, "mongodb", "diagnostic_data")()
 
 	var m bson.M
 
 	logger := d.base.logger
 	client := d.base.client
 
+	nodeType, err := getNodeType(d.ctx, client)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"component": "diagnosticDataCollector",
+		}).Errorf("Cannot get node type: %s", err)
+	}
+
+	var metrics []prometheus.Metric
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 	if res.Err() != nil {
-		if isArbiter, _ := isArbiter(d.ctx, client); isArbiter {
+		if nodeType != typeArbiter {
+			logger.Warnf("failed to run command: getDiagnosticData, some metrics might be unavailable %s", res.Err())
+		}
+	} else {
+		if err := res.Decode(&m); err != nil {
+			logger.Errorf("cannot run getDiagnosticData: %s", err)
 			return
 		}
-	}
 
-	if err := res.Decode(&m); err != nil {
-		logger.Errorf("cannot run getDiagnosticData: %s", err)
-	}
+		if m == nil || m["data"] == nil {
+			logger.Error("cannot run getDiagnosticData: response is empty")
+		}
 
-	if m == nil || m["data"] == nil {
-		logger.Error("cannot run getDiagnosticData: response is empty")
-	}
+		var ok bool
+		m, ok = m["data"].(bson.M)
+		if !ok {
+			err = errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
+			logger.Errorf("cannot decode getDiagnosticData: %s", err)
+		}
 
-	m, ok := m["data"].(bson.M)
-	if !ok {
-		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
-		logger.Errorf("cannot decode getDiagnosticData: %s", err)
-	}
+		logger.Debug("getDiagnosticData result")
+		debugResult(logger, m)
 
-	logger.Debug("getDiagnosticData result")
-	debugResult(logger, m)
+		metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
+		metrics = append(metrics, locksMetrics(logger, m)...)
 
-	metrics := makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
-	metrics = append(metrics, locksMetrics(logger, m)...)
+		securityMetric, err := d.getSecurityMetricFromLineOptions(client)
+		if err != nil {
+			logger.Errorf("failed to run command: getCmdLineOptions: %s", err)
+		} else if securityMetric != nil {
+			metrics = append(metrics, securityMetric)
+		}
 
-	securityMetric, err := d.getSecurityMetricFromLineOptions(client)
-	if err != nil {
-		logger.Errorf("cannot decode getCmdLineOtpions: %s", err)
-	} else if securityMetric != nil {
-		metrics = append(metrics, securityMetric)
+		if d.compatibleMode {
+			metrics = append(metrics, specialMetrics(d.ctx, client, m, nodeType, logger)...)
+
+			if cem, err := cacheEvictedTotalMetric(m); err == nil {
+				metrics = append(metrics, cem)
+			}
+		}
 	}
 
 	if d.compatibleMode {
-		metrics = append(metrics, specialMetrics(d.ctx, client, m, logger)...)
-
-		if cem, err := cacheEvictedTotalMetric(m); err == nil {
-			metrics = append(metrics, cem)
+		buildInfo, err := retrieveMongoDBBuildInfo(d.ctx, client, logger)
+		if err != nil {
+			logger.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
 		}
 
-		nodeType, err := getNodeType(d.ctx, client)
-		if err != nil {
-			logger.WithFields(logrus.Fields{
-				"component": "diagnosticDataCollector",
-			}).Errorf("Cannot get node type to check if this is a mongos: %s", err)
-		} else if nodeType == typeMongos {
+		metrics = append(metrics, serverVersion(buildInfo))
+
+		if nodeType == typeArbiter {
+			if hm := arbiterMetrics(d.ctx, client, logger); hm != nil {
+				metrics = append(metrics, hm...)
+			}
+		}
+
+		if nodeType == typeMongos {
 			metrics = append(metrics, mongosMetrics(d.ctx, client, logger)...)
 		}
 	}

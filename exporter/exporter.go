@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // Package exporter implements the collectors and metrics handlers.
 package exporter
@@ -22,15 +21,12 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -39,12 +35,10 @@ import (
 
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
-	path                  string
 	client                *mongo.Client
 	clientMu              sync.Mutex
 	logger                *logrus.Logger
 	opts                  *Opts
-	webListenAddress      string
 	lock                  *sync.Mutex
 	totalCollectionsCount int
 }
@@ -57,26 +51,37 @@ type Opts struct {
 	CollStatsLimit         int
 	CompatibleMode         bool
 	DirectConnect          bool
+	ConnectTimeoutMS       int
 	DisableDefaultRegistry bool
 	DiscoveringMode        bool
 	GlobalConnPool         bool
+	ProfileTimeTS          int
+	TimeoutOffset          int
+	CurrentOpSlowTime      string
 
-	CollectAll             bool
-	EnableDBStats          bool
-	EnableDiagnosticData   bool
-	EnableReplicasetStatus bool
-	EnableTopMetrics       bool
-	EnableIndexStats       bool
-	EnableCollStats        bool
+	CollectAll               bool
+	EnableDBStats            bool
+	EnableDBStatsFreeStorage bool
+	EnableDiagnosticData     bool
+	EnableReplicasetStatus   bool
+	EnableCurrentopMetrics   bool
+	EnableTopMetrics         bool
+	EnableIndexStats         bool
+	EnableCollStats          bool
+	EnableProfile            bool
+	EnableShards             bool
+	EnableFCV                bool // Feature Compatibility Version.
 
 	EnableOverrideDescendingIndex bool
 
+	// Enable metrics for Percona Backup for MongoDB (PBM).
+	EnablePBMMetrics bool
+
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
-	Path                  string
-	URI                   string
-	WebListenAddress      string
-	TLSConfigPath         string
+
+	URI      string
+	NodeName string
 }
 
 var (
@@ -100,16 +105,9 @@ func New(opts *Opts) *Exporter {
 
 	ctx := context.Background()
 
-	if opts.Path == "" {
-		opts.Logger.Warn("Web telemetry path \"\" invalid, falling back to \"/\" instead")
-		opts.Path = "/"
-	}
-
 	exp := &Exporter{
-		path:                  opts.Path,
 		logger:                opts.Logger,
 		opts:                  opts,
-		webListenAddress:      opts.WebListenAddress,
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
 	}
@@ -134,16 +132,16 @@ func (e *Exporter) getTotalCollectionsCount() int {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
+	nodeType, err := getNodeType(ctx, client)
+	if err != nil {
+		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
+	}
+
+	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
 	registry.MustRegister(gc)
 
 	if client == nil {
 		return registry
-	}
-
-	nodeType, err := getNodeType(ctx, client)
-	if err != nil {
-		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
 	}
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
@@ -160,10 +158,31 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		}
 		e.opts.EnableDiagnosticData = true
 		e.opts.EnableDBStats = true
+		e.opts.EnableDBStatsFreeStorage = true
 		e.opts.EnableCollStats = true
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
 		e.opts.EnableIndexStats = true
+		e.opts.EnableCurrentopMetrics = true
+		e.opts.EnableProfile = true
+		e.opts.EnableShards = true
+		e.opts.EnableFCV = true
+		e.opts.EnablePBMMetrics = true
+	}
+
+	// arbiter only have isMaster privileges
+	if nodeType == typeArbiter {
+		e.opts.EnableDBStats = false
+		e.opts.EnableDBStatsFreeStorage = false
+		e.opts.EnableCollStats = false
+		e.opts.EnableTopMetrics = false
+		e.opts.EnableReplicasetStatus = false
+		e.opts.EnableIndexStats = false
+		e.opts.EnableCurrentopMetrics = false
+		e.opts.EnableProfile = false
+		e.opts.EnableShards = false
+		e.opts.EnableFCV = false
+		e.opts.EnablePBMMetrics = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -190,8 +209,20 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if e.opts.EnableDBStats && limitsOk && requestOpts.EnableDBStats {
 		cc := newDBStatsCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo, nil)
+			e.opts.CompatibleMode, topologyInfo, nil, e.opts.EnableDBStatsFreeStorage)
 		registry.MustRegister(cc)
+	}
+
+	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableCurrentopMetrics && e.opts.CurrentOpSlowTime != "" {
+		coc := newCurrentopCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo, e.opts.CurrentOpSlowTime)
+		registry.MustRegister(coc)
+	}
+
+	if e.opts.EnableProfile && nodeType != typeMongos && limitsOk && requestOpts.EnableProfile && e.opts.ProfileTimeTS != 0 {
+		pc := newProfileCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo, e.opts.ProfileTimeTS)
+		registry.MustRegister(pc)
 	}
 
 	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
@@ -205,6 +236,21 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
+	}
+
+	if e.opts.EnableShards && nodeType == typeMongos && requestOpts.EnableShards {
+		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
+		registry.MustRegister(sc)
+	}
+
+	if e.opts.EnableFCV && nodeType != typeMongos {
+		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger)
+		registry.MustRegister(fcvc)
+	}
+
+	if e.opts.EnablePBMMetrics && requestOpts.EnablePBMMetrics {
+		pbmc := newPbmCollector(ctx, client, e.opts.URI, e.opts.Logger)
+		registry.MustRegister(pbmc)
 	}
 
 	return registry
@@ -222,7 +268,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 			return e.client, nil
 		}
 
-		client, err := connect(context.Background(), e.opts.URI, e.opts.DirectConnect)
+		client, err := connect(context.Background(), e.opts)
 		if err != nil {
 			return nil, err
 		}
@@ -232,7 +278,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	}
 
 	// !e.opts.GlobalConnPool: create new client for every scrape.
-	client, err := connect(ctx, e.opts.URI, e.opts.DirectConnect)
+	client, err := connect(ctx, e.opts)
 	if err != nil {
 		return nil, err
 	}
@@ -245,39 +291,17 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
-		// To support also older ones vmagents.
+		// To support older ones vmagents.
 		if err != nil {
 			seconds = 10
 		}
+		seconds -= e.opts.TimeoutOffset
 
 		var client *mongo.Client
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
 		defer cancel()
 
-		filters := r.URL.Query()["collect[]"]
-
-		requestOpts := Opts{}
-
-		if len(filters) == 0 {
-			requestOpts = *e.opts
-		}
-
-		for _, filter := range filters {
-			switch filter {
-			case "diagnosticdata":
-				requestOpts.EnableDiagnosticData = true
-			case "replicasetstatus":
-				requestOpts.EnableReplicasetStatus = true
-			case "dbstats":
-				requestOpts.EnableDBStats = true
-			case "topmetrics":
-				requestOpts.EnableTopMetrics = true
-			case "indexstats":
-				requestOpts.EnableIndexStats = true
-			case "collstats":
-				requestOpts.EnableCollStats = true
-			}
-		}
+		requestOpts := GetRequestOpts(r.URL.Query()["collect[]"], e.opts)
 
 		client, err = e.getClient(ctx)
 		if err != nil {
@@ -316,13 +340,14 @@ func (e *Exporter) Handler() http.Handler {
 			gatherers = append(gatherers, prometheus.DefaultGatherer)
 		}
 
+		var ti *topologyInfo
 		if client != nil {
 			// Topology can change between requests, so we need to get it every time.
-			ti := newTopologyInfo(ctx, client, e.logger)
-
-			registry := e.makeRegistry(ctx, client, ti, requestOpts)
-			gatherers = append(gatherers, registry)
+			ti = newTopologyInfo(ctx, client, e.logger)
 		}
+
+		registry := e.makeRegistry(ctx, client, ti, requestOpts)
+		gatherers = append(gatherers, registry)
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
@@ -334,38 +359,58 @@ func (e *Exporter) Handler() http.Handler {
 	})
 }
 
-// Run starts the exporter.
-func (e *Exporter) Run() {
-	mux := http.DefaultServeMux
-	mux.Handle(e.path, e.Handler())
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
-            <head><title>MongoDB Exporter</title></head>
-            <body>
-            <h1>MongoDB Exporter</h1>
-            <p><a href='/metrics'>Metrics</a></p>
-            </body>
-            </html>`))
-	})
+// GetRequestOpts makes exporter.Opts structure from request filters and default options.
+func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
+	requestOpts := Opts{}
 
-	server := &http.Server{
-		Addr:    e.webListenAddress,
-		Handler: mux,
+	if len(filters) == 0 {
+		requestOpts = *defaultOpts
 	}
 
-	if err := web.ListenAndServe(server, e.opts.TLSConfigPath, promlog.New(&promlog.Config{})); err != nil {
-		e.logger.Errorf("error starting server: %v", err)
-		os.Exit(1)
+	for _, filter := range filters {
+		switch filter {
+		case "diagnosticdata":
+			requestOpts.EnableDiagnosticData = true
+		case "replicasetstatus":
+			requestOpts.EnableReplicasetStatus = true
+		case "dbstats":
+			requestOpts.EnableDBStats = true
+		case "topmetrics":
+			requestOpts.EnableTopMetrics = true
+		case "currentopmetrics":
+			requestOpts.EnableCurrentopMetrics = true
+		case "indexstats":
+			requestOpts.EnableIndexStats = true
+		case "collstats":
+			requestOpts.EnableCollStats = true
+		case "profile":
+			requestOpts.EnableProfile = true
+		case "shards":
+			requestOpts.EnableShards = true
+		case "fcv":
+			requestOpts.EnableFCV = true
+		case "pbm":
+			requestOpts.EnablePBMMetrics = true
+		}
 	}
+
+	return requestOpts
 }
 
-func connect(ctx context.Context, dsn string, directConnect bool) (*mongo.Client, error) {
-	clientOpts, err := dsn_fix.ClientOptionsForDSN(dsn)
+func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
+	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
-	clientOpts.SetDirect(directConnect)
+
+	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
+
+	if clientOpts.ConnectTimeout == nil {
+		connectTimeout := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
+		clientOpts.SetConnectTimeout(connectTimeout)
+		clientOpts.SetServerSelectionTimeout(connectTimeout)
+	}
 
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {

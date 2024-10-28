@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2022 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
@@ -33,6 +32,7 @@ import (
 var (
 	testDBs   = []string{"testdb01", "testdb02"}
 	testColls = []string{"col01", "col02", "colxx", "colyy"}
+	testViews = []string{"view01", "view02"}
 )
 
 func setupDB(ctx context.Context, t *testing.T, client *mongo.Client) {
@@ -45,6 +45,10 @@ func setupDB(ctx context.Context, t *testing.T, client *mongo.Client) {
 				assert.NoError(t, err)
 			}
 		}
+	}
+	for _, view := range testViews {
+		err := client.Database(testDBs[0]).CreateView(ctx, view, testColls[0], mongo.Pipeline{})
+		assert.NoError(t, err)
 	}
 }
 
@@ -106,7 +110,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("Filter in databases", func(t *testing.T) {
 		want := []string{"col01", "col02", "colxx"}
 		inNameSpaces := []string{testDBs[0] + ".col0", testDBs[0] + ".colx"}
-		colls, err := listCollections(ctx, client, testDBs[0], inNameSpaces)
+		colls, err := listCollections(ctx, client, testDBs[0], inNameSpaces, true)
 		sort.Strings(colls)
 
 		assert.NoError(t, err)
@@ -116,22 +120,32 @@ func TestListCollections(t *testing.T) {
 	t.Run("With namespaces list", func(t *testing.T) {
 		// Advanced filtering test
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views"},
 			"testdb02": {"col01", "col02"},
 		}
 		// List all collections in testdb01 (inDBs[0]) but only col01 and col02 from testdb02.
 		filterInNameSpaces := []string{testDBs[0], testDBs[1] + ".col01", testDBs[1] + ".col02"}
-		namespaces, err := listAllCollections(ctx, client, filterInNameSpaces, systemDBs)
+		namespaces, err := listAllCollections(ctx, client, filterInNameSpaces, systemDBs, true)
 		assert.NoError(t, err)
 		assert.Equal(t, wantNS, namespaces)
 	})
 
 	t.Run("Empty namespaces list", func(t *testing.T) {
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views"},
 			"testdb02": {"col01", "col02", "colxx", "colyy"},
 		}
-		namespaces, err := listAllCollections(ctx, client, nil, systemDBs)
+		namespaces, err := listAllCollections(ctx, client, nil, systemDBs, true)
+		assert.NoError(t, err)
+		assert.Equal(t, wantNS, namespaces)
+	})
+
+	t.Run("Collections with views", func(t *testing.T) {
+		wantNS := map[string][]string{
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views", "view01", "view02"},
+			"testdb02": {"col01", "col02", "colxx", "colyy"},
+		}
+		namespaces, err := listAllCollections(ctx, client, nil, systemDBs, false)
 		assert.NoError(t, err)
 		assert.Equal(t, wantNS, namespaces)
 	})
@@ -139,7 +153,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("Count basic", func(t *testing.T) {
 		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, 8, count)
+		assert.Equal(t, 9, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {
@@ -172,4 +186,26 @@ func TestSplitNamespace(t *testing.T) {
 		assert.Equal(t, tc.wantDatabase, db)
 		assert.Equal(t, tc.wantCollection, coll)
 	}
+}
+
+//nolint:paralleltest
+func TestCheckNamespacesForViews(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	setupDB(ctx, t, client)
+	defer cleanupDB(ctx, client)
+
+	t.Run("Views in provided collection list (should fail)", func(t *testing.T) {
+		_, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
+		assert.EqualError(t, err, "namespace testdb01.view01 is a view and cannot be used for collstats/indexstats")
+	})
+
+	t.Run("No Views in provided collection list", func(t *testing.T) {
+		filtered, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views"})
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"testdb01.col01", "testdb01.system.views"}, filtered)
+	})
 }

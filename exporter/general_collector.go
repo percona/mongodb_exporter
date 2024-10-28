@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
@@ -25,18 +24,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-// This collector is always enabled and it is not directly related to any particular MongoDB
-// command to gather stats.
+// This collector is always enabled and collects general MongoDB connectivity status.
 type generalCollector struct {
-	ctx  context.Context
-	base *baseCollector
+	ctx      context.Context
+	base     *baseCollector
+	nodeType mongoDBNodeType
 }
 
 // newGeneralCollector creates a collector for MongoDB connectivity status.
-func newGeneralCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *generalCollector {
+func newGeneralCollector(ctx context.Context, client *mongo.Client, nodeType mongoDBNodeType, logger *logrus.Logger) *generalCollector {
 	return &generalCollector{
-		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		ctx:      ctx,
+		nodeType: nodeType,
+		base:     newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "general"})),
 	}
 }
 
@@ -49,22 +49,33 @@ func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
-	defer prometheus.MeasureCollectTime(ch, "mongodb", "general")()
-	ch <- mongodbUpMetric(d.ctx, d.base.client, d.base.logger)
+	defer measureCollectTime(ch, "mongodb", "general")()
+	ch <- mongodbUpMetric(d.ctx, d.base.client, d.nodeType, d.base.logger)
 }
 
-func mongodbUpMetric(ctx context.Context, client *mongo.Client, log *logrus.Logger) prometheus.Metric {
+func mongodbUpMetric(ctx context.Context, client *mongo.Client, nodeType mongoDBNodeType, log *logrus.Entry) prometheus.Metric { //nolint:ireturn
 	var value float64
+	var clusterRole mongoDBNodeType
 
 	if client != nil {
 		if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {
 			value = 1
 		} else {
-			log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err)
+			log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err.Error())
+		}
+
+		switch nodeType { //nolint:exhaustive
+		case typeMongos:
+			clusterRole = typeMongos
+		case typeArbiter:
+			clusterRole = typeArbiter
+		default:
+			clusterRole = typeMongod
 		}
 	}
 
-	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, nil)
+	labels := map[string]string{"cluster_role": string(clusterRole)}
+	d := prometheus.NewDesc("mongodb_up", "Whether MongoDB is up.", nil, labels)
 
 	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
 }
