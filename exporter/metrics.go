@@ -16,7 +16,6 @@
 package exporter
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -185,15 +184,6 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 	if label != "" {
 		rm.ln = append(rm.ln, label)
 		rm.lv = append(rm.lv, name)
-	}
-
-	if name == "start" || name == "end" {
-		fmt.Println("fqName: ", fqName)
-		fmt.Println("help: ", help)
-		fmt.Println("val: ", *f)
-		fmt.Println("vt: ", metricType)
-		fmt.Println("ln: ", rm.ln)
-		fmt.Println("lv: ", rm.lv)
 	}
 
 	return rm, nil

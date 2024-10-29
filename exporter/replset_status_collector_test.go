@@ -36,7 +36,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti)
+	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti, nil)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -66,7 +66,7 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti)
+	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti, nil)
 
 	// Replication set metrics should not be generated for unsharded server
 	count := testutil.CollectAndCount(c)

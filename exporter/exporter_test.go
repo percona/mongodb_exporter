@@ -187,8 +187,7 @@ func TestMongoS(t *testing.T) {
 
 		e := New(exporterOpts)
 
-		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, new(labelsGetterMock))
+		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode, new(labelsGetterMock), nil)
 
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 

@@ -812,8 +812,10 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 
 	if nodeType != typeArbiter {
 		metrics = append(metrics, myState(ctx, client))
-		if rm := replSetMetrics(m); rm != nil {
-			metrics = append(metrics, rm...)
+		if replSetGetStatus, ok := m["replSetGetStatus"].(bson.M); ok {
+			if rm := replSetMetrics(replSetGetStatus, l); rm != nil {
+				metrics = append(metrics, rm...)
+			}
 		}
 
 		if nodeType != typeMongos {
@@ -982,17 +984,15 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return []prometheus.Metric{headMetric, tailMetric}, nil
 }
 
-func replSetMetrics(d bson.M) []prometheus.Metric {
-	replSetGetStatus, ok := d["replSetGetStatus"].(bson.M)
-	if !ok {
-		return nil
-	}
+func replSetMetrics(d bson.M, l *logrus.Entry) []prometheus.Metric {
 	var repl proto.ReplicaSetStatus
-	b, err := bson.Marshal(replSetGetStatus)
+	b, err := bson.Marshal(d)
 	if err != nil {
+		l.Warnf("cannot marshal replica set status: %s", err)
 		return nil
 	}
 	if err := bson.Unmarshal(b, &repl); err != nil {
+		l.Warnf("cannot unmarshal replica set status: %s", err)
 		return nil
 	}
 

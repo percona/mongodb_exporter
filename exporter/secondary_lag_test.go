@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 	"strings"
 	"testing"
 	"time"
@@ -126,7 +127,7 @@ func TestSecondaryLag(t *testing.T) {
 	assert.NoError(t, err)
 
 	m, _ = m["data"].(bson.M)
-	metrics := replSetMetrics(m)
+	metrics := replSetMetrics(m, logrus.WithField("component", "test"))
 	var lag prometheus.Metric
 	for _, m := range metrics {
 		if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_member_replication_lag"`) {
