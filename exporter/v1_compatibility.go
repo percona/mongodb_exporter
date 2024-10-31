@@ -474,8 +474,20 @@ func conversions() []conversion {
 			newName: "mongodb_ss_wt_txn_transaction_checkpoint_total_time_msecs",
 		},
 		{
+			oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
+			newName: "mongodb_ss_wt_checkpoint_total_time_msecs",
+		},
+		{
 			oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
 			newName: "mongodb_ss_wt_txn_transaction_checkpoint_currently_running",
+		},
+		{
+			oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
+			newName: "mongodb_ss_wt_checkpoint_currently_running",
+		},
+		{
+			oldName: "mongodb_ss_tcmalloc_tcmalloc_thread_cache_free_bytes",
+			newName: "mongodb_ss_tcmalloc_tcmalloc_thread_cache_free",
 		},
 		{
 			oldName:     "mongodb_mongod_wiredtiger_transactions_total",
@@ -571,6 +583,15 @@ func conversions() []conversion {
 		{
 			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
 			prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",
+			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"min_time_msecs": "min",
+				"max_time_msecs": "max",
+			},
+		},
+		{
+			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
+			prefix:      "mongodb_ss_wt_checkpoint",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"min_time_msecs": "min",
