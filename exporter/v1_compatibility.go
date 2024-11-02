@@ -852,6 +852,9 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 }
 
 func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Entry) (buildInfo, error) {
+	if client == nil {
+		return buildInfo{}, errors.New("cannot get mongo build info: client is nil")
+	}
 	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
 	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
 

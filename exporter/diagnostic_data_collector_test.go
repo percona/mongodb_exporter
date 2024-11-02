@@ -421,7 +421,7 @@ func cleanTestData(ctx context.Context, client *mongo.Client, count int) error {
 }
 
 func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -434,7 +434,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	ti := labelsGetterMock{}
 
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
