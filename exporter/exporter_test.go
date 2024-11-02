@@ -188,7 +188,7 @@ func TestMongoS(t *testing.T) {
 
 		e := New(exporterOpts)
 
-		version, err := getMongoVersion(ctx, client)
+		version, err := retrieveMongoDBBuildInfo(ctx, client, exporterOpts.Logger.WithField("component", "test"))
 		require.NoError(t, err)
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode, new(labelsGetterMock), version)
 

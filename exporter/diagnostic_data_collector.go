@@ -35,12 +35,14 @@ type diagnosticDataCollector struct {
 	ctx  context.Context
 	base *baseCollector
 
+	buildInfo buildInfo
+
 	compatibleMode bool
 	topologyInfo   labelsGetter
 }
 
 // newDiagnosticDataCollector creates a collector for diagnostic information.
-func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *diagnosticDataCollector {
+func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, buildInfo buildInfo) *diagnosticDataCollector {
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
 		logger.WithFields(logrus.Fields{
@@ -56,6 +58,8 @@ func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logge
 	return &diagnosticDataCollector{
 		ctx:  ctx,
 		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "diagnostic_data"})),
+
+		buildInfo: buildInfo,
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
@@ -135,12 +139,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if d.compatibleMode {
-		buildInfo, err := retrieveMongoDBBuildInfo(d.ctx, client, logger)
-		if err != nil {
-			logger.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
-		}
-
-		metrics = append(metrics, serverVersion(buildInfo))
+		metrics = append(metrics, serverVersion(d.buildInfo))
 
 		if nodeType == typeArbiter {
 			if hm := arbiterMetrics(d.ctx, client, logger); hm != nil {

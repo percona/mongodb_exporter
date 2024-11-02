@@ -37,11 +37,11 @@ type replSetGetStatusCollector struct {
 	compatibleMode bool
 	topologyInfo   labelsGetter
 
-	version *MongoVersion
+	version buildInfo
 }
 
 // newReplicationSetStatusCollector creates a collector for statistics on replication set.
-func newReplicationSetStatusCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, version *MongoVersion) *replSetGetStatusCollector {
+func newReplicationSetStatusCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, version buildInfo) *replSetGetStatusCollector {
 	return &replSetGetStatusCollector{
 		ctx:  ctx,
 		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "replset_status"})),
@@ -89,12 +89,12 @@ func (d *replSetGetStatusCollector) collect(ch chan<- prometheus.Metric) {
 		ch <- metric
 	}
 
-	if strings.HasPrefix(d.version.VersionString, "8.") {
+	if strings.HasPrefix(d.version.Version, "8.") {
 		for _, metric := range makeMetrics("rs", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 			ch <- metric
 		}
 		if d.compatibleMode {
-			logger.Infof("collecting compatibility metrics for version %s", d.version.VersionString)
+			logger.Infof("collecting compatibility metrics for version %s", d.version.Version)
 			metrics := replSetMetrics(m, logger)
 			for _, metric := range metrics {
 				ch <- metric

@@ -46,7 +46,10 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	logger := logrus.New()
 	ti := labelsGetterMock{}
 
-	c := newDiagnosticDataCollector(ctx, client, logger, false, ti)
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.NoError(t, err)
+
+	c := newDiagnosticDataCollector(ctx, client, logger, false, ti, dbBuildInfo)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -70,7 +73,7 @@ func TestDiagnosticDataCollector(t *testing.T) {
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
 	}
 
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
 
@@ -188,7 +191,10 @@ func TestCollectorWithCompatibleMode(t *testing.T) {
 			logger := logrus.New()
 			ti := labelsGetterMock{}
 
-			c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+			require.NoError(t, err)
+
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 			err = testutil.CollectAndCompare(c, tt.expectedMetrics(), tt.metricsFilter...)
 			assert.NoError(t, err)
@@ -202,12 +208,16 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti := newTopologyInfo(ctx, client, logrus.New())
+	logger := logrus.New()
+	ti := newTopologyInfo(ctx, client, logger)
 
-	c := newDiagnosticDataCollector(ctx, client, logrus.New(), true, ti)
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.NoError(t, err)
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 	reg := prometheus.NewRegistry()
-	err := reg.Register(c)
+	err = reg.Register(c)
 	require.NoError(t, err)
 	metrics := helpers.CollectMetrics(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
@@ -281,7 +291,11 @@ func TestDiagnosticDataErrors(t *testing.T) {
 
 			logger, hook := logrustest.NewNullLogger()
 			ti := newTopologyInfo(ctx, client, logger)
-			c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+			require.NoError(t, err)
+
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 			reg := prometheus.NewRegistry()
 			err = reg.Register(c)
@@ -318,11 +332,15 @@ func TestContextTimeout(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti := newTopologyInfo(ctx, client, logrus.New())
+	logger := logrus.New()
+	ti := newTopologyInfo(ctx, client, logger)
+
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.NoError(t, err)
 
 	dbCount := 100
 
-	err := addTestData(ctx, client, dbCount)
+	err = addTestData(ctx, client, dbCount)
 	assert.NoError(t, err)
 
 	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
@@ -330,7 +348,7 @@ func TestContextTimeout(t *testing.T) {
 	cctx, ccancel := context.WithCancel(context.Background())
 	ccancel()
 
-	c := newDiagnosticDataCollector(cctx, client, logrus.New(), true, ti)
+	c := newDiagnosticDataCollector(cctx, client, logger, true, ti, dbBuildInfo)
 	// it should not panic
 	helpers.CollectMetrics(c)
 }
@@ -415,7 +433,10 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.NoError(t, err)
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`

@@ -37,7 +37,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	version, err := getMongoVersion(ctx, client)
+	version, err := retrieveMongoDBBuildInfo(ctx, client, logrus.New().WithField("component", "test"))
 	require.NoError(t, err)
 	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti, version)
 
@@ -69,7 +69,7 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	version, err := getMongoVersion(ctx, client)
+	version, err := retrieveMongoDBBuildInfo(ctx, client, logrus.New().WithField("component", "test"))
 	require.NoError(t, err)
 
 	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti, version)

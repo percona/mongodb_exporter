@@ -28,7 +28,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
@@ -130,18 +129,6 @@ func (e *Exporter) getTotalCollectionsCount() int {
 	return e.totalCollectionsCount
 }
 
-type MongoVersion struct {
-	VersionString string `bson:"version"`
-	PSMDBVersion  string `bson:"psmdbVersion"`
-	Version       []int  `bson:"versionArray"`
-}
-
-func getMongoVersion(ctx context.Context, client *mongo.Client) (*MongoVersion, error) {
-	var ver MongoVersion
-	err := client.Database("admin").RunCommand(ctx, bson.D{{"buildInfo", 1}}).Decode(&ver)
-	return &ver, err
-}
-
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
@@ -150,9 +137,9 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.logger.Errorf("Registry - Cannot get node type : %s", err)
 	}
 
-	version, err := getMongoVersion(ctx, client)
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, e.logger.WithField("component", "buildInfo"))
 	if err != nil {
-		e.logger.Warnf("Registry - Cannot get MongoDB version: %s", err)
+		e.logger.Warnf("Registry - Cannot get MongoDB buildInfo: %s", err)
 	}
 
 	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
@@ -221,7 +208,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
 		ddc := newDiagnosticDataCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
+			e.opts.CompatibleMode, topologyInfo, dbBuildInfo)
 		registry.MustRegister(ddc)
 	}
 
@@ -252,7 +239,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	// replSetGetStatus is not supported through mongos.
 	if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo, version)
+			e.opts.CompatibleMode, topologyInfo, dbBuildInfo)
 		registry.MustRegister(rsgsc)
 	}
 
