@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net"
 	"net/http"
@@ -187,7 +188,9 @@ func TestMongoS(t *testing.T) {
 
 		e := New(exporterOpts)
 
-		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode, new(labelsGetterMock), nil)
+		version, err := getMongoVersion(ctx, client)
+		require.NoError(t, err)
+		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode, new(labelsGetterMock), version)
 
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 

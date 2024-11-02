@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 	"time"
@@ -36,7 +37,9 @@ func TestReplsetStatusCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti, nil)
+	version, err := getMongoVersion(ctx, client)
+	require.NoError(t, err)
+	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti, version)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -54,7 +57,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 		"mongodb_myState",
 		"mongodb_ok",
 	}
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
 
@@ -66,7 +69,10 @@ func TestReplsetStatusCollectorNoSharding(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti, nil)
+	version, err := getMongoVersion(ctx, client)
+	require.NoError(t, err)
+
+	c := newReplicationSetStatusCollector(ctx, client, logrus.New(), false, ti, version)
 
 	// Replication set metrics should not be generated for unsharded server
 	count := testutil.CollectAndCount(c)
