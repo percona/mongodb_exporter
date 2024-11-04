@@ -49,3 +49,17 @@ jobs:
           sleep 10
           make test-race
           make test-cluster-clean
+
+      - name: Run debug commands on failure
+        if: ${{ failure() }}
+        run: |
+          echo "--- Environment variables ---"
+          env | sort
+          echo "--- GO Environment ---"
+          go env | sort
+          echo "--- Git status ---"
+          git status
+          echo "--- Docker logs ---"
+          docker compose logs
+          echo "--- Docker ps ---"
+          docker compose ps -a
