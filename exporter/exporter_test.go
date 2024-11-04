@@ -27,12 +27,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/percona/mongodb_exporter/internal/tu"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 // Use this for testing because labels like cluster ID are not constant in docker containers
@@ -187,10 +185,7 @@ func TestMongoS(t *testing.T) {
 		assert.NoError(t, err)
 
 		e := New(exporterOpts)
-
-		version, err := retrieveMongoDBBuildInfo(ctx, client, exporterOpts.Logger.WithField("component", "test"))
-		require.NoError(t, err)
-		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode, new(labelsGetterMock), version)
+		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode, new(labelsGetterMock))
 
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 

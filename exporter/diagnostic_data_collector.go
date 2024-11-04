@@ -112,12 +112,24 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			err = errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
 			logger.Errorf("cannot decode getDiagnosticData: %s", err)
 		}
-		if c, ok := m["common"].(bson.M); ok {
-			m = c
-		}
 
 		logger.Debug("getDiagnosticData result")
 		debugResult(logger, m)
+
+		// MongoDB 8.0 splits the diagnostic data into multiple blocks, so we need to merge them
+		if d.buildInfo.VersionArray[0] >= 8 {
+			b := bson.M{}
+			for _, mv := range m {
+				block, ok := mv.(bson.M)
+				if !ok {
+					continue
+				}
+				for k, v := range block {
+					b[k] = v
+				}
+			}
+			m = b
+		}
 
 		metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 		metrics = append(metrics, locksMetrics(logger, m)...)

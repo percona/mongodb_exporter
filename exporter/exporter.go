@@ -239,7 +239,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	// replSetGetStatus is not supported through mongos.
 	if e.opts.EnableReplicasetStatus && nodeType != typeMongos && requestOpts.EnableReplicasetStatus {
 		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo, dbBuildInfo)
+			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
 	}
 

@@ -17,8 +17,6 @@ package exporter
 
 import (
 	"context"
-	"strings"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -36,19 +34,16 @@ type replSetGetStatusCollector struct {
 
 	compatibleMode bool
 	topologyInfo   labelsGetter
-
-	version buildInfo
 }
 
 // newReplicationSetStatusCollector creates a collector for statistics on replication set.
-func newReplicationSetStatusCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, version buildInfo) *replSetGetStatusCollector {
+func newReplicationSetStatusCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *replSetGetStatusCollector {
 	return &replSetGetStatusCollector{
 		ctx:  ctx,
 		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "replset_status"})),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
-		version:        version,
 	}
 }
 
@@ -87,19 +82,6 @@ func (d *replSetGetStatusCollector) collect(ch chan<- prometheus.Metric) {
 
 	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric
-	}
-
-	if strings.HasPrefix(d.version.Version, "8.") {
-		for _, metric := range makeMetrics("rs", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
-			ch <- metric
-		}
-		if d.compatibleMode {
-			logger.Infof("collecting compatibility metrics for version %s", d.version.Version)
-			metrics := replSetMetrics(m, logger)
-			for _, metric := range metrics {
-				ch <- metric
-			}
-		}
 	}
 }
 
