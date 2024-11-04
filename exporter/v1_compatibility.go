@@ -858,38 +858,26 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
 	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
 
-	var buildInfoDoc bson.M
+	var buildInfoDoc buildInfo
 	err := res.Decode(&buildInfoDoc)
 	if err != nil {
 		return buildInfo{}, errors.Wrap(err, "Failed to run buildInfo command")
 	}
 
-	modules, ok := buildInfoDoc["modules"].(bson.A)
-	if !ok {
-		return buildInfo{}, errors.Wrap(err, "Failed to cast module information variable")
-	}
-
-	var bi buildInfo
-	if len(modules) > 0 && modules[0].(string) == "enterprise" {
-		bi.Edition = EnterpriseEdition
+	if len(buildInfoDoc.Modules) > 0 && buildInfoDoc.Modules[0] == "enterprise" {
+		buildInfoDoc.Edition = EnterpriseEdition
 	} else {
-		bi.Edition = CommunityEdition
+		buildInfoDoc.Edition = CommunityEdition
 	}
-	l.Debug("MongoDB edition: ", bi.Edition)
+	l.Debug("MongoDB edition: ", buildInfoDoc.Edition)
 
-	_, ok = buildInfoDoc["psmdbVersion"]
-	if ok {
-		bi.Vendor = PerconaVendor
+	if buildInfoDoc.PSMDBVersion != "" {
+		buildInfoDoc.Vendor = PerconaVendor
 	} else {
-		bi.Vendor = MongoDBVendor
+		buildInfoDoc.Vendor = MongoDBVendor
 	}
 
-	bi.Version, ok = buildInfoDoc["version"].(string)
-	if !ok {
-		return buildInfo{}, errors.Wrap(err, "Failed to cast version information variable")
-	}
-
-	return bi, nil
+	return buildInfoDoc, nil
 }
 
 func storageEngine(m bson.M) (prometheus.Metric, error) { //nolint:ireturn
@@ -1348,9 +1336,12 @@ type rawStatus struct {
 }
 
 type buildInfo struct {
-	Version string
-	Edition string
-	Vendor  string
+	Version      string `bson:"version"`
+	PSMDBVersion string `bson:"psmdbVersion"`
+	VersionArray []int  `bson:"versionArray"`
+	Edition      string
+	Vendor       string
+	Modules      []string `bson:"modules"`
 }
 
 func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Entry) *databaseStatList {

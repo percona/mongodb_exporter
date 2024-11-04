@@ -51,24 +51,26 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	c := newDiagnosticDataCollector(ctx, client, logger, false, ti, dbBuildInfo)
 
+	prefix := "local.oplog.rs.stats.storageStats.wiredTiger"
+	if dbBuildInfo.VersionArray[0] < 7 {
+		prefix = "local.oplog.rs.stats.wiredTiger"
+	}
+
 	// The last \n at the end of this string is important
-	expected := strings.NewReader(`
-	# HELP mongodb_oplog_stats_ok local.oplog.rs.stats.
-	# TYPE mongodb_oplog_stats_ok untyped
-	mongodb_oplog_stats_ok 1
-	# HELP mongodb_oplog_stats_wt_btree_fixed_record_size local.oplog.rs.stats.wiredTiger.btree.
+	expectedString := fmt.Sprintf(`
+	# HELP mongodb_oplog_stats_wt_btree_fixed_record_size %s.btree.
 	# TYPE mongodb_oplog_stats_wt_btree_fixed_record_size untyped
 	mongodb_oplog_stats_wt_btree_fixed_record_size 0
-	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts local.oplog.rs.stats.wiredTiger.transaction.
+	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts %s.transaction.
 	# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
-	mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
+	mongodb_oplog_stats_wt_transaction_update_conflicts 0`, prefix, prefix)
+	expected := strings.NewReader(expectedString + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_oplog_stats_ok",
 		"mongodb_oplog_stats_wt_btree_fixed_record_size",
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
 	}
