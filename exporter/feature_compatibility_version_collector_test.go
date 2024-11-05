@@ -55,6 +55,14 @@ func TestFCVCollector(t *testing.T) {
 		mversion = "4.4"
 	case mmv == "4.4":
 		mversion = "4.2"
+	case mmv == "6.0":
+		mversion = "5.0"
+	case mmv == "7.0":
+		mversion = "6.0"
+	case mmv == "8.0":
+		mversion = "7.0"
+	default:
+		mversion = mmv
 	}
 
 	// The last \n at the end of this string is important

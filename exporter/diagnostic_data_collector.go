@@ -35,12 +35,14 @@ type diagnosticDataCollector struct {
 	ctx  context.Context
 	base *baseCollector
 
+	buildInfo buildInfo
+
 	compatibleMode bool
 	topologyInfo   labelsGetter
 }
 
 // newDiagnosticDataCollector creates a collector for diagnostic information.
-func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *diagnosticDataCollector {
+func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, buildInfo buildInfo) *diagnosticDataCollector {
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
 		logger.WithFields(logrus.Fields{
@@ -56,6 +58,8 @@ func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logge
 	return &diagnosticDataCollector{
 		ctx:  ctx,
 		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "diagnostic_data"})),
+
+		buildInfo: buildInfo,
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
@@ -112,6 +116,21 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 		logger.Debug("getDiagnosticData result")
 		debugResult(logger, m)
 
+		// MongoDB 8.0 splits the diagnostic data into multiple blocks, so we need to merge them
+		if d.buildInfo.VersionArray[0] >= 8 { //nolint:gomnd
+			b := bson.M{}
+			for _, mv := range m {
+				block, ok := mv.(bson.M)
+				if !ok {
+					continue
+				}
+				for k, v := range block {
+					b[k] = v
+				}
+			}
+			m = b
+		}
+
 		metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 		metrics = append(metrics, locksMetrics(logger, m)...)
 
@@ -132,12 +151,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	if d.compatibleMode {
-		buildInfo, err := retrieveMongoDBBuildInfo(d.ctx, client, logger)
-		if err != nil {
-			logger.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
-		}
-
-		metrics = append(metrics, serverVersion(buildInfo))
+		metrics = append(metrics, serverVersion(d.buildInfo))
 
 		if nodeType == typeArbiter {
 			if hm := arbiterMetrics(d.ctx, client, logger); hm != nil {

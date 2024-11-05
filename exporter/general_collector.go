@@ -63,14 +63,11 @@ func mongodbUpMetric(ctx context.Context, client *mongo.Client, nodeType mongoDB
 		} else {
 			log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err.Error())
 		}
-
 		switch nodeType { //nolint:exhaustive
-		case typeMongos:
-			clusterRole = typeMongos
-		case typeArbiter:
-			clusterRole = typeArbiter
-		default:
+		case typeShardServer:
 			clusterRole = typeMongod
+		default:
+			clusterRole = nodeType
 		}
 	}
 

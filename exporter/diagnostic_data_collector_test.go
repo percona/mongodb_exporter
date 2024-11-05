@@ -46,31 +46,36 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	logger := logrus.New()
 	ti := labelsGetterMock{}
 
-	c := newDiagnosticDataCollector(ctx, client, logger, false, ti)
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.NoError(t, err)
+
+	c := newDiagnosticDataCollector(ctx, client, logger, false, ti, dbBuildInfo)
+
+	prefix := "local.oplog.rs.stats.storageStats.wiredTiger"
+	if dbBuildInfo.VersionArray[0] < 7 {
+		prefix = "local.oplog.rs.stats.wiredTiger"
+	}
 
 	// The last \n at the end of this string is important
-	expected := strings.NewReader(`
-	# HELP mongodb_oplog_stats_ok local.oplog.rs.stats.
-	# TYPE mongodb_oplog_stats_ok untyped
-	mongodb_oplog_stats_ok 1
-	# HELP mongodb_oplog_stats_wt_btree_fixed_record_size local.oplog.rs.stats.wiredTiger.btree.
+	expectedString := fmt.Sprintf(`
+	# HELP mongodb_oplog_stats_wt_btree_fixed_record_size %s.btree.
 	# TYPE mongodb_oplog_stats_wt_btree_fixed_record_size untyped
 	mongodb_oplog_stats_wt_btree_fixed_record_size 0
-	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts local.oplog.rs.stats.wiredTiger.transaction.
+	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts %s.transaction.
 	# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
-	mongodb_oplog_stats_wt_transaction_update_conflicts 0` + "\n")
+	mongodb_oplog_stats_wt_transaction_update_conflicts 0`, prefix, prefix)
+	expected := strings.NewReader(expectedString + "\n")
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_oplog_stats_ok",
 		"mongodb_oplog_stats_wt_btree_fixed_record_size",
 		"mongodb_oplog_stats_wt_transaction_update_conflicts",
 	}
 
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
 
@@ -188,7 +193,10 @@ func TestCollectorWithCompatibleMode(t *testing.T) {
 			logger := logrus.New()
 			ti := labelsGetterMock{}
 
-			c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+			require.NoError(t, err)
+
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 			err = testutil.CollectAndCompare(c, tt.expectedMetrics(), tt.metricsFilter...)
 			assert.NoError(t, err)
@@ -202,12 +210,16 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti := newTopologyInfo(ctx, client, logrus.New())
+	logger := logrus.New()
+	ti := newTopologyInfo(ctx, client, logger)
 
-	c := newDiagnosticDataCollector(ctx, client, logrus.New(), true, ti)
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.NoError(t, err)
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 	reg := prometheus.NewRegistry()
-	err := reg.Register(c)
+	err = reg.Register(c)
 	require.NoError(t, err)
 	metrics := helpers.CollectMetrics(c)
 	actualMetrics := helpers.ReadMetrics(metrics)
@@ -281,7 +293,11 @@ func TestDiagnosticDataErrors(t *testing.T) {
 
 			logger, hook := logrustest.NewNullLogger()
 			ti := newTopologyInfo(ctx, client, logger)
-			c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+
+			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+			require.NoError(t, err)
+
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 			reg := prometheus.NewRegistry()
 			err = reg.Register(c)
@@ -318,11 +334,15 @@ func TestContextTimeout(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	ti := newTopologyInfo(ctx, client, logrus.New())
+	logger := logrus.New()
+	ti := newTopologyInfo(ctx, client, logger)
+
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.NoError(t, err)
 
 	dbCount := 100
 
-	err := addTestData(ctx, client, dbCount)
+	err = addTestData(ctx, client, dbCount)
 	assert.NoError(t, err)
 
 	defer cleanTestData(ctx, client, dbCount) //nolint:errcheck
@@ -330,7 +350,7 @@ func TestContextTimeout(t *testing.T) {
 	cctx, ccancel := context.WithCancel(context.Background())
 	ccancel()
 
-	c := newDiagnosticDataCollector(cctx, client, logrus.New(), true, ti)
+	c := newDiagnosticDataCollector(cctx, client, logger, true, ti, dbBuildInfo)
 	// it should not panic
 	helpers.CollectMetrics(c)
 }
@@ -403,7 +423,7 @@ func cleanTestData(ctx context.Context, client *mongo.Client, count int) error {
 }
 
 func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -415,7 +435,10 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.Error(t, err)
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`

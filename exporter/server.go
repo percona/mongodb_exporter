@@ -147,18 +147,24 @@ func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.Ha
 				}()
 			}
 
+			var registry *prometheus.Registry
 			var ti *topologyInfo
 			if client != nil {
 				// Topology can change between requests, so we need to get it every time.
 				ti = newTopologyInfo(ctx, client, e.logger)
+				registry = e.makeRegistry(ctx, client, ti, requestOpts)
+			} else {
+				registry = prometheus.NewRegistry()
+				gc := newGeneralCollector(ctx, client, "", e.opts.Logger)
+				registry.MustRegister(gc)
 			}
 
 			hostlabels := prometheus.Labels{
 				"instance": e.opts.NodeName,
 			}
 
-			registry := NewGathererWrapper(e.makeRegistry(ctx, client, ti, requestOpts), hostlabels)
-			gatherers = append(gatherers, registry)
+			gw := NewGathererWrapper(registry, hostlabels)
+			gatherers = append(gatherers, gw)
 		}
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.

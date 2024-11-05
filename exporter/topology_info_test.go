@@ -136,7 +136,8 @@ func TestGetClusterRole(t *testing.T) {
 		require.NoError(t, err)
 
 		client := tu.TestClient(ctx, port, t)
-		nodeType, err := getClusterRole(ctx, client)
+		logger := logrus.WithField("component", "test")
+		nodeType, err := getClusterRole(ctx, client, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.want, nodeType, fmt.Sprintf("container name: %s, port: %s", tc.containerName, port))
 	}

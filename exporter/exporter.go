@@ -134,15 +134,16 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
-		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
+		e.logger.Errorf("Registry - Cannot get node type : %s", err)
+	}
+
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, e.logger.WithField("component", "buildInfo"))
+	if err != nil {
+		e.logger.Warnf("Registry - Cannot get MongoDB buildInfo: %s", err)
 	}
 
 	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
 	registry.MustRegister(gc)
-
-	if client == nil {
-		return registry
-	}
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
 	// present in the database.
@@ -203,7 +204,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
 		ddc := newDiagnosticDataCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
+			e.opts.CompatibleMode, topologyInfo, dbBuildInfo)
 		registry.MustRegister(ddc)
 	}
 
@@ -335,13 +336,18 @@ func (e *Exporter) Handler() http.Handler {
 			gatherers = append(gatherers, prometheus.DefaultGatherer)
 		}
 
+		var registry *prometheus.Registry
 		var ti *topologyInfo
 		if client != nil {
 			// Topology can change between requests, so we need to get it every time.
 			ti = newTopologyInfo(ctx, client, e.logger)
+			registry = e.makeRegistry(ctx, client, ti, requestOpts)
+		} else {
+			registry = prometheus.NewRegistry()
+			gc := newGeneralCollector(ctx, client, "", e.opts.Logger)
+			registry.MustRegister(gc)
 		}
 
-		registry := e.makeRegistry(ctx, client, ti, requestOpts)
 		gatherers = append(gatherers, registry)
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.

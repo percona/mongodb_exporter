@@ -52,11 +52,14 @@ var (
 	prefixes = [][]string{
 		{"serverStatus.wiredTiger.transaction", "ss_wt_txn"},
 		{"serverStatus.wiredTiger", "ss_wt"},
+		{"serverStatus.queues.execution", "ss_wt_concurrentTransactions"},
 		{"serverStatus", "ss"},
 		{"replSetGetStatus", "rs"},
 		{"systemMetrics", "sys"},
 		{"local.oplog.rs.stats.wiredTiger", "oplog_stats_wt"},
+		{"local.oplog.rs.stats.storageStats.wiredTiger", "oplog_stats_wt"},
 		{"local.oplog.rs.stats", "oplog_stats"},
+		{"local.oplog.rs.stats.storageStats", "oplog_stats"},
 		{"collstats_storage.wiredTiger", "collstats_storage_wt"},
 		{"collstats_storage.indexDetails", "collstats_storage_idx"},
 		{"collStats.storageStats", "collstats_storage"},
@@ -105,6 +108,7 @@ var (
 		"serverStatus.opcountersRepl.":                    "legacy_op_type",
 		"serverStatus.transactions.commitTypes.":          "commit_type",
 		"serverStatus.wiredTiger.concurrentTransactions.": "txn_rw_type",
+		"serverStatus.queues.execution.":                  "txn_rw_type",
 		"serverStatus.wiredTiger.perf.":                   "perf_bucket",
 		"systemMetrics.disks.":                            "device_name",
 	}

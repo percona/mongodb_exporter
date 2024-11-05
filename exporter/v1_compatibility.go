@@ -474,8 +474,20 @@ func conversions() []conversion {
 			newName: "mongodb_ss_wt_txn_transaction_checkpoint_total_time_msecs",
 		},
 		{
+			oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
+			newName: "mongodb_ss_wt_checkpoint_total_time_msecs",
+		},
+		{
 			oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
 			newName: "mongodb_ss_wt_txn_transaction_checkpoint_currently_running",
+		},
+		{
+			oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
+			newName: "mongodb_ss_wt_checkpoint_currently_running",
+		},
+		{
+			oldName: "mongodb_ss_tcmalloc_tcmalloc_thread_cache_free_bytes",
+			newName: "mongodb_ss_tcmalloc_tcmalloc_thread_cache_free",
 		},
 		{
 			oldName:     "mongodb_mongod_wiredtiger_transactions_total",
@@ -571,6 +583,15 @@ func conversions() []conversion {
 		{
 			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
 			prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",
+			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"min_time_msecs": "min",
+				"max_time_msecs": "max",
+			},
+		},
+		{
+			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
+			prefix:      "mongodb_ss_wt_checkpoint",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"min_time_msecs": "min",
@@ -812,8 +833,10 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 
 	if nodeType != typeArbiter {
 		metrics = append(metrics, myState(ctx, client))
-		if rm := replSetMetrics(m); rm != nil {
-			metrics = append(metrics, rm...)
+		if replSetGetStatus, ok := m["replSetGetStatus"].(bson.M); ok {
+			if rm := replSetMetrics(replSetGetStatus, l); rm != nil {
+				metrics = append(metrics, rm...)
+			}
 		}
 
 		if nodeType != typeMongos {
@@ -829,41 +852,32 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 }
 
 func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Entry) (buildInfo, error) {
+	if client == nil {
+		return buildInfo{}, errors.New("cannot get mongo build info: client is nil")
+	}
 	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
 	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
 
-	var buildInfoDoc bson.M
+	var buildInfoDoc buildInfo
 	err := res.Decode(&buildInfoDoc)
 	if err != nil {
 		return buildInfo{}, errors.Wrap(err, "Failed to run buildInfo command")
 	}
 
-	modules, ok := buildInfoDoc["modules"].(bson.A)
-	if !ok {
-		return buildInfo{}, errors.Wrap(err, "Failed to cast module information variable")
-	}
-
-	var bi buildInfo
-	if len(modules) > 0 && modules[0].(string) == "enterprise" {
-		bi.Edition = EnterpriseEdition
+	if len(buildInfoDoc.Modules) > 0 && buildInfoDoc.Modules[0] == "enterprise" {
+		buildInfoDoc.Edition = EnterpriseEdition
 	} else {
-		bi.Edition = CommunityEdition
+		buildInfoDoc.Edition = CommunityEdition
 	}
-	l.Debug("MongoDB edition: ", bi.Edition)
+	l.Debug("MongoDB edition: ", buildInfoDoc.Edition)
 
-	_, ok = buildInfoDoc["psmdbVersion"]
-	if ok {
-		bi.Vendor = PerconaVendor
+	if buildInfoDoc.PSMDBVersion != "" {
+		buildInfoDoc.Vendor = PerconaVendor
 	} else {
-		bi.Vendor = MongoDBVendor
+		buildInfoDoc.Vendor = MongoDBVendor
 	}
 
-	bi.Version, ok = buildInfoDoc["version"].(string)
-	if !ok {
-		return buildInfo{}, errors.Wrap(err, "Failed to cast version information variable")
-	}
-
-	return bi, nil
+	return buildInfoDoc, nil
 }
 
 func storageEngine(m bson.M) (prometheus.Metric, error) { //nolint:ireturn
@@ -982,17 +996,15 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return []prometheus.Metric{headMetric, tailMetric}, nil
 }
 
-func replSetMetrics(d bson.M) []prometheus.Metric {
-	replSetGetStatus, ok := d["replSetGetStatus"].(bson.M)
-	if !ok {
-		return nil
-	}
+func replSetMetrics(d bson.M, l *logrus.Entry) []prometheus.Metric {
 	var repl proto.ReplicaSetStatus
-	b, err := bson.Marshal(replSetGetStatus)
+	b, err := bson.Marshal(d)
 	if err != nil {
+		l.Warnf("cannot marshal replica set status: %s", err)
 		return nil
 	}
 	if err := bson.Unmarshal(b, &repl); err != nil {
+		l.Warnf("cannot unmarshal replica set status: %s", err)
 		return nil
 	}
 
@@ -1324,9 +1336,12 @@ type rawStatus struct {
 }
 
 type buildInfo struct {
-	Version string
-	Edition string
-	Vendor  string
+	Version      string `bson:"version"`
+	PSMDBVersion string `bson:"psmdbVersion"`
+	VersionArray []int  `bson:"versionArray"`
+	Edition      string
+	Vendor       string
+	Modules      []string `bson:"modules"`
 }
 
 func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Entry) *databaseStatList {
