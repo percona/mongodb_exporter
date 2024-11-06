@@ -228,10 +228,12 @@ func TestBuildURI(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		newUri := buildURI(tc.origin, tc.newUser, tc.newPassword, logrus.New())
-		// t.Logf("Origin: %s", tc.origin)
-		// t.Logf("Expect: %s", tc.expect)
-		// t.Logf("Result: %s", newUri)
-		assert.Equal(t, tc.expect, newUri)
+		t.Run(tc.situation, func(t *testing.T) {
+			newURI := buildURI(tc.origin, tc.newUser, tc.newPassword, logrus.New())
+			// t.Logf("Origin: %s", tc.origin)
+			// t.Logf("Expect: %s", tc.expect)
+			// t.Logf("Result: %s", newURI)
+			assert.Equal(t, tc.expect, newURI)
+		})
 	}
 }
