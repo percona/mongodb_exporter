@@ -278,7 +278,7 @@ services:
     standalone-encrypted:
         user: root
         container_name: "standalone-encrypted"
-        image: percona/percona-server-mongodb:5.0.13-11
+        image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
             - "${TEST_MONGODB_STANDALONE_ENCRYPTED_PORT:-27027}:27017"
         volumes:
