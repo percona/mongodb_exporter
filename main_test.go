@@ -219,12 +219,18 @@ func TestBuildURI(t *testing.T) {
 			newPassword: "",
 			expect:      "mongodb+srv://xxx:zzz@127.0.0.1",
 		},
+		{
+			situation:   "url with special characters in username and password",
+			origin:      "mongodb://127.0.0.1",
+			newUser:     "xxx?!#$%^&*()_+",
+			newPassword: "yyy?!#$%^&*()_+",
+			expect:      "mongodb://xxx%3F%21%23$%25%5E&%2A%28%29_+:yyy%3F%21%23$%25%5E&%2A%28%29_+@127.0.0.1",
+		},
 	}
 	for _, tc := range tests {
-		newUri := buildURI(tc.origin, tc.newUser, tc.newPassword)
-		// t.Logf("Origin: %s", tc.origin)
-		// t.Logf("Expect: %s", tc.expect)
-		// t.Logf("Result: %s", newUri)
-		assert.Equal(t, newUri, tc.expect)
+		t.Run(tc.situation, func(t *testing.T) {
+			newURI := buildURI(tc.origin, tc.newUser, tc.newPassword, logrus.New())
+			assert.Equal(t, tc.expect, newURI)
+		})
 	}
 }

@@ -139,7 +139,7 @@ func main() {
 }
 
 func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.Exporter {
-	uri = buildURI(uri, opts.User, opts.Password)
+	uri = buildURI(uri, opts.User, opts.Password, log)
 	log.Debugf("Connection URI: %s", uri)
 
 	uriParsed, _ := url.Parse(uri)
@@ -266,26 +266,23 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 	return URIs
 }
 
-func buildURI(uri string, user string, password string) string {
-	prefix := "mongodb://" // default prefix
+func buildURI(uri string, user string, password string, log *logrus.Logger) string {
+	defaultPrefix := "mongodb://" // default prefix
 	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
 
-	// Split the uri prefix if there is any
-	if matchRegexp.MatchString(uri) {
-		uriArray := strings.SplitN(uri, "://", 2)
-		prefix = uriArray[0] + "://"
-		uri = uriArray[1]
+	// Split the uri defaultPrefix if there is any
+	if !matchRegexp.MatchString(uri) {
+		uri = defaultPrefix + uri
+	}
+	parsedURI, err := url.Parse(uri)
+	if err != nil {
+		log.Fatalf("Failed to parse URI %s: %v", uri, err)
+		return uri
 	}
 
-	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
-	// DO concat a new uri with user and pass arguments value
-	if !strings.Contains(uri, "@") && user != "" && password != "" {
-		// add user and pass to the uri
-		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
+	if parsedURI.User == nil && user != "" && password != "" {
+		parsedURI.User = url.UserPassword(user, password)
 	}
 
-	// add back prefix after adding the user and pass
-	uri = prefix + uri
-
-	return uri
+	return parsedURI.String()
 }
