@@ -53,7 +53,8 @@ func TestCollStatsCollector(t *testing.T) {
 	ti := labelsGetterMock{}
 
 	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
-	c := newCollectionStatsCollector(ctx, client, logrus.New(), false, false, ti, collection)
+	logger := logrus.New()
+	c := newCollectionStatsCollector(ctx, client, logger, false, false, ti, collection)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -67,6 +68,11 @@ mongodb_collstats_latencyStats_commands_latency{collection="testcol_02",database
 mongodb_collstats_latencyStats_transactions_ops{collection="testcol_00",database="testdb"} 0
 mongodb_collstats_latencyStats_transactions_ops{collection="testcol_01",database="testdb"} 0
 mongodb_collstats_latencyStats_transactions_ops{collection="testcol_02",database="testdb"} 0
+# HELP mongodb_collstats_storageStats_indexSizes collstats.storageStats.indexSizes.
+# TYPE mongodb_collstats_storageStats_indexSizes untyped
+mongodb_collstats_storageStats_indexSizes{collection="testcol_00",database="testdb",index_name="_id_"} 4096
+mongodb_collstats_storageStats_indexSizes{collection="testcol_01",database="testdb",index_name="_id_"} 4096
+mongodb_collstats_storageStats_indexSizes{collection="testcol_02",database="testdb",index_name="_id_"} 4096
 # HELP mongodb_collstats_storageStats_capped collstats.storageStats.
 # TYPE mongodb_collstats_storageStats_capped untyped
 mongodb_collstats_storageStats_capped{collection="testcol_00",database="testdb"} 0
@@ -81,6 +87,7 @@ mongodb_collstats_storageStats_capped{collection="testcol_02",database="testdb"}
 	filter := []string{
 		"mongodb_collstats_latencyStats_commands_latency",
 		"mongodb_collstats_storageStats_capped",
+		"mongodb_collstats_storageStats_indexSizes",
 		"mongodb_collstats_latencyStats_transactions_ops",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)

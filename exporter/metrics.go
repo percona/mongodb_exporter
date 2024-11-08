@@ -111,6 +111,7 @@ var (
 		"serverStatus.queues.execution.":                  "txn_rw_type",
 		"serverStatus.wiredTiger.perf.":                   "perf_bucket",
 		"systemMetrics.disks.":                            "device_name",
+		"collstats.storageStats.indexSizes.":              "index_name",
 	}
 
 	// Regular expressions used to make the metric name Prometheus-compatible
