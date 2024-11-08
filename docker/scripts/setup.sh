@@ -78,7 +78,8 @@ function general_servers() {
         "members": [
             {
                 "_id": 0,
-                "host": "${mongodb1}:${port}"
+                "host": "${mongodb1}:${port}",
+                "priority": 1000
             },
             {
                 "_id": 1,
