@@ -16,6 +16,10 @@ Currently, these metric sources are implemented:
 - replSetGetStatus
 - serverStatus
 
+## Supported MongoDB versions
+
+The exporter works with Percona Server for MongoDB and MongoDB Community or Enterprise Edition versions 4.4 and newer. Older versions might also work but are not tested anymore.
+
 ## Info on Percona MongoDB exporter versions
 
 The old 0.1x.y version (ex `master` branch) has been moved to the `release-0.1x` branch.
@@ -48,10 +52,10 @@ A docker image is available on the [official percona repository](https://hub.doc
 
 ```sh
 # with podman
-podman run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+podman run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
 
 # with docker
-docker run -d -p 9216:9216 -p 17001:17001 percona/mongodb_exporter:0.20 --mongodb.uri=mongodb://127.0.0.1:17001
+docker run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
 ```
 
 #### Permissions
@@ -91,11 +95,28 @@ You can run the exporter specifying multiple URIs, devided by a comma in --mongo
 ```sh
 --mongodb.uri=mongodb://user:pass@127.0.0.1:27017/admin,mongodb://user2:pass2@127.0.0.1:27018/admin
 ```
-In this case you can use the **/scrape** endpoint with the **target** parameter to retreive the specified tartget's metrics.  When querying the data you can use just mongodb://host:port in the targer parameter without other parameters and, of course without host credentials
+In this case you can use the **/scrape** endpoint with the **target** parameter to retreive the specified tartget's metrics.  When querying the data you can use just mongodb://host:port in the target parameter without other parameters and, of course without host credentials
 ```sh
 GET /scrape?target=mongodb://127.0.0.1:27018
 ```
+If your URI is prefixed by mongodb:// or mongodb+srv:// schema, any host not prefixed by it after comma is being treated as part of a cluster rather then as a standalone host. Thus clusters and standalone hosts can be combined like this:
+```
+--mongodb.uri=mongodb+srv://user:pass@host1:27017,host2:27017,host3:27017/admin,mongodb://user2:pass2@host4:27018/admin
+```
 
+You can use the --split-cluster option to split all cluster nodes into separate targets. This mode is useful when cluster nodes are defined as SRV records and the mongodb_exporter is running with mongodb+srv domain specified. In this case SRV records will be queried upon mongodb_exporter start and each cluster node can be queried using the **target** parameter of multitarget endpoint. 
+
+#### Overall targets request endpoint
+
+There is an overall targets endpoint **/scrapeall** that queries all the targets in one request. It can be used to store multiple node metrics without separate target requests. In this case, each node metric will have a **instance** label containing the node name as a host:port pair (or just host if no port was not specified). For example, for mongodb_exporter running with the options:
+```
+--mongodb.uri="mongodb://host1:27015,host2:27016" --split-cluster=true
+``` 
+we get metrics like this:
+```
+mongodb_up{instance="host1:27015"} 1
+mongodb_up{instance="host2:27016"} 1
+```
 
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.

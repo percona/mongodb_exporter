@@ -41,7 +41,7 @@ type indexstatsCollector struct {
 func newIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery, overrideDescendingIndex bool, topology labelsGetter, collections []string) *indexstatsCollector {
 	return &indexstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "indexstats"})),
 
 		discoveringMode:         discovery,
 		topologyInfo:            topology,
@@ -62,20 +62,27 @@ func (d *indexstatsCollector) Collect(ch chan<- prometheus.Metric) {
 func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	defer measureCollectTime(ch, "mongodb", "indexstats")()
 
-	collections := d.collections
-
-	logger := d.base.logger
 	client := d.base.client
+	logger := d.base.logger
 
+	var collections []string
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
+		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
-			logger.Errorf("cannot auto discover databases and collections")
+			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
 
-		collections = fromMapToSlice(namespaces)
+		collections = fromMapToSlice(onlyCollectionsNamespaces)
+	} else {
+		var err error
+		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
+		if err != nil {
+			logger.Errorf("cannot list collections: %s", err.Error())
+
+			return
+		}
 	}
 
 	for _, dbCollection := range collections {
@@ -86,6 +93,11 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		database := parts[0]
 		collection := strings.Join(parts[1:], ".")
+
+		// exclude system collections
+		if strings.HasPrefix(collection, "system.") {
+			continue
+		}
 
 		aggregation := bson.D{
 			{Key: "$indexStats", Value: bson.M{}},

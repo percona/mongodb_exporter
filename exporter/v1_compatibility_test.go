@@ -88,14 +88,14 @@ func TestMakeLockMetric(t *testing.T) {
 
 	want := `Desc{fqName: "mongodb_ss_locks_acquireCount", ` +
 		`help: "mongodb_ss_locks_acquireCount", ` +
-		`constLabels: {}, variableLabels: [lock_mode resource]}`
+		`constLabels: {}, variableLabels: {lock_mode,resource}}`
 
 	p, err := makeLockMetric(m, lm)
 	assert.NoError(t, err)
 
 	// Fix description since labels don't have a specific order because they are stores in a map.
 	pd := p.Desc().String()
-	pd = strings.ReplaceAll(pd, "resource lock_mode", "lock_mode resource")
+	pd = strings.ReplaceAll(pd, "resource,lock_mode", "lock_mode,resource")
 
 	assert.Equal(t, want, pd)
 }
@@ -108,8 +108,9 @@ func TestAddLocksMetrics(t *testing.T) {
 	err = json.Unmarshal(buf, &m)
 	assert.NoError(t, err)
 
-	var metrics []prometheus.Metric
-	metrics = locksMetrics(logrus.New(), m)
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	metrics := locksMetrics(logger.WithField("component", "test"), m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
@@ -119,19 +120,19 @@ func TestAddLocksMetrics(t *testing.T) {
 		err := metric.Write(&m)
 		assert.NoError(t, err)
 
-		ms = strings.ReplaceAll(ms, "resource lock_mode", "lock_mode resource")
+		ms = strings.ReplaceAll(ms, "resource,lock_mode", "lock_mode,resource")
 		desc = append(desc, ms)
 	}
 
 	sort.Strings(desc)
 	want := []string{
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireWaitCount\", help: \"mongodb_ss_locks_acquireWaitCount\", constLabels: {}, variableLabels: [lock_mode resource]}",
-		"Desc{fqName: \"mongodb_ss_locks_timeAcquiringMicros\", help: \"mongodb_ss_locks_timeAcquiringMicros\", constLabels: {}, variableLabels: [lock_mode resource]}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
+		"Desc{fqName: \"mongodb_ss_locks_acquireWaitCount\", help: \"mongodb_ss_locks_acquireWaitCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
+		"Desc{fqName: \"mongodb_ss_locks_timeAcquiringMicros\", help: \"mongodb_ss_locks_timeAcquiringMicros\", constLabels: {}, variableLabels: {lock_mode,resource}}",
 	}
 
 	assert.Equal(t, want, desc)
@@ -206,6 +207,42 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 	assert.Equal(t, want, nm)
 }
 
+func TestMongosMetrics(t *testing.T) {
+	t.Parallel()
+	t.Run("test mongodb_mongos_sharding_chunks_is_balancer_running metric", func(t *testing.T) {
+		type bss struct {
+			Mode string `bson:"mode"`
+		}
+
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongos")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		var bs bss
+		cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
+		err = client.Database("admin").RunCommand(ctx, cmd).Decode(&bs)
+		require.NoError(t, err)
+
+		var metric prometheus.Metric
+		var m dto.Metric
+		metric, err = balancerEnabled(ctx, client)
+		assert.NoError(t, err)
+
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+
+		expected := 0
+		if bs.Mode == "full" {
+			expected = 1
+		}
+		assert.Equal(t, float64(expected), m.GetGauge().GetValue()) //nolint
+	})
+}
+
 // myState should always return a metric. If there is no connection, the value
 // should be the MongoDB unknown state = 6
 func TestMyState(t *testing.T) {
@@ -267,13 +304,15 @@ func TestArbiterMetrics(t *testing.T) {
 		containerName := "mongo-1-arbiter"
 
 		logger := logrus.New()
+		logger.SetLevel(logrus.DebugLevel)
+
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
 		port, err := tu.PortForContainer(containerName)
 		require.NoError(t, err)
 		client := tu.TestClient(ctx, port, t)
-		metrics := arbiterMetrics(ctx, client, logger)
+		metrics := arbiterMetrics(ctx, client, logger.WithField("component", "test"))
 		var rsMembers dto.Metric
 		for _, m := range metrics {
 			if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_number_of_members"`) {

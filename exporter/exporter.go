@@ -57,6 +57,7 @@ type Opts struct {
 	GlobalConnPool         bool
 	ProfileTimeTS          int
 	TimeoutOffset          int
+	CurrentOpSlowTime      string
 
 	CollectAll               bool
 	EnableDBStats            bool
@@ -69,13 +70,18 @@ type Opts struct {
 	EnableCollStats          bool
 	EnableProfile            bool
 	EnableShards             bool
+	EnableFCV                bool // Feature Compatibility Version.
 
 	EnableOverrideDescendingIndex bool
+
+	// Enable metrics for Percona Backup for MongoDB (PBM).
+	EnablePBMMetrics bool
 
 	IndexStatsCollections []string
 	Logger                *logrus.Logger
 
-	URI string
+	URI      string
+	NodeName string
 }
 
 var (
@@ -126,17 +132,18 @@ func (e *Exporter) getTotalCollectionsCount() int {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
-	registry.MustRegister(gc)
-
-	if client == nil {
-		return registry
-	}
-
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
-		e.logger.Errorf("Registry - Cannot get node type to check if this is a mongos : %s", err)
+		e.logger.Errorf("Registry - Cannot get node type : %s", err)
 	}
+
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, e.logger.WithField("component", "buildInfo"))
+	if err != nil {
+		e.logger.Warnf("Registry - Cannot get MongoDB buildInfo: %s", err)
+	}
+
+	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
+	registry.MustRegister(gc)
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
 	// present in the database.
@@ -160,6 +167,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
 		e.opts.EnableShards = true
+		e.opts.EnableFCV = true
+		e.opts.EnablePBMMetrics = true
 	}
 
 	// arbiter only have isMaster privileges
@@ -173,6 +182,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCurrentopMetrics = false
 		e.opts.EnableProfile = false
 		e.opts.EnableShards = false
+		e.opts.EnableFCV = false
+		e.opts.EnablePBMMetrics = false
 	}
 
 	// If we manually set the collection names we want or auto discovery is set.
@@ -193,7 +204,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
 		ddc := newDiagnosticDataCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
+			e.opts.CompatibleMode, topologyInfo, dbBuildInfo)
 		registry.MustRegister(ddc)
 	}
 
@@ -203,9 +214,9 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(cc)
 	}
 
-	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableCurrentopMetrics {
+	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableCurrentopMetrics && e.opts.CurrentOpSlowTime != "" {
 		coc := newCurrentopCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
+			e.opts.CompatibleMode, topologyInfo, e.opts.CurrentOpSlowTime)
 		registry.MustRegister(coc)
 	}
 
@@ -228,9 +239,19 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(rsgsc)
 	}
 
-	if e.opts.EnableShards && requestOpts.EnableShards {
+	if e.opts.EnableShards && nodeType == typeMongos && requestOpts.EnableShards {
 		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
+	}
+
+	if e.opts.EnableFCV && nodeType != typeMongos {
+		fcvc := newFeatureCompatibilityCollector(ctx, client, e.opts.Logger)
+		registry.MustRegister(fcvc)
+	}
+
+	if e.opts.EnablePBMMetrics && requestOpts.EnablePBMMetrics {
+		pbmc := newPbmCollector(ctx, client, e.opts.URI, e.opts.Logger)
+		registry.MustRegister(pbmc)
 	}
 
 	return registry
@@ -271,7 +292,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
-		// To support also older ones vmagents.
+		// To support older ones vmagents.
 		if err != nil {
 			seconds = 10
 		}
@@ -281,36 +302,7 @@ func (e *Exporter) Handler() http.Handler {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
 		defer cancel()
 
-		filters := r.URL.Query()["collect[]"]
-
-		requestOpts := Opts{}
-
-		if len(filters) == 0 {
-			requestOpts = *e.opts
-		}
-
-		for _, filter := range filters {
-			switch filter {
-			case "diagnosticdata":
-				requestOpts.EnableDiagnosticData = true
-			case "replicasetstatus":
-				requestOpts.EnableReplicasetStatus = true
-			case "dbstats":
-				requestOpts.EnableDBStats = true
-			case "topmetrics":
-				requestOpts.EnableTopMetrics = true
-			case "currentopmetrics":
-				requestOpts.EnableCurrentopMetrics = true
-			case "indexstats":
-				requestOpts.EnableIndexStats = true
-			case "collstats":
-				requestOpts.EnableCollStats = true
-			case "profile":
-				requestOpts.EnableProfile = true
-			case "shards":
-				requestOpts.EnableShards = true
-			}
-		}
+		requestOpts := GetRequestOpts(r.URL.Query()["collect[]"], e.opts)
 
 		client, err = e.getClient(ctx)
 		if err != nil {
@@ -344,13 +336,18 @@ func (e *Exporter) Handler() http.Handler {
 			gatherers = append(gatherers, prometheus.DefaultGatherer)
 		}
 
+		var registry *prometheus.Registry
 		var ti *topologyInfo
 		if client != nil {
 			// Topology can change between requests, so we need to get it every time.
 			ti = newTopologyInfo(ctx, client, e.logger)
+			registry = e.makeRegistry(ctx, client, ti, requestOpts)
+		} else {
+			registry = prometheus.NewRegistry()
+			gc := newGeneralCollector(ctx, client, "", e.opts.Logger)
+			registry.MustRegister(gc)
 		}
 
-		registry := e.makeRegistry(ctx, client, ti, requestOpts)
 		gatherers = append(gatherers, registry)
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
@@ -361,6 +358,44 @@ func (e *Exporter) Handler() http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+// GetRequestOpts makes exporter.Opts structure from request filters and default options.
+func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
+	requestOpts := Opts{}
+
+	if len(filters) == 0 {
+		requestOpts = *defaultOpts
+	}
+
+	for _, filter := range filters {
+		switch filter {
+		case "diagnosticdata":
+			requestOpts.EnableDiagnosticData = true
+		case "replicasetstatus":
+			requestOpts.EnableReplicasetStatus = true
+		case "dbstats":
+			requestOpts.EnableDBStats = true
+		case "topmetrics":
+			requestOpts.EnableTopMetrics = true
+		case "currentopmetrics":
+			requestOpts.EnableCurrentopMetrics = true
+		case "indexstats":
+			requestOpts.EnableIndexStats = true
+		case "collstats":
+			requestOpts.EnableCollStats = true
+		case "profile":
+			requestOpts.EnableProfile = true
+		case "shards":
+			requestOpts.EnableShards = true
+		case "fcv":
+			requestOpts.EnableFCV = true
+		case "pbm":
+			requestOpts.EnablePBMMetrics = true
+		}
+	}
+
+	return requestOpts
 }
 
 func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {

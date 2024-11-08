@@ -40,7 +40,7 @@ type collstatsCollector struct {
 func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible, discovery bool, topology labelsGetter, collections []string) *collstatsCollector {
 	return &collstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "collstats"})),
 
 		compatibleMode:  compatible,
 		discoveringMode: discovery,
@@ -61,20 +61,26 @@ func (d *collstatsCollector) Collect(ch chan<- prometheus.Metric) {
 func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	defer measureCollectTime(ch, "mongodb", "collstats")()
 
-	collections := d.collections
-
 	client := d.base.client
 	logger := d.base.logger
 
+	var collections []string
 	if d.discoveringMode {
-		namespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs)
+		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
 			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
 
 			return
 		}
 
-		collections = fromMapToSlice(namespaces)
+		collections = fromMapToSlice(onlyCollectionsNamespaces)
+	} else {
+		var err error
+		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
+		if err != nil {
+			logger.Errorf("cannot list collections: %s", err.Error())
+			return
+		}
 	}
 
 	for _, dbCollection := range collections {
@@ -85,6 +91,11 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		database := parts[0]
 		collection := strings.Join(parts[1:], ".") // support collections having a .
+
+		// exclude system collections
+		if strings.HasPrefix(collection, "system.") {
+			continue
+		}
 
 		aggregation := bson.D{
 			{
@@ -127,22 +138,15 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		labels["collection"] = collection
 
 		for _, metrics := range stats {
+			if shard, ok := metrics["shard"].(string); ok {
+				labels["shard"] = shard
+			}
+
 			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {
 				ch <- metric
 			}
 		}
 	}
-}
-
-func fromMapToSlice(databases map[string][]string) []string {
-	var collections []string
-	for db, cols := range databases {
-		for _, value := range cols {
-			collections = append(collections, db+"."+value)
-		}
-	}
-
-	return collections
 }
 
 var _ prometheus.Collector = (*collstatsCollector)(nil)

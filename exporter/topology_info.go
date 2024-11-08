@@ -57,7 +57,7 @@ type topologyInfo struct {
 	// by a new connector, able to reconnect if needed. In case of reconnection, we should
 	// call loadLabels to refresh the labels because they might have changed
 	client *mongo.Client
-	logger *logrus.Logger
+	logger *logrus.Entry
 	rw     sync.RWMutex
 	labels map[string]string
 }
@@ -68,7 +68,7 @@ var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 func newTopologyInfo(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *topologyInfo {
 	ti := &topologyInfo{
 		client: client,
-		logger: logger,
+		logger: logger.WithFields(logrus.Fields{"component": "topology_info"}),
 		labels: make(map[string]string),
 		rw:     sync.RWMutex{},
 	}
@@ -103,7 +103,7 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 
 	t.labels = make(map[string]string)
 
-	role, err := getClusterRole(ctx, t.client)
+	role, err := getClusterRole(ctx, t.client, t.logger)
 	if err != nil {
 		return errors.Wrap(err, "cannot get node type for topology info")
 	}
@@ -138,6 +138,9 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 }
 
 func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, error) {
+	if client == nil {
+		return "", errors.New("cannot get mongo node type from an empty client")
+	}
 	md := proto.MasterDoc{}
 	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
 		return "", err
@@ -154,13 +157,12 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 	return typeMongod, nil
 }
 
-func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
+func getClusterRole(ctx context.Context, client *mongo.Client, logger *logrus.Entry) (string, error) {
 	cmdOpts := primitive.M{}
 	// Not always we can get this info. For example, we cannot get this for hidden hosts so
 	// if there is an error, just ignore it
 	res := client.Database("admin").RunCommand(ctx, primitive.D{
 		{Key: "getCmdLineOpts", Value: 1},
-		{Key: "recordStats", Value: 1},
 	})
 
 	if res.Err() != nil {
@@ -170,6 +172,9 @@ func getClusterRole(ctx context.Context, client *mongo.Client) (string, error) {
 	if err := res.Decode(&cmdOpts); err != nil {
 		return "", errors.Wrap(err, "cannot decode getCmdLineOpts response")
 	}
+
+	logger.Debug("getCmdLineOpts response:")
+	debugResult(logger, cmdOpts)
 
 	if walkTo(cmdOpts, []string{"parsed", "sharding", "configDB"}) != nil {
 		return "mongos", nil

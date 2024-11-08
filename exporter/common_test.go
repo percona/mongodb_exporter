@@ -32,6 +32,7 @@ import (
 var (
 	testDBs   = []string{"testdb01", "testdb02"}
 	testColls = []string{"col01", "col02", "colxx", "colyy"}
+	testViews = []string{"view01", "view02"}
 )
 
 func setupDB(ctx context.Context, t *testing.T, client *mongo.Client) {
@@ -44,6 +45,10 @@ func setupDB(ctx context.Context, t *testing.T, client *mongo.Client) {
 				assert.NoError(t, err)
 			}
 		}
+	}
+	for _, view := range testViews {
+		err := client.Database(testDBs[0]).CreateView(ctx, view, testColls[0], mongo.Pipeline{})
+		assert.NoError(t, err)
 	}
 }
 
@@ -105,7 +110,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("Filter in databases", func(t *testing.T) {
 		want := []string{"col01", "col02", "colxx"}
 		inNameSpaces := []string{testDBs[0] + ".col0", testDBs[0] + ".colx"}
-		colls, err := listCollections(ctx, client, testDBs[0], inNameSpaces)
+		colls, err := listCollections(ctx, client, testDBs[0], inNameSpaces, true)
 		sort.Strings(colls)
 
 		assert.NoError(t, err)
@@ -115,22 +120,32 @@ func TestListCollections(t *testing.T) {
 	t.Run("With namespaces list", func(t *testing.T) {
 		// Advanced filtering test
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views"},
 			"testdb02": {"col01", "col02"},
 		}
 		// List all collections in testdb01 (inDBs[0]) but only col01 and col02 from testdb02.
 		filterInNameSpaces := []string{testDBs[0], testDBs[1] + ".col01", testDBs[1] + ".col02"}
-		namespaces, err := listAllCollections(ctx, client, filterInNameSpaces, systemDBs)
+		namespaces, err := listAllCollections(ctx, client, filterInNameSpaces, systemDBs, true)
 		assert.NoError(t, err)
 		assert.Equal(t, wantNS, namespaces)
 	})
 
 	t.Run("Empty namespaces list", func(t *testing.T) {
 		wantNS := map[string][]string{
-			"testdb01": {"col01", "col02", "colxx", "colyy"},
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views"},
 			"testdb02": {"col01", "col02", "colxx", "colyy"},
 		}
-		namespaces, err := listAllCollections(ctx, client, nil, systemDBs)
+		namespaces, err := listAllCollections(ctx, client, nil, systemDBs, true)
+		assert.NoError(t, err)
+		assert.Equal(t, wantNS, namespaces)
+	})
+
+	t.Run("Collections with views", func(t *testing.T) {
+		wantNS := map[string][]string{
+			"testdb01": {"col01", "col02", "colxx", "colyy", "system.views", "view01", "view02"},
+			"testdb02": {"col01", "col02", "colxx", "colyy"},
+		}
+		namespaces, err := listAllCollections(ctx, client, nil, systemDBs, false)
 		assert.NoError(t, err)
 		assert.Equal(t, wantNS, namespaces)
 	})
@@ -138,7 +153,7 @@ func TestListCollections(t *testing.T) {
 	t.Run("Count basic", func(t *testing.T) {
 		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, 8, count)
+		assert.Equal(t, 9, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {
@@ -171,4 +186,26 @@ func TestSplitNamespace(t *testing.T) {
 		assert.Equal(t, tc.wantDatabase, db)
 		assert.Equal(t, tc.wantCollection, coll)
 	}
+}
+
+//nolint:paralleltest
+func TestCheckNamespacesForViews(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	setupDB(ctx, t, client)
+	defer cleanupDB(ctx, client)
+
+	t.Run("Views in provided collection list (should fail)", func(t *testing.T) {
+		_, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
+		assert.EqualError(t, err, "namespace testdb01.view01 is a view and cannot be used for collstats/indexstats")
+	})
+
+	t.Run("No Views in provided collection list", func(t *testing.T) {
+		filtered, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views"})
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"testdb01.col01", "testdb01.system.views"}, filtered)
+	})
 }

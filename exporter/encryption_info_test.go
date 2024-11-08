@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -45,7 +46,10 @@ func TestGetEncryptionInfo(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newDiagnosticDataCollector(ctx, client, logger, true, ti)
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	require.NoError(t, err)
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -61,6 +65,6 @@ func TestGetEncryptionInfo(t *testing.T) {
 		"mongodb_version_info",
 	}
 
-	err := testutil.CollectAndCompare(c, expected, filter...)
+	err = testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
 }
