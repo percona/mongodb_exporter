@@ -23,6 +23,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -126,7 +127,7 @@ func TestSecondaryLag(t *testing.T) {
 	assert.NoError(t, err)
 
 	m, _ = m["data"].(bson.M)
-	metrics := replSetMetrics(m)
+	metrics := replSetMetrics(m, logrus.WithField("component", "test"))
 	var lag prometheus.Metric
 	for _, m := range metrics {
 		if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_member_replication_lag"`) {

@@ -30,40 +30,89 @@ import (
 )
 
 func TestGeneralCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	t.Parallel()
+	t.Run("mongod cluster role", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
 
-	client := tu.DefaultTestClient(ctx, t)
-	c := newGeneralCollector(ctx, client, logrus.New())
+		client := tu.DefaultTestClient(ctx, t)
+		nodeType, _ := getNodeType(ctx, client)
+		c := newGeneralCollector(ctx, client, nodeType, logrus.New())
 
-	filter := []string{
-		"collector_scrape_time_ms",
-	}
-	count := testutil.CollectAndCount(c, filter...)
-	assert.Equal(t, len(filter), count, "Meta-metric for collector is missing")
+		filter := []string{
+			"collector_scrape_time_ms",
+		}
+		count := testutil.CollectAndCount(c, filter...)
+		assert.Equal(t, len(filter), count, "Meta-metric for collector is missing")
 
-	// The last \n at the end of this string is important
-	expected := strings.NewReader(`
+		// The last \n at the end of this string is important
+		expected := strings.NewReader(`
 	# HELP mongodb_up Whether MongoDB is up.
 	# TYPE mongodb_up gauge
-	mongodb_up 1
+	mongodb_up {cluster_role="mongod"} 1
 	` + "\n")
-	filter = []string{
-		"mongodb_up",
-	}
-	err := testutil.CollectAndCompare(c, expected, filter...)
-	require.NoError(t, err)
+		filter = []string{
+			"mongodb_up",
+		}
+		err := testutil.CollectAndCompare(c, expected, filter...)
+		require.NoError(t, err)
 
-	assert.NoError(t, client.Disconnect(ctx))
+		assert.NoError(t, client.Disconnect(ctx))
 
-	expected = strings.NewReader(`
+		expected = strings.NewReader(`
 	# HELP mongodb_up Whether MongoDB is up.
 	# TYPE mongodb_up gauge
-	mongodb_up 0
+	mongodb_up {cluster_role="mongod"} 0
 	` + "\n")
-	filter = []string{
-		"mongodb_up",
-	}
-	err = testutil.CollectAndCompare(c, expected, filter...)
-	require.NoError(t, err)
+		filter = []string{
+			"mongodb_up",
+		}
+		err = testutil.CollectAndCompare(c, expected, filter...)
+		require.NoError(t, err)
+	})
+
+	t.Run("mongos cluster role", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongos")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		nodeType, _ := getNodeType(ctx, client)
+		c := newGeneralCollector(ctx, client, nodeType, logrus.New())
+
+		filter := []string{
+			"collector_scrape_time_ms",
+		}
+		count := testutil.CollectAndCount(c, filter...)
+		assert.Equal(t, len(filter), count, "Meta-metric for collector is missing")
+
+		// The last \n at the end of this string is important
+		expected := strings.NewReader(`
+	# HELP mongodb_up Whether MongoDB is up.
+	# TYPE mongodb_up gauge
+	mongodb_up {cluster_role="mongos"} 1
+	` + "\n")
+		filter = []string{
+			"mongodb_up",
+		}
+		err = testutil.CollectAndCompare(c, expected, filter...)
+		require.NoError(t, err)
+
+		assert.NoError(t, client.Disconnect(ctx))
+
+		expected = strings.NewReader(`
+	# HELP mongodb_up Whether MongoDB is up.
+	# TYPE mongodb_up gauge
+	mongodb_up {cluster_role="mongos"} 0
+	` + "\n")
+		filter = []string{
+			"mongodb_up",
+		}
+		err = testutil.CollectAndCompare(c, expected, filter...)
+		require.NoError(t, err)
+	})
 }

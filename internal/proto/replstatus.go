@@ -136,11 +136,17 @@ type ShardIdentity struct {
 	ConfigsvrConnectionString string             `bson:"configsvrConnectionString"`
 }
 
-// MyState is a subset of getDiagnosticData result used to tag metrics in the MongoDB exporter
-type MyState struct {
-	Data struct {
-		ReplicasetGetStatus struct {
-			MyState int `bson:"myState"`
-		} `bson:"replSetGetStatus"`
-	} `bson:"data"`
+// HelloResponse represents the response from a Mongo `hello` command.
+type HelloResponse struct {
+	ArbiterOnly bool     `bson:"arbiterOnly"`
+	Arbiters    []string `bson:"arbiters"`
+	Hosts       []string `bson:"hosts"`
+	IsMaster    bool     `bson:"ismaster"`
+	Me          string   `bson:"me"`
+	Ok          int      `bson:"ok"`
+	Primary     string   `bson:"primary"`
+	ReadOnly    bool     `bson:"readOnly"`
+	Secondary   bool     `bson:"secondary"`
+	SetName     string   `bson:"setName"`
+	SetVersion  int      `bson:"setVersion"`
 }

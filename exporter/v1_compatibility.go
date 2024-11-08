@@ -35,9 +35,18 @@ import (
 )
 
 const (
-	// UnknownState is the values for an unknown rs state.
-	// From MongoDB documentation: https://docs.mongodb.com/manual/reference/replica-states/
+	// PrimaryState is the state of the primary node in a replica set.
+	// See: https://docs.mongodb.com/manual/reference/replica-states/
+	PrimaryState = 1
+
+	// SecondaryState is the state of a secondary node in a replica set.
+	SecondaryState = 2
+
+	// UnknownState is the state of an unknown node in a replica set.
 	UnknownState = 6
+
+	// ArbiterState is the state of an arbiter in a replica set.
+	ArbiterState = 7
 
 	// EnterpriseEdition shows that MongoDB is Enterprise edition.
 	EnterpriseEdition = "Enterprise"
@@ -465,8 +474,20 @@ func conversions() []conversion {
 			newName: "mongodb_ss_wt_txn_transaction_checkpoint_total_time_msecs",
 		},
 		{
+			oldName: "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds_total",
+			newName: "mongodb_ss_wt_checkpoint_total_time_msecs",
+		},
+		{
 			oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
 			newName: "mongodb_ss_wt_txn_transaction_checkpoint_currently_running",
+		},
+		{
+			oldName: "mongodb_mongod_wiredtiger_transactions_running_checkpoints",
+			newName: "mongodb_ss_wt_checkpoint_currently_running",
+		},
+		{
+			oldName: "mongodb_ss_tcmalloc_tcmalloc_thread_cache_free_bytes",
+			newName: "mongodb_ss_tcmalloc_tcmalloc_thread_cache_free",
 		},
 		{
 			oldName:     "mongodb_mongod_wiredtiger_transactions_total",
@@ -562,6 +583,15 @@ func conversions() []conversion {
 		{
 			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
 			prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",
+			suffixLabel: "type",
+			suffixMapping: map[string]string{
+				"min_time_msecs": "min",
+				"max_time_msecs": "max",
+			},
+		},
+		{
+			oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
+			prefix:      "mongodb_ss_wt_checkpoint",
 			suffixLabel: "type",
 			suffixMapping: map[string]string{
 				"min_time_msecs": "min",
@@ -707,7 +737,7 @@ func lockMetrics() []lockMetric {
 // This function reads the human readable list from lockMetrics() and creates a slice of metrics
 // ready to be exposed, taking the value for each metric from th provided bson.M structure from
 // getDiagnosticData.
-func locksMetrics(logger *logrus.Logger, m bson.M) []prometheus.Metric {
+func locksMetrics(logger *logrus.Entry, m bson.M) []prometheus.Metric {
 	metrics := lockMetrics()
 	res := make([]prometheus.Metric, 0, len(metrics))
 
@@ -773,7 +803,7 @@ func specialMetricDefinitions() []specialMetric {
 	}
 }
 
-func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logrus.Logger) []prometheus.Metric {
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeType mongoDBNodeType, l *logrus.Entry) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
 	for _, def := range specialMetricDefinitions() {
@@ -793,68 +823,61 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, l *logr
 		metrics = append(metrics, metric)
 	}
 
-	buildInfo, err := retrieveMongoDBBuildInfo(ctx, client, l)
-	if err != nil {
-		l.Errorf("cannot retrieve MongoDB buildInfo: %s", err)
+	if nodeType == typeMongod || nodeType == typeArbiter {
+		if engine, err := storageEngine(m); err != nil {
+			l.Errorf("cannot retrieve engine type: %s", err)
+		} else {
+			metrics = append(metrics, engine)
+		}
 	}
 
-	if engine, err := storageEngine(m); err != nil {
-		l.Errorf("cannot retrieve engine type: %s", err)
-	} else {
-		metrics = append(metrics, engine)
-	}
-	metrics = append(metrics, serverVersion(buildInfo))
-	metrics = append(metrics, myState(ctx, client))
+	if nodeType != typeArbiter {
+		metrics = append(metrics, myState(ctx, client))
+		if replSetGetStatus, ok := m["replSetGetStatus"].(bson.M); ok {
+			if rm := replSetMetrics(replSetGetStatus, l); rm != nil {
+				metrics = append(metrics, rm...)
+			}
+		}
 
-	if mm := replSetMetrics(m); mm != nil {
-		metrics = append(metrics, mm...)
-	}
-
-	if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
-		l.Warnf("cannot create metrics for oplog: %s", err)
-	} else {
-		metrics = append(metrics, opLogMetrics...)
+		if nodeType != typeMongos {
+			if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
+				l.Warnf("cannot create metrics for oplog: %s", err)
+			} else {
+				metrics = append(metrics, opLogMetrics...)
+			}
+		}
 	}
 
 	return metrics
 }
 
-func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Logger) (buildInfo, error) {
+func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Entry) (buildInfo, error) {
+	if client == nil {
+		return buildInfo{}, errors.New("cannot get mongo build info: client is nil")
+	}
 	buildInfoCmd := bson.D{bson.E{Key: "buildInfo", Value: 1}}
 	res := client.Database("admin").RunCommand(ctx, buildInfoCmd)
 
-	var buildInfoDoc bson.M
+	var buildInfoDoc buildInfo
 	err := res.Decode(&buildInfoDoc)
 	if err != nil {
 		return buildInfo{}, errors.Wrap(err, "Failed to run buildInfo command")
 	}
 
-	modules, ok := buildInfoDoc["modules"].(bson.A)
-	if !ok {
-		return buildInfo{}, errors.Wrap(err, "Failed to cast module information variable")
-	}
-
-	var bi buildInfo
-	if len(modules) > 0 && modules[0].(string) == "enterprise" {
-		bi.Edition = EnterpriseEdition
+	if len(buildInfoDoc.Modules) > 0 && buildInfoDoc.Modules[0] == "enterprise" {
+		buildInfoDoc.Edition = EnterpriseEdition
 	} else {
-		bi.Edition = CommunityEdition
+		buildInfoDoc.Edition = CommunityEdition
 	}
-	l.Debug("MongoDB edition: ", bi.Edition)
+	l.Debug("MongoDB edition: ", buildInfoDoc.Edition)
 
-	_, ok = buildInfoDoc["psmdbVersion"]
-	if ok {
-		bi.Vendor = PerconaVendor
+	if buildInfoDoc.PSMDBVersion != "" {
+		buildInfoDoc.Vendor = PerconaVendor
 	} else {
-		bi.Vendor = MongoDBVendor
+		buildInfoDoc.Vendor = MongoDBVendor
 	}
 
-	bi.Version, ok = buildInfoDoc["version"].(string)
-	if !ok {
-		return buildInfo{}, errors.Wrap(err, "Failed to cast version information variable")
-	}
-
-	return bi, nil
+	return buildInfoDoc, nil
 }
 
 func storageEngine(m bson.M) (prometheus.Metric, error) { //nolint:ireturn
@@ -889,15 +912,9 @@ func serverVersion(bi buildInfo) prometheus.Metric { //nolint:ireturn
 }
 
 func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
-	state, err := util.MyState(ctx, client)
+	id, state, err := util.MyState(ctx, client)
 	if err != nil {
 		state = UnknownState
-	}
-
-	var id string
-	rs, err := util.ReplicasetConfig(ctx, client)
-	if err == nil {
-		id = rs.Config.ID
 	}
 
 	name := "mongodb_mongod_replset_my_state"
@@ -909,6 +926,36 @@ func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(state))
 
 	return metric
+}
+
+// arbiterMetrics returns metrics for mongoDB arbiter instances.
+func arbiterMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
+	response, err := util.MyRole(ctx, client)
+	if err != nil {
+		l.Errorf("cannot get role of the running instance: %s", err)
+		return nil
+	}
+
+	var metrics []prometheus.Metric
+	createMetric := func(name, help string, value float64, labels map[string]string) {
+		const prefix = "mongodb_mongod_replset_"
+		d := prometheus.NewDesc(prefix+name, help, nil, labels)
+		metrics = append(metrics, prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value))
+	}
+
+	createMetric("my_state",
+		"An integer between 0 and 10 that represents the replica state of the current member",
+		float64(ArbiterState), map[string]string{
+			"set": response.SetName,
+		})
+
+	createMetric("number_of_members",
+		"The number of replica set members.",
+		float64(len(response.Hosts)+len(response.Arbiters)), map[string]string{
+			"set": response.SetName,
+		})
+
+	return metrics
 }
 
 func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
@@ -949,17 +996,15 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return []prometheus.Metric{headMetric, tailMetric}, nil
 }
 
-func replSetMetrics(m bson.M) []prometheus.Metric {
-	replSetGetStatus, ok := m["replSetGetStatus"].(bson.M)
-	if !ok {
-		return nil
-	}
+func replSetMetrics(d bson.M, l *logrus.Entry) []prometheus.Metric {
 	var repl proto.ReplicaSetStatus
-	b, err := bson.Marshal(replSetGetStatus)
+	b, err := bson.Marshal(d)
 	if err != nil {
+		l.Warnf("cannot marshal replica set status: %s", err)
 		return nil
 	}
 	if err := bson.Unmarshal(b, &repl); err != nil {
+		l.Warnf("cannot unmarshal replica set status: %s", err)
 		return nil
 	}
 
@@ -971,7 +1016,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 	for _, m := range repl.Members {
 		if m.StateStr == "PRIMARY" {
 			primaryOpTime = m.OptimeDate.Time()
-			gotPrimary = !primaryOpTime.IsZero()
+			gotPrimary = primaryOpTime.Unix() != 0
 
 			break
 		}
@@ -994,12 +1039,11 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 			"name":  m.Name,
 			"state": m.StateStr,
 			"set":   repl.Set,
+			"self":  "0",
 		}
 		if m.Self {
-			createMetric("my_name", "The replica state name of the current member.", 1, map[string]string{
-				"name": m.Name,
-				"set":  repl.Set,
-			})
+			labels["self"] = "1"
+			createMetric("my_name", "The replica state name of the current member.", 1, labels)
 		}
 
 		if !m.ElectionTime.IsZero() {
@@ -1007,7 +1051,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 				"The timestamp the node was elected as replica leader",
 				float64(m.ElectionTime.T), labels)
 		}
-		if t := m.OptimeDate.Time(); gotPrimary && !t.IsZero() && m.StateStr != "PRIMARY" {
+		if t := m.OptimeDate.Time(); gotPrimary && t.Unix() != 0 && m.StateStr != "PRIMARY" {
 			val := math.Abs(float64(t.Unix() - primaryOpTime.Unix()))
 			createMetric("member_replication_lag",
 				"The replication lag that this member has with the primary.",
@@ -1037,7 +1081,7 @@ func replSetMetrics(m bson.M) []prometheus.Metric {
 	return metrics
 }
 
-func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
 	if metric, err := databasesTotalPartitioned(ctx, client); err != nil {
@@ -1064,27 +1108,13 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) 
 		metrics = append(metrics, metric)
 	}
 
-	metric, err := chunksTotal(ctx, client)
-	if err != nil {
-		l.Debugf("cannot create metric for chunks total: %s", err)
+	if metric, err := chunksBalancerRunning(ctx, client); err != nil {
+		l.Debugf("cannot create metric for chunks balancer running: %s", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
-	ms, err := chunksTotalPerShard(ctx, client)
-	if err != nil {
-		l.Debugf("cannot create metric for chunks total per shard: %s", err)
-	} else {
-		metrics = append(metrics, ms...)
-	}
-
-	if metric, err := chunksBalanced(ctx, client); err != nil {
-		l.Debugf("cannot create metric for chunks balanced: %s", err)
-	} else {
-		metrics = append(metrics, metric)
-	}
-
-	ms, err = changelog10m(ctx, client, l)
+	ms, err := changelog10m(ctx, client, l)
 	if err != nil {
 		l.Errorf("cannot create metric for changelog: %s", err)
 	} else {
@@ -1149,7 +1179,7 @@ func shardedCollectionsTotal(ctx context.Context, client *mongo.Client) (prometh
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(collCount))
 }
 
-func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
+func chunksBalancerRunning(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	var m struct {
 		InBalancerRound bool `bson:"inBalancerRound"`
 	}
@@ -1166,8 +1196,8 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 		value = 1
 	}
 
-	name := "mongodb_mongos_sharding_chunks_is_balanced"
-	help := "Shards are balanced"
+	name := "mongodb_mongos_sharding_chunks_is_balancer_running"
+	help := "Shard balancer is in a balancing round"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, value)
@@ -1175,17 +1205,17 @@ func chunksBalanced(ctx context.Context, client *mongo.Client) (prometheus.Metri
 
 func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	type bss struct {
-		Stopped bool `bson:"stopped"`
+		Mode string `bson:"mode"`
 	}
 	var bs bss
 	enabled := 0
 
-	err := client.Database("config").Collection("settings").FindOne(ctx, bson.M{"_id": "balancer"}).Decode(&bs)
+	cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
+	err := client.Database("admin").RunCommand(ctx, cmd).Decode(&bs)
 	if err != nil {
 		return nil, err
 	}
-
-	if !bs.Stopped {
+	if bs.Mode == "full" {
 		enabled = 1
 	}
 
@@ -1193,60 +1223,7 @@ func balancerEnabled(ctx context.Context, client *mongo.Client) (prometheus.Metr
 	help := "Balancer is enabled"
 
 	d := prometheus.NewDesc(name, help, nil, nil)
-	metric, _ := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
-
-	return metric, nil
-}
-
-func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
-	n, err := client.Database("config").Collection("chunks").CountDocuments(ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-
-	name := "mongodb_mongos_sharding_chunks_total"
-	help := "Total number of chunks"
-
-	d := prometheus.NewDesc(name, help, nil, nil)
-	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
-}
-
-func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
-	aggregation := bson.D{
-		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
-	}
-
-	cursor, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
-	if err != nil {
-		return nil, err
-	}
-
-	var shards []bson.M
-	if err = cursor.All(ctx, &shards); err != nil {
-		return nil, err
-	}
-
-	metrics := make([]prometheus.Metric, 0, len(shards))
-
-	for _, shard := range shards {
-		help := "Total number of chunks per shard"
-		labels := map[string]string{"shard": shard["_id"].(string)}
-
-		d := prometheus.NewDesc("mongodb_mongos_sharding_shard_chunks_total", help, nil, labels)
-		val, ok := shard["count"].(int32)
-		if !ok {
-			continue
-		}
-
-		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(val))
-		if err != nil {
-			continue
-		}
-
-		metrics = append(metrics, metric)
-	}
-
-	return metrics, nil
+	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(enabled))
 }
 
 func shardingShardsTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
@@ -1292,7 +1269,7 @@ type ShardingChangelogStats struct {
 	Items *[]ShardingChangelogSummary
 }
 
-func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Logger) ([]prometheus.Metric, error) {
+func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Entry) ([]prometheus.Metric, error) {
 	var metrics []prometheus.Metric
 
 	coll := client.Database("config").Collection("changelog")
@@ -1359,12 +1336,15 @@ type rawStatus struct {
 }
 
 type buildInfo struct {
-	Version string
-	Edition string
-	Vendor  string
+	Version      string `bson:"version"`
+	PSMDBVersion string `bson:"psmdbVersion"`
+	VersionArray []int  `bson:"versionArray"`
+	Edition      string
+	Vendor       string
+	Modules      []string `bson:"modules"`
 }
 
-func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Logger) *databaseStatList {
+func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Entry) *databaseStatList {
 	dbStatList := &databaseStatList{}
 	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
@@ -1386,7 +1366,7 @@ func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Lo
 	return dbStatList
 }
 
-func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Logger) []prometheus.Metric {
+func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
 	var metrics []prometheus.Metric
 
 	dbStatList := getDatabaseStatList(ctx, client, l)

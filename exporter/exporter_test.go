@@ -186,9 +186,7 @@ func TestMongoS(t *testing.T) {
 		assert.NoError(t, err)
 
 		e := New(exporterOpts)
-
-		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, new(labelsGetterMock))
+		rsgsc := newReplicationSetStatusCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode, new(labelsGetterMock))
 
 		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
@@ -199,75 +197,61 @@ func TestMongoS(t *testing.T) {
 	}
 }
 
-func TestMongoUp(t *testing.T) {
-	ctx := context.Background()
-
-	exporterOpts := &Opts{
-		Logger:         logrus.New(),
-		URI:            "mongodb://127.0.0.1:123456/admin",
-		DirectConnect:  true,
-		GlobalConnPool: false,
-		CollectAll:     true,
-	}
-
-	client, err := connect(ctx, exporterOpts)
-	assert.Error(t, err)
-
-	e := New(exporterOpts)
-
-	gc := newGeneralCollector(ctx, client, e.opts.Logger)
-
-	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
-
-	res := r.Unregister(gc)
-	assert.Equal(t, true, res)
-}
-
 func TestMongoUpMetric(t *testing.T) {
 	ctx := context.Background()
 
 	type testcase struct {
-		URI  string
-		Want int
+		name        string
+		URI         string
+		clusterRole string
+		Want        int
 	}
 
 	testCases := []testcase{
 		{URI: "mongodb://127.0.0.1:12345/admin", Want: 0},
-		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "27017")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_ARBITER_PORT", "27017")), Want: 1, clusterRole: "arbiter"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_MONGOS_PORT", "27017")), Want: 1, clusterRole: "mongos"},
 	}
 
 	for _, tc := range testCases {
-		exporterOpts := &Opts{
-			Logger:           logrus.New(),
-			URI:              tc.URI,
-			ConnectTimeoutMS: 200,
-			DirectConnect:    true,
-			GlobalConnPool:   false,
-			CollectAll:       true,
-		}
+		t.Run(tc.clusterRole+"/"+tc.URI, func(t *testing.T) {
+			exporterOpts := &Opts{
+				Logger:           logrus.New(),
+				URI:              tc.URI,
+				ConnectTimeoutMS: 200,
+				DirectConnect:    true,
+				GlobalConnPool:   false,
+				CollectAll:       true,
+			}
 
-		client, err := connect(ctx, exporterOpts)
-		if tc.Want == 1 {
-			assert.NoError(t, err, "Must be able to connect to %s", tc.URI)
-		} else {
-			assert.Error(t, err, "Must be unable to connect to %s", tc.URI)
-		}
+			client, err := connect(ctx, exporterOpts)
+			if tc.Want == 1 {
+				assert.NoError(t, err, "Must be able to connect to %s", tc.URI)
+			} else {
+				assert.Error(t, err, "Must be unable to connect to %s", tc.URI)
+			}
 
-		e := New(exporterOpts)
-		gc := newGeneralCollector(ctx, client, e.opts.Logger)
-		r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+			e := New(exporterOpts)
+			nodeType, _ := getNodeType(ctx, client)
+			gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
+			r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
-		expected := strings.NewReader(`
+			expected := strings.NewReader(fmt.Sprintf(`
 		# HELP mongodb_up Whether MongoDB is up.
 		# TYPE mongodb_up gauge
-		mongodb_up ` + strconv.Itoa(tc.Want) + "\n")
-		filter := []string{
-			"mongodb_up",
-		}
-		err = testutil.CollectAndCompare(gc, expected, filter...)
-		assert.NoError(t, err, "mongodb_up metric should be %d", tc.Want)
+		mongodb_up {cluster_role="%s"} %s`, tc.clusterRole, strconv.Itoa(tc.Want)) + "\n")
 
-		res := r.Unregister(gc)
-		assert.Equal(t, true, res)
+			filter := []string{
+				"mongodb_up",
+			}
+			err = testutil.CollectAndCompare(gc, expected, filter...)
+			assert.NoError(t, err, "mongodb_up metric should be %d", tc.Want)
+
+			res := r.Unregister(gc)
+			assert.Equal(t, true, res)
+		})
 	}
 }

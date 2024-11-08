@@ -17,7 +17,7 @@ REPO ?= percona/$(NAME)
 GORELEASER_FLAGS ?=
 UID ?= $(shell id -u)
 
-export TEST_MONGODB_IMAGE?=mongo:4.2
+export TEST_MONGODB_IMAGE?=mongo:4.4
 export TEST_MONGODB_ADMIN_USERNAME?=
 export TEST_MONGODB_ADMIN_PASSWORD?=
 export TEST_MONGODB_USERNAME?=
@@ -76,8 +76,9 @@ build:                      ## Compile using plain go build
 release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
 		-v ${PWD}:/go/src/github.com/user/repo \
+		-v /var/run/docker.sock:/var/run/docker.sock \
 		-w /go/src/github.com/user/repo \
-		goreleaser/goreleaser release --snapshot --skip-publish --rm-dist 
+		goreleaser/goreleaser release --snapshot --skip=publish --clean
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
@@ -107,7 +108,8 @@ test-cover: env              ## Run tests and collect cross-package coverage inf
 	go test -race -timeout 30s -coverprofile=cover.out -covermode=atomic -coverpkg=./... ./...
 
 test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
-	docker compose up -d --wait
+	docker compose up --build -d
+	./docker/scripts/setup-pbm.sh
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
-	docker compose down --remove-orphans --volumes --timeout 1
+	docker compose down --remove-orphans --volumes

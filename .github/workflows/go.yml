@@ -22,8 +22,15 @@ jobs:
         image:
           - mongo:4.4
           - mongo:5.0
+          - mongo:6.0
+          - mongo:7.0
+          - mongo:8.0
+          - mongo:latest
           - percona/percona-server-mongodb:4.4
           - percona/percona-server-mongodb:5.0
+          - percona/percona-server-mongodb:6.0
+          - percona/percona-server-mongodb:7.0
+          - percona/percona-server-mongodb:latest
 
     runs-on: ubuntu-latest
 
@@ -32,7 +39,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
@@ -43,6 +50,7 @@ jobs:
           make test-cover
           make test-cluster-clean
 
+
       - name: Upload coverage results
         uses: codecov/codecov-action@v3
         with:
@@ -50,3 +58,17 @@ jobs:
           flags: agent
           env_vars: GO_VERSION,TEST_MONGODB_IMAGE
           fail_ci_if_error: false
+
+      - name: Run debug commands on failure
+        if: ${{ failure() }}
+        run: |
+          echo "--- Environment variables ---"
+          env | sort
+          echo "--- GO Environment ---"
+          go env | sort
+          echo "--- Git status ---"
+          git status
+          echo "--- Docker logs ---"
+          docker compose logs
+          echo "--- Docker ps ---"
+          docker compose ps -a

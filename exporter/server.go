@@ -16,13 +16,17 @@
 package exporter
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/promslog"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/sirupsen/logrus"
 )
@@ -32,10 +36,12 @@ type ServerMap map[string]http.Handler
 
 // ServerOpts is the options for the main http handler
 type ServerOpts struct {
-	Path             string
-	MultiTargetPath  string
-	WebListenAddress string
-	TLSConfigPath    string
+	Path                   string
+	MultiTargetPath        string
+	OverallTargetPath      string
+	WebListenAddress       string
+	TLSConfigPath          string
+	DisableDefaultRegistry bool
 }
 
 // Runs the main web-server
@@ -51,6 +57,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 	defaultExporter := exporters[0]
 	mux.Handle(opts.Path, defaultExporter.Handler())
 	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap))
+	mux.HandleFunc(opts.OverallTargetPath, OverallTargetsHandler(exporters, log))
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
@@ -73,7 +80,11 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 		WebListenAddresses: &[]string{opts.WebListenAddress},
 		WebConfigFile:      &opts.TLSConfigPath,
 	}
-	if err := web.ListenAndServe(server, flags, promlog.New(&promlog.Config{})); err != nil {
+	logLevel := &promslog.AllowedLevel{}
+	_ = logLevel.Set(log.Level.String())
+	if err := web.ListenAndServe(server, flags, promslog.New(&promslog.Config{ //nolint:exhaustivestruct
+		Level: logLevel,
+	})); err != nil {
 		log.Errorf("error starting server: %v", err)
 		os.Exit(1)
 	}
@@ -94,6 +105,75 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 			}
 		}
 		http.Error(w, "Unable to find target", http.StatusNotFound)
+	}
+}
+
+// OverallTargetsHandler is a handler to scrape all the targets in one request.
+// Adds instance label to each metric.
+func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
+		// To support older ones vmagents.
+		if err != nil {
+			seconds = 10
+			logger.Debug("Can't get X-Prometheus-Scrape-Timeout-Seconds header, using default value 10")
+		}
+
+		var gatherers prometheus.Gatherers
+		gatherers = append(gatherers, prometheus.DefaultGatherer)
+
+		filters := r.URL.Query()["collect[]"]
+
+		for _, e := range exporters {
+			ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds-e.opts.TimeoutOffset)*time.Second)
+			defer cancel()
+
+			requestOpts := GetRequestOpts(filters, e.opts)
+
+			client, err := e.getClient(ctx)
+			if err != nil {
+				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
+			}
+
+			// Close client after usage.
+			if !e.opts.GlobalConnPool {
+				defer func() {
+					if client != nil {
+						err := client.Disconnect(ctx)
+						if err != nil {
+							logger.Errorf("Cannot disconnect client: %v", err)
+						}
+					}
+				}()
+			}
+
+			var registry *prometheus.Registry
+			var ti *topologyInfo
+			if client != nil {
+				// Topology can change between requests, so we need to get it every time.
+				ti = newTopologyInfo(ctx, client, e.logger)
+				registry = e.makeRegistry(ctx, client, ti, requestOpts)
+			} else {
+				registry = prometheus.NewRegistry()
+				gc := newGeneralCollector(ctx, client, "", e.opts.Logger)
+				registry.MustRegister(gc)
+			}
+
+			hostlabels := prometheus.Labels{
+				"instance": e.opts.NodeName,
+			}
+
+			gw := NewGathererWrapper(registry, hostlabels)
+			gatherers = append(gatherers, gw)
+		}
+
+		// Delegate http serving to Prometheus client library, which will call collector.Collect.
+		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
+			ErrorHandling: promhttp.ContinueOnError,
+			ErrorLog:      logger,
+		})
+
+		h.ServeHTTP(w, r)
 	}
 }
 
