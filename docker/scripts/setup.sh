@@ -47,6 +47,7 @@ function cnf_servers() {
             {
                 "_id": 0,
                 "host": "${mongodb1}:${port}"
+                "priority": 1000
             },
             {
                 "_id": 1,
