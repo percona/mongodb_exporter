@@ -301,7 +301,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	for k, val := range m {
 		nextPrefix := prefix + k
 
-		var l = make(map[string]string)
+		l := make(map[string]string)
 		if label, ok := keyNodesToLabels[prefix]; ok {
 			for k, v := range labels {
 				l[k] = v
