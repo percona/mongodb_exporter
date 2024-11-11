@@ -1,23 +1,23 @@
 // mongodb_exporter
 // Copyright (C) 2022 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -31,7 +31,8 @@ import (
 
 var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
 
-func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string) ([]string, error) {
+func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string, skipViews bool) ([]string, error) {
+	opts := &options.ListCollectionsOptions{NameOnly: pointer.ToBool(true), AuthorizedCollections: pointer.ToBool(true)}
 	filter := bson.D{} // Default=empty -> list all collections
 
 	// if there is a filter with the list of collections we want, create a filter like
@@ -58,7 +59,11 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 		}
 	}
 
-	collections, err := client.Database(database).ListCollectionNames(ctx, filter)
+	if skipViews {
+		filter = append(filter, primitive.E{Key: "type", Value: "collection"})
+	}
+
+	collections, err := client.Database(database).ListCollectionNames(ctx, filter, opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot get the list of collections for discovery")
 	}
@@ -154,7 +159,36 @@ func unique(slice []string) []string {
 	return list
 }
 
-func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string) (map[string][]string, error) {
+func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
+	onlyCollectionsNamespaces, err := listAllCollections(ctx, client, nil, nil, true)
+	if err != nil {
+		return nil, err
+	}
+
+	namespaces := make(map[string]struct{})
+	for db, collections := range onlyCollectionsNamespaces {
+		for _, collection := range removeEmptyStrings(collections) {
+			namespaces[fmt.Sprintf("%s.%s", db, collection)] = struct{}{}
+		}
+	}
+
+	filteredCollections := []string{}
+	for _, collection := range removeEmptyStrings(collections) {
+		if len(strings.Split(collection, ".")) < 2 { //nolint:gomnd
+			continue
+		}
+
+		if _, ok := namespaces[collection]; !ok {
+			return nil, errors.Errorf("namespace %s is a view and cannot be used for collstats/indexstats", collection)
+		}
+
+		filteredCollections = append(filteredCollections, collection)
+	}
+
+	return filteredCollections, nil
+}
+
+func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string, skipViews bool) (map[string][]string, error) {
 	namespaces := make(map[string][]string)
 
 	dbs, err := databases(ctx, client, filterInNamespaces, excludeDBs)
@@ -178,7 +212,7 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 				continue
 			}
 
-			colls, err := listCollections(ctx, client, db, []string{namespace})
+			colls, err := listCollections(ctx, client, db, []string{namespace}, skipViews)
 			if err != nil {
 				return nil, errors.Wrapf(err, "cannot list the collections for %q", db)
 			}
@@ -210,7 +244,7 @@ func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includ
 	var count int
 
 	for _, dbname := range databases {
-		colls, err := listCollections(ctx, client, dbname, filterInCollections)
+		colls, err := listCollections(ctx, client, dbname, filterInCollections, true)
 		if err != nil {
 			return 0, errors.Wrap(err, "cannot get collections count")
 		}
@@ -227,4 +261,15 @@ func splitNamespace(ns string) (database, collection string) {
 	}
 
 	return parts[0], strings.Join(parts[1:], ".")
+}
+
+func fromMapToSlice(databases map[string][]string) []string {
+	var collections []string
+	for db, cols := range databases {
+		for _, value := range cols {
+			collections = append(collections, db+"."+value)
+		}
+	}
+
+	return collections
 }

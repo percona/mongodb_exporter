@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package exporter
 
@@ -53,11 +52,14 @@ var (
 	prefixes = [][]string{
 		{"serverStatus.wiredTiger.transaction", "ss_wt_txn"},
 		{"serverStatus.wiredTiger", "ss_wt"},
+		{"serverStatus.queues.execution", "ss_wt_concurrentTransactions"},
 		{"serverStatus", "ss"},
 		{"replSetGetStatus", "rs"},
 		{"systemMetrics", "sys"},
 		{"local.oplog.rs.stats.wiredTiger", "oplog_stats_wt"},
+		{"local.oplog.rs.stats.storageStats.wiredTiger", "oplog_stats_wt"},
 		{"local.oplog.rs.stats", "oplog_stats"},
+		{"local.oplog.rs.stats.storageStats", "oplog_stats"},
 		{"collstats_storage.wiredTiger", "collstats_storage_wt"},
 		{"collstats_storage.indexDetails", "collstats_storage_idx"},
 		{"collStats.storageStats", "collstats_storage"},
@@ -106,6 +108,7 @@ var (
 		"serverStatus.opcountersRepl.":                    "legacy_op_type",
 		"serverStatus.transactions.commitTypes.":          "commit_type",
 		"serverStatus.wiredTiger.concurrentTransactions.": "txn_rw_type",
+		"serverStatus.queues.execution.":                  "txn_rw_type",
 		"serverStatus.wiredTiger.perf.":                   "perf_bucket",
 		"systemMetrics.disks.":                            "device_name",
 	}
@@ -209,7 +212,9 @@ func asFloat64(value interface{}) (*float64, error) {
 		f = v
 	case primitive.DateTime:
 		f = float64(v)
-	case primitive.A, primitive.ObjectID, primitive.Timestamp, primitive.Binary, string, []uint8, time.Time:
+	case primitive.Timestamp:
+		f = float64(v.T)
+	case primitive.A, primitive.ObjectID, primitive.Binary, string, []uint8, time.Time:
 		return nil, nil
 	default:
 		return nil, errors.Wrapf(errCannotHandleType, "%T", v)
@@ -252,7 +257,6 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		case map[string]interface{}:
 			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
 		case primitive.A:
-			v = []interface{}(v)
 			res = append(res, processSlice(prefix, k, v, labels, compatibleMode)...)
 		case []interface{}:
 			continue

@@ -1,3 +1,53 @@
+Release 0.41.1
+- Fix panic (regression bug in v0.41.0) occuring when fcv collector is enabled
+
+Release 0.41.0
+
+- Add extra label for replicaset metrics
+- Add information about supported MongoDB versions
+- Add command line flag to disable metrics about the exporter it-self
+- Add PBM metrics collector
+- Add cluster role label for mongodb_up
+- Add feature compatibility version collector
+- Migrate chunks metrics from v1 compatibility to shards collector
+- Correctly recognize arbiter nodes
+- Fix node type detection
+- Collstats, indexstats iterate only over collections, not views.
+- Fix case where users are prefixed with mongodb
+- Reconsider inclusion of opid in mongodb_currentop_query_uptime
+- List only authorized collections
+- Correctly evaluate balancer metrics
+- Reduce error logs from diagnostic data on arbiter nodes
+- Refactoring currentop_collector
+- Remove system colections from index stats
+- Update Go version
+- Update dependencies
+
+Release 0.40.0
+
+- Multi-target support
+- Update license to Apache 2.0
+- Add option --collector.dbstatsfreestorage to receive freeStorage stats from dbstats
+- New Current Op Metrics collector
+- New collector to collect data from the system profile
+- Add support for timestamp metrics with seconds precision
+- Update Go version
+- Update dependencies
+
+Release 0.39.0
+
+- Fixed issue with connection to authenticated MongoDB Arbiter
+- Update dependencies
+
+Release 0.38.0
+
+- Fixed setting auth options for connection to MongoDB
+
+Release 0.37.0
+
+- Disable creating metric mongodb_mongod_storage_engine when it's not possible to retrieve (for example for mongos type of instance)
+- Update dependencies
+
 Release 0.36.0
 
 - Added security metrics with info about encryption

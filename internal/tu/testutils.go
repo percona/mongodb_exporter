@@ -1,18 +1,17 @@
 // mongodb_exporter
 // Copyright (C) 2017 Percona LLC
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Affero General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // Package tu has Test Util functions
 package tu
@@ -21,15 +20,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/foxcpp/go-mockdns"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -69,13 +69,24 @@ func GetenvDefault(key, defaultValue string) string {
 func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
 	port, err := PortForContainer("mongo-1-1")
 	require.NoError(t, err)
+
 	return TestClient(ctx, port, t)
 }
 
-// GetImageNameForDefault returns image name and version of running
-// default test mongo container.
-func GetImageNameForDefault() (string, string, error) {
-	di, err := InspectContainer("mongo-1-1")
+// DefaultTestClientMongoS returns the mongos MongoDB connection used for tests. It is a direct
+// connection to the mongos server.
+func DefaultTestClientMongoS(ctx context.Context, t *testing.T) *mongo.Client {
+	t.Helper()
+
+	port, err := PortForContainer("mongos")
+	require.NoError(t, err)
+
+	return TestClient(ctx, port, t)
+}
+
+// GetImageNameForContainer returns image name and version of a running test container.
+func GetImageNameForContainer(containerName string) (string, string, error) {
+	di, err := InspectContainer(containerName)
 	if err != nil {
 		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
 	}
@@ -105,6 +116,7 @@ func GetImageNameForDefault() (string, string, error) {
 			break
 		}
 	}
+
 	return imageBaseName, version, nil
 }
 
@@ -140,7 +152,7 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 
 // LoadJSON loads a file and returns the result of unmarshaling it into a bson.M structure.
 func LoadJSON(filename string) (bson.M, error) {
-	buf, err := ioutil.ReadFile(filepath.Clean(filename))
+	buf, err := os.ReadFile(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
 	}
@@ -185,4 +197,55 @@ func PortForContainer(name string) (string, error) {
 	}
 
 	return ports[0].HostPort, nil
+}
+
+// SetupFakeResolver sets up Fake DNS server to resolve SRV records.
+func SetupFakeResolver() *mockdns.Server {
+	p1, err1 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"), 10, 64)
+	p2, err2 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "17002"), 10, 64)
+	p3, err3 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_SECONDARY2_PORT", "17003"), 10, 64)
+
+	if err1 != nil || err2 != nil || err3 != nil {
+		panic("Invalid ports")
+	}
+
+	testZone := map[string]mockdns.Zone{
+		"_mongodb._tcp.server.example.com.": {
+			SRV: []net.SRV{
+				{
+					Target: "mongo1.example.com.",
+					Port:   uint16(p1),
+				},
+				{
+					Target: "mongo2.example.com.",
+					Port:   uint16(p2),
+				},
+				{
+					Target: "mongo3.example.com.",
+					Port:   uint16(p3),
+				},
+			},
+		},
+		"server.example.com.": {
+			TXT: []string{"authSource=admin"},
+			A:   []string{"1.2.3.4"},
+		},
+		"mongo1.example.com.": {
+			A: []string{"127.0.0.1"},
+		},
+		"mongo2.example.com.": {
+			A: []string{"127.0.0.1"},
+		},
+		"mongo3.example.com.": {
+			A: []string{"127.0.0.1"},
+		},
+		"unexistent.com.": {
+			A: []string{"127.0.0.1"},
+		},
+	}
+
+	srv, _ := mockdns.NewServer(testZone, true)
+	srv.PatchNet(net.DefaultResolver)
+
+	return srv
 }
