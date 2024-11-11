@@ -25,7 +25,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-
 type replSetGetConfigCollector struct {
 	ctx  context.Context
 	base *baseCollector
