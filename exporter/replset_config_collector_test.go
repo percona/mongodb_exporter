@@ -49,7 +49,7 @@ func TestReplsetConfigCollector(t *testing.T) {
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_cfg_protocolVersion",
+		"mongodb_rs_cfg_protocolVersion",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
