@@ -106,7 +106,7 @@ func makeExcludeFilter(exclude []string) *primitive.E {
 	if len(exclude) == 0 {
 		return nil
 	}
-	var filterExpressions []bson.D
+	filterExpressions := make([]bson.D, 0, len(exclude))
 	for _, dbname := range exclude {
 		filterExpressions = append(filterExpressions,
 			bson.D{{Key: "name", Value: bson.D{{Key: "$ne", Value: dbname}}}},
@@ -117,12 +117,12 @@ func makeExcludeFilter(exclude []string) *primitive.E {
 }
 
 func makeDBsFilter(filterInNamespaces []string) *primitive.E {
-	filterExpressions := []bson.D{}
 
 	nss := removeEmptyStrings(filterInNamespaces)
 	if len(nss) == 0 {
 		return nil
 	}
+	filterExpressions := make([]bson.D, 0, len(nss))
 	for _, namespace := range nss {
 		parts := strings.Split(namespace, ".")
 		filterExpressions = append(filterExpressions,
