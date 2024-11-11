@@ -154,7 +154,6 @@ var (
 		"storageStats.indexDetails.":                               "index_name",
 		"config.image_collection.stats.storageStats.indexDetails.": "index_name",
 		"config.transactions.stats.storageStats.indexDetails.":     "index_name",
-		"config.image_collection.stats.storageStats.indexSizes.":   "index_name",
 		"collstats.storageStats.indexDetails.":                     "index_name",
 	}
 
@@ -282,7 +281,7 @@ func rawToPrometheusMetric(rm *rawMetric) (prometheus.Metric, error) {
 // the help would be empty.
 func metricHelp(prefix, name string) string {
 	if _, ok := nodeToPDMetrics[prefix]; ok {
-		return prefix
+		return strings.TrimSuffix(prefix, ".")
 	}
 	if prefix != "" {
 		return prefix + name

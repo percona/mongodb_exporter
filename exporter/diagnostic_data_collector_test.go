@@ -44,6 +44,7 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
 	ti := labelsGetterMock{}
 
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
@@ -58,10 +59,10 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expectedString := fmt.Sprintf(`
-	# HELP mongodb_oplog_stats_wt_btree_fixed_record_size %s.btree.
+	# HELP mongodb_oplog_stats_wt_btree_fixed_record_size %s.btree.fixed-record size
 	# TYPE mongodb_oplog_stats_wt_btree_fixed_record_size untyped
 	mongodb_oplog_stats_wt_btree_fixed_record_size 0
-	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts %s.transaction.
+	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts %s.transaction.update conflicts
 	# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
 	mongodb_oplog_stats_wt_transaction_update_conflicts 0`, prefix, prefix)
 	expected := strings.NewReader(expectedString + "\n")
@@ -211,6 +212,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	client := tu.DefaultTestClient(ctx, t)
 
 	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
 	ti := newTopologyInfo(ctx, client, logger)
 
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
