@@ -44,7 +44,6 @@ func TestDiagnosticDataCollector(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
 	ti := labelsGetterMock{}
 
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
