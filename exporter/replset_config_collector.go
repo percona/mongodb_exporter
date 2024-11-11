@@ -43,7 +43,7 @@ type replSetGetConfigCollector struct {
 func newReplicationSetConfigCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *replSetGetConfigCollector {
 	return &replSetGetConfigCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger),
+		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "replset_config"})),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
