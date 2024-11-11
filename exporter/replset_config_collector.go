@@ -92,7 +92,7 @@ func (d *replSetGetConfigCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debug("replSetGetConfig result:")
 	debugResult(logger, m)
 
-	for _, metric := range makeMetrics("cfg", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
+	for _, metric := range makeMetrics("rs_cfg", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric
 	}
 }
