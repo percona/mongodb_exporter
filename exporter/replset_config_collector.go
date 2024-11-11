@@ -25,10 +25,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// const (
-// 	replicationNotEnabled        = 76
-// 	replicationNotYetInitialized = 94
-// )
 
 type replSetGetConfigCollector struct {
 	ctx  context.Context
