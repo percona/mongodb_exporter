@@ -59,7 +59,7 @@ func (d *replSetGetConfigCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (d *replSetGetConfigCollector) collect(ch chan<- prometheus.Metric) {
-	defer prometheus.MeasureCollectTime(ch, "mongodb", "replset_config")()
+	defer measureCollectTime(ch, "mongodb", "replset_config")()
 
 	logger := d.base.logger
 	client := d.base.client
