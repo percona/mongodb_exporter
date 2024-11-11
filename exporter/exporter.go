@@ -246,7 +246,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		rsgsc := newReplicationSetConfigCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo)
 		registry.MustRegister(rsgsc)
-  }
+	}
 	if e.opts.EnableShards && nodeType == typeMongos && requestOpts.EnableShards {
 		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
