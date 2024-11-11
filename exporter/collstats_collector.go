@@ -99,23 +99,16 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		aggregation := bson.D{
 			{
-				Key: "$collStats", Value: bson.M{
+				Key: "$collStats",
+				Value: bson.M{
 					// TODO: PMM-9568 : Add support to handle histogram metrics
 					"latencyStats": bson.M{"histograms": false},
 					"storageStats": bson.M{"scale": 1},
 				},
 			},
 		}
-		project := bson.D{
-			{
-				Key: "$project", Value: bson.M{
-					"storageStats.wiredTiger":   0,
-					"storageStats.indexDetails": 0,
-				},
-			},
-		}
 
-		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation, project})
+		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
 		if err != nil {
 			logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
 
