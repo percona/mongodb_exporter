@@ -382,8 +382,8 @@ func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 			requestOpts.EnableDiagnosticData = true
 		case "replicasetstatus":
 			requestOpts.EnableReplicasetStatus = true
-    case "replicasetconfig":
-      requestOpts.EnableReplicasetConfig = true
+		case "replicasetconfig":
+			requestOpts.EnableReplicasetConfig = true
 		case "dbstats":
 			requestOpts.EnableDBStats = true
 		case "topmetrics":
