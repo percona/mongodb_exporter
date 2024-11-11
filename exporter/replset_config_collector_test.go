@@ -63,11 +63,7 @@ func TestReplsetConfigCollectorNoSharding(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := &replSetGetConfigCollector{
-		ctx:          ctx,
-		client:       client,
-		topologyInfo: ti,
-	}
+	c := newReplicationSetConfigCollector(ctx, client, logrus.New(), false, ti)
 
 	// Replication set metrics should not be generated for unsharded server
 	count := testutil.CollectAndCount(c)
