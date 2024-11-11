@@ -14,6 +14,7 @@ Currently, these metric sources are implemented:
 - $indexStats
 - getDiagnosticData
 - replSetGetStatus
+- replSetGetConfig
 - serverStatus
 
 ## Supported MongoDB versions

@@ -387,6 +387,9 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 		if state, ok := s["stateStr"].(string); ok {
 			labels["member_state"] = state
 		}
+		if host, ok := s["host"].(string); ok {
+			labels["member_idx"] = host
+		}
 
 		metrics = append(metrics, makeMetrics(prefix, s, labels, compatibleMode)...)
 	}

@@ -54,6 +54,7 @@ type GlobalFlags struct {
 	EnableExporterMetrics    bool `name:"collector.exporter-metrics" help:"Enable collecting metrics about the exporter itself (process_*, go_*)" negatable:"" default:"True"`
 	EnableDiagnosticData     bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
 	EnableReplicasetStatus   bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
+	EnableReplicasetConfig   bool `name:"collector.replicasetconfig" help:"Enable collecting metrics from replSetGetConfig"`
 	EnableDBStats            bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
 	EnableDBStatsFreeStorage bool `name:"collector.dbstatsfreestorage" help:"Enable collecting free space metrics from dbStats"`
 	EnableTopMetrics         bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
@@ -174,6 +175,7 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		DisableDefaultRegistry:   !opts.EnableExporterMetrics,
 		EnableDiagnosticData:     opts.EnableDiagnosticData,
 		EnableReplicasetStatus:   opts.EnableReplicasetStatus,
+		EnableReplicasetConfig:   opts.EnableReplicasetConfig,
 		EnableCurrentopMetrics:   opts.EnableCurrentopMetrics,
 		EnableTopMetrics:         opts.EnableTopMetrics,
 		EnableDBStats:            opts.EnableDBStats,

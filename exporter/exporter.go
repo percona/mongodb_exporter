@@ -64,6 +64,7 @@ type Opts struct {
 	EnableDBStatsFreeStorage bool
 	EnableDiagnosticData     bool
 	EnableReplicasetStatus   bool
+	EnableReplicasetConfig   bool
 	EnableCurrentopMetrics   bool
 	EnableTopMetrics         bool
 	EnableIndexStats         bool
@@ -163,6 +164,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.opts.EnableCollStats = true
 		e.opts.EnableTopMetrics = true
 		e.opts.EnableReplicasetStatus = true
+		e.opts.EnableReplicasetConfig = true
 		e.opts.EnableIndexStats = true
 		e.opts.EnableCurrentopMetrics = true
 		e.opts.EnableProfile = true
@@ -239,6 +241,12 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(rsgsc)
 	}
 
+	// replSetGetStatus is not supported through mongos.
+	if e.opts.EnableReplicasetConfig && nodeType != typeMongos && requestOpts.EnableReplicasetConfig {
+		rsgsc := newReplicationSetConfigCollector(ctx, client, e.opts.Logger,
+			e.opts.CompatibleMode, topologyInfo)
+		registry.MustRegister(rsgsc)
+	}
 	if e.opts.EnableShards && nodeType == typeMongos && requestOpts.EnableShards {
 		sc := newShardsCollector(ctx, client, e.opts.Logger, e.opts.CompatibleMode)
 		registry.MustRegister(sc)
@@ -374,6 +382,8 @@ func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 			requestOpts.EnableDiagnosticData = true
 		case "replicasetstatus":
 			requestOpts.EnableReplicasetStatus = true
+		case "replicasetconfig":
+			requestOpts.EnableReplicasetConfig = true
 		case "dbstats":
 			requestOpts.EnableDBStats = true
 		case "topmetrics":
