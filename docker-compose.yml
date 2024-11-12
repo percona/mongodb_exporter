@@ -176,7 +176,7 @@ services:
         container_name: "mongo-cnf-2"
         image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
-            - "${TEST_MONGODB_CONFIGSVR1_PORT:-17007}:27017"
+            - "${TEST_MONGODB_CONFIGSVR2_PORT:-17008}:27017"
         command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16
         networks:
             - cnf-serv
@@ -185,7 +185,7 @@ services:
         container_name: "mongo-cnf-3"
         image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
-            - "${TEST_MONGODB_CONFIGSVR2_PORT:-17008}:27017"
+            - "${TEST_MONGODB_CONFIGSVR3_PORT:-17009}:27017"
         command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16
         networks:
             - cnf-serv
@@ -194,7 +194,7 @@ services:
         container_name: "mongo-cnf-1"
         image: ${TEST_MONGODB_IMAGE:-mongo:4.4}
         ports:
-            - "${TEST_MONGODB_CONFIGSVR3_PORT:-17009}:27017"
+            - "${TEST_MONGODB_CONFIGSVR1_PORT:-17007}:27017"
         command: mongod --dbpath /data/db --replSet cnf-serv --configsvr --port 27017 --oplogSize 16
         networks:
             - cnf-serv

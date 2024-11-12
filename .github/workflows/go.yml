@@ -43,12 +43,21 @@ jobs:
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
-      - name: Test
+      - name: Run tests with code coverage
         run: |
           TEST_MONGODB_IMAGE=${{ matrix.image }} make test-cluster
           sleep 10
-          make test-race
+          make test-cover
           make test-cluster-clean
+
+
+      - name: Upload coverage results
+        uses: codecov/codecov-action@v3
+        with:
+          file: cover.out
+          flags: agent
+          env_vars: GO_VERSION,TEST_MONGODB_IMAGE
+          fail_ci_if_error: false
 
       - name: Run debug commands on failure
         if: ${{ failure() }}
