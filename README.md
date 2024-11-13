@@ -5,6 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/percona/mongodb_exporter/badge)](https://scorecard.dev/viewer/?uri=github.com/percona/mongodb_exporter)
 [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/mongodb_exporter)](https://cla-assistant.percona.com/percona/mongodb_exporter)
+[![Forum](https://img.shields.io/badge/Forum-join-brightgreen)](https://forums.percona.com/)
 
 
 This is the new MongoDB exporter implementation that handles ALL metrics exposed by MongoDB monitoring commands.
