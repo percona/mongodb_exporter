@@ -270,7 +270,7 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 
 // buildURIManually builds the URI manually by checking if the user and password are supplied
 func buildURIManually(uri string, user string, password string) string {
-	uriArray := strings.SplitN(uri, "://", 2)
+	uriArray := strings.SplitN(uri, "://", 2) //nolint:mnd
 	prefix := uriArray[0] + "://"
 	uri = uriArray[1]
 
