@@ -268,18 +268,36 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 	return URIs
 }
 
+// buildURIManually builds the URI manually by checking if the user and password are supplied
+func buildURIManually(uri string, user string, password string) string {
+	uriArray := strings.SplitN(uri, "://", 2) //nolint:mnd
+	prefix := uriArray[0] + "://"
+	uri = uriArray[1]
+
+	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
+	// DO concat a new uri with user and pass arguments value
+	if !strings.Contains(uri, "@") && user != "" && password != "" {
+		// add user and pass to the uri
+		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
+	}
+
+	// add back prefix after adding the user and pass
+	uri = prefix + uri
+
+	return uri
+}
+
 func buildURI(uri string, user string, password string, log *logrus.Logger) string {
 	defaultPrefix := "mongodb://" // default prefix
-	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
 
-	// Split the uri defaultPrefix if there is any
-	if !matchRegexp.MatchString(uri) {
+	if !strings.HasPrefix(uri, defaultPrefix) && !strings.HasPrefix(uri, "mongodb+srv://") {
 		uri = defaultPrefix + uri
 	}
 	parsedURI, err := url.Parse(uri)
 	if err != nil {
-		log.Fatalf("Failed to parse URI %s: %v", uri, err)
-		return uri
+		// PMM generates URI with escaped path to socket file, so url.Parse fails
+		// in this case we build URI manually
+		return buildURIManually(uri, user, password)
 	}
 
 	if parsedURI.User == nil && user != "" && password != "" {
