@@ -50,12 +50,12 @@ define TEST_ENV
 	TEST_MONGODB_S1_PRIMARY_PORT=$(TEST_MONGODB_S1_PRIMARY_PORT) \
 	TEST_MONGODB_S1_SECONDARY1_PORT=$(TEST_MONGODB_S1_SECONDARY1_PORT) \
 	TEST_MONGODB_S1_SECONDARY2_PORT=$(TEST_MONGODB_S1_SECONDARY2_PORT) \
-	TEST_MONGODB_S1_ARTBITER_PORT=$(TEST_MONGODB_S1_ARBITER_PORT) \
+	TEST_MONGODB_S1_ARBITER_PORT=$(TEST_MONGODB_S1_ARBITER_PORT) \
 	TEST_MONGODB_S2_RS=$(TEST_MONGODB_S2_RS) \
 	TEST_MONGODB_S2_PRIMARY_PORT=$(TEST_MONGODB_S2_PRIMARY_PORT) \
 	TEST_MONGODB_S2_SECONDARY1_PORT=$(TEST_MONGODB_S2_SECONDARY1_PORT) \
 	TEST_MONGODB_S2_SECONDARY2_PORT=$(TEST_MONGODB_S2_SECONDARY2_PORT) \
-	TEST_MONGODB_S2_ARTBITER_PORT=$(TEST_MONGODB_S2_ARBITER_PORT) \
+	TEST_MONGODB_S2_ARBITER_PORT=$(TEST_MONGODB_S2_ARBITER_PORT) \
 	TEST_MONGODB_CONFIGSVR_RS=$(TEST_MONGODB_CONFIGSVR_RS) \
 	TEST_MONGODB_CONFIGSVR1_PORT=$(TEST_MONGODB_CONFIGSVR1_PORT) \
 	TEST_MONGODB_CONFIGSVR2_PORT=$(TEST_MONGODB_CONFIGSVR2_PORT) \
@@ -67,7 +67,7 @@ endef
 env:
 	@echo $(TEST_ENV) | tr ' ' '\n' >.env
 
-init:                       ## Install linters.
+init:                       ## Install linters
 	cd tools && go generate -x -tags=tools
 
 build:                      ## Compile using plain go build
@@ -82,7 +82,7 @@ release:                      ## Build the binaries using goreleaser
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
-format:                     ## Format source code.
+format:                     ## Format source code
 	go mod tidy
 	bin/gofumpt -l -w $(FILES)
 	bin/gci write --section Standard --section Default --section "Prefix(github.com/percona/mongodb_exporter)" .
@@ -90,24 +90,26 @@ format:                     ## Format source code.
 check:                      ## Run checks/linters
 	bin/golangci-lint run
 
-check-license:              ## Check license in headers.
+check-license:              ## Check license in headers
 	@go run .github/check-license.go
 
-help:                       ## Display this help message.
+help:                       ## Display this help message
 	@echo "Please use \`make <target>\` where <target> is one of:"
 	@grep '^[a-zA-Z]' $(MAKEFILE_LIST) | \
 	awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
-test: env                   ## Run all tests.
+test: env                   ## Run all tests
 	go test -v -count 1 -timeout 30s ./...
 
-test-race: env              ## Run all tests with race flag.
+test-race: env              ## Run all tests with race flag
 	go test -race -v -timeout 30s ./...
+
+test-cover: env              ## Run tests and collect cross-package coverage information
+	go test -race -timeout 30s -coverprofile=cover.out -covermode=atomic -coverpkg=./... ./...
 
 test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
 	docker compose up --build -d
 	./docker/scripts/setup-pbm.sh
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
-	docker compose down --remove-orphans
-
+	docker compose down --remove-orphans --volumes

@@ -117,7 +117,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 		debugResult(logger, m)
 
 		// MongoDB 8.0 splits the diagnostic data into multiple blocks, so we need to merge them
-		if d.buildInfo.VersionArray[0] >= 8 { //nolint:gomnd
+		if _, ok := m["common"]; ok {
 			b := bson.M{}
 			for _, mv := range m {
 				block, ok := mv.(bson.M)

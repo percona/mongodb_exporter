@@ -100,6 +100,7 @@ function general_servers() {
 EOF
 }
 
+
 case $1 in
     cnf_servers)
         cnf_servers
