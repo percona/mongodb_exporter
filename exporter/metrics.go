@@ -93,24 +93,68 @@ var (
 	//   mongodb_ss_opcounters{legacy_op_type="command"} 67923
 	//
 	nodeToPDMetrics = map[string]string{
-		"collStats.storageStats.indexDetails.":            "index_name",
-		"globalLock.activeQueue.":                         "count_type",
-		"globalLock.locks.":                               "lock_type",
-		"serverStatus.asserts.":                           "assert_type",
-		"serverStatus.connections.":                       "conn_type",
-		"serverStatus.globalLock.currentQueue.":           "count_type",
-		"serverStatus.metrics.commands.":                  "cmd_name",
-		"serverStatus.metrics.cursor.open.":               "csr_type",
-		"serverStatus.metrics.document.":                  "doc_op_type",
-		"serverStatus.opLatencies.":                       "op_type",
-		"serverStatus.opReadConcernCounters.":             "concern_type",
-		"serverStatus.opcounters.":                        "legacy_op_type",
-		"serverStatus.opcountersRepl.":                    "legacy_op_type",
-		"serverStatus.transactions.commitTypes.":          "commit_type",
-		"serverStatus.wiredTiger.concurrentTransactions.": "txn_rw_type",
-		"serverStatus.queues.execution.":                  "txn_rw_type",
-		"serverStatus.wiredTiger.perf.":                   "perf_bucket",
-		"systemMetrics.disks.":                            "device_name",
+		"collStats.storageStats.indexDetails.":                   "index_name",
+		"globalLock.activeQueue.":                                "count_type",
+		"globalLock.locks.":                                      "lock_type",
+		"serverStatus.asserts.":                                  "assert_type",
+		"serverStatus.connections.":                              "conn_type",
+		"serverStatus.globalLock.currentQueue.":                  "count_type",
+		"serverStatus.metrics.commands.":                         "cmd_name",
+		"serverStatus.metrics.cursor.open.":                      "csr_type",
+		"serverStatus.metrics.document.":                         "doc_op_type",
+		"serverStatus.opLatencies.":                              "op_type",
+		"serverStatus.opReadConcernCounters.":                    "concern_type",
+		"serverStatus.opcounters.":                               "legacy_op_type",
+		"serverStatus.opcountersRepl.":                           "legacy_op_type",
+		"serverStatus.transactions.commitTypes.":                 "commit_type",
+		"serverStatus.wiredTiger.concurrentTransactions.":        "txn_rw_type",
+		"serverStatus.queues.execution.":                         "txn_rw_type",
+		"serverStatus.wiredTiger.perf.":                          "perf_bucket",
+		"systemMetrics.disks.":                                   "device_name",
+		"collstats.storageStats.indexSizes.":                     "index_name",
+		"config.transactions.stats.storageStats.indexSizes.":     "index_name",
+		"config.image_collection.stats.storageStats.indexSizes.": "index_name",
+	}
+
+	// This map is used to add labels to some specific metrics.
+	// The difference from the case above that it works with middle nodes in the structure.
+	// For example, the fields under the storageStats.indexDetails. structure have this
+	// signature:
+	//
+	//    "storageStats": primitive.M{
+	//        "indexDetails": primitive.M{
+	//            "_id_": primitive.M{
+	//                "LSM": primitive.M{
+	//                    "bloom filter false positives": int32(0),
+	//                    "bloom filter hits":            int32(0),
+	//                    "bloom filter misses":          int32(0),
+	// ...
+	//                },
+	//				"block-manager": primitive.M{
+	//                    "allocations requiring file extension": int32(0),
+	// ...
+	//                },
+	// ...
+	//            },
+	//            "name_1": primitive.M{
+	// ...
+	//            },
+	// ...
+	//        },
+	//    },
+	//
+	// Applying the renaming rules, storageStats will become storageStats but instead of having metrics
+	// with the form storageStats.indexDetails.<index_name>.<metric_name> where index_name is each one of
+	// the fields inside the structure (_id_, name_1, etc), those keys will become labels for the same
+	// metric name. The label name is defined as the value for each metric name in the map and the value
+	// the label will have is the field name in the structure. Example.
+	//
+	//   mongodb_storageStats_indexDetails_index_name_LSM_bloom_filter_false_positives{index_name="_id_"} 0
+	keyNodesToLabels = map[string]string{
+		"storageStats.indexDetails.":                               "index_name",
+		"config.image_collection.stats.storageStats.indexDetails.": "index_name",
+		"config.transactions.stats.storageStats.indexDetails.":     "index_name",
+		"collstats.storageStats.indexDetails.":                     "index_name",
 	}
 
 	// Regular expressions used to make the metric name Prometheus-compatible
@@ -236,8 +280,11 @@ func rawToPrometheusMetric(rm *rawMetric) (prometheus.Metric, error) {
 // by prometheus. For first level metrics, there is no prefix so we should use the metric name or
 // the help would be empty.
 func metricHelp(prefix, name string) string {
+	if _, ok := nodeToPDMetrics[prefix]; ok {
+		return strings.TrimSuffix(prefix, ".")
+	}
 	if prefix != "" {
-		return prefix
+		return prefix + name
 	}
 
 	return name
@@ -251,17 +298,29 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	}
 
 	for k, val := range m {
+		nextPrefix := prefix + k
+
+		l := make(map[string]string)
+		if label, ok := keyNodesToLabels[prefix]; ok {
+			for k, v := range labels {
+				l[k] = v
+			}
+			l[label] = k
+			nextPrefix = prefix + label
+		} else {
+			l = labels
+		}
 		switch v := val.(type) {
 		case bson.M:
-			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
+			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
 		case map[string]interface{}:
-			res = append(res, makeMetrics(prefix+k, v, labels, compatibleMode)...)
+			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
 		case primitive.A:
-			res = append(res, processSlice(prefix, k, v, labels, compatibleMode)...)
+			res = append(res, processSlice(nextPrefix, v, l, compatibleMode)...)
 		case []interface{}:
 			continue
 		default:
-			rm, err := makeRawMetric(prefix, k, v, labels)
+			rm, err := makeRawMetric(prefix, k, v, l)
 			if err != nil {
 				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 				res = append(res, invalidMetric)
@@ -302,7 +361,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
 // and each member is represented by a map[string]interface{}.
-func processSlice(prefix, k string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
+func processSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 	labels := make(map[string]string)
 	for name, value := range commonLabels {
@@ -332,7 +391,7 @@ func processSlice(prefix, k string, v []interface{}, commonLabels map[string]str
 			labels["member_idx"] = host
 		}
 
-		metrics = append(metrics, makeMetrics(prefix+k, s, labels, compatibleMode)...)
+		metrics = append(metrics, makeMetrics(prefix, s, labels, compatibleMode)...)
 	}
 
 	return metrics

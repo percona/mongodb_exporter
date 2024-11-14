@@ -151,11 +151,19 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		nodeName = uriParsed.Host
 	}
 
+	collStatsNamespaces := []string{}
+	if opts.CollStatsNamespaces != "" {
+		collStatsNamespaces = strings.Split(opts.CollStatsNamespaces, ",")
+	}
+	indexStatsCollections := []string{}
+	if opts.IndexStatsCollections != "" {
+		indexStatsCollections = strings.Split(opts.IndexStatsCollections, ",")
+	}
 	exporterOpts := &exporter.Opts{
-		CollStatsNamespaces:   strings.Split(opts.CollStatsNamespaces, ","),
+		CollStatsNamespaces:   collStatsNamespaces,
 		CompatibleMode:        opts.CompatibleMode,
 		DiscoveringMode:       opts.DiscoveringMode,
-		IndexStatsCollections: strings.Split(opts.IndexStatsCollections, ","),
+		IndexStatsCollections: indexStatsCollections,
 		Logger:                log,
 		URI:                   uri,
 		NodeName:              nodeName,

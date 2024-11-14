@@ -79,7 +79,10 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 //
 // - exclude: List of databases to be excluded. Useful to ignore system databases.
 func databases(ctx context.Context, client *mongo.Client, filterInNamespaces []string, exclude []string) ([]string, error) {
-	opts := &options.ListDatabasesOptions{NameOnly: pointer.ToBool(true), AuthorizedDatabases: pointer.ToBool(true)}
+	opts := &options.ListDatabasesOptions{
+		NameOnly:            pointer.ToBool(true),
+		AuthorizedDatabases: pointer.ToBool(true),
+	}
 
 	filter := bson.D{}
 
@@ -100,33 +103,32 @@ func databases(ctx context.Context, client *mongo.Client, filterInNamespaces []s
 }
 
 func makeExcludeFilter(exclude []string) *primitive.E {
-	filterExpressions := []bson.D{}
+	if len(exclude) == 0 {
+		return nil
+	}
+
+	filterExpressions := make([]bson.D, 0, len(exclude))
 	for _, dbname := range exclude {
 		filterExpressions = append(filterExpressions,
 			bson.D{{Key: "name", Value: bson.D{{Key: "$ne", Value: dbname}}}},
 		)
 	}
 
-	if len(filterExpressions) == 0 {
-		return nil
-	}
-
 	return &primitive.E{Key: "$and", Value: filterExpressions}
 }
 
 func makeDBsFilter(filterInNamespaces []string) *primitive.E {
-	filterExpressions := []bson.D{}
-
 	nss := removeEmptyStrings(filterInNamespaces)
+	if len(nss) == 0 {
+		return nil
+	}
+
+	filterExpressions := make([]bson.D, 0, len(nss))
 	for _, namespace := range nss {
 		parts := strings.Split(namespace, ".")
 		filterExpressions = append(filterExpressions,
 			bson.D{{Key: "name", Value: bson.D{{Key: "$eq", Value: parts[0]}}}},
 		)
-	}
-
-	if len(filterExpressions) == 0 {
-		return nil
 	}
 
 	return &primitive.E{Key: "$or", Value: filterExpressions}
