@@ -227,6 +227,48 @@ func TestBuildURI(t *testing.T) {
 			newPassword: "yyy?!#$%^&*()_+",
 			expect:      "mongodb://xxx%3F%21%23$%25%5E&%2A%28%29_+:yyy%3F%21%23$%25%5E&%2A%28%29_+@127.0.0.1",
 		},
+		{
+			situation:   "path to socket",
+			origin:      "mongodb:///tmp/mongodb-27017.sock",
+			newUser:     "",
+			newPassword: "",
+			expect:      "mongodb:///tmp/mongodb-27017.sock",
+		},
+		{
+			situation:   "path to socket with params",
+			origin:      "mongodb://username:s3cur3%20p%40$$w0r4.@%2Fvar%2Frun%2Fmongodb%2Fmongodb.sock/database?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000",
+			newUser:     "",
+			newPassword: "",
+			expect:      "mongodb://username:s3cur3%20p%40$$w0r4.@%2Fvar%2Frun%2Fmongodb%2Fmongodb.sock/database?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000",
+		},
+		{
+			situation:   "path to socket with auth",
+			origin:      "mongodb://xxx:yyy@/tmp/mongodb-27017.sock",
+			newUser:     "",
+			newPassword: "",
+			expect:      "mongodb://xxx:yyy@/tmp/mongodb-27017.sock",
+		},
+		{
+			situation:   "path to socket with auth and user params",
+			origin:      "mongodb:///tmp/mongodb-27017.sock",
+			newUser:     "xxx",
+			newPassword: "yyy",
+			expect:      "mongodb://xxx:yyy@/tmp/mongodb-27017.sock",
+		},
+		{
+			situation:   "path to socket without prefix",
+			origin:      "/tmp/mongodb-27017.sock",
+			newUser:     "",
+			newPassword: "",
+			expect:      "mongodb:///tmp/mongodb-27017.sock",
+		},
+		{
+			situation:   "path to socket without prefix with auth",
+			origin:      "/tmp/mongodb-27017.sock",
+			newUser:     "xxx",
+			newPassword: "yyy",
+			expect:      "mongodb://xxx:yyy@/tmp/mongodb-27017.sock",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.situation, func(t *testing.T) {
