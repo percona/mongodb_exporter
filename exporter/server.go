@@ -159,8 +159,9 @@ func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.Ha
 				registry.MustRegister(gc)
 			}
 
-			hostlabels := prometheus.Labels{
-				"instance": e.opts.NodeName,
+			hostlabels := prometheus.Labels{}
+			if e.opts.NodeName != "" {
+				hostlabels["instance"] = e.opts.NodeName
 			}
 
 			gw := NewGathererWrapper(registry, hostlabels)
