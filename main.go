@@ -145,11 +145,12 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 
 	uriParsed, _ := url.Parse(uri)
 	var nodeName string
-	if uriParsed == nil {
+	switch {
+	case uriParsed == nil:
 		nodeName = ""
-	} else if uriParsed.Port() != "" {
+	case uriParsed.Port() != "":
 		nodeName = net.JoinHostPort(uriParsed.Hostname(), uriParsed.Port())
-	} else {
+	default:
 		nodeName = uriParsed.Host
 	}
 
