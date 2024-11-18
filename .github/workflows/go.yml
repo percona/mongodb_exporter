@@ -55,7 +55,7 @@ jobs:
 
 
       - name: Upload coverage results
-        uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3.1.6
+        uses: codecov/codecov-action@5c47607acb93fed5485fdbf7232e8a31425f672a # v5.0.2
         with:
           file: cover.out
           flags: agent
