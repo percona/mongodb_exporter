@@ -140,14 +140,17 @@ func main() {
 }
 
 func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.Exporter {
-	uri = buildURI(uri, opts.User, opts.Password, log)
+	uri = buildURI(uri, opts.User, opts.Password)
 	log.Debugf("Connection URI: %s", uri)
 
 	uriParsed, _ := url.Parse(uri)
 	var nodeName string
-	if uriParsed.Port() != "" {
+	switch {
+	case uriParsed == nil:
+		nodeName = ""
+	case uriParsed.Port() != "":
 		nodeName = net.JoinHostPort(uriParsed.Hostname(), uriParsed.Port())
-	} else {
+	default:
 		nodeName = uriParsed.Host
 	}
 
@@ -295,7 +298,7 @@ func buildURIManually(uri string, user string, password string) string {
 	return uri
 }
 
-func buildURI(uri string, user string, password string, log *logrus.Logger) string {
+func buildURI(uri string, user string, password string) string {
 	defaultPrefix := "mongodb://" // default prefix
 
 	if !strings.HasPrefix(uri, defaultPrefix) && !strings.HasPrefix(uri, "mongodb+srv://") {

@@ -272,7 +272,7 @@ func TestBuildURI(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.situation, func(t *testing.T) {
-			newURI := buildURI(tc.origin, tc.newUser, tc.newPassword, logrus.New())
+			newURI := buildURI(tc.origin, tc.newUser, tc.newPassword)
 			assert.Equal(t, tc.expect, newURI)
 		})
 	}
