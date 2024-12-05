@@ -10,12 +10,14 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   goreleaser:
     permissions:
       contents: write  # for goreleaser/goreleaser-action to create a GitHub release
+      packages: write
+      attestations: write
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
