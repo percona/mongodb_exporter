@@ -8,9 +8,6 @@ on:
   # manually trigger the release
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
   goreleaser:
     permissions:
