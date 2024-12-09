@@ -153,6 +153,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.getTotalCollectionsCount() <= e.opts.CollStatsLimit {
 		limitsOk = true
 	}
+	limitsOk = true
 
 	if e.opts.CollectAll {
 		if len(e.opts.CollStatsNamespaces) == 0 {
@@ -191,7 +192,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	// If we manually set the collection names we want or auto discovery is set.
 	if (len(e.opts.CollStatsNamespaces) > 0 || e.opts.DiscoveringMode) && e.opts.EnableCollStats && limitsOk && requestOpts.EnableCollStats {
 		cc := newCollectionStatsCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, e.opts.DiscoveringMode,
+			e.opts.DiscoveringMode,
 			topologyInfo, e.opts.CollStatsNamespaces)
 		registry.MustRegister(cc)
 	}
