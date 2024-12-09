@@ -335,7 +335,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 
 			metrics := []*rawMetric{rm}
 
-			if renamedMetrics := metricRenameAndLabel(rm, specialConversions()); renamedMetrics != nil {
+			if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
 				metrics = renamedMetrics
 			}
 
@@ -435,62 +435,60 @@ func metricRenameAndLabel(rm *rawMetric, convs []conversion) []*rawMetric {
 
 // specialConversions returns a list of special conversions we want to implement.
 // See: https://jira.percona.com/browse/PMM-6506
-func specialConversions() []conversion {
-	return []conversion{
-		{
-			oldName:     "mongodb_ss_opLatencies_ops",
-			prefix:      "mongodb_ss_opLatencies",
-			suffixLabel: "op_type",
-			suffixMapping: map[string]string{
-				"commands_ops":     "commands",
-				"reads_ops":        "reads",
-				"transactions_ops": "transactions",
-				"writes_ops":       "writes",
-			},
+var specialConversions = []conversion{
+	{
+		oldName:     "mongodb_ss_opLatencies_ops",
+		prefix:      "mongodb_ss_opLatencies",
+		suffixLabel: "op_type",
+		suffixMapping: map[string]string{
+			"commands_ops":     "commands",
+			"reads_ops":        "reads",
+			"transactions_ops": "transactions",
+			"writes_ops":       "writes",
 		},
-		{
-			oldName:     "mongodb_ss_opLatencies_latency",
-			prefix:      "mongodb_ss_opLatencies",
-			suffixLabel: "op_type",
-			suffixMapping: map[string]string{
-				"commands_latency":     "commands",
-				"reads_latency":        "reads",
-				"transactions_latency": "transactions",
-				"writes_latency":       "writes",
-			},
+	},
+	{
+		oldName:     "mongodb_ss_opLatencies_latency",
+		prefix:      "mongodb_ss_opLatencies",
+		suffixLabel: "op_type",
+		suffixMapping: map[string]string{
+			"commands_latency":     "commands",
+			"reads_latency":        "reads",
+			"transactions_latency": "transactions",
+			"writes_latency":       "writes",
 		},
-		// mongodb_ss_wt_concurrentTransactions_read_out
-		// mongodb_ss_wt_concurrentTransactions_write_out
-		{
-			oldName:     "mongodb_ss_wt_concurrentTransactions_out",
-			prefix:      "mongodb_ss_wt_concurrentTransactions",
-			suffixLabel: "txn_rw",
-			suffixMapping: map[string]string{
-				"read_out":  "read",
-				"write_out": "write",
-			},
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_out
+	// mongodb_ss_wt_concurrentTransactions_write_out
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_out",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_out":  "read",
+			"write_out": "write",
 		},
-		// mongodb_ss_wt_concurrentTransactions_read_available
-		// mongodb_ss_wt_concurrentTransactions_write_available
-		{
-			oldName:     "mongodb_ss_wt_concurrentTransactions_available",
-			prefix:      "mongodb_ss_wt_concurrentTransactions",
-			suffixLabel: "txn_rw",
-			suffixMapping: map[string]string{
-				"read_available":  "read",
-				"write_available": "write",
-			},
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_available
+	// mongodb_ss_wt_concurrentTransactions_write_available
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_available",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_available":  "read",
+			"write_available": "write",
 		},
-		// mongodb_ss_wt_concurrentTransactions_read_totalTickets
-		// mongodb_ss_wt_concurrentTransactions_write_totalTickets
-		{
-			oldName:     "mongodb_ss_wt_concurrentTransactions_totalTickets",
-			prefix:      "mongodb_ss_wt_concurrentTransactions",
-			suffixLabel: "txn_rw",
-			suffixMapping: map[string]string{
-				"read_totalTickets":  "read",
-				"write_totalTickets": "write",
-			},
+	},
+	// mongodb_ss_wt_concurrentTransactions_read_totalTickets
+	// mongodb_ss_wt_concurrentTransactions_write_totalTickets
+	{
+		oldName:     "mongodb_ss_wt_concurrentTransactions_totalTickets",
+		prefix:      "mongodb_ss_wt_concurrentTransactions",
+		suffixLabel: "txn_rw",
+		suffixMapping: map[string]string{
+			"read_totalTickets":  "read",
+			"write_totalTickets": "write",
 		},
-	}
+	},
 }
