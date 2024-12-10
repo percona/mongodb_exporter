@@ -42,7 +42,7 @@ func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logg
 		ctx:  ctx,
 		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "collstats"})),
 
-		compatibleMode:  false, //there are no compatible metrics for this collector.
+		compatibleMode:  false, // there are no compatible metrics for this collector.
 		discoveringMode: discovery,
 		topologyInfo:    topology,
 
@@ -107,16 +107,8 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 				},
 			},
 		}
-		//project := bson.D{
-		//	{
-		//		Key: "$project", Value: bson.M{
-		//			"storageStats.wiredTiger":   0,
-		//			"storageStats.indexDetails": 0,
-		//		},
-		//	},
-		//}
 
-		pipeline := mongo.Pipeline{aggregation}//project
+		pipeline := mongo.Pipeline{aggregation}
 
 		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, pipeline)
 		if err != nil {
