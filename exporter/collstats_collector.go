@@ -107,16 +107,16 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 				},
 			},
 		}
-		project := bson.D{
-			{
-				Key: "$project", Value: bson.M{
-					"storageStats.wiredTiger":   0,
-					"storageStats.indexDetails": 0,
-				},
-			},
-		}
+		//project := bson.D{
+		//	{
+		//		Key: "$project", Value: bson.M{
+		//			"storageStats.wiredTiger":   0,
+		//			"storageStats.indexDetails": 0,
+		//		},
+		//	},
+		//}
 
-		pipeline := mongo.Pipeline{aggregation, project}
+		pipeline := mongo.Pipeline{aggregation}//project
 
 		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, pipeline)
 		if err != nil {
