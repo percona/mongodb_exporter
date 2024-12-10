@@ -435,7 +435,7 @@ func metricRenameAndLabel(rm *rawMetric, convs []conversion) []*rawMetric {
 
 // specialConversions returns a list of special conversions we want to implement.
 // See: https://jira.percona.com/browse/PMM-6506
-var specialConversions = []conversion{
+var specialConversions = []conversion{ //nolint:gochecknoglobals
 	{
 		oldName:     "mongodb_ss_opLatencies_ops",
 		prefix:      "mongodb_ss_opLatencies",

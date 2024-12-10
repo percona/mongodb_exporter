@@ -32,8 +32,9 @@ linters:
       - unused
       - testpackage
       - wsl
-      - exhaustivestruct
+      - exhaustruct
       - varnamelen
+      - gochecknoglobals # we need globals for better performance, we use them for mapping, and we don't manipulate them, so it's safe.
       - maligned          #deprecated
       - scopelint         #deprecated
       - golint            #deprecated
