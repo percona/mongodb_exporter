@@ -118,16 +118,17 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 
 		// MongoDB 8.0 splits the diagnostic data into multiple blocks, so we need to merge them
 		if _, ok := m["common"]; ok {
-			for kv, mv := range m {
+			b := bson.M{}
+			for _, mv := range m {
 				block, ok := mv.(bson.M)
 				if !ok {
 					continue
 				}
 				for k, v := range block {
-					m[k] = v
+					b[k] = v
 				}
-				delete(m, kv)
 			}
+			m = b
 		}
 
 		metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
