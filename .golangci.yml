@@ -34,7 +34,7 @@ linters:
       - wsl
       - exhaustruct
       - varnamelen
-      - gochecknoglobals # we need globals for better performance, we use them for mapping, and we don't manipulate them, so it's safe.
+      - gochecknoglobals # we need globals for better performance, we use them for mapping, and we don't mutate them, so it's safe.
       - maligned          #deprecated
       - scopelint         #deprecated
       - golint            #deprecated
