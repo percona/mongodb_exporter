@@ -153,7 +153,6 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		e.getTotalCollectionsCount() <= e.opts.CollStatsLimit {
 		limitsOk = true
 	}
-	limitsOk = true
 
 	if e.opts.CollectAll {
 		if len(e.opts.CollStatsNamespaces) == 0 {
