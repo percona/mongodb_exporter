@@ -211,7 +211,7 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		m := metricRenameAndLabel(tc.in, specialConversions())
+		m := metricRenameAndLabel(tc.in, specialConversions)
 		assert.Equal(t, m[0], tc.want)
 	}
 }

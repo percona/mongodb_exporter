@@ -42,7 +42,7 @@ func newTopCollector(ctx context.Context, client *mongo.Client, logger *logrus.L
 	return &topCollector{
 		ctx:            ctx,
 		base:           newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "top"})),
-		compatibleMode: compatible,
+		compatibleMode: false, // there are no compatible metrics for this collector.
 		topologyInfo:   topology,
 	}
 }

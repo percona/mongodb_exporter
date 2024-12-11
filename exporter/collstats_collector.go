@@ -37,12 +37,12 @@ type collstatsCollector struct {
 }
 
 // newCollectionStatsCollector creates a collector for statistics about collections.
-func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible, discovery bool, topology labelsGetter, collections []string) *collstatsCollector {
+func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery bool, topology labelsGetter, collections []string) *collstatsCollector {
 	return &collstatsCollector{
 		ctx:  ctx,
 		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "collstats"})),
 
-		compatibleMode:  compatible,
+		compatibleMode:  false, // there are no compatible metrics for this collector.
 		discoveringMode: discovery,
 		topologyInfo:    topology,
 
@@ -108,7 +108,9 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			},
 		}
 
-		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
+		pipeline := mongo.Pipeline{aggregation}
+
+		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, pipeline)
 		if err != nil {
 			logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
 
