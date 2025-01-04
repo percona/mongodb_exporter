@@ -344,6 +344,7 @@ func (e *Exporter) Run() {
             </body>
             </html>`))
 	})
+	mux.HandleFunc("/api/health", e.HealthHandler)
 
 	server := &http.Server{
 		Addr:    e.webListenAddress,
