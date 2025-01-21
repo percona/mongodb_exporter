@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.13.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
-	go.mongodb.org/mongo-driver v1.17.1
+	go.mongodb.org/mongo-driver v1.17.2
 )
 
 require github.com/foxcpp/go-mockdns v1.1.0
