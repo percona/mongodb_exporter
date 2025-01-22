@@ -35,7 +35,7 @@ jobs:
           publish_results: true
 
       - name: Upload results
-        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v3.pre.node20
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v3.pre.node20
         with:
           name: SARIF file
           path: results.sarif
@@ -43,6 +43,6 @@ jobs:
 
       # Upload the results to GitHub's code scanning dashboard (optional).
       - name: "Upload to code-scanning"
-        uses: github/codeql-action/upload-sarif@48ab28a6f5dbc2a99bf1e0131198dd8f1df78169 # v3.28.0
+        uses: github/codeql-action/upload-sarif@d68b2d4edb4189fd2a5366ac14e72027bd4b37dd # v3.28.2
         with:
           sarif_file: results.sarif
