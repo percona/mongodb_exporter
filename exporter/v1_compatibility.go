@@ -649,8 +649,8 @@ var conversions = []conversion{
 		newName: "mongodb_ss_metrics_getLastError_wtime_totalMillis",
 	},
 	{
-		oldName: "mongodb_ss_wt_cache_maximum_bytes_configured",
-		newName: "mongodb_mongod_wiredtiger_cache_max_bytes",
+		oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
+		newName: "mongodb_ss_wt_cache_maximum_bytes_configured",
 	},
 	{
 		oldName: "mongodb_mongod_db_collections_total",
