@@ -436,10 +436,6 @@ var conversions = []conversion{
 		suffixLabel: "type",
 	},
 	{
-		oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
-		newName: "mongodb_ss_wt_cache_maximum_bytes_configured",
-	},
-	{
 		oldName: "mongodb_mongod_wiredtiger_cache_overhead_percent",
 		newName: "mongodb_ss_wt_cache_percentage_overhead",
 	},
