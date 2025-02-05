@@ -230,7 +230,6 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 		"mongodb_mongod_wiredtiger_cache_bytes",
 		"mongodb_mongod_wiredtiger_transactions_total",
 		"mongodb_mongod_wiredtiger_cache_bytes_total",
-		"mongodb_mongod_wiredtiger_cache_max_bytes",
 		"mongodb_op_counters_total",
 		"mongodb_ss_mem_resident",
 		"mongodb_ss_mem_virtual",
@@ -238,6 +237,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 		"mongodb_ss_metrics_getLastError_wtime_totalMillis",
 		"mongodb_ss_opcounters",
 		"mongodb_ss_opcountersRepl",
+		"mongodb_ss_wt_cache_maximum_bytes_configured",
 		"mongodb_ss_wt_cache_modified_pages_evicted",
 	}
 	actualMetrics = filterMetrics(actualMetrics, filters)
