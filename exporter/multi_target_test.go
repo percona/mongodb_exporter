@@ -44,7 +44,7 @@ func TestMultiTarget(t *testing.T) {
 			ConnectTimeoutMS: 1000,
 		},
 		{
-			URI:              fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"))),
+			URI:              fmt.Sprintf("mongodb://admin:admin@%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"))),
 			DirectConnect:    true,
 			ConnectTimeoutMS: 1000,
 		},
