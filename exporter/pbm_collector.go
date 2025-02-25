@@ -25,6 +25,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
+
+	"github.com/percona/mongodb_exporter/internal/util"
 )
 
 // pbm collector collects metrics from PBM (Percona Backup for MongoDb).
@@ -125,7 +127,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 }
 
 func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
-	currentNode, err := sdk.GetNodeInfo(ctx, pbmClient)
+	currentNode, err := util.MyRole(ctx, p.base.client)
 	if err != nil {
 		l.Errorf("failed to get current node info: %s", err.Error())
 		return nil
