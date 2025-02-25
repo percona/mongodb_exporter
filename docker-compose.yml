@@ -286,6 +286,48 @@ services:
             - ./docker/scripts:/scripts
         command: /scripts/run-mongodb-encrypted.sh
 
+    kerberos:
+        build:
+            dockerfile: ./docker/kerberos.dockerfile
+        container_name: kerberos
+        hostname: kerberos
+        environment:
+            - KRB5_TRACE=/dev/stderr
+            - MONGO_HOST=psmdb-kerberos
+            - KERBEROS_HOST=kerberos
+        depends_on:
+            -   psmdb-kerberos
+        volumes:
+            - ./docker/kerberos/conf:/etc/
+            - ./docker/kerberos/cache:/tmp/
+            - ./docker/scripts:/scripts
+        ports:
+            - "88:88/udp"
+        entrypoint: [ "sh", "/scripts/setup-krb5-server.sh" ]
+        healthcheck:
+            test: [ "CMD", "kadmin.local", "-q", "listprincs" ]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    psmdb-kerberos:
+        image: percona/percona-server-mongodb:8.0
+        container_name: psmdb-kerberos
+        hostname: psmdb-kerberos
+        ports:
+            - 27017:27017
+        environment:
+            - KRB5_KTNAME=/tmp/mongodb.keytab
+            - KRB5CCNAME=/tmp/krb5cc_0
+            - MONGO_INITDB_ROOT_USERNAME=admin
+            - MONGO_INITDB_ROOT_PASSWORD=adminpassword
+        volumes:
+            - ./docker/kerberos/conf:/etc/
+            - ./docker/scripts:/scripts
+            - ./docker/kerberos/cache:/tmp/
+        command: >
+            mongod --bind_ip_all --auth --setParameter authenticationMechanisms=GSSAPI,SCRAM-SHA-256
+
 volumes:
     pbm-backups:
 
