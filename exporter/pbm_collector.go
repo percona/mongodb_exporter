@@ -25,6 +25,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
+
+	"github.com/percona/mongodb_exporter/internal/util"
 )
 
 // pbm collector collects metrics from PBM (Percona Backup for MongoDb).
@@ -125,6 +127,12 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 }
 
 func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
+	currentNode, err := util.MyRole(ctx, p.base.client)
+	if err != nil {
+		l.Errorf("failed to get current node info: %s", err.Error())
+		return nil
+	}
+
 	clusterStatus, err := cli.ClusterStatus(ctx, pbmClient, cli.RSConfGetter(p.mongoURI))
 	if err != nil {
 		l.Errorf("failed to get cluster status: %s", err.Error())
@@ -132,7 +140,6 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 	}
 
 	metrics := make([]prometheus.Metric, 0, len(clusterStatus))
-
 	for replsetName, nodes := range clusterStatus {
 		for _, node := range nodes {
 			var pbmStatusMetric float64
@@ -146,14 +153,20 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 			default: // !node.OK
 				pbmStatusMetric = float64(pbmAgentStatusError)
 			}
+			labels := map[string]string{
+				"host":        node.Host,
+				"replica_set": replsetName,
+				"role":        string(node.Role),
+				"self":        "0",
+			}
+			if node.Host == currentNode.Me {
+				labels["self"] = "1"
+			}
 			metrics = append(metrics, createPBMMetric("agent_status",
 				"PBM Agent Status",
 				pbmStatusMetric,
-				map[string]string{
-					"host":        node.Host,
-					"replica_set": replsetName,
-					"role":        string(node.Role),
-				}),
+				labels,
+			),
 			)
 		}
 	}
