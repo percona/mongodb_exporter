@@ -46,8 +46,8 @@ jobs:
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
-      - name: Install krb5 libraries
-        run: sudo apt-get install -y libkrb5-dev
+      #- name: Install krb5 libraries
+      #  run: sudo apt-get install -y libkrb5-dev
 
       - name: Run tests with code coverage
         run: |
