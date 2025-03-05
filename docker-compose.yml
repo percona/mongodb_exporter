@@ -324,7 +324,6 @@ services:
             - KRB5_CONFIG=/tmp/krb5.conf
             - MONGO_INITDB_ROOT_USERNAME=admin
             - MONGO_INITDB_ROOT_PASSWORD=adminpassword
-            - MONGODB_HOST=psmdb-kerberos
         volumes:
             - ./docker/scripts:/scripts
             - ./docker/kerberos/cache:/tmp/
