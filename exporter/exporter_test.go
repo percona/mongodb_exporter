@@ -199,13 +199,8 @@ func TestMongoS(t *testing.T) {
 	}
 }
 
-func TestGSSAPIAuth(t *testing.T) {
-	logger := logrus.New()
-	logger.SetReportCaller(true)
-
+func generateKerberosConfigFile(t *testing.T) (*os.File, error) {
 	kerberosHost, err := tu.IpForContainer("kerberos")
-	require.NoError(t, err)
-	mongoHost, err := tu.IpForContainer("psmdb-kerberos")
 	require.NoError(t, err)
 
 	config := fmt.Sprintf(`
@@ -226,15 +221,27 @@ func TestGSSAPIAuth(t *testing.T) {
     perconatest.com = PERCONATEST.COM
     %s = PERCONATEST.COM
 `, kerberosHost, kerberosHost)
-
 	configFile, err := os.Create(t.TempDir() + "/krb5.conf")
+	require.NoError(t, err)
+
+	_, err = configFile.WriteString(config)
+	require.NoError(t, err)
+
+	return configFile, nil
+}
+func TestGSSAPIAuth(t *testing.T) {
+	logger := logrus.New()
+	logger.SetReportCaller(true)
+
+	mongoHost, err := tu.IpForContainer("psmdb-kerberos")
+	require.NoError(t, err)
+
+	configFile, err := generateKerberosConfigFile(t)
 	require.NoError(t, err)
 	defer func() {
 		_ = configFile.Close()
 		_ = os.Setenv("KRB5_CONFIG", "")
 	}()
-	_, err = configFile.WriteString(config)
-	require.NoError(t, err)
 
 	t.Setenv("KRB5_CONFIG", configFile.Name())
 	ctx := context.Background()
