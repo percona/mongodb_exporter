@@ -329,24 +329,6 @@ services:
             - ./docker/kerberos/cache:/tmp/
         command: >
             mongod --bind_ip_all --auth --setParameter authenticationMechanisms=GSSAPI,SCRAM-SHA-256
-
-
-    exporter-kerberos:
-        build:
-            dockerfile: ./docker/kerberos-exporter.dockerfile
-        container_name: exporter-kerberos
-        hostname: exporter-kerberos
-        ports:
-            -   "9217:9216"
-        environment:
-            - KRB5_KTNAME=/tmp/mongodb.keytab
-            - KRB5CCNAME=/tmp/krb5cc_0
-            - MONGO
-        volumes:
-            - ./docker/kerberos/conf/krb5.conf:/etc/krb5.conf
-            - ./docker/scripts/setup-krb5-exporter.sh:/scripts/setup-krb5-exporter.sh
-            - ./docker/kerberos/cache:/tmp/
-        entrypoint: [ "sh", "/scripts/setup-krb5-exporter.sh" ]
 volumes:
     pbm-backups:
 
