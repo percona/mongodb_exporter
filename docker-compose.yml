@@ -265,7 +265,7 @@ services:
             - PORT2=27017
             - PORT3=27017
             - VERSION=${TEST_MONGODB_IMAGE}
-        entrypoint: [ "/scripts/init-shard.sh" ]
+        entrypoint: [ "/scripts/setup-shard.sh" ]
         restart: on-failure:20
 
     standalone:
@@ -286,6 +286,49 @@ services:
             - ./docker/scripts:/scripts
         command: /scripts/run-mongodb-encrypted.sh
 
+    kerberos:
+        build:
+            dockerfile: ./docker/kerberos.dockerfile
+        container_name: kerberos
+        hostname: kerberos
+        environment:
+            - KRB5_TRACE=/dev/stderr
+            - MONGO_HOST=psmdb-kerberos
+            - KERBEROS_HOST=kerberos
+            - KRB5_CONFIG=/krb5/krb5.conf
+            - MONGO_KERBEROS_USERNAME=pmm-test
+            - MONGO_KERBEROS_PASSWORD=password1
+        depends_on:
+            -   psmdb-kerberos
+        volumes:
+            - ./docker/kerberos/cache:/krb5/
+            - ./docker/scripts:/scripts
+        ports:
+            - "88:88/udp"
+        entrypoint: [ "sh", "/scripts/setup-krb5-server.sh" ]
+        healthcheck:
+            test: [ "CMD", "kadmin.local", "-q", "listprincs" ]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    psmdb-kerberos:
+        image: percona/percona-server-mongodb:8.0
+        container_name: psmdb-kerberos
+        hostname: psmdb-kerberos
+        ports:
+            - 29017:27017
+        environment:
+            - KRB5_KTNAME=/krb5/mongodb.keytab
+            - KRB5CCNAME=/krb5/krb5cc_0
+            - KRB5_CONFIG=/krb5/krb5.conf
+            - MONGO_INITDB_ROOT_USERNAME=admin
+            - MONGO_INITDB_ROOT_PASSWORD=adminpassword
+        volumes:
+            - ./docker/scripts:/scripts
+            - ./docker/kerberos/cache:/krb5/
+        command: >
+            mongod --bind_ip_all --auth --setParameter authenticationMechanisms=GSSAPI,SCRAM-SHA-256
 volumes:
     pbm-backups:
 
