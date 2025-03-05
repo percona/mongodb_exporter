@@ -4,7 +4,7 @@ mongohost=`getent hosts ${MONGO_HOST} | awk '{ print $1 }'`
 kerberos_host=`getent hosts ${KERBEROS_HOST} | awk '{ print $1 }'`
 gateway_ip=`ip route | grep default | awk '{print $3}'`
 
-cat > /tmp/krb5.conf <<EOL
+cat > /krb5/krb5.conf <<EOL
 [libdefaults]
     default_realm = PERCONATEST.COM
     forwardable = true
@@ -27,5 +27,5 @@ kdb5_util create -s -P password
 kadmin.local -q "addprinc -pw password root/admin"
 kadmin.local -q "addprinc -pw mongodb mongodb/${mongohost}"
 kadmin.local -q "addprinc -pw password1 pmm-test"
-kadmin.local -q "ktadd -k /tmp/mongodb.keytab mongodb/${mongohost}@PERCONATEST.COM"
+kadmin.local -q "ktadd -k /krb5/mongodb.keytab mongodb/${mongohost}@PERCONATEST.COM"
 krb5kdc -n

@@ -295,13 +295,13 @@ services:
             - KRB5_TRACE=/dev/stderr
             - MONGO_HOST=psmdb-kerberos
             - KERBEROS_HOST=kerberos
-            - KRB5_CONFIG=/tmp/krb5.conf
+            - KRB5_CONFIG=/krb5/krb5.conf
             - MONGO_KERBEROS_USERNAME=pmm-test
             - MONGO_KERBEROS_PASSWORD=password1
         depends_on:
             -   psmdb-kerberos
         volumes:
-            - ./docker/kerberos/cache:/tmp/
+            - ./docker/kerberos/cache:/krb5/
             - ./docker/scripts:/scripts
         ports:
             - "88:88/udp"
@@ -319,14 +319,14 @@ services:
         ports:
             - 29017:27017
         environment:
-            - KRB5_KTNAME=/tmp/mongodb.keytab
-            - KRB5CCNAME=/tmp/krb5cc_0
-            - KRB5_CONFIG=/tmp/krb5.conf
+            - KRB5_KTNAME=/krb5/mongodb.keytab
+            - KRB5CCNAME=/krb5/krb5cc_0
+            - KRB5_CONFIG=/krb5/krb5.conf
             - MONGO_INITDB_ROOT_USERNAME=admin
             - MONGO_INITDB_ROOT_PASSWORD=adminpassword
         volumes:
             - ./docker/scripts:/scripts
-            - ./docker/kerberos/cache:/tmp/
+            - ./docker/kerberos/cache:/krb5/
         command: >
             mongod --bind_ip_all --auth --setParameter authenticationMechanisms=GSSAPI,SCRAM-SHA-256
 volumes:
