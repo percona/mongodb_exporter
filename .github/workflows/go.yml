@@ -46,7 +46,7 @@ jobs:
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
-      - name: Install jq tool
+      - name: Install kerberos development libraries
         run: |
           sudo apt-get update
           sudo apt-get install libkrb5-dev

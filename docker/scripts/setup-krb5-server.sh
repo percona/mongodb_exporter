@@ -2,7 +2,6 @@
 
 mongohost=`getent hosts ${MONGO_HOST} | awk '{ print $1 }'`
 kerberos_host=`getent hosts ${KERBEROS_HOST} | awk '{ print $1 }'`
-gateway_ip=`ip route | grep default | awk '{print $3}'`
 
 cat > /krb5/krb5.conf <<EOL
 [libdefaults]

@@ -199,8 +199,9 @@ func TestMongoS(t *testing.T) {
 	}
 }
 
-func generateKerberosConfigFile(t *testing.T) (*os.File, error) {
-	kerberosHost, err := tu.IpForContainer("kerberos")
+func generateKerberosConfigFile(t *testing.T) *os.File {
+	t.Helper()
+	kerberosHost, err := tu.IPForContainer("kerberos")
 	require.NoError(t, err)
 
 	config := fmt.Sprintf(`
@@ -227,17 +228,17 @@ func generateKerberosConfigFile(t *testing.T) (*os.File, error) {
 	_, err = configFile.WriteString(config)
 	require.NoError(t, err)
 
-	return configFile, nil
+	return configFile
 }
 
 func TestGSSAPIAuth(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true)
 
-	mongoHost, err := tu.IpForContainer("psmdb-kerberos")
+	mongoHost, err := tu.IPForContainer("psmdb-kerberos")
 	require.NoError(t, err)
 
-	configFile, err := generateKerberosConfigFile(t)
+	configFile := generateKerberosConfigFile(t)
 	require.NoError(t, err)
 	defer func() {
 		_ = configFile.Close()

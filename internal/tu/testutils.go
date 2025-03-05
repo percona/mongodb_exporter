@@ -199,8 +199,8 @@ func PortForContainer(name string) (string, error) {
 	return ports[0].HostPort, nil
 }
 
-// IpForContainer returns the IP address of a running container.
-func IpForContainer(name string) (string, error) {
+// IPForContainer returns the IP address of a running container.
+func IPForContainer(name string) (string, error) {
 	di, err := InspectContainer(name)
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot get error for container %q", name)
