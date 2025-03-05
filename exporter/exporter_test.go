@@ -229,6 +229,7 @@ func generateKerberosConfigFile(t *testing.T) (*os.File, error) {
 
 	return configFile, nil
 }
+
 func TestGSSAPIAuth(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true)
