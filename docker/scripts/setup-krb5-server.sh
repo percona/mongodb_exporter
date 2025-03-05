@@ -4,7 +4,7 @@ mongohost=`getent hosts ${MONGO_HOST} | awk '{ print $1 }'`
 kerberos_host=`getent hosts ${KERBEROS_HOST} | awk '{ print $1 }'`
 gateway_ip=`ip route | grep default | awk '{print $3}'`
 
-cat > /etc/krb5.conf <<EOL
+cat > /tmp/krb5.conf <<EOL
 [libdefaults]
     default_realm = PERCONATEST.COM
     forwardable = true

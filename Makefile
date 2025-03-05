@@ -108,7 +108,6 @@ test-cover: env              ## Run tests and collect cross-package coverage inf
 	go test -tags gssapi -race -timeout 30s -coverprofile=cover.out -covermode=atomic -coverpkg=./... ./...
 
 test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
-	touch ./docker/kerberos/cache/krb5.conf
 	docker compose up --build -d
 	./docker/scripts/init-psmdb-kerberos.sh
 	./docker/scripts/init-pbm.sh
