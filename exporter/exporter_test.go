@@ -201,6 +201,7 @@ func TestMongoS(t *testing.T) {
 
 func TestMongoWithGSSAPI(t *testing.T) {
 	logger := logrus.New()
+	logger.SetReportCaller(true)
 
 	kerberosHost, err := tu.IpForContainer("kerberos")
 	require.NoError(t, err)
