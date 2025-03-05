@@ -114,4 +114,3 @@ test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MON
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
 	docker compose down --remove-orphans --volumes
-	rm -f ./docker/kerberos/cache/*

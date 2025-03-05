@@ -199,7 +199,7 @@ func TestMongoS(t *testing.T) {
 	}
 }
 
-func TestMongoWithGSSAPI(t *testing.T) {
+func TestGSSAPIAuth(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true)
 
@@ -241,7 +241,11 @@ func TestMongoWithGSSAPI(t *testing.T) {
 
 	username := "pmm-test%40PERCONATEST.COM"
 	password := "password1"
-	uri := fmt.Sprintf("mongodb://%s:%s@%s:27017/?authSource=$external&authMechanism=GSSAPI", username, password, mongoHost)
+	uri := fmt.Sprintf("mongodb://%s:%s@%s/?authSource=$external&authMechanism=GSSAPI",
+		username,
+		password,
+		net.JoinHostPort(mongoHost, "27017"),
+	)
 	exporterOpts := &Opts{
 		URI:            uri,
 		Logger:         logger,
@@ -258,10 +262,10 @@ func TestMongoWithGSSAPI(t *testing.T) {
 	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
 	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
 
-	expected := strings.NewReader(fmt.Sprintf(`
+	expected := strings.NewReader(`
 		# HELP mongodb_up Whether MongoDB is up.
 		# TYPE mongodb_up gauge
-		mongodb_up {cluster_role="mongod"} 1`) + "\n")
+		mongodb_up {cluster_role="mongod"} 1` + "\n")
 
 	filter := []string{
 		"mongodb_up",
@@ -270,7 +274,7 @@ func TestMongoWithGSSAPI(t *testing.T) {
 	assert.NoError(t, err, "mongodb_up metric should be 1")
 
 	res := r.Unregister(gc)
-	assert.Equal(t, true, res)
+	assert.True(t, res)
 }
 
 func TestMongoUpMetric(t *testing.T) {
