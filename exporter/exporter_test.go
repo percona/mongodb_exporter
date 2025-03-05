@@ -227,8 +227,12 @@ func TestMongoWithGSSAPI(t *testing.T) {
     %s = PERCONATEST.COM
 `, kerberosHost, kerberosHost)
 
-	configFile, err := os.Create(t.TempDir() + "krb5.conf")
+	configFile, err := os.Create(t.TempDir() + "/krb5.conf")
 	require.NoError(t, err)
+	defer func() {
+		_ = configFile.Close()
+		_ = os.Setenv("KRB5_CONFIG", "")
+	}()
 	_, err = configFile.WriteString(config)
 	require.NoError(t, err)
 
