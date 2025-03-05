@@ -265,7 +265,7 @@ services:
             - PORT2=27017
             - PORT3=27017
             - VERSION=${TEST_MONGODB_IMAGE}
-        entrypoint: [ "/scripts/init-shard.sh" ]
+        entrypoint: [ "/scripts/setup-shard.sh" ]
         restart: on-failure:20
 
     standalone:
@@ -317,12 +317,13 @@ services:
         container_name: psmdb-kerberos
         hostname: psmdb-kerberos
         ports:
-            - 27017:27017
+            - 29017:27017
         environment:
             - KRB5_KTNAME=/tmp/mongodb.keytab
             - KRB5CCNAME=/tmp/krb5cc_0
             - MONGO_INITDB_ROOT_USERNAME=admin
             - MONGO_INITDB_ROOT_PASSWORD=adminpassword
+            - MONGODB_HOST=psmdb-kerberos
         volumes:
             - ./docker/kerberos/conf/krb5.conf:/etc/krb5.conf
             - ./docker/scripts:/scripts

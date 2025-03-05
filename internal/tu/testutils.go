@@ -199,6 +199,19 @@ func PortForContainer(name string) (string, error) {
 	return ports[0].HostPort, nil
 }
 
+func IpForContainer(name string) (string, error) {
+	di, err := InspectContainer(name)
+	if err != nil {
+		return "", errors.Wrapf(err, "cannot get error for container %q", name)
+	}
+
+	if len(di) == 0 {
+		return "", errors.Wrapf(err, "cannot get error for container %q (empty array)", name)
+	}
+
+	return di[0].NetworkSettings.Networks.MongodbExporterDefault.IPAddress, nil
+}
+
 // SetupFakeResolver sets up Fake DNS server to resolve SRV records.
 func SetupFakeResolver() *mockdns.Server {
 	p1, err1 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"), 10, 64)

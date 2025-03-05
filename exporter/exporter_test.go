@@ -18,10 +18,12 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -195,6 +197,75 @@ func TestMongoS(t *testing.T) {
 		err = client.Disconnect(ctx)
 		assert.NoError(t, err)
 	}
+}
+
+func TestMongoWithGSSAPI(t *testing.T) {
+	logger := logrus.New()
+
+	kerberosHost, err := tu.IpForContainer("kerberos")
+	require.NoError(t, err)
+	mongoHost, err := tu.IpForContainer("psmdb-kerberos")
+	require.NoError(t, err)
+
+	config := fmt.Sprintf(`
+[libdefaults]
+    default_realm = PERCONATEST.COM
+    forwardable = true
+    dns_lookup_realm = false
+    dns_lookup_kdc = false
+    ignore_acceptor_hostname = true
+    rdns = false
+[realms]
+    PERCONATEST.COM = {
+        kdc_ports = 88
+        kdc = %s
+    }
+[domain_realm]
+    .perconatest.com = PERCONATEST.COM
+    perconatest.com = PERCONATEST.COM
+    %s = PERCONATEST.COM
+`, kerberosHost, kerberosHost)
+
+	configFile, err := os.Create(t.TempDir() + "krb5.conf")
+	require.NoError(t, err)
+	_, err = configFile.WriteString(config)
+	require.NoError(t, err)
+
+	t.Setenv("KRB5_CONFIG", configFile.Name())
+	ctx := context.Background()
+
+	username := "pmm-test%40PERCONATEST.COM"
+	password := "password1"
+	uri := fmt.Sprintf("mongodb://%s:%s@%s:27017/?authSource=$external&authMechanism=GSSAPI", username, password, mongoHost)
+	exporterOpts := &Opts{
+		URI:            uri,
+		Logger:         logger,
+		CollectAll:     true,
+		GlobalConnPool: false,
+		DirectConnect:  true,
+	}
+
+	client, err := connect(ctx, exporterOpts)
+	assert.NoError(t, err)
+
+	e := New(exporterOpts)
+	nodeType, _ := getNodeType(ctx, client)
+	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
+	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+	expected := strings.NewReader(fmt.Sprintf(`
+		# HELP mongodb_up Whether MongoDB is up.
+		# TYPE mongodb_up gauge
+		mongodb_up {cluster_role="mongod"} 1`) + "\n")
+
+	filter := []string{
+		"mongodb_up",
+	}
+	err = testutil.CollectAndCompare(gc, expected, filter...)
+	assert.NoError(t, err, "mongodb_up metric should be 1")
+
+	res := r.Unregister(gc)
+	assert.Equal(t, true, res)
 }
 
 func TestMongoUpMetric(t *testing.T) {
