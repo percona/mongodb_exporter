@@ -13,13 +13,5 @@ echo "Started.."
 
 # create role with anyAction on all resources (needed to allow exporter run execute commands)
 # create mongodb user using the same username as the kerberos principal
-mongosh --host 127.0.0.1:27017 -u ${username} -p ${password} <<EOF
-db.getSiblingDB("admin").createRole({
-  role: "anyAction",
-  privileges: [
-    { resource: { anyResource: true }, actions: [ "anyAction" ] }
-  ],
-  roles: []
-});
-db.getSiblingDB("\$external").createUser({user: "pmm-test@PERCONATEST.COM",roles: [{role: "anyAction", db: "admin"}]});
-EOF
+mongosh --host 127.0.0.1:27017 -u "$username" -p "$password" --eval 'db.getSiblingDB("admin").createRole({role: "anyAction", privileges: [{ resource: { anyResource: true }, actions: [ "anyAction" ] }], roles: [] });'
+mongosh --host 127.0.0.1:27017 -u "$username" -p "$password" --eval 'db.getSiblingDB("$external").createUser({user: "pmm-test@PERCONATEST.COM", roles: [{role: "anyAction", db: "admin"}]});'
