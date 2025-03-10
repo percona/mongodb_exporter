@@ -48,7 +48,7 @@ services:
             - "mongo-1-3"
             - "mongo-1-arbiter"
         volumes:
-            - ./docker/scripts:/scripts
+            - ./test-setup/scripts:/scripts
         environment:
             - MONGO1=mongo-1-1
             - MONGO2=mongo-1-2
@@ -63,7 +63,7 @@ services:
     mongo-2-2:
         container_name: "mongo-2-2"
         build:
-            dockerfile: ./docker/mongodb-auth.dockerfile
+            dockerfile: test-setup/mongodb-auth.dockerfile
         environment:
             - MONGO_INITDB_ROOT_USERNAME=${TEST_MONGODB_USERNAME:-admin}
             - MONGO_INITDB_ROOT_PASSWORD=${TEST_MONGODB_PASSWORD:-admin}
@@ -76,7 +76,7 @@ services:
     mongo-2-3:
         container_name: "mongo-2-3"
         build:
-            dockerfile: ./docker/mongodb-auth.dockerfile
+            dockerfile: test-setup/mongodb-auth.dockerfile
         ports:
             - "${TEST_MONGODB_S2_SECONDARY1_PORT:-17005}:27017"
         command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
@@ -86,7 +86,7 @@ services:
     mongo-2-1:
         container_name: "mongo-2-1"
         build:
-            dockerfile: ./docker/mongodb-auth.dockerfile
+            dockerfile: test-setup/mongodb-auth.dockerfile
         ports:
             - "${TEST_MONGODB_S2_SECONDARY2_PORT:-17006}:27017"
         command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
@@ -96,7 +96,7 @@ services:
     mongo-2-arbiter:
         container_name: "mongo-2-arbiter"
         build:
-            dockerfile: ./docker/mongodb-auth.dockerfile
+            dockerfile: test-setup/mongodb-auth.dockerfile
         ports:
             - "${TEST_MONGODB_S2_ARBITER:-17012}:27017"
         command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
@@ -112,8 +112,8 @@ services:
         environment:
             - PBM_MONGODB_URI=mongodb://admin:admin@mongo-2-1:27017
         volumes:
-            - ./docker/pbm/config:/etc/config
-            - ./docker/scripts:/scripts
+            - ./test-setup/pbm/config:/etc/config
+            - ./test-setup/scripts:/scripts
             - pbm-backups:/opt/backups
         networks:
             - rs2
@@ -127,8 +127,8 @@ services:
         environment:
             - PBM_MONGODB_URI=mongodb://admin:admin@mongo-2-2:27017
         volumes:
-            - ./docker/pbm/config:/etc/config
-            - ./docker/scripts:/scripts
+            - ./test-setup/pbm/config:/etc/config
+            - ./test-setup/scripts:/scripts
             - pbm-backups:/opt/backups
         networks:
             - rs2
@@ -142,8 +142,8 @@ services:
         environment:
             - PBM_MONGODB_URI=mongodb://admin:admin@mongo-2-3:27017
         volumes:
-            - ./docker/pbm/config:/etc/config
-            - ./docker/scripts:/scripts
+            - ./test-setup/pbm/config:/etc/config
+            - ./test-setup/scripts:/scripts
             - pbm-backups:/opt/backups
         networks:
             - rs2
@@ -157,7 +157,7 @@ services:
             - "mongo-2-3"
             - "mongo-2-arbiter"
         volumes:
-            - ./docker/scripts:/scripts
+            - ./test-setup/scripts:/scripts
         environment:
             - MONGO1=mongo-2-2
             - MONGO2=mongo-2-1
@@ -210,7 +210,7 @@ services:
             - "mongo-cnf-2"
             - "mongo-cnf-3"
         volumes:
-            - ./docker/scripts:/scripts
+            - ./test-setup/scripts:/scripts
         environment:
             - MONGO1=mongo-cnf-1
             - MONGO2=mongo-cnf-2
@@ -249,7 +249,7 @@ services:
             - rs2
             - cnf-serv
         volumes:
-            - ./docker/scripts:/scripts
+            - ./test-setup/scripts:/scripts
         environment:
             - MONGOS=mongos
             - MONGO11=mongo-1-1
@@ -282,8 +282,8 @@ services:
         ports:
             - "${TEST_MONGODB_STANDALONE_ENCRYPTED_PORT:-27027}:27017"
         volumes:
-            - ./docker/secret/mongodb_secrets.txt:/secret/mongodb_secrets.txt
-            - ./docker/scripts:/scripts
+            - ./test-setup/secret/mongodb_secrets.txt:/secret/mongodb_secrets.txt
+            - ./test-setup/scripts:/scripts
         command: /scripts/run-mongodb-encrypted.sh
 
     kerberos:
@@ -301,7 +301,7 @@ services:
             -   psmdb-kerberos
         volumes:
             - kerberos-config:/krb5/
-            - ./docker/scripts:/scripts
+            - ./test-setup/scripts:/scripts
         ports:
             - "88:88/udp"
         entrypoint: [ "sh", "/scripts/setup-krb5-server.sh" ]
@@ -324,7 +324,7 @@ services:
             - MONGO_INITDB_ROOT_USERNAME=admin
             - MONGO_INITDB_ROOT_PASSWORD=adminpassword
         volumes:
-            - ./docker/scripts:/scripts
+            - ./test-setup/scripts:/scripts
             - kerberos-config:/krb5/
         command: >
             mongod --bind_ip_all --auth --setParameter authenticationMechanisms=GSSAPI,SCRAM-SHA-256
