@@ -287,7 +287,7 @@ services:
         command: /scripts/run-mongodb-encrypted.sh
 
     kerberos:
-        image: ${TEST_KERBEROS_IMAGE:-ghcr.io/idoqo/kerberos:0.1.0} # todo: change after publishing to perconalab registry.
+        image: ${TEST_KERBEROS_IMAGE:-idoko/kerberos:0.1.0} # todo: change after publishing to perconalab registry.
         container_name: kerberos
         hostname: kerberos
         environment:
