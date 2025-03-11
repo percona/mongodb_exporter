@@ -3,7 +3,7 @@ version: 2
 builds:
   - binary: mongodb_exporter
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - linux
       - darwin
