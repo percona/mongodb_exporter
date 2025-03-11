@@ -19,7 +19,7 @@ builds:
         goarch: arm
     flags:
       - -v
-      - -tags gssapi
+      - -tags=gssapi
     ldflags:
         - -s -w -X main.version=v{{.Version}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
 archives:
