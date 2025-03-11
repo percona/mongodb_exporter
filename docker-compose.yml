@@ -287,7 +287,8 @@ services:
         command: /scripts/run-mongodb-encrypted.sh
 
     kerberos:
-        image: ${TEST_KERBEROS_IMAGE:-idoko/kerberos:0.1.0} # todo: change after publishing to perconalab registry.
+        build:
+            dockerfile: test-setup/kerberos.dockerfile
         container_name: kerberos
         hostname: kerberos
         environment:
@@ -300,7 +301,7 @@ services:
         depends_on:
             -   psmdb-kerberos
         volumes:
-            - kerberos-config:/krb5/
+            - kerberos-config:/krb5
             - ./test-setup/scripts:/scripts
         ports:
             - "88:88/udp"
@@ -325,7 +326,7 @@ services:
             - MONGO_INITDB_ROOT_PASSWORD=adminpassword
         volumes:
             - ./test-setup/scripts:/scripts
-            - kerberos-config:/krb5/
+            - kerberos-config:/krb5
         command: >
             mongod --bind_ip_all --auth --setParameter authenticationMechanisms=GSSAPI,SCRAM-SHA-256
 volumes:
