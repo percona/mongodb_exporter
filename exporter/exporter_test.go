@@ -280,7 +280,7 @@ func TestGSSAPIAuth(t *testing.T) {
 		"mongodb_up",
 	}
 	err = testutil.CollectAndCompare(gc, expected, filter...)
-	assert.NoError(t, err, "mongodb_up metric should be 1")
+	require.NoError(t, err, "mongodb_up metric should be 1")
 
 	res := r.Unregister(gc)
 	assert.True(t, res)
