@@ -75,7 +75,7 @@ Connecting user should have sufficient rights to query needed stats:
       }
 ```
 When using the PBM collector to get metrics from Percona Backup for MongoDB, the user should also have enough permissions
-to query the PBM internal collectors (in the `admin` database). One option is to grant `find` privileges on the `admin` collection:
+to query the PBM internal collections (in the `admin` database). One option is to grant `find` privileges on the `admin` collection:
 ```
 privileges: [
         { resource: { db: "admin", collection: "" }, actions: [ "find" ] },
