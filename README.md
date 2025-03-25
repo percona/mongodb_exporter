@@ -61,7 +61,7 @@ podman run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb:/
 docker run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
 ```
 
-#### Permissions
+### Permissions
 Connecting user should have sufficient rights to query needed stats:
 
 ```
@@ -74,6 +74,24 @@ Connecting user should have sufficient rights to query needed stats:
          "db":"local"
       }
 ```
+When using the PBM collector to get metrics from Percona Backup for MongoDB, the user should also have sufficient privileges
+to query the PBM internal collections (in the `admin` database). One option is to grant `find` privileges on the `admin` collection:
+```
+privileges: [
+        { resource: { db: "admin", collection: "" }, actions: [ "find" ] },
+],
+```
+
+Alternatively, you can grant the `find` privilege for each PBM internal collection (see: https://docs.percona.com/percona-backup-mongodb/details/control-collections.html):
+```
+privileges: [
+       { resource: { db: "admin", collection: "pbmBackups" }, actions: [ "find" ] },
+       { resource: { db: "admin", collection: "pbmAgents" }, actions: [ "find" ] },
+       { resource: { db: "admin", collection: "pbmConfig" }, actions: [ "find" ] },
+       ...
+],
+```
+However, this is not recommended as the list of internal collections may change in future releases.
 
 More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
 
