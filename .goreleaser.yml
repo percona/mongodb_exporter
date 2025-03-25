@@ -3,7 +3,7 @@ version: 2
 builds:
   - binary: mongodb_exporter
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goos:
       - linux
       - darwin
@@ -19,6 +19,7 @@ builds:
         goarch: arm
     flags:
       - -v
+      - -tags=gssapi
     ldflags:
         - -s -w -X main.version=v{{.Version}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
 archives:
