@@ -2,10 +2,8 @@ module github.com/percona/mongodb_exporter/tools
 
 go 1.23
 
-toolchain go1.23.2
-
 require (
-	github.com/daixiang0/gci v0.13.5
+	github.com/daixiang0/gci v0.13.6
 	github.com/golangci/golangci-lint v1.63.4
 	github.com/reviewdog/reviewdog v0.20.3
 	mvdan.cc/gofumpt v0.7.0
