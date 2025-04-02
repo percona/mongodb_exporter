@@ -80,7 +80,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 		WebListenAddresses: &[]string{opts.WebListenAddress},
 		WebConfigFile:      &opts.TLSConfigPath,
 	}
-	logLevel := &promslog.AllowedLevel{}
+	logLevel := &promslog.Level{}
 	_ = logLevel.Set(log.Level.String())
 	if err := web.ListenAndServe(server, flags, promslog.New(&promslog.Config{ //nolint:exhaustivestruct
 		Level: logLevel,
