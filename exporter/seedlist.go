@@ -16,29 +16,30 @@
 package exporter
 
 import (
+	"fmt"
+	"log"
+	"log/slog"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 // GetSeedListFromSRV converts mongodb+srv URI to flat connection string.
-func GetSeedListFromSRV(uri string, log *logrus.Logger) string {
+func GetSeedListFromSRV(uri string, logger *slog.Logger) string {
 	uriParsed, err := url.Parse(uri)
 	if err != nil {
-		log.Fatalf("Failed to parse URI %s: %v", uri, err)
+		log.Fatal(fmt.Sprintf("Failed to parse URI %s: %v", uri, err))
 	}
 
 	cname, srvRecords, err := net.LookupSRV("mongodb", "tcp", uriParsed.Hostname())
 	if err != nil {
-		log.Errorf("Failed to lookup SRV records for %s: %v", uri, err)
+		logger.Error("Failed to lookup SRV records", "uri", uri, "error", err)
 		return uri
 	}
 
 	if len(srvRecords) == 0 {
-		log.Errorf("No SRV records found for %s", uri)
+		logger.Error("No SRV records found", "uri", uri)
 		return uri
 	}
 
@@ -46,16 +47,16 @@ func GetSeedListFromSRV(uri string, log *logrus.Logger) string {
 
 	txtRecords, err := net.LookupTXT(uriParsed.Hostname())
 	if err != nil {
-		log.Errorf("Failed to lookup TXT records for %s: %v", cname, err)
+		logger.Error("Failed to lookup TXT records", "cname", cname, "error", err)
 	}
 	if len(txtRecords) > 1 {
-		log.Errorf("Multiple TXT records found for %s, thus were not applied", cname)
+		logger.Error("Multiple TXT records were found and none will be applied", "cname", cname)
 	}
 	if len(txtRecords) == 1 {
 		// We take connection parameters from the TXT record
 		uriParams, err := url.ParseQuery(txtRecords[0])
 		if err != nil {
-			log.Errorf("Failed to parse TXT record %s: %v", txtRecords[0], err)
+			logger.Error("Failed to parse TXT record", "txt_record", txtRecords[0], "error", err)
 		} else {
 			// Override connection parameters with ones from URI query string
 			for p, v := range uriParsed.Query() {
