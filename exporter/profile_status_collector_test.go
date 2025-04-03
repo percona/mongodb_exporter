@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -49,7 +49,7 @@ func TestProfileCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newProfileCollector(ctx, client, logrus.New(), false, ti, 30)
+	c := newProfileCollector(ctx, client, promslog.New(&promslog.Config{}), false, ti, 30)
 
 	expected := strings.NewReader(`
 	# HELP mongodb_profile_slow_query_count profile_slow_query.count

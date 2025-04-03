@@ -17,10 +17,10 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -38,10 +38,10 @@ type collstatsCollector struct {
 }
 
 // newCollectionStatsCollector creates a collector for statistics about collections.
-func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery bool, topology labelsGetter, collections []string, enableDetails bool) *collstatsCollector {
+func newCollectionStatsCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, discovery bool, topology labelsGetter, collections []string, enableDetails bool) *collstatsCollector {
 	return &collstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "collstats"})),
+		base: newBaseCollector(client, logger.With("collector", "collstats")),
 
 		compatibleMode:  false, // there are no compatible metrics for this collector.
 		discoveringMode: discovery,
@@ -70,7 +70,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	if d.discoveringMode {
 		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
-			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
+			logger.Error("cannot auto discover databases and collections", "error", err.Error())
 
 			return
 		}
@@ -80,7 +80,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		var err error
 		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
 		if err != nil {
-			logger.Errorf("cannot list collections: %s", err.Error())
+			logger.Error("cannot list collections", "error", err.Error())
 			return
 		}
 	}
@@ -126,19 +126,19 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, pipeline)
 		if err != nil {
-			logger.Errorf("cannot get $collstats cursor for collection %s.%s: %s", database, collection, err)
+			logger.Error("cannot get $collstats cursor for collection", "database", database, "collection", collection, "error", err)
 
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
-			logger.Errorf("cannot get $collstats for collection %s.%s: %s", database, collection, err)
+			logger.Error("cannot get $collstats for collection", "database", database, "collection", collection, "error", err)
 
 			continue
 		}
 
-		logger.Debugf("$collStats metrics for %s.%s", database, collection)
+		logger.Debug("$collStats metrics for %s.%s", "database", database, "collection", collection)
 		debugResult(logger, stats)
 
 		prefix := "collstats"

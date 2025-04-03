@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
@@ -59,7 +59,7 @@ func TestMultiTarget(t *testing.T) {
 	for i, opt := range opts {
 		exporters[i] = New(opt)
 	}
-	log := logrus.New()
+	log := promslog.New(&promslog.Config{})
 	serverMap := buildServerMap(exporters, log)
 
 	expected := []string{
@@ -112,7 +112,7 @@ func TestOverallHandler(t *testing.T) {
 	}
 	exporters := make([]*Exporter, len(opts))
 
-	logger := logrus.New()
+	logger := promslog.New(&promslog.Config{})
 
 	for i, opt := range opts {
 		exporters[i] = New(opt)

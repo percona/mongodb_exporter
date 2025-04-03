@@ -17,10 +17,10 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -42,22 +42,19 @@ type diagnosticDataCollector struct {
 }
 
 // newDiagnosticDataCollector creates a collector for diagnostic information.
-func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, buildInfo buildInfo) *diagnosticDataCollector {
+func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, compatible bool, topology labelsGetter, buildInfo buildInfo) *diagnosticDataCollector {
+	logger = logger.With("component", "diagnosticDataCollector")
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
-		logger.WithFields(logrus.Fields{
-			"component": "diagnosticDataCollector",
-		}).Errorf("Cannot get node type: %s", err)
+		logger.Error("Cannot get node type", "error", err)
 	}
 	if nodeType == typeArbiter {
-		logger.WithFields(logrus.Fields{
-			"component": "diagnosticDataCollector",
-		}).Warn("some metrics might be unavailable on arbiter nodes")
+		logger.Warn("some metrics might be unavailable on arbiter nodes")
 	}
 
 	return &diagnosticDataCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "diagnostic_data"})),
+		base: newBaseCollector(client, logger.With("collector", "diagnostic_data")),
 
 		buildInfo: buildInfo,
 
@@ -84,9 +81,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 
 	nodeType, err := getNodeType(d.ctx, client)
 	if err != nil {
-		logger.WithFields(logrus.Fields{
-			"component": "diagnosticDataCollector",
-		}).Errorf("Cannot get node type: %s", err)
+		logger.Error("Cannot get node type", "error", err)
 	}
 
 	var metrics []prometheus.Metric
@@ -94,11 +89,11 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 	if res.Err() != nil {
 		if nodeType != typeArbiter {
-			logger.Warnf("failed to run command: getDiagnosticData, some metrics might be unavailable %s", res.Err())
+			logger.Warn("failed to run command: getDiagnosticData, some metrics might be unavailable", "error", res.Err())
 		}
 	} else {
 		if err := res.Decode(&m); err != nil {
-			logger.Errorf("cannot run getDiagnosticData: %s", err)
+			logger.Error("cannot run getDiagnosticData", "error", err)
 			return
 		}
 
@@ -110,7 +105,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 		m, ok = m["data"].(bson.M)
 		if !ok {
 			err = errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
-			logger.Errorf("cannot decode getDiagnosticData: %s", err)
+			logger.Error("cannot decode getDiagnosticData", "error", err)
 		}
 
 		logger.Debug("getDiagnosticData result")
@@ -136,7 +131,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 
 		securityMetric, err := d.getSecurityMetricFromLineOptions(client)
 		if err != nil {
-			logger.Errorf("failed to run command: getCmdLineOptions: %s", err)
+			logger.Error("failed to run command: getCmdLineOptions", "error", err)
 		} else if securityMetric != nil {
 			metrics = append(metrics, securityMetric)
 		}

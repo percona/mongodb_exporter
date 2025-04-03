@@ -18,10 +18,10 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -57,7 +57,7 @@ type topologyInfo struct {
 	// by a new connector, able to reconnect if needed. In case of reconnection, we should
 	// call loadLabels to refresh the labels because they might have changed
 	client *mongo.Client
-	logger *logrus.Entry
+	logger *slog.Logger
 	rw     sync.RWMutex
 	labels map[string]string
 }
@@ -65,17 +65,17 @@ type topologyInfo struct {
 // ErrCannotGetTopologyLabels Cannot read topology labels.
 var ErrCannotGetTopologyLabels = fmt.Errorf("cannot get topology labels")
 
-func newTopologyInfo(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *topologyInfo {
+func newTopologyInfo(ctx context.Context, client *mongo.Client, logger *slog.Logger) *topologyInfo {
 	ti := &topologyInfo{
 		client: client,
-		logger: logger.WithFields(logrus.Fields{"component": "topology_info"}),
+		logger: logger.With("component", "topology_info"),
 		labels: make(map[string]string),
 		rw:     sync.RWMutex{},
 	}
 
 	err := ti.loadLabels(ctx)
 	if err != nil {
-		logger.Warnf("cannot load topology labels: %s", err)
+		logger.Warn("cannot load topology labels", "error", err)
 	}
 
 	return ti
@@ -157,7 +157,7 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 	return typeMongod, nil
 }
 
-func getClusterRole(ctx context.Context, client *mongo.Client, logger *logrus.Entry) (string, error) {
+func getClusterRole(ctx context.Context, client *mongo.Client, logger *slog.Logger) (string, error) {
 	cmdOpts := primitive.M{}
 	// Not always we can get this info. For example, we cannot get this for hidden hosts so
 	// if there is an error, just ignore it

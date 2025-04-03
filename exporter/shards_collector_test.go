@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
@@ -35,7 +35,7 @@ func TestShardsCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
-	c := newShardsCollector(ctx, client, logrus.New(), false)
+	c := newShardsCollector(ctx, client, promslog.New(&promslog.Config{}), false)
 
 	reg := prometheus.NewPedanticRegistry()
 	if err := reg.Register(c); err != nil {

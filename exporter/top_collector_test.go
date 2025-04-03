@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
@@ -35,7 +35,7 @@ func TestTopCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newTopCollector(ctx, client, logrus.New(), false, ti)
+	c := newTopCollector(ctx, client, promslog.New(&promslog.Config{}), false, ti)
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge

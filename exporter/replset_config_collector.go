@@ -17,10 +17,10 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -34,10 +34,10 @@ type replSetGetConfigCollector struct {
 }
 
 // newReplicationSetConfigCollector creates a collector for configuration of replication set.
-func newReplicationSetConfigCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter) *replSetGetConfigCollector {
+func newReplicationSetConfigCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, compatible bool, topology labelsGetter) *replSetGetConfigCollector {
 	return &replSetGetConfigCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "replset_config"})),
+		base: newBaseCollector(client, logger.With("collector", "replset_config")),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
@@ -69,7 +69,7 @@ func (d *replSetGetConfigCollector) collect(ch chan<- prometheus.Metric) {
 				return
 			}
 		}
-		logger.Errorf("cannot get replSetGetConfig: %s", err)
+		logger.Error("cannot get replSetGetConfig", "error", err)
 
 		return
 	}
@@ -77,7 +77,7 @@ func (d *replSetGetConfigCollector) collect(ch chan<- prometheus.Metric) {
 	config, ok := m["config"].(bson.M)
 	if !ok {
 		err := errors.Wrapf(errUnexpectedDataType, "%T for data field", m["config"])
-		logger.Errorf("cannot decode getDiagnosticData: %s", err)
+		logger.Error("cannot decode getDiagnosticData", "error", err)
 
 		return
 	}

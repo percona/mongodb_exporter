@@ -18,13 +18,13 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -725,10 +725,10 @@ var lockMetrics = []lockMetric{
 }
 
 // locksMetrics returns the list of lock metrics as a prometheus.Metric slice
-// This function reads the human readable list from lockMetrics() and creates a slice of metrics
+// This function reads the human-readable list from lockMetrics() and creates a slice of metrics
 // ready to be exposed, taking the value for each metric from th provided bson.M structure from
 // getDiagnosticData.
-func locksMetrics(logger *logrus.Entry, m bson.M) []prometheus.Metric {
+func locksMetrics(logger *slog.Logger, m bson.M) []prometheus.Metric {
 	res := make([]prometheus.Metric, 0, len(lockMetrics))
 
 	for _, lm := range lockMetrics {
@@ -737,7 +737,7 @@ func locksMetrics(logger *logrus.Entry, m bson.M) []prometheus.Metric {
 			continue
 		}
 		if err != nil {
-			logger.Errorf("cannot convert lock metric %s to old style: %s", mm.Desc(), err)
+			logger.Error("cannot convert lock metric to old style", "metric", mm.Desc(), "error", err)
 			continue
 		}
 		res = append(res, mm)
@@ -791,20 +791,20 @@ var specialMetricDefinitions = []specialMetric{
 	},
 }
 
-func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeType mongoDBNodeType, l *logrus.Entry) []prometheus.Metric {
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeType mongoDBNodeType, l *slog.Logger) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
 	for _, def := range specialMetricDefinitions {
 		val, err := sumMetrics(m, def.paths)
 		if err != nil {
-			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
+			l.Error("cannot create metric for path", "paths", def.paths, "error", err)
 			continue
 		}
 
 		d := prometheus.NewDesc(def.name, def.help, nil, def.labels)
 		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
 		if err != nil {
-			l.Errorf("cannot create metric for path: %v: %s", def.paths, err)
+			l.Error("cannot create metric for path", "paths", def.paths, "error", err)
 			continue
 		}
 
@@ -813,7 +813,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 
 	if nodeType == typeMongod || nodeType == typeArbiter {
 		if engine, err := storageEngine(m); err != nil {
-			l.Errorf("cannot retrieve engine type: %s", err)
+			l.Error("cannot retrieve engine type", "error", err)
 		} else {
 			metrics = append(metrics, engine)
 		}
@@ -829,7 +829,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 
 		if nodeType != typeMongos {
 			if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
-				l.Warnf("cannot create metrics for oplog: %s", err)
+				l.Warn("cannot create metrics for oplog", "error", err)
 			} else {
 				metrics = append(metrics, opLogMetrics...)
 			}
@@ -839,7 +839,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 	return metrics
 }
 
-func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logrus.Entry) (buildInfo, error) {
+func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *slog.Logger) (buildInfo, error) {
 	if client == nil {
 		return buildInfo{}, errors.New("cannot get mongo build info: client is nil")
 	}
@@ -857,7 +857,7 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *logr
 	} else {
 		buildInfoDoc.Edition = CommunityEdition
 	}
-	l.Debug("MongoDB edition: ", buildInfoDoc.Edition)
+	l.Debug("MongoDB edition", "edition", buildInfoDoc.Edition)
 
 	if buildInfoDoc.PSMDBVersion != "" {
 		buildInfoDoc.Vendor = PerconaVendor
@@ -917,10 +917,10 @@ func myState(ctx context.Context, client *mongo.Client) prometheus.Metric {
 }
 
 // arbiterMetrics returns metrics for mongoDB arbiter instances.
-func arbiterMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
+func arbiterMetrics(ctx context.Context, client *mongo.Client, l *slog.Logger) []prometheus.Metric {
 	response, err := util.MyRole(ctx, client)
 	if err != nil {
-		l.Errorf("cannot get role of the running instance: %s", err)
+		l.Error("cannot get role of the running instance", "error", err)
 		return nil
 	}
 
@@ -984,15 +984,15 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return []prometheus.Metric{headMetric, tailMetric}, nil
 }
 
-func replSetMetrics(d bson.M, l *logrus.Entry) []prometheus.Metric {
+func replSetMetrics(d bson.M, l *slog.Logger) []prometheus.Metric {
 	var repl proto.ReplicaSetStatus
 	b, err := bson.Marshal(d)
 	if err != nil {
-		l.Warnf("cannot marshal replica set status: %s", err)
+		l.Warn("cannot marshal replica set status", "error", err)
 		return nil
 	}
 	if err := bson.Unmarshal(b, &repl); err != nil {
-		l.Warnf("cannot unmarshal replica set status: %s", err)
+		l.Warn("cannot unmarshal replica set status", "error", err)
 		return nil
 	}
 
@@ -1069,42 +1069,42 @@ func replSetMetrics(d bson.M, l *logrus.Entry) []prometheus.Metric {
 	return metrics
 }
 
-func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
+func mongosMetrics(ctx context.Context, client *mongo.Client, l *slog.Logger) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 
 	if metric, err := databasesTotalPartitioned(ctx, client); err != nil {
-		l.Debugf("cannot create metric for database total: %s", err)
+		l.Debug("cannot create metric for database total", "error", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
 	if metric, err := databasesTotalUnpartitioned(ctx, client); err != nil {
-		l.Debugf("cannot create metric for database total: %s", err)
+		l.Debug("cannot create metric for database total", "error", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
 	if metric, err := shardedCollectionsTotal(ctx, client); err != nil {
-		l.Debugf("cannot create metric for collections total: %s", err)
+		l.Debug("cannot create metric for collections total", "error", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
 	if metric, err := balancerEnabled(ctx, client); err != nil {
-		l.Debugf("cannot create metric for balancer is enabled: %s", err)
+		l.Debug("cannot create metric for balancer is enabled", "error", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
 	if metric, err := chunksBalancerRunning(ctx, client); err != nil {
-		l.Debugf("cannot create metric for chunks balancer running: %s", err)
+		l.Debug("cannot create metric for chunks balancer running", "error", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
 	ms, err := changelog10m(ctx, client, l)
 	if err != nil {
-		l.Errorf("cannot create metric for changelog: %s", err)
+		l.Error("cannot create metric for changelog", "error", err)
 	} else {
 		metrics = append(metrics, ms...)
 	}
@@ -1112,13 +1112,13 @@ func mongosMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) [
 	metrics = append(metrics, dbstatsMetrics(ctx, client, l)...)
 
 	if metric, err := shardingShardsTotal(ctx, client); err != nil {
-		l.Debugf("cannot create metric for database total: %s", err)
+		l.Debug("cannot create metric for database total", "error", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
 	if metric, err := shardingShardsDrainingTotal(ctx, client); err != nil {
-		l.Debugf("cannot create metric for database total: %s", err)
+		l.Debug("cannot create metric for database total", "error", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
@@ -1257,7 +1257,7 @@ type ShardingChangelogStats struct {
 	Items *[]ShardingChangelogSummary
 }
 
-func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Entry) ([]prometheus.Metric, error) {
+func changelog10m(ctx context.Context, client *mongo.Client, l *slog.Logger) ([]prometheus.Metric, error) {
 	var metrics []prometheus.Metric
 
 	coll := client.Database("config").Collection("changelog")
@@ -1274,7 +1274,7 @@ func changelog10m(ctx context.Context, client *mongo.Client, l *logrus.Entry) ([
 	for c.Next(ctx) {
 		s := &ShardingChangelogSummary{}
 		if err := c.Decode(s); err != nil {
-			l.Error(err)
+			l.Error("failed to decode changelog summary", "error", err)
 			continue
 		}
 
@@ -1332,20 +1332,20 @@ type buildInfo struct {
 	Modules      []string `bson:"modules"`
 }
 
-func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.Entry) *databaseStatList {
+func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *slog.Logger) *databaseStatList {
 	dbStatList := &databaseStatList{}
 	dbNames, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
-		l.Errorf("Failed to get database names: %s.", err)
+		l.Error("Failed to get database names", "error", err)
 		return nil
 	}
-	l.Debugf("getting stats for databases: %v", dbNames)
+	l.Debug("getting stats for databases", "databases", dbNames)
 	for _, db := range dbNames {
 		dbStatus := databaseStatus{}
 		r := client.Database(db).RunCommand(context.TODO(), bson.D{{Key: "dbStats", Value: 1}, {Key: "scale", Value: 1}})
 		err := r.Decode(&dbStatus)
 		if err != nil {
-			l.Errorf("Failed to get database status: %s.", err)
+			l.Error("Failed to get database status", "error", err)
 			return nil
 		}
 		dbStatList.Members = append(dbStatList.Members, dbStatus)
@@ -1354,7 +1354,7 @@ func getDatabaseStatList(ctx context.Context, client *mongo.Client, l *logrus.En
 	return dbStatList
 }
 
-func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *logrus.Entry) []prometheus.Metric {
+func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *slog.Logger) []prometheus.Metric {
 	var metrics []prometheus.Metric
 
 	dbStatList := getDatabaseStatList(ctx, client, l)

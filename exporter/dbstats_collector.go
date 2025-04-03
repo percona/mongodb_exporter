@@ -17,9 +17,9 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -37,10 +37,10 @@ type dbstatsCollector struct {
 }
 
 // newDBStatsCollector creates a collector for statistics on database storage.
-func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool, topology labelsGetter, databaseRegex []string, freeStorage bool) *dbstatsCollector {
+func newDBStatsCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, compatible bool, topology labelsGetter, databaseRegex []string, freeStorage bool) *dbstatsCollector {
 	return &dbstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "dbstats"})),
+		base: newBaseCollector(client, logger.With("collector", "dbstats")),
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
@@ -67,12 +67,12 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 	dbNames, err := databases(d.ctx, client, d.databaseFilter, nil)
 	if err != nil {
-		logger.Errorf("Failed to get database names: %s", err)
+		logger.Error("Failed to get database names", "error", err)
 
 		return
 	}
 
-	logger.Debugf("getting stats for databases: %v", dbNames)
+	logger.Debug("getting stats for databases", "databases", dbNames)
 	for _, db := range dbNames {
 		var dbStats bson.M
 		var cmd bson.D
@@ -84,12 +84,12 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 		r := client.Database(db).RunCommand(d.ctx, cmd)
 		err := r.Decode(&dbStats)
 		if err != nil {
-			logger.Errorf("Failed to get $dbstats for database %s: %s", db, err)
+			logger.Error("Failed to get $dbstats for database", "database", db, "error", err)
 
 			continue
 		}
 
-		logger.Debugf("$dbStats metrics for %s", db)
+		logger.Debug("$dbStats metrics for", "database", db)
 		debugResult(logger, dbStats)
 
 		prefix := "dbstats"

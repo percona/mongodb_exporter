@@ -18,11 +18,11 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -35,10 +35,10 @@ type shardsCollector struct {
 }
 
 // newShardsCollector creates collector collecting metrics about chunks for shards Mongo.
-func newShardsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatibleMode bool) *shardsCollector {
+func newShardsCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, compatibleMode bool) *shardsCollector {
 	return &shardsCollector{
 		ctx:        ctx,
-		base:       newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "shards"})),
+		base:       newBaseCollector(client, logger.With("collector", "shards")),
 		compatible: compatibleMode,
 	}
 }
@@ -62,14 +62,14 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 	metrics := make([]prometheus.Metric, 0)
 	metric, err := chunksTotal(ctx, client)
 	if err != nil {
-		logger.Warnf("cannot create metric for chunks total: %s", err)
+		logger.Warn("cannot create metric for chunks total", "error", err)
 	} else {
 		metrics = append(metrics, metric)
 	}
 
 	ms, err := chunksTotalPerShard(ctx, client)
 	if err != nil {
-		logger.Warnf("cannot create metric for chunks total per shard: %s", err)
+		logger.Warn("cannot create metric for chunks total per shard", "error", err)
 	} else {
 		metrics = append(metrics, ms...)
 	}
@@ -80,7 +80,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 
 	databaseNames, err := client.ListDatabaseNames(d.ctx, bson.D{})
 	if err != nil {
-		logger.Errorf("cannot get database names: %s", err)
+		logger.Error("cannot get database names", "error", err)
 	}
 	for _, database := range databaseNames {
 		collections := d.getCollectionsForDBName(database)
@@ -155,14 +155,14 @@ func (d *shardsCollector) getCollectionsForDBName(database string) []primitive.M
 	cursor := client.Database("config").Collection("collections")
 	rs, err := cursor.Find(d.ctx, bson.M{"_id": bson.M{"$regex": fmt.Sprintf("^%s.", database), "$options": "i"}})
 	if err != nil {
-		logger.Errorf("cannot find _id starting with \"%s.\":%s", database, err)
+		logger.Error("cannot find _id with database prefix", "database", database, "error", err)
 		return nil
 	}
 
 	var decoded []bson.M
 	err = rs.All(d.ctx, &decoded)
 	if err != nil {
-		logger.Errorf("cannot decode collections: %s", err)
+		logger.Error("cannot decode collections", "error", err)
 		return nil
 	}
 
@@ -193,14 +193,14 @@ func (d *shardsCollector) getChunksForCollection(row primitive.M) []bson.M {
 
 	cur, err := client.Database("config").Collection("chunks").Aggregate(context.Background(), aggregation)
 	if err != nil {
-		logger.Errorf("cannot get $shards cursor for collection config.chunks: %s", err)
+		logger.Error("cannot get $shards cursor for collection config.chunks", "error", err)
 		return nil
 	}
 
 	var chunks []bson.M
 	err = cur.All(context.Background(), &chunks)
 	if err != nil {
-		logger.Errorf("cannot decode $shards for collection config.chunks: %s", err)
+		logger.Error("cannot decode $shards for collection config.chunks", "error", err)
 		return nil
 	}
 

@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/foxcpp/go-mockdns"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
@@ -54,7 +54,7 @@ func TestParseURIList(t *testing.T) {
 			"mongodb://server5",
 		},
 	}
-	logger := logrus.New()
+	logger := promslog.New(&promslog.Config{})
 	for test, expected := range tests {
 		actual := parseURIList(strings.Split(test, ","), logger, false)
 		assert.Equal(t, expected, actual)
@@ -83,7 +83,7 @@ func TestSplitCluster(t *testing.T) {
 		},
 	}
 
-	logger := logrus.New()
+	logger := promslog.New(&promslog.Config{})
 
 	srv := tu.SetupFakeResolver()
 
@@ -116,7 +116,7 @@ func TestBuildExporter(t *testing.T) {
 
 		CompatibleMode: true,
 	}
-	log := logrus.New()
+	log := promslog.New(&promslog.Config{})
 	buildExporter(opts, "mongodb://usr:pwd@127.0.0.1/", log)
 }
 

@@ -18,10 +18,10 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -38,10 +38,10 @@ type indexstatsCollector struct {
 }
 
 // newIndexStatsCollector creates a collector for statistics on index usage.
-func newIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, discovery, overrideDescendingIndex bool, topology labelsGetter, collections []string) *indexstatsCollector {
+func newIndexStatsCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, discovery, overrideDescendingIndex bool, topology labelsGetter, collections []string) *indexstatsCollector {
 	return &indexstatsCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "indexstats"})),
+		base: newBaseCollector(client, logger.With("collector", "indexstats")),
 
 		discoveringMode:         discovery,
 		topologyInfo:            topology,
@@ -69,7 +69,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	if d.discoveringMode {
 		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
 		if err != nil {
-			logger.Errorf("cannot auto discover databases and collections: %s", err.Error())
+			logger.Error("cannot auto discover databases and collections", "error", err.Error())
 
 			return
 		}
@@ -79,7 +79,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 		var err error
 		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
 		if err != nil {
-			logger.Errorf("cannot list collections: %s", err.Error())
+			logger.Error("cannot list collections", "error", err.Error())
 
 			return
 		}
@@ -105,19 +105,19 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		cursor, err := client.Database(database).Collection(collection).Aggregate(d.ctx, mongo.Pipeline{aggregation})
 		if err != nil {
-			logger.Errorf("cannot get $indexStats cursor for collection %s.%s: %s", database, collection, err)
+			logger.Error("cannot get $indexStats cursor for collection", "database", database, "collection", collection, "error", err)
 
 			continue
 		}
 
 		var stats []bson.M
 		if err = cursor.All(d.ctx, &stats); err != nil {
-			logger.Errorf("cannot get $indexStats for collection %s.%s: %s", database, collection, err)
+			logger.Error("cannot get $indexStats for collection", "database", database, "collection", collection, "error", err)
 
 			continue
 		}
 
-		d.base.logger.Debugf("indexStats for %s.%s", database, collection)
+		d.base.logger.Debug("indexStats", "database", database, "collection", collection)
 
 		debugResult(d.base.logger, stats)
 
