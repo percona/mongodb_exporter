@@ -363,7 +363,7 @@ func (e *Exporter) Handler() http.Handler {
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
 			ErrorHandling: promhttp.ContinueOnError,
-			// ErrorLog:      e.logger, // todo(idoqo): check with prometheus/client_golang about the interface here
+			ErrorLog:      newHTTPErrorLogger(e.logger),
 		})
 
 		h.ServeHTTP(w, r)

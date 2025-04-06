@@ -170,7 +170,7 @@ func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.Hand
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
 			ErrorHandling: promhttp.ContinueOnError,
-			// ErrorLog:      logger, // todo(idoqo): check with promhttp
+			ErrorLog:      newHTTPErrorLogger(logger),
 		})
 
 		h.ServeHTTP(w, r)
