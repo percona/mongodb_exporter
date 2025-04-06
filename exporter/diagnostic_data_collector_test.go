@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 	"strings"
 	"testing"
@@ -253,13 +254,48 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 }
 
+// errorCountHandler is a custom handler that keeps tracks of the number of errors and warnings that were logged.
+// it discards all errors of other levels.
+type errorCountHandler struct {
+	opts       slog.HandlerOptions
+	logRecords []slog.Record
+}
+
+func newErrorCountHandler(opts *slog.HandlerOptions) *errorCountHandler {
+	h := &errorCountHandler{
+		logRecords: make([]slog.Record, 0),
+	}
+	if opts != nil {
+		h.opts = *opts
+	}
+	if h.opts.Level == nil {
+		h.opts.Level = slog.LevelWarn
+	}
+	return h
+}
+
+func (h *errorCountHandler) Handle(ctx context.Context, r slog.Record) error {
+	if r.Level == slog.LevelError || r.Level == slog.LevelWarn {
+		h.logRecords = append(h.logRecords, r)
+	}
+	return nil
+}
+
+func (h *errorCountHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= slog.LevelInfo
+}
+
+func (h *errorCountHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *errorCountHandler) WithGroup(name string) slog.Handler {
+	return h
+}
+
 //nolint:funlen
 func TestDiagnosticDataErrors(t *testing.T) {
 	t.Parallel()
-	type log struct {
-		message string
-		level   uint32
-	}
 
 	type testCase struct {
 		name            string
@@ -295,7 +331,8 @@ func TestDiagnosticDataErrors(t *testing.T) {
 			require.NoError(t, err)
 			client := tu.TestClient(ctx, port, t)
 
-			logger := promslog.New(&promslog.Config{})
+			errCountLogHandler := newErrorCountHandler(nil)
+			logger := slog.New(errCountLogHandler)
 			ti := newTopologyInfo(ctx, client, logger)
 
 			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
@@ -308,27 +345,16 @@ func TestDiagnosticDataErrors(t *testing.T) {
 			require.NoError(t, err)
 			_ = helpers.CollectMetrics(c)
 
-			/*var errorLogs []log
-			for _, entry := range hook.Entries {
-				if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
-					errorLogs = append(errorLogs, log{
-						message: entry.Message,
-						level:   uint32(entry.Level),
-					})
-				}
-			}
-
 			if tc.expectedMessage == "" {
-				assert.Empty(t, errorLogs)
+				assert.Empty(t, errCountLogHandler.logRecords)
 			} else {
-				require.NotEmpty(t, errorLogs)
-				assert.True(
-					t,
-					strings.HasPrefix(hook.LastEntry().Message, tc.expectedMessage),
-					"'%s' has no prefix: '%s'",
-					hook.LastEntry().Message,
-					tc.expectedMessage)
-			}*/
+				require.NotEmpty(t, errCountLogHandler.logRecords)
+				messages := make([]string, 0, len(errCountLogHandler.logRecords))
+				for _, record := range errCountLogHandler.logRecords {
+					messages = append(messages, record.Message)
+				}
+				assert.Contains(t, messages, tc.expectedMessage)
+			}
 		})
 	}
 }
