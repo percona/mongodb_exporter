@@ -256,7 +256,7 @@ func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []st
 		for _, hosturl := range URIs {
 			urlParsed, err := url.Parse(hosturl)
 			if err != nil {
-				log.Fatal(fmt.Sprintf("Failed to parse URI %s: %v", hosturl, err))
+				log.Fatalf("Failed to parse URI %s: %v", hosturl, err)
 			}
 			for _, host := range strings.Split(urlParsed.Host, ",") {
 				targetURI := "mongodb://"

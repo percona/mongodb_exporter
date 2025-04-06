@@ -16,7 +16,6 @@
 package exporter
 
 import (
-	"fmt"
 	"log"
 	"log/slog"
 	"net"
@@ -29,7 +28,7 @@ import (
 func GetSeedListFromSRV(uri string, logger *slog.Logger) string {
 	uriParsed, err := url.Parse(uri)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("Failed to parse URI %s: %v", uri, err))
+		log.Fatalf("Failed to parse URI %s: %v", uri, err)
 	}
 
 	cname, srvRecords, err := net.LookupSRV("mongodb", "tcp", uriParsed.Hostname())

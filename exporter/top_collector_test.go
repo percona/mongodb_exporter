@@ -35,7 +35,7 @@ func TestTopCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newTopCollector(ctx, client, promslog.New(&promslog.Config{}), false, ti)
+	c := newTopCollector(ctx, client, promslog.New(&promslog.Config{}), ti)
 
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge

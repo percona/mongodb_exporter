@@ -231,8 +231,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
-		tc := newTopCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
+		tc := newTopCollector(ctx, client, e.opts.Logger, topologyInfo)
 		registry.MustRegister(tc)
 	}
 
