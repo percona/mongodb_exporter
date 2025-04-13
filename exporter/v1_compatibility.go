@@ -791,7 +791,7 @@ var specialMetricDefinitions = []specialMetric{
 	},
 }
 
-func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeType mongoDBNodeType, l *slog.Logger) []prometheus.Metric {
+func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeType mongoDBNodeType, l *slog.Logger) []prometheus.Metric { //nolint:cyclop
 	metrics := make([]prometheus.Metric, 0)
 
 	for _, def := range specialMetricDefinitions {
@@ -984,7 +984,7 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return []prometheus.Metric{headMetric, tailMetric}, nil
 }
 
-func replSetMetrics(d bson.M, l *slog.Logger) []prometheus.Metric {
+func replSetMetrics(d bson.M, l *slog.Logger) []prometheus.Metric { //nolint:cyclop
 	var repl proto.ReplicaSetStatus
 	b, err := bson.Marshal(d)
 	if err != nil {

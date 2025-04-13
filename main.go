@@ -197,9 +197,7 @@ func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exp
 		CurrentOpSlowTime:      opts.CurrentOpSlowTime,
 	}
 
-	e := exporter.New(exporterOpts)
-
-	return e
+	return exporter.New(exporterOpts)
 }
 
 func buildServers(opts GlobalFlags, logger *slog.Logger) []*exporter.Exporter {
@@ -212,7 +210,7 @@ func buildServers(opts GlobalFlags, logger *slog.Logger) []*exporter.Exporter {
 	return servers
 }
 
-func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []string {
+func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []string { //nolint:gocognit
 	var URIs []string
 
 	// If server URI is prefixed with mongodb scheme string, then every next URI in

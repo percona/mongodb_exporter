@@ -25,7 +25,7 @@ import (
 )
 
 // GetSeedListFromSRV converts mongodb+srv URI to flat connection string.
-func GetSeedListFromSRV(uri string, logger *slog.Logger) string {
+func GetSeedListFromSRV(uri string, logger *slog.Logger) string { //nolint:cyclop
 	uriParsed, err := url.Parse(uri)
 	if err != nil {
 		log.Fatalf("Failed to parse URI %s: %v", uri, err)
