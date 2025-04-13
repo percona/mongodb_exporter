@@ -274,7 +274,7 @@ func newErrorCountHandler(opts *slog.HandlerOptions) *errorCountHandler {
 	return h
 }
 
-func (h *errorCountHandler) Handle(ctx context.Context, r slog.Record) error {
+func (h *errorCountHandler) Handle(_ context.Context, r slog.Record) error {
 	if r.Level == slog.LevelError || r.Level == slog.LevelWarn {
 		h.logRecords = append(h.logRecords, r)
 	}
@@ -285,11 +285,11 @@ func (h *errorCountHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= slog.LevelInfo
 }
 
-func (h *errorCountHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (h *errorCountHandler) WithAttrs(_ []slog.Attr) slog.Handler {
 	return h
 }
 
-func (h *errorCountHandler) WithGroup(name string) slog.Handler {
+func (h *errorCountHandler) WithGroup(_ string) slog.Handler {
 	return h
 }
 

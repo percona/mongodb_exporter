@@ -210,7 +210,7 @@ func buildServers(opts GlobalFlags, logger *slog.Logger) []*exporter.Exporter {
 	return servers
 }
 
-func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []string { //nolint:gocognit
+func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []string { //nolint:gocognit,cyclop
 	var URIs []string
 
 	// If server URI is prefixed with mongodb scheme string, then every next URI in

@@ -138,8 +138,7 @@ func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.Hand
 			if !e.opts.GlobalConnPool {
 				defer func() {
 					if client != nil {
-						err := client.Disconnect(ctx)
-						if err != nil {
+						if err := client.Disconnect(ctx); err != nil {
 							logger.Error("Cannot disconnect client", "error", err)
 						}
 					}

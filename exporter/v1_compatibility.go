@@ -984,7 +984,7 @@ func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric
 	return []prometheus.Metric{headMetric, tailMetric}, nil
 }
 
-func replSetMetrics(d bson.M, l *slog.Logger) []prometheus.Metric { //nolint:cyclop
+func replSetMetrics(d bson.M, l *slog.Logger) []prometheus.Metric { //nolint:cyclop,funlen
 	var repl proto.ReplicaSetStatus
 	b, err := bson.Marshal(d)
 	if err != nil {
