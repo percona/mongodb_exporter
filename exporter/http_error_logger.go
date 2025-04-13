@@ -2,9 +2,10 @@ package exporter
 
 import (
 	"fmt"
+	"log/slog"
+
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"log/slog"
 )
 
 // httpErrorLogger is a wrapper around slog.Logger that can log promhttp errors (by implementing a Println method).
