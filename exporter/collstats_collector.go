@@ -116,9 +116,9 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			project := bson.D{
 				{
 					Key: "$project", Value: bson.M{
-					"storageStats.wiredTiger":   0,
-					"storageStats.indexDetails": 0,
-				},
+						"storageStats.wiredTiger":   0,
+						"storageStats.indexDetails": 0,
+					},
 				},
 			}
 			pipeline = append(pipeline, project)
