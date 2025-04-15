@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 	"strings"
 	"testing"
@@ -28,8 +29,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -43,10 +43,10 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
-	logger := logrus.New()
+	logger := promslog.New(&promslog.Config{})
 	ti := labelsGetterMock{}
 
-	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
 	c := newDiagnosticDataCollector(ctx, client, logger, false, ti, dbBuildInfo)
@@ -190,10 +190,10 @@ func TestCollectorWithCompatibleMode(t *testing.T) {
 			port, err := tu.PortForContainer(tt.containerName)
 			require.NoError(t, err)
 			client := tu.TestClient(ctx, port, t)
-			logger := logrus.New()
+			logger := promslog.New(&promslog.Config{})
 			ti := labelsGetterMock{}
 
-			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 			require.NoError(t, err)
 
 			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
@@ -210,11 +210,15 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
+	logLevel := promslog.NewLevel()
+	err := logLevel.Set("debug")
+	require.NoError(t, err)
+	logger := promslog.New(&promslog.Config{
+		Level: logLevel,
+	})
 	ti := newTopologyInfo(ctx, client, logger)
 
-	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
 	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
@@ -250,13 +254,48 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 }
 
+// errorCountHandler is a custom handler that keeps tracks of the number of errors and warnings that were logged.
+// it discards all errors of other levels.
+type errorCountHandler struct {
+	opts       slog.HandlerOptions
+	logRecords []slog.Record
+}
+
+func newErrorCountHandler(opts *slog.HandlerOptions) *errorCountHandler {
+	h := &errorCountHandler{
+		logRecords: make([]slog.Record, 0),
+	}
+	if opts != nil {
+		h.opts = *opts
+	}
+	if h.opts.Level == nil {
+		h.opts.Level = slog.LevelWarn
+	}
+	return h
+}
+
+func (h *errorCountHandler) Handle(_ context.Context, r slog.Record) error {
+	if r.Level == slog.LevelError || r.Level == slog.LevelWarn {
+		h.logRecords = append(h.logRecords, r)
+	}
+	return nil
+}
+
+func (h *errorCountHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= slog.LevelInfo
+}
+
+func (h *errorCountHandler) WithAttrs(_ []slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *errorCountHandler) WithGroup(_ string) slog.Handler {
+	return h
+}
+
 //nolint:funlen
 func TestDiagnosticDataErrors(t *testing.T) {
 	t.Parallel()
-	type log struct {
-		message string
-		level   uint32
-	}
 
 	type testCase struct {
 		name            string
@@ -292,10 +331,11 @@ func TestDiagnosticDataErrors(t *testing.T) {
 			require.NoError(t, err)
 			client := tu.TestClient(ctx, port, t)
 
-			logger, hook := logrustest.NewNullLogger()
+			errCountLogHandler := newErrorCountHandler(nil)
+			logger := slog.New(errCountLogHandler)
 			ti := newTopologyInfo(ctx, client, logger)
 
-			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 			require.NoError(t, err)
 
 			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
@@ -305,26 +345,15 @@ func TestDiagnosticDataErrors(t *testing.T) {
 			require.NoError(t, err)
 			_ = helpers.CollectMetrics(c)
 
-			var errorLogs []log
-			for _, entry := range hook.Entries {
-				if entry.Level == logrus.ErrorLevel || entry.Level == logrus.WarnLevel {
-					errorLogs = append(errorLogs, log{
-						message: entry.Message,
-						level:   uint32(entry.Level),
-					})
-				}
-			}
-
 			if tc.expectedMessage == "" {
-				assert.Empty(t, errorLogs)
+				assert.Empty(t, errCountLogHandler.logRecords)
 			} else {
-				require.NotEmpty(t, errorLogs)
-				assert.True(
-					t,
-					strings.HasPrefix(hook.LastEntry().Message, tc.expectedMessage),
-					"'%s' has no prefix: '%s'",
-					hook.LastEntry().Message,
-					tc.expectedMessage)
+				require.NotEmpty(t, errCountLogHandler.logRecords)
+				messages := make([]string, 0, len(errCountLogHandler.logRecords))
+				for _, record := range errCountLogHandler.logRecords {
+					messages = append(messages, record.Message)
+				}
+				assert.Contains(t, messages, tc.expectedMessage)
 			}
 		})
 	}
@@ -335,10 +364,10 @@ func TestContextTimeout(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	logger := logrus.New()
+	logger := promslog.New(&promslog.Config{})
 	ti := newTopologyInfo(ctx, client, logger)
 
-	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
 	dbCount := 100
@@ -431,12 +460,11 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	err := client.Disconnect(ctx)
 	assert.NoError(t, err)
 
-	logger := logrus.New()
-	logger.Out = io.Discard // disable logs in tests
+	logger := promslog.NewNopLogger()
 
 	ti := labelsGetterMock{}
 
-	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.Error(t, err)
 
 	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)

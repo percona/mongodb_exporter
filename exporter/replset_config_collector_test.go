@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
@@ -36,7 +36,7 @@ func TestReplsetConfigCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newReplicationSetConfigCollector(ctx, client, logrus.New(), false, ti)
+	c := newReplicationSetConfigCollector(ctx, client, promslog.New(&promslog.Config{}), false, ti)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
@@ -62,7 +62,7 @@ func TestReplsetConfigCollectorNoSharding(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	c := newReplicationSetConfigCollector(ctx, client, logrus.New(), false, ti)
+	c := newReplicationSetConfigCollector(ctx, client, promslog.New(&promslog.Config{}), false, ti)
 
 	// Replication set metrics should not be generated for unsharded server
 	count := testutil.CollectAndCount(c)

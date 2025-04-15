@@ -17,23 +17,23 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type baseCollector struct {
 	client *mongo.Client
-	logger *logrus.Entry
+	logger *slog.Logger
 
 	lock         sync.Mutex
 	metricsCache []prometheus.Metric
 }
 
 // newBaseCollector creates a skeletal collector, which is used to create other collectors.
-func newBaseCollector(client *mongo.Client, logger *logrus.Entry) *baseCollector {
+func newBaseCollector(client *mongo.Client, logger *slog.Logger) *baseCollector {
 	return &baseCollector{
 		client: client,
 		logger: logger,

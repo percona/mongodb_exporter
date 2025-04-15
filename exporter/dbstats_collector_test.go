@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -58,7 +58,7 @@ func TestDBStatsCollector(t *testing.T) {
 
 	ti := labelsGetterMock{}
 
-	logger := logrus.New()
+	logger := promslog.New(&promslog.Config{})
 	c := newDBStatsCollector(ctx, client, logger, false, ti, []string{dbName}, false)
 	expected := strings.NewReader(`
 	# HELP mongodb_dbstats_collections dbstats.collections

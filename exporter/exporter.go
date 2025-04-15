@@ -19,6 +19,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
@@ -27,7 +28,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
@@ -37,7 +38,7 @@ import (
 type Exporter struct {
 	client                *mongo.Client
 	clientMu              sync.Mutex
-	logger                *logrus.Logger
+	logger                *slog.Logger
 	opts                  *Opts
 	lock                  *sync.Mutex
 	totalCollectionsCount int
@@ -79,7 +80,7 @@ type Opts struct {
 	CurrentOpSlowTime      string
 	ProfileTimeTS          int
 
-	Logger *logrus.Logger
+	Logger *slog.Logger
 
 	URI      string
 	NodeName string
@@ -101,7 +102,8 @@ func New(opts *Opts) *Exporter {
 	}
 
 	if opts.Logger == nil {
-		opts.Logger = logrus.New()
+		promslogConfig := &promslog.Config{}
+		opts.Logger = promslog.New(promslogConfig)
 	}
 
 	ctx := context.Background()
@@ -116,7 +118,7 @@ func New(opts *Opts) *Exporter {
 	go func() {
 		_, err := exp.getClient(ctx)
 		if err != nil {
-			exp.logger.Errorf("Cannot connect to MongoDB: %v", err)
+			exp.logger.Error("Cannot connect to MongoDB", "error", err)
 		}
 	}()
 
@@ -135,12 +137,12 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
-		e.logger.Errorf("Registry - Cannot get node type : %s", err)
+		e.logger.Error("Registry - Cannot get node type", "error", err)
 	}
 
-	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, e.logger.WithField("component", "buildInfo"))
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, e.logger.With("component", "buildInfo"))
 	if err != nil {
-		e.logger.Warnf("Registry - Cannot get MongoDB buildInfo: %s", err)
+		e.logger.Warn("Registry - Cannot get MongoDB buildInfo", "error", err)
 	}
 
 	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
@@ -229,8 +231,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	if e.opts.EnableTopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableTopMetrics {
-		tc := newTopCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo)
+		tc := newTopCollector(ctx, client, e.opts.Logger, topologyInfo)
 		registry.MustRegister(tc)
 	}
 
@@ -314,7 +315,7 @@ func (e *Exporter) Handler() http.Handler {
 
 		client, err = e.getClient(ctx)
 		if err != nil {
-			e.logger.Errorf("Cannot connect to MongoDB: %v", err)
+			e.logger.Error("Cannot connect to MongoDB", "error", err)
 		}
 
 		if client != nil && e.getTotalCollectionsCount() <= 0 {
@@ -332,7 +333,7 @@ func (e *Exporter) Handler() http.Handler {
 				if client != nil {
 					err := client.Disconnect(ctx)
 					if err != nil {
-						e.logger.Errorf("Cannot disconnect client: %v", err)
+						e.logger.Error("Cannot disconnect client", "error", err)
 					}
 				}
 			}()
@@ -361,7 +362,7 @@ func (e *Exporter) Handler() http.Handler {
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
 			ErrorHandling: promhttp.ContinueOnError,
-			ErrorLog:      e.logger,
+			ErrorLog:      newHTTPErrorLogger(e.logger),
 		})
 
 		h.ServeHTTP(w, r)

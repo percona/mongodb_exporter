@@ -24,7 +24,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -41,7 +41,7 @@ func TestFCVCollector(t *testing.T) {
 	database.Drop(ctx)       //nolint:errcheck
 	defer database.Drop(ctx) //nolint:errcheck
 
-	c := newFeatureCompatibilityCollector(ctx, client, logrus.New())
+	c := newFeatureCompatibilityCollector(ctx, client, promslog.New(&promslog.Config{}))
 
 	sversion, _ := getMongoDBVersionInfo(t, "mongo-1-1")
 

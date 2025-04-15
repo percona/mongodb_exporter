@@ -18,9 +18,9 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -36,12 +36,12 @@ type topCollector struct {
 
 var ErrInvalidOrMissingTotalsEntry = fmt.Errorf("invalid or misssing totals entry in top results")
 
-func newTopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger, compatible bool,
+func newTopCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger,
 	topology labelsGetter,
 ) *topCollector {
 	return &topCollector{
 		ctx:            ctx,
-		base:           newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "top"})),
+		base:           newBaseCollector(client, logger.With("collector", "top")),
 		compatibleMode: false, // there are no compatible metrics for this collector.
 		topologyInfo:   topology,
 	}

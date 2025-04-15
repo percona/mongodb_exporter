@@ -18,10 +18,10 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -32,10 +32,10 @@ type featureCompatibilityCollector struct {
 }
 
 // newProfileCollector creates a collector for being processed queries.
-func newFeatureCompatibilityCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger) *featureCompatibilityCollector {
+func newFeatureCompatibilityCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger) *featureCompatibilityCollector {
 	return &featureCompatibilityCollector{
 		ctx:  ctx,
-		base: newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "featureCompatibility"})),
+		base: newBaseCollector(client, logger.With("collector", "featureCompatibility")),
 	}
 }
 
@@ -59,7 +59,7 @@ func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 
 	m := make(map[string]interface{})
 	if err := res.Decode(&m); err != nil {
-		d.base.logger.Errorf("Failed to decode featureCompatibilityVersion: %v", err)
+		d.base.logger.Error("Failed to decode featureCompatibilityVersion", "error", err)
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 		return
 	}
@@ -69,7 +69,7 @@ func (d *featureCompatibilityCollector) collect(ch chan<- prometheus.Metric) {
 		versionString := fmt.Sprintf("%v", rawValue)
 		version, err := strconv.ParseFloat(versionString, 64)
 		if err != nil {
-			d.base.logger.Errorf("Failed to parse featureCompatibilityVersion: %v", err)
+			d.base.logger.Error("Failed to parse featureCompatibilityVersion", "error", err)
 			ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 			return
 		}

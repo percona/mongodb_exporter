@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,7 +38,7 @@ func TestGeneralCollector(t *testing.T) {
 
 		client := tu.DefaultTestClient(ctx, t)
 		nodeType, _ := getNodeType(ctx, client)
-		c := newGeneralCollector(ctx, client, nodeType, logrus.New())
+		c := newGeneralCollector(ctx, client, nodeType, promslog.New(&promslog.Config{}))
 
 		filter := []string{
 			"collector_scrape_time_ms",
@@ -82,7 +82,7 @@ func TestGeneralCollector(t *testing.T) {
 		client := tu.TestClient(ctx, port, t)
 
 		nodeType, _ := getNodeType(ctx, client)
-		c := newGeneralCollector(ctx, client, nodeType, logrus.New())
+		c := newGeneralCollector(ctx, client, nodeType, promslog.New(&promslog.Config{}))
 
 		filter := []string{
 			"collector_scrape_time_ms",
