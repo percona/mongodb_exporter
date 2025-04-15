@@ -116,9 +116,9 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			project := bson.D{
 				{
 					Key: "$project", Value: bson.M{
-						"storageStats.wiredTiger":   0,
-						"storageStats.indexDetails": 0,
-					},
+					"storageStats.wiredTiger":   0,
+					"storageStats.indexDetails": 0,
+				},
 				},
 			}
 			pipeline = append(pipeline, project)
@@ -138,7 +138,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		logger.Debug("$collStats metrics for %s.%s", "database", database, "collection", collection)
+		logger.Debug("$collStats metrics", "database", database, "collection", collection)
 		debugResult(logger, stats)
 
 		prefix := "collstats"
