@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -89,7 +89,7 @@ func TestTopologyLabels(t *testing.T) {
 			require.NoError(t, err)
 
 			client := tu.TestClient(ctx, port, t)
-			ti := newTopologyInfo(ctx, client, logrus.New())
+			ti := newTopologyInfo(ctx, client, promslog.New(&promslog.Config{}))
 			bl := ti.baseLabels()
 			assert.Equal(t, tc.want[labelReplicasetName], bl[labelReplicasetName], tc.containerName)
 			assert.Equal(t, tc.want[labelReplicasetState], bl[labelReplicasetState], tc.containerName)
@@ -136,7 +136,7 @@ func TestGetClusterRole(t *testing.T) {
 		require.NoError(t, err)
 
 		client := tu.TestClient(ctx, port, t)
-		logger := logrus.WithField("component", "test")
+		logger := promslog.New(&promslog.Config{}).With("component", "test")
 		nodeType, err := getClusterRole(ctx, client, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.want, nodeType, fmt.Sprintf("container name: %s, port: %s", tc.containerName, port))

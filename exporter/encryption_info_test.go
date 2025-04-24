@@ -18,13 +18,12 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -46,12 +45,11 @@ func TestGetEncryptionInfo(t *testing.T) {
 		err := client.Disconnect(ctx)
 		assert.NoError(t, err)
 	})
-	logger := logrus.New()
-	logger.Out = io.Discard // disable logs in tests
+	logger := promslog.NewNopLogger()
 
 	ti := labelsGetterMock{}
 
-	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.WithField("component", "test"))
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
 	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)

@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -60,7 +60,7 @@ func TestCurrentopCollector(t *testing.T) {
 	ti := labelsGetterMock{}
 	st := "0s"
 
-	c := newCurrentopCollector(ctx, client, logrus.New(), false, ti, st)
+	c := newCurrentopCollector(ctx, client, promslog.New(&promslog.Config{}), false, ti, st)
 
 	// Filter metrics by reason:
 	// 1. The result will be different on different hardware
