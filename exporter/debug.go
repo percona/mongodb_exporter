@@ -16,25 +16,25 @@
 package exporter
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
-
-	"github.com/sirupsen/logrus"
 )
 
-func debugResult(log *logrus.Entry, m interface{}) {
-	if !log.Logger.IsLevelEnabled(logrus.DebugLevel) {
+func debugResult(log *slog.Logger, m interface{}) {
+	if !log.Enabled(context.TODO(), slog.LevelDebug) {
 		return
 	}
 
 	debugStr, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		log.Errorf("cannot marshal struct for debug: %s", err)
+		log.Error("cannot marshal struct for debug", "error", err)
 		return
 	}
 
-	// don't use logrus because:
+	// don't use the passed-in logger because:
 	// 1. It will escape new lines and " making it harder to read and to use
 	// 2. It will add timestamp
 	// 3. This way is easier to copy/paste to put the info in a ticket

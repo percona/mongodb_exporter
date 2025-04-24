@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/foxcpp/go-mockdns"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
@@ -29,7 +29,7 @@ import (
 func TestGetSeedListFromSRV(t *testing.T) {
 	// Can't run in parallel because it patches the net.DefaultResolver
 
-	log := logrus.New()
+	log := promslog.New(&promslog.Config{})
 	srv := tu.SetupFakeResolver()
 
 	defer func(t *testing.T) {

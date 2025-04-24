@@ -29,7 +29,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -80,7 +80,7 @@ func TestConnect(t *testing.T) {
 
 	//nolint:dupl
 	t.Run("Test per-request connection", func(t *testing.T) {
-		log := logrus.New()
+		log := promslog.New(&promslog.Config{})
 
 		exporterOpts := &Opts{
 			Logger:         log,
@@ -114,7 +114,7 @@ func TestConnect(t *testing.T) {
 
 	//nolint:dupl
 	t.Run("Test global connection", func(t *testing.T) {
-		log := logrus.New()
+		log := promslog.New(&promslog.Config{})
 
 		exporterOpts := &Opts{
 			Logger:         log,
@@ -153,7 +153,7 @@ func TestConnect(t *testing.T) {
 // replSetGetStatusCollector and it should return false since it wasn't registered.
 // Note: Two Collectors are considered equal if their Describe method yields the
 // same set of descriptors.
-// unregister will try to Describe to get the descriptors set and we are using
+// unregister will try to Describe to get the descriptors set, and we are using
 // DescribeByCollect so, in the logs, you will see an error:
 // msg="cannot get replSetGetStatus: replSetGetStatus is not supported through mongos"
 // This is correct. Collect is being executed to Describe and Unregister.
@@ -177,7 +177,7 @@ func TestMongoS(t *testing.T) {
 
 	for _, test := range tests {
 		exporterOpts := &Opts{
-			Logger:                 logrus.New(),
+			Logger:                 promslog.New(&promslog.Config{}),
 			URI:                    fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, test.port)),
 			DirectConnect:          true,
 			GlobalConnPool:         false,
@@ -308,7 +308,7 @@ func TestMongoUpMetric(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.clusterRole+"/"+tc.URI, func(t *testing.T) {
 			exporterOpts := &Opts{
-				Logger:           logrus.New(),
+				Logger:           promslog.New(&promslog.Config{}),
 				URI:              tc.URI,
 				ConnectTimeoutMS: 200,
 				DirectConnect:    true,

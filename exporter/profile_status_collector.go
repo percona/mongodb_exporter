@@ -17,10 +17,10 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -35,12 +35,12 @@ type profileCollector struct {
 }
 
 // newProfileCollector creates a collector for being processed queries.
-func newProfileCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger,
+func newProfileCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger,
 	compatible bool, topology labelsGetter, profileTimeTS int,
 ) *profileCollector {
 	return &profileCollector{
 		ctx:            ctx,
-		base:           newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "profile"})),
+		base:           newBaseCollector(client, logger.With("collector", "profile")),
 		compatibleMode: compatible,
 		topologyInfo:   topology,
 		profiletimets:  profileTimeTS,
@@ -64,7 +64,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 
 	databases, err := databases(d.ctx, client, nil, nil)
 	if err != nil {
-		logger.Warnf("cannot get databases: %s", err)
+		logger.Warn("cannot get databases", "error", err)
 		return
 	}
 
@@ -78,7 +78,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	for _, db := range databases {
 		res, err := client.Database(db).Collection("system.profile").CountDocuments(d.ctx, cmd)
 		if err != nil {
-			logger.Warnf("cannot get profile count for database %s: %s", db, err)
+			logger.Warn("cannot get profile count for database", "database", db, "error", err)
 			break
 		}
 		labels["database"] = db

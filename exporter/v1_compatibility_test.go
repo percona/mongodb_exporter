@@ -27,7 +27,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -108,9 +108,13 @@ func TestAddLocksMetrics(t *testing.T) {
 	err = json.Unmarshal(buf, &m)
 	assert.NoError(t, err)
 
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-	metrics := locksMetrics(logger.WithField("component", "test"), m)
+	logLevel := promslog.NewLevel()
+	err = logLevel.Set("debug")
+	require.NoError(t, err)
+	logger := promslog.New(&promslog.Config{
+		Level: logLevel,
+	})
+	metrics := locksMetrics(logger.With("component", "test"), m)
 
 	desc := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
@@ -303,8 +307,12 @@ func TestArbiterMetrics(t *testing.T) {
 		t.Parallel()
 		containerName := "mongo-1-arbiter"
 
-		logger := logrus.New()
-		logger.SetLevel(logrus.DebugLevel)
+		logLevel := promslog.NewLevel()
+		err := logLevel.Set("debug")
+		require.NoError(t, err)
+		logger := promslog.New(&promslog.Config{
+			Level: logLevel,
+		})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
@@ -312,7 +320,7 @@ func TestArbiterMetrics(t *testing.T) {
 		port, err := tu.PortForContainer(containerName)
 		require.NoError(t, err)
 		client := tu.TestClient(ctx, port, t)
-		metrics := arbiterMetrics(ctx, client, logger.WithField("component", "test"))
+		metrics := arbiterMetrics(ctx, client, logger.With("component", "test"))
 		var rsMembers dto.Metric
 		for _, m := range metrics {
 			if strings.HasPrefix(m.Desc().String(), `Desc{fqName: "mongodb_mongod_replset_number_of_members"`) {

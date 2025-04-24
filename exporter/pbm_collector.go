@@ -17,13 +17,13 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/percona/percona-backup-mongodb/sdk"
 	"github.com/percona/percona-backup-mongodb/sdk/cli"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/util"
@@ -55,7 +55,7 @@ func createPBMMetric(name, help string, value float64, labels map[string]string)
 	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
 }
 
-func newPbmCollector(ctx context.Context, client *mongo.Client, mongoURI string, logger *logrus.Logger) *pbmCollector {
+func newPbmCollector(ctx context.Context, client *mongo.Client, mongoURI string, logger *slog.Logger) *pbmCollector {
 	// we can't get details of other cluster members from PBM if directConnection is set to true,
 	// we re-write it if that option is set (e.g from PMM).
 	if strings.Contains(mongoURI, "directConnection=true") {
@@ -65,7 +65,7 @@ func newPbmCollector(ctx context.Context, client *mongo.Client, mongoURI string,
 	return &pbmCollector{
 		ctx:      ctx,
 		mongoURI: mongoURI,
-		base:     newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "pbm"})),
+		base:     newBaseCollector(client, logger.With("collector", "pbm")),
 	}
 }
 
@@ -86,19 +86,19 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	pbmEnabledMetric := 0
 	pbmClient, err := sdk.NewClient(p.ctx, p.mongoURI)
 	if err != nil {
-		logger.Warnf("failed to create PBM client: %s", err.Error())
+		logger.Warn("failed to create PBM client", "error", err.Error())
 		return
 	}
 	defer func() {
 		err := pbmClient.Close(p.ctx)
 		if err != nil {
-			logger.Errorf("failed to close PBM client: %v", err)
+			logger.Error("failed to close PBM client", "error", err)
 		}
 	}()
 
 	pbmConfig, err := pbmClient.GetConfig(p.ctx)
 	if err != nil {
-		logger.Infof("failed to get PBM configuration: %s", err.Error())
+		logger.Info("failed to get PBM configuration", "error", err.Error())
 	}
 
 	if pbmConfig != nil {
@@ -126,16 +126,16 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
+func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger) []prometheus.Metric {
 	currentNode, err := util.MyRole(ctx, p.base.client)
 	if err != nil {
-		l.Errorf("failed to get current node info: %s", err.Error())
+		l.Error("failed to get current node info", "error", err.Error())
 		return nil
 	}
 
 	clusterStatus, err := cli.ClusterStatus(ctx, pbmClient, cli.RSConfGetter(p.mongoURI))
 	if err != nil {
-		l.Errorf("failed to get cluster status: %s", err.Error())
+		l.Error("failed to get cluster status", "error", err.Error())
 		return nil
 	}
 
@@ -174,10 +174,10 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 	return metrics
 }
 
-func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *logrus.Entry) []prometheus.Metric {
+func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger) []prometheus.Metric {
 	backupsList, err := pbmClient.GetAllBackups(ctx)
 	if err != nil {
-		l.Errorf("failed to get PBM backup list: %s", err.Error())
+		l.Error("failed to get PBM backup list", "error", err.Error())
 		return nil
 	}
 

@@ -17,13 +17,15 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"log/slog"
 	"net"
 	"net/url"
 	"regexp"
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 
 	"github.com/percona/mongodb_exporter/exporter"
 )
@@ -104,20 +106,15 @@ func main() {
 		return
 	}
 
-	log := logrus.New()
-
-	levels := map[string]logrus.Level{
-		"debug": logrus.DebugLevel,
-		"error": logrus.ErrorLevel,
-		"fatal": logrus.FatalLevel,
-		"info":  logrus.InfoLevel,
-		"warn":  logrus.WarnLevel,
-	}
-	log.SetLevel(levels[opts.LogLevel])
-	log.Debugf("Compatible mode: %v", opts.CompatibleMode)
+	logLevel := promslog.NewLevel()
+	_ = logLevel.Set(opts.LogLevel)
+	logger := promslog.New(&promslog.Config{
+		Level: logLevel,
+	})
+	logger.Debug("Compatible mode", "compatible_mode", opts.CompatibleMode)
 
 	if opts.WebTelemetryPath == "" {
-		log.Warn("Web telemetry path \"\" invalid, falling back to \"/\" instead")
+		logger.Warn("Web telemetry path \"\" is invalid, falling back to \"/\" instead")
 		opts.WebTelemetryPath = "/"
 	}
 
@@ -126,7 +123,7 @@ func main() {
 	}
 
 	if opts.TimeoutOffset <= 0 {
-		log.Warn("Timeout offset needs to be greater than \"0\", falling back to \"1\". You can specify the timout offset with --web.timeout-offset command argument")
+		logger.Warn("Timeout offset needs to be greater than \"0\", falling back to \"1\". You can specify the timout offset with --web.timeout-offset command argument")
 		opts.TimeoutOffset = 1
 	}
 
@@ -137,12 +134,12 @@ func main() {
 		WebListenAddress:  opts.WebListenAddress,
 		TLSConfigPath:     opts.TLSConfigPath,
 	}
-	exporter.RunWebServer(serverOpts, buildServers(opts, log), log)
+	exporter.RunWebServer(serverOpts, buildServers(opts, logger), logger)
 }
 
-func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.Exporter {
+func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exporter {
 	uri = buildURI(uri, opts.User, opts.Password)
-	log.Debugf("Connection URI: %s", uri)
+	log.Debug("Connection URI", "uri", uri)
 
 	uriParsed, _ := url.Parse(uri)
 	var nodeName string
@@ -200,12 +197,10 @@ func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.E
 		CurrentOpSlowTime:      opts.CurrentOpSlowTime,
 	}
 
-	e := exporter.New(exporterOpts)
-
-	return e
+	return exporter.New(exporterOpts)
 }
 
-func buildServers(opts GlobalFlags, logger *logrus.Logger) []*exporter.Exporter {
+func buildServers(opts GlobalFlags, logger *slog.Logger) []*exporter.Exporter {
 	URIs := parseURIList(opts.URI, logger, opts.SplitCluster)
 	servers := make([]*exporter.Exporter, len(URIs))
 	for serverIdx := range URIs {
@@ -215,11 +210,11 @@ func buildServers(opts GlobalFlags, logger *logrus.Logger) []*exporter.Exporter 
 	return servers
 }
 
-func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []string {
+func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []string { //nolint:gocognit,cyclop
 	var URIs []string
 
 	// If server URI is prefixed with mongodb scheme string, then every next URI in
-	// line not prefixed with mongodb scheme string is a part of cluster. Otherwise
+	// line not prefixed with mongodb scheme string is a part of cluster. Otherwise,
 	// treat it as a standalone server
 	realURI := ""
 	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
@@ -259,7 +254,7 @@ func parseURIList(uriList []string, logger *logrus.Logger, splitCluster bool) []
 		for _, hosturl := range URIs {
 			urlParsed, err := url.Parse(hosturl)
 			if err != nil {
-				logger.Fatal(fmt.Sprintf("Failed to parse URI %s: %v", hosturl, err))
+				log.Fatalf("Failed to parse URI %s: %v", hosturl, err)
 			}
 			for _, host := range strings.Split(urlParsed.Host, ",") {
 				targetURI := "mongodb://"
