@@ -232,8 +232,7 @@ func generateKerberosConfigFile(t *testing.T) *os.File {
 }
 
 func TestGSSAPIAuth(t *testing.T) {
-	logger := logrus.New()
-	logger.SetReportCaller(true)
+	logger := promslog.New(&promslog.Config{})
 
 	mongoHost, err := tu.IPForContainer("psmdb-kerberos")
 	require.NoError(t, err)
