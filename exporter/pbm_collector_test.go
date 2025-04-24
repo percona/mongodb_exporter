@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -41,7 +41,7 @@ func TestPBMCollector(t *testing.T) {
 	client := tu.TestClient(ctx, port, t)
 	mongoURI := "mongodb://admin:admin@127.0.0.1:17006/?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000" //nolint:gosec
 
-	c := newPbmCollector(ctx, client, mongoURI, logrus.New())
+	c := newPbmCollector(ctx, client, mongoURI, promslog.New(&promslog.Config{}))
 
 	t.Run("pbm configured metric", func(t *testing.T) {
 		filter := []string{
