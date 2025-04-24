@@ -1,7 +1,7 @@
 name: 'Close stale issues and PRs'
 on:
   schedule:
-    - cron: '30 1 * * *'
+    - cron: '30 1 * * MON-FRI' # 1:30 AM every weekday
 
 jobs:
   stale:
@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/stale@v9
         with:
-          stale-issue-message: 'This issue is stale because it has been open 120 days with no activity. Remove stale label or comment or this will be closed in 7 days.'
+          stale-issue-message: 'This issue has been marked as stale because it has been open for 120 days without activity. Please remove the stale label or add a comment; otherwise, it will be closed in 7 days.'
           days-before-stale: 120
           days-before-close: 7
           exempt-issue-labels: bug
