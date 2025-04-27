@@ -241,7 +241,7 @@ func TestGSSAPIAuth(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		_ = configFile.Close()
-		_ = os.Setenv("KRB5_CONFIG", "")
+		t.Setenv("KRB5_CONFIG", "")
 	}()
 
 	t.Setenv("KRB5_CONFIG", configFile.Name())
