@@ -27,7 +27,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promslog"
 	"github.com/prometheus/exporter-toolkit/web"
 )
 
@@ -80,10 +79,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
 		WebListenAddresses: &[]string{opts.WebListenAddress},
 		WebConfigFile:      &opts.TLSConfigPath,
 	}
-	logLevel := &promslog.Level{}
-	if err := web.ListenAndServe(server, flags, promslog.New(&promslog.Config{ //nolint:exhaustivestruct
-		Level: logLevel,
-	})); err != nil {
+	if err := web.ListenAndServe(server, flags, log); err != nil {
 		log.Error("error starting server", "error", err)
 		os.Exit(1)
 	}
