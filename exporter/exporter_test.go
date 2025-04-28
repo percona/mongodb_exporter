@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -195,6 +197,92 @@ func TestMongoS(t *testing.T) {
 		err = client.Disconnect(ctx)
 		assert.NoError(t, err)
 	}
+}
+
+func generateKerberosConfigFile(t *testing.T) *os.File {
+	t.Helper()
+	kerberosHost, err := tu.IPForContainer("kerberos")
+	require.NoError(t, err)
+
+	config := fmt.Sprintf(`
+[libdefaults]
+    default_realm = PERCONATEST.COM
+    forwardable = true
+    dns_lookup_realm = false
+    dns_lookup_kdc = false
+    ignore_acceptor_hostname = true
+    rdns = false
+[realms]
+    PERCONATEST.COM = {
+        kdc_ports = 88
+        kdc = %s
+    }
+[domain_realm]
+    .perconatest.com = PERCONATEST.COM
+    perconatest.com = PERCONATEST.COM
+    %s = PERCONATEST.COM
+`, kerberosHost, kerberosHost)
+	configFile, err := os.Create(t.TempDir() + "/krb5.conf")
+	require.NoError(t, err)
+
+	_, err = configFile.WriteString(config)
+	require.NoError(t, err)
+
+	return configFile
+}
+
+func TestGSSAPIAuth(t *testing.T) {
+	logger := promslog.New(&promslog.Config{})
+
+	mongoHost, err := tu.IPForContainer("psmdb-kerberos")
+	require.NoError(t, err)
+
+	configFile := generateKerberosConfigFile(t)
+	require.NoError(t, err)
+	defer func() {
+		_ = configFile.Close()
+		t.Setenv("KRB5_CONFIG", "")
+	}()
+
+	t.Setenv("KRB5_CONFIG", configFile.Name())
+	ctx := context.Background()
+
+	username := "pmm-test%40PERCONATEST.COM"
+	password := "password1"
+	uri := fmt.Sprintf("mongodb://%s:%s@%s/?authSource=$external&authMechanism=GSSAPI",
+		username,
+		password,
+		net.JoinHostPort(mongoHost, "27017"),
+	)
+	exporterOpts := &Opts{
+		URI:            uri,
+		Logger:         logger,
+		CollectAll:     true,
+		GlobalConnPool: false,
+		DirectConnect:  true,
+	}
+
+	client, err := connect(ctx, exporterOpts)
+	assert.NoError(t, err)
+
+	e := New(exporterOpts)
+	nodeType, _ := getNodeType(ctx, client)
+	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
+	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+	expected := strings.NewReader(`
+		# HELP mongodb_up Whether MongoDB is up.
+		# TYPE mongodb_up gauge
+		mongodb_up {cluster_role="mongod"} 1` + "\n")
+
+	filter := []string{
+		"mongodb_up",
+	}
+	err = testutil.CollectAndCompare(gc, expected, filter...)
+	require.NoError(t, err, "mongodb_up metric should be 1")
+
+	res := r.Unregister(gc)
+	assert.True(t, res)
 }
 
 func TestMongoUpMetric(t *testing.T) {
