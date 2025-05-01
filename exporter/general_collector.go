@@ -17,9 +17,9 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
@@ -32,11 +32,11 @@ type generalCollector struct {
 }
 
 // newGeneralCollector creates a collector for MongoDB connectivity status.
-func newGeneralCollector(ctx context.Context, client *mongo.Client, nodeType mongoDBNodeType, logger *logrus.Logger) *generalCollector {
+func newGeneralCollector(ctx context.Context, client *mongo.Client, nodeType mongoDBNodeType, logger *slog.Logger) *generalCollector {
 	return &generalCollector{
 		ctx:      ctx,
 		nodeType: nodeType,
-		base:     newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "general"})),
+		base:     newBaseCollector(client, logger.With("collector", "general")),
 	}
 }
 
@@ -53,7 +53,7 @@ func (d *generalCollector) collect(ch chan<- prometheus.Metric) {
 	ch <- mongodbUpMetric(d.ctx, d.base.client, d.nodeType, d.base.logger)
 }
 
-func mongodbUpMetric(ctx context.Context, client *mongo.Client, nodeType mongoDBNodeType, log *logrus.Entry) prometheus.Metric { //nolint:ireturn
+func mongodbUpMetric(ctx context.Context, client *mongo.Client, nodeType mongoDBNodeType, log *slog.Logger) prometheus.Metric { //nolint:ireturn
 	var value float64
 	var clusterRole mongoDBNodeType
 
@@ -61,7 +61,7 @@ func mongodbUpMetric(ctx context.Context, client *mongo.Client, nodeType mongoDB
 		if err := client.Ping(ctx, readpref.PrimaryPreferred()); err == nil {
 			value = 1
 		} else {
-			log.Errorf("error while checking mongodb connection: %s. mongo_up is set to 0", err.Error())
+			log.Error("error while checking mongodb connection, mongo_up will be set to 0", "error", err.Error())
 		}
 		switch nodeType { //nolint:exhaustive
 		case typeShardServer:

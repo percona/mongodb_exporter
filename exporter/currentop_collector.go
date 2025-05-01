@@ -17,12 +17,13 @@ package exporter
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -39,12 +40,12 @@ type currentopCollector struct {
 var ErrInvalidOrMissingInprogEntry = errors.New("invalid or missing inprog entry in currentop results")
 
 // newCurrentopCollector creates a collector for being processed queries.
-func newCurrentopCollector(ctx context.Context, client *mongo.Client, logger *logrus.Logger,
+func newCurrentopCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger,
 	compatible bool, topology labelsGetter, currentOpSlowTime string,
 ) *currentopCollector {
 	return &currentopCollector{
 		ctx:               ctx,
-		base:              newBaseCollector(client, logger.WithFields(logrus.Fields{"collector": "currentop"})),
+		base:              newBaseCollector(client, logger.With("collector", "currentop")),
 		compatibleMode:    compatible,
 		topologyInfo:      topology,
 		currentopslowtime: currentOpSlowTime,
@@ -66,7 +67,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	slowtime, err := time.ParseDuration(d.currentopslowtime)
 	if err != nil {
-		logger.Errorf("Failed to parse slowtime: %s", err)
+		logger.Error("Failed to parse slowtime", "error", err)
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 		return
 	}
@@ -90,7 +91,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 	var r primitive.M
 	if err := res.Decode(&r); err != nil {
-		logger.Errorf("Failed to decode currentOp response: %s", err)
+		logger.Error("Failed to decode currentOp response", "error", err)
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 		return
 	}
@@ -101,7 +102,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	inprog, ok := r["inprog"].(primitive.A)
 
 	if !ok {
-		logger.Errorf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"])
+		logger.Error(fmt.Sprintf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"]))
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
 			ErrInvalidOrMissingInprogEntry)
 	}
@@ -115,33 +116,33 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 		bsonMapElement, ok := bsonMap.(primitive.M)
 		if !ok {
-			logger.Errorf("Invalid type primitive.M assertion for bsonMap: %T", bsonMapElement)
+			logger.Error(fmt.Sprintf("Invalid type primitive.M assertion for bsonMap: %T", bsonMapElement))
 			continue
 		}
 		opid, ok := bsonMapElement["opid"].(int32)
 		if !ok {
-			logger.Errorf("Invalid type int32 assertion for 'opid': %T", bsonMapElement)
+			logger.Error(fmt.Sprintf("Invalid type int32 assertion for 'opid': %T", bsonMapElement))
 			continue
 		}
 		namespace, ok := bsonMapElement["ns"].(string)
 		if !ok {
-			logger.Errorf("Invalid type string assertion for 'ns': %T", bsonMapElement)
+			logger.Error(fmt.Sprintf("Invalid type string assertion for 'ns': %T", bsonMapElement))
 			continue
 		}
 		db, collection := splitNamespace(namespace)
 		op, ok := bsonMapElement["op"].(string)
 		if !ok {
-			logger.Errorf("Invalid type string assertion for 'op': %T", bsonMapElement)
+			logger.Error(fmt.Sprintf("Invalid type string assertion for 'op': %T", bsonMapElement))
 			continue
 		}
 		desc, ok := bsonMapElement["desc"].(string)
 		if !ok {
-			logger.Errorf("Invalid type string assertion for 'desc': %T", bsonMapElement)
+			logger.Error(fmt.Sprintf("Invalid type string assertion for 'desc': %T", bsonMapElement))
 			continue
 		}
 		microsecs_running, ok := bsonMapElement["microsecs_running"].(int64)
 		if !ok {
-			logger.Errorf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement)
+			logger.Error(fmt.Sprintf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement))
 			continue
 		}
 

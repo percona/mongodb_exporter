@@ -20,14 +20,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestDebug(t *testing.T) {
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
+	logLevel := promslog.NewLevel()
+	err := logLevel.Set("debug")
+	require.NoError(t, err)
 
 	olderr := os.Stderr
 	r, w, _ := os.Pipe()
@@ -35,10 +37,13 @@ func TestDebug(t *testing.T) {
 	os.Stderr = w
 	defer func() {
 		os.Stderr = olderr
-		logrus.SetLevel(logrus.ErrorLevel)
+		_ = logLevel.Set("error")
 	}()
 
-	log.Out = w
+	log := promslog.New(&promslog.Config{
+		Level:  logLevel,
+		Writer: w,
+	})
 
 	m := bson.M{
 		"f1": 1,
@@ -55,7 +60,7 @@ func TestDebug(t *testing.T) {
   }
 }` + "\n"
 
-	debugResult(log.WithField("component", "test"), m)
+	debugResult(log.With("component", "test"), m)
 	assert.NoError(t, w.Close())
 	out, _ := io.ReadAll(r)
 

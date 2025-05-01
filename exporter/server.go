@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,9 +27,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promslog"
 	"github.com/prometheus/exporter-toolkit/web"
-	"github.com/sirupsen/logrus"
 )
 
 // ServerMap stores http handlers for each host
@@ -44,8 +43,8 @@ type ServerOpts struct {
 	DisableDefaultRegistry bool
 }
 
-// Runs the main web-server
-func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
+// RunWebServer runs the main web-server
+func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
 	mux := http.DefaultServeMux
 
 	if len(exporters) == 0 {
@@ -68,7 +67,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
             </body>
             </html>`))
 		if err != nil {
-			log.Errorf("error writing response: %v", err)
+			log.Error("error writing response", "error", err)
 		}
 	})
 
@@ -80,12 +79,8 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *logrus.Logger) {
 		WebListenAddresses: &[]string{opts.WebListenAddress},
 		WebConfigFile:      &opts.TLSConfigPath,
 	}
-	logLevel := &promslog.AllowedLevel{}
-	_ = logLevel.Set(log.Level.String())
-	if err := web.ListenAndServe(server, flags, promslog.New(&promslog.Config{ //nolint:exhaustivestruct
-		Level: logLevel,
-	})); err != nil {
-		log.Errorf("error starting server: %v", err)
+	if err := web.ListenAndServe(server, flags, log); err != nil {
+		log.Error("error starting server", "error", err)
 		os.Exit(1)
 	}
 }
@@ -110,7 +105,7 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 
 // OverallTargetsHandler is a handler to scrape all the targets in one request.
 // Adds instance label to each metric.
-func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.HandlerFunc {
+func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
 		// To support older ones vmagents.
@@ -132,16 +127,15 @@ func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.Ha
 
 			client, err := e.getClient(ctx)
 			if err != nil {
-				e.logger.Errorf("Cannot connect to MongoDB: %v", err)
+				e.logger.Error("Cannot connect to MongoDB", "error", err)
 			}
 
 			// Close client after usage.
 			if !e.opts.GlobalConnPool {
 				defer func() {
 					if client != nil {
-						err := client.Disconnect(ctx)
-						if err != nil {
-							logger.Errorf("Cannot disconnect client: %v", err)
+						if err := client.Disconnect(ctx); err != nil {
+							logger.Error("Cannot disconnect client", "error", err)
 						}
 					}
 				}()
@@ -171,20 +165,20 @@ func OverallTargetsHandler(exporters []*Exporter, logger *logrus.Logger) http.Ha
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
 			ErrorHandling: promhttp.ContinueOnError,
-			ErrorLog:      logger,
+			ErrorLog:      newHTTPErrorLogger(logger),
 		})
 
 		h.ServeHTTP(w, r)
 	}
 }
 
-func buildServerMap(exporters []*Exporter, log *logrus.Logger) ServerMap {
+func buildServerMap(exporters []*Exporter, log *slog.Logger) ServerMap {
 	servers := make(ServerMap, len(exporters))
 	for _, e := range exporters {
-		if url, err := url.Parse(e.opts.URI); err == nil {
-			servers[url.Host] = e.Handler()
+		if parsedURL, err := url.Parse(e.opts.URI); err == nil {
+			servers[parsedURL.Host] = e.Handler()
 		} else {
-			log.Errorf("Unable to parse addr %s as url: %s", e.opts.URI, err)
+			log.Error("Unable to parse provided address as url", "address", e.opts.URI, "error", err)
 		}
 	}
 
