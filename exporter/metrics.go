@@ -164,10 +164,17 @@ var (
 	dollarRe              = regexp.MustCompile(`\_$`)
 )
 
+var prometheusizeCache = make(map[string]string)
+
 // prometheusize renames metrics by replacing some prefixes with shorter names
 // replace special chars to follow Prometheus metric naming rules and adds the
 // exporter name prefix.
 func prometheusize(s string) string {
+	if renamed, exists := prometheusizeCache[s]; exists {
+		return renamed
+	}
+	back := strings.Clone(s)
+
 	for _, pair := range prefixes {
 		if strings.HasPrefix(s, pair[0]+".") {
 			s = pair[1] + strings.TrimPrefix(s, pair[0])
@@ -179,6 +186,8 @@ func prometheusize(s string) string {
 	s = dollarRe.ReplaceAllString(s, "")
 	s = repeatedUnderscoresRe.ReplaceAllString(s, "_")
 	s = strings.TrimPrefix(s, "_")
+
+	prometheusizeCache[back] = strings.Clone(s)
 
 	return exporterPrefix + s
 }
