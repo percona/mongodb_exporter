@@ -173,7 +173,7 @@ func prometheusize(s string) string {
 	if renamed, exists := prometheusizeCache[s]; exists {
 		return renamed
 	}
-	back := strings.Clone(s)
+	backup := strings.Clone(s)
 
 	for _, pair := range prefixes {
 		if strings.HasPrefix(s, pair[0]+".") {
@@ -186,10 +186,10 @@ func prometheusize(s string) string {
 	s = dollarRe.ReplaceAllString(s, "")
 	s = repeatedUnderscoresRe.ReplaceAllString(s, "_")
 	s = strings.TrimPrefix(s, "_")
+	s = exporterPrefix + s
 
-	prometheusizeCache[back] = strings.Clone(s)
-
-	return exporterPrefix + s
+	prometheusizeCache[backup] = strings.Clone(s)
+	return s
 }
 
 // nameAndLabel checks if there are predefined metric name and label for that metric or
