@@ -61,7 +61,7 @@ jobs:
       - name: Upload coverage results
         uses: codecov/codecov-action@ad3126e916f78f00edff4ed0317cf185271ccc2d # v5.4.2
         with:
-          file: cover.out
+          files: cover.out
           flags: agent
           env_vars: GO_VERSION,TEST_MONGODB_IMAGE
           fail_ci_if_error: false
