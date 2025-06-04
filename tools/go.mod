@@ -1,8 +1,6 @@
 module github.com/percona/mongodb_exporter/tools
 
-go 1.23.0
-
-toolchain go1.24.1
+go 1.24.3
 
 require (
 	github.com/daixiang0/gci v0.13.6
