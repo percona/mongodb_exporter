@@ -2,6 +2,7 @@ dist: build
 version: 2
 builds:
   - binary: mongodb_exporter
+    id: mongodb_exporter
     env:
     goos:
       - linux
@@ -20,7 +21,8 @@ builds:
       - -v
     ldflags:
         - -s -w -X main.version=v{{.Version}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
-  - binary: mongodb_exporter.gssapi
+  - binary: mongodb_exporter-gssapi
+    id: mongodb_exporter-gssapi
     env:
       - CGO_ENABLED=1
     goos:
