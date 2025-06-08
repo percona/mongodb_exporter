@@ -1,0 +1,75 @@
+name: Version Check
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Get version from VERSION file
+        id: file-version
+        run: |
+          if [ -f "VERSION" ]; then
+            FILE_VERSION=$(cat VERSION | tr -d '\n\r ')
+            echo "version=$FILE_VERSION" >> $GITHUB_OUTPUT
+            echo "VERSION file contains: $FILE_VERSION"
+          else
+            echo "VERSION file not found!"
+            exit 1
+          fi
+
+      - name: Get version from git tag
+        id: git-version
+        run: |
+          GIT_VERSION=$(git describe --tags --abbrev=0 --always)
+          echo "version=$GIT_VERSION" >> $GITHUB_OUTPUT
+          echo "Git tag version: $GIT_VERSION"
+
+      - name: Install semver comparison tool
+        run: |
+          npm install -g semver
+
+      - name: Compare versions
+        run: |
+          FILE_VERSION="${{ steps.file-version.outputs.version }}"
+          GIT_VERSION="${{ steps.git-version.outputs.version }}"
+          
+          echo "Comparing versions:"
+          echo "  VERSION file: $FILE_VERSION"
+          echo "  Git tag:      $GIT_VERSION"
+          
+          # Remove 'v' prefix if present for comparison
+          FILE_VERSION_CLEAN=$(echo "$FILE_VERSION" | sed 's/^v//')
+          GIT_VERSION_CLEAN=$(echo "$GIT_VERSION" | sed 's/^v//')
+          
+          # Check if versions are valid semver
+          if ! semver "$FILE_VERSION_CLEAN" >/dev/null 2>&1; then
+            echo "ERROR: VERSION file contains invalid semantic version: $FILE_VERSION"
+            exit 1
+          fi
+          
+          if ! semver "$GIT_VERSION_CLEAN" >/dev/null 2>&1; then
+            echo "ERROR: Git tag contains invalid semantic version: $GIT_VERSION"
+            exit 1
+          fi
+          
+          # Compare versions: -1 if first < second, 0 if equal, 1 if first > second
+          COMPARISON=$(semver -r ">=$GIT_VERSION_CLEAN" "$FILE_VERSION_CLEAN" && echo "valid" || echo "invalid")
+          
+          if [ "$COMPARISON" = "invalid" ]; then
+            echo "VERSION file ($FILE_VERSION) is behind git tag ($GIT_VERSION)"
+            echo "The VERSION file must be ahead of or equal to the latest git tag."
+            exit 1
+          else
+            echo "VERSION file ($FILE_VERSION) is ahead of or equal to git tag ($GIT_VERSION)"
+          fi
