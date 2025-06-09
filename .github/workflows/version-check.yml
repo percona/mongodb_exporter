@@ -64,9 +64,7 @@ jobs:
           fi
           
           # Compare versions: -1 if first < second, 0 if equal, 1 if first > second
-          COMPARISON=$(semver -r ">=$GIT_VERSION_CLEAN" "$FILE_VERSION_CLEAN" && echo "valid" || echo "invalid")
-          
-          if [ "$COMPARISON" = "invalid" ]; then
+          if [ ! $(semver -r ">=$GIT_VERSION_CLEAN" "$FILE_VERSION_CLEAN") ]; then
             echo "VERSION file ($FILE_VERSION) is behind git tag ($GIT_VERSION)"
             echo "The VERSION file must be ahead of or equal to the latest git tag."
             exit 1
