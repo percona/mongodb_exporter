@@ -1,12 +1,12 @@
 module github.com/percona/mongodb_exporter
 
-go 1.23.0
+go 1.24
 
-toolchain go1.24.1
+toolchain go1.24.3
 
 require (
 	github.com/AlekSi/pointer v1.2.0
-	github.com/alecthomas/kong v1.10.0
+	github.com/alecthomas/kong v1.11.0
 	github.com/percona/exporter_shared v0.7.6
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/common v0.63.0
 	github.com/prometheus/exporter-toolkit v0.14.0
 	github.com/stretchr/testify v1.10.0
-	go.mongodb.org/mongo-driver v1.17.3
+	go.mongodb.org/mongo-driver v1.17.4
 )
 
 require github.com/foxcpp/go-mockdns v1.1.0
