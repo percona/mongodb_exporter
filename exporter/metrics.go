@@ -18,6 +18,7 @@ package exporter
 import (
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -164,10 +165,17 @@ var (
 	dollarRe              = regexp.MustCompile(`\_$`)
 )
 
+var prometheusizeCache = sync.Map{}
+
 // prometheusize renames metrics by replacing some prefixes with shorter names
 // replace special chars to follow Prometheus metric naming rules and adds the
 // exporter name prefix.
 func prometheusize(s string) string {
+	if renamed, exists := prometheusizeCache.Load(s); exists {
+		return renamed.(string)
+	}
+	backup := strings.Clone(s)
+
 	for _, pair := range prefixes {
 		if strings.HasPrefix(s, pair[0]+".") {
 			s = pair[1] + strings.TrimPrefix(s, pair[0])
@@ -179,8 +187,11 @@ func prometheusize(s string) string {
 	s = dollarRe.ReplaceAllString(s, "")
 	s = repeatedUnderscoresRe.ReplaceAllString(s, "_")
 	s = strings.TrimPrefix(s, "_")
+	s = exporterPrefix + s
 
-	return exporterPrefix + s
+	prometheusizeCache.Store(backup, strings.Clone(s))
+
+	return s
 }
 
 // nameAndLabel checks if there are predefined metric name and label for that metric or
