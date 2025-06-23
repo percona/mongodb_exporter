@@ -45,7 +45,7 @@ type ServerOpts struct {
 
 // RunWebServer runs the main web-server
 func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
-	mux := http.DefaultServeMux
+	mux := http.NewServeMux()
 
 	if len(exporters) == 0 {
 		panic("No exporters were built. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
