@@ -6,7 +6,7 @@ toolchain go1.24.3
 
 require (
 	github.com/AlekSi/pointer v1.2.0
-	github.com/alecthomas/kong v1.11.0
+	github.com/alecthomas/kong v1.12.0
 	github.com/percona/exporter_shared v0.7.6
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
