@@ -300,20 +300,25 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 // run for hooking up custom HTTP servers.
 func (e *Exporter) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
-		// To support older ones vmagents.
-		if err != nil {
-			seconds = 10
+		scrapeTimeoutHeader := r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds")
+		seconds := 10.0
+
+		if scrapeTimeoutHeader != "" {
+			if parsedSeconds, err := strconv.ParseFloat(scrapeTimeoutHeader, 64); err == nil {
+				seconds = parsedSeconds
+			} else {
+				e.logger.Info("Invalid X-Prometheus-Timeout-Scrape-Timeout-Seconds header", "error", err)
+			}
 		}
-		seconds -= e.opts.TimeoutOffset
+		seconds -= float64(e.opts.TimeoutOffset)
 
 		var client *mongo.Client
-		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds)*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(seconds*float64(time.Second)))
 		defer cancel()
 
 		requestOpts := GetRequestOpts(r.URL.Query()["collect[]"], e.opts)
 
-		client, err = e.getClient(ctx)
+		client, err := e.getClient(ctx)
 		if err != nil {
 			e.logger.Error("Cannot connect to MongoDB", "error", err)
 		}
