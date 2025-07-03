@@ -273,8 +273,13 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 		e.clientMu.Lock()
 		defer e.clientMu.Unlock()
 
-		// If client is already initialized, return it.
+		// If client is already initialized, and Ping is successful -- return it.
 		if e.client != nil {
+			err := e.client.Ping(ctx, nil)
+			if err != nil {
+				return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
+			}
+
 			return e.client, nil
 		}
 
