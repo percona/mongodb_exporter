@@ -193,6 +193,16 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 			}),
 		)
 
+		// Add backup_last_transition_ts metric
+		metrics = append(metrics, createPBMMetric("backup_last_transition_ts",
+			"Last transition timestamp of PBM backup (seconds since epoch)",
+			float64(backup.LastTransitionTS), map[string]string{
+				"opid":   backup.OPID,
+				"status": string(backup.Status),
+				"name":   backup.Name,
+			}),
+		)
+
 		var endTime int64
 		switch pbmAgentStatus(backup.Status) {
 		case statusDone, statusCancelled, statusError, statusDown:
