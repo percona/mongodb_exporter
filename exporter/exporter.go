@@ -312,7 +312,7 @@ func (e *Exporter) Handler() http.Handler {
 			if parsedSeconds, err := strconv.ParseFloat(scrapeTimeoutHeader, 64); err == nil {
 				seconds = parsedSeconds
 			} else {
-				e.logger.Info("Invalid X-Prometheus-Timeout-Scrape-Timeout-Seconds header", "error", err)
+				e.logger.Info("Invalid X-Prometheus-Scrape-Timeout-Seconds header", "error", err)
 			}
 		}
 		seconds -= float64(e.opts.TimeoutOffset)
