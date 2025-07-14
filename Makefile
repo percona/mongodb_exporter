@@ -70,8 +70,11 @@ env:
 init:                       ## Install linters
 	cd tools && go generate -x -tags=tools
 
-build:                      ## Compile using plain go build
+build:                      ## Build exporter binary using plain go build.
 	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
+
+build-gssapi:                      ## Build exporter binary with GSSAPI support (requires CGO enabled).
+	CGO_ENABLED=1 go build -ldflags="$(GO_BUILD_LDFLAGS)" -tags gssapi  -o $(PMM_RELEASE_PATH)/mongodb_exporter
 
 release:                      ## Build the binaries using goreleaser
 	docker run --rm --privileged \
