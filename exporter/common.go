@@ -60,7 +60,9 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 	}
 
 	if skipViews {
-		filter = append(filter, primitive.E{Key: "type", Value: "collection"})
+		filter = append(filter, primitive.E{Key: "type", Value: bson.D{
+			{Key: "$in", Value: bson.A{"collection", "timeseries"}},
+		}})
 	}
 
 	collections, err := client.Database(database).ListCollectionNames(ctx, filter, opts)
