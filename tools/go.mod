@@ -5,7 +5,7 @@ go 1.24
 toolchain go1.24.3
 
 require (
-	github.com/daixiang0/gci v0.13.6
+	github.com/daixiang0/gci v0.13.7
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/reviewdog/reviewdog v0.20.3
 	mvdan.cc/gofumpt v0.8.0
