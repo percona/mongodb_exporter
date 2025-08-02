@@ -21,8 +21,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-#RUN git config --global --add safe.directory '*'
-#RUN git config --global url."https://".insteadOf git://
+RUN git config --global --add safe.directory '*'
 
 COPY --from=installer /go/bin/goreleaser /go/bin/goreleaser
 ENTRYPOINT ["/go/bin/goreleaser"]
