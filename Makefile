@@ -76,12 +76,12 @@ build:                      ## Build exporter binary using plain go build.
 build-gssapi:                      ## Build exporter binary with GSSAPI support (requires CGO enabled).
 	CGO_ENABLED=1 go build -ldflags="$(GO_BUILD_LDFLAGS)" -tags gssapi  -o $(PMM_RELEASE_PATH)/mongodb_exporter
 
-release:                      ## Build the binaries using goreleaser
-	docker run --rm --privileged \
+release:                      ## Build and release the binaries using goreleaser
+	docker build -f goreleaser.Dockerfile -t percona/goreleaser . && docker run --rm --privileged \
 		-v ${PWD}:/go/src/github.com/user/repo \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-w /go/src/github.com/user/repo \
-		goreleaser/goreleaser release --snapshot --skip=publish --clean
+		percona/goreleaser release --snapshot --skip=publish --clean
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
