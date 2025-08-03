@@ -125,14 +125,14 @@ If your URI is prefixed by mongodb:// or mongodb+srv:// schema, any host not pre
 --mongodb.uri=mongodb+srv://user:pass@host1:27017,host2:27017,host3:27017/admin,mongodb://user2:pass2@host4:27018/admin
 ```
 
-You can use the --split-cluster option to split all cluster nodes into separate targets. This mode is useful when cluster nodes are defined as SRV records and the mongodb_exporter is running with mongodb+srv domain specified. In this case SRV records will be queried upon mongodb_exporter start and each cluster node can be queried using the **target** parameter of multitarget endpoint. 
+You can use the --split-cluster option to split all cluster nodes into separate targets. This mode is useful when cluster nodes are defined as SRV records and the  mongodb_exporter is running with mongodb+srv domain specified. In this case SRV records will be queried upon mongodb_exporter start and each cluster node can be queried  using the **target** parameter of multitarget endpoint.
 
 #### Overall targets request endpoint
 
 There is an overall targets endpoint **/scrapeall** that queries all the targets in one request. It can be used to store multiple node metrics without separate target requests. In this case, each node metric will have a **instance** label containing the node name as a host:port pair (or just host if no port was not specified). For example, for mongodb_exporter running with the options:
 ```
 --mongodb.uri="mongodb://host1:27015,host2:27016" --split-cluster=true
-``` 
+```
 we get metrics like this:
 ```
 mongodb_up{instance="host1:27015"} 1
@@ -160,7 +160,7 @@ HELP mongodb_mongod_wiredtiger_log_bytes_total mongodb_mongod_wiredtiger_log_byt
 mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
 ```
 #### Enabling profile metrics gathering
-`--collector.profile` 
+`--collector.profile`
 To collect metrics, you need to enable the profiler in [MongoDB](https://www.mongodb.com/docs/manual/tutorial/manage-the-database-profiler/):
 Usage example: `db.setProfilingLevel(2)`
 
@@ -171,7 +171,7 @@ Usage example: `db.setProfilingLevel(2)`
 |2|The profiler collects data for all operations.|
 
 #### Enabling shards metrics gathering
-When shard metrics collection is enabled by `--collector.shards`, the exporter will expose metrics related to sharded Mongo. 
+When shard metrics collection is enabled by `--collector.shards`, the exporter will expose metrics related to sharded Mongo.
 Example, if shards collector is enabled:
 ```
 # HELP mongodb_shards_collection_chunks_count sharded collection chunks.
@@ -196,8 +196,33 @@ The labels are:
 
 - cl_id: Cluster ID
 - rs_nm: Replicaset name
-- rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`. 
+- rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`.
 Check [the official documentation](https://docs.mongodb.com/manual/reference/replica-states/) for details on replicaset status values.
+
+#### Prometheus Configuration to Scrape Multiple MongoDB Hosts
+The Prometheus documentation [provides](https://prometheus.io/docs/guides/multi-target-exporter/) a good example of multi-target exporters.
+
+To use `mongodb_exporter` in multi-target mode, you can use the `/scrape` endpoint with the `target` parameter.
+
+You can optionally specify initial URIs using `--mongodb.uri` (or `MONGODB_URI`) to preload a set of MongoDB instances, but it is not required. Additional targets can still be queried dynamically via `/scrape?target=...`.
+
+This allows combining static and dynamic target discovery in a flexible way.
+```
+scrape_configs:
+  - job_name: 'mongodb_exporter_targets'
+    metrics_path: /scrape
+    static_configs:
+      - targets:
+          - mongodb://mongo-host1:27017
+          - mongo-host2:27017
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: <<MONGODB-EXPORTER-HOSTNAME>>:9121
+```
 
 ## Usage Reference
 
