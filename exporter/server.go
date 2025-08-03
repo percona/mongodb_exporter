@@ -91,12 +91,12 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, exporterOpts *Opts, l
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
-			<head><title>MongoDB Exporter</title></head>
-			<body>
-			<h1>MongoDB Exporter</h1>
-			<p><a href='/metrics'>Metrics</a></p>
-			</body>
-			</html>`))
+            <head><title>MongoDB Exporter</title></head>
+            <body>
+            <h1>MongoDB Exporter</h1>
+            <p><a href='/metrics'>Metrics</a></p>
+            </body>
+            </html>`))
 		if err != nil {
 			log.Error("error writing response", "error", err)
 		}
