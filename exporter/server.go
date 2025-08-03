@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -44,28 +44,59 @@ type ServerOpts struct {
 }
 
 // RunWebServer runs the main web-server
-func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
+func RunWebServer(opts *ServerOpts, exporters []*Exporter, exporterOpts *Opts, log *slog.Logger) {
 	mux := http.NewServeMux()
-
-	if len(exporters) == 0 {
-		panic("No exporters were built. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
-	}
-
 	serverMap := buildServerMap(exporters, log)
 
-	defaultExporter := exporters[0]
-	mux.Handle(opts.Path, defaultExporter.Handler())
-	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap))
+	exportersCache := make(map[string]*Exporter)
+	var cacheMutex sync.Mutex
+
+	// Prefill cache with existing exporters
+	for _, exp := range exporters {
+		cacheMutex.Lock()
+		cacheKey := exp.opts.URI
+		exportersCache[cacheKey] = exp
+		cacheMutex.Unlock()
+	}
+
+	mux.HandleFunc(opts.Path, func(w http.ResponseWriter, r *http.Request) {
+		targetHost := r.URL.Query().Get("target")
+
+		if targetHost == "" {
+			// Serve local and cached exporter metrics
+			if len(exporters) > 0 {
+				exporters[0].Handler().ServeHTTP(w, r)
+				return
+			}
+
+			// No local exporters, try to serve first cached exporter
+			cacheMutex.Lock()
+			defer cacheMutex.Unlock()
+			for _, exp := range exportersCache {
+				exp.Handler().ServeHTTP(w, r)
+				return
+			}
+
+			reg := prometheus.NewRegistry()
+			h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+			h.ServeHTTP(w, r)
+			return
+		}
+
+		multiTargetHandler(serverMap, exporterOpts, exportersCache, &cacheMutex, log).ServeHTTP(w, r)
+	})
+
+	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap, exporterOpts, exportersCache, &cacheMutex, log))
 	mux.HandleFunc(opts.OverallTargetPath, OverallTargetsHandler(exporters, log))
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
-            <head><title>MongoDB Exporter</title></head>
-            <body>
-            <h1>MongoDB Exporter</h1>
-            <p><a href='/metrics'>Metrics</a></p>
-            </body>
-            </html>`))
+			<head><title>MongoDB Exporter</title></head>
+			<body>
+			<h1>MongoDB Exporter</h1>
+			<p><a href='/metrics'>Metrics</a></p>
+			</body>
+			</html>`))
 		if err != nil {
 			log.Error("error writing response", "error", err)
 		}
@@ -85,21 +116,62 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
 	}
 }
 
-func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
+// multiTargetHandler returns a handler that scrapes metrics from a target specified by the 'target' query parameter.
+// It completes the URI and caches dynamic exporters by target.
+func multiTargetHandler(serverMap ServerMap, exporterOpts *Opts, exportersCache map[string]*Exporter, cacheMutex *sync.Mutex, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		targetHost := r.URL.Query().Get("target")
-		if targetHost != "" {
-			if !strings.HasPrefix(targetHost, "mongodb://") {
-				targetHost = "mongodb://" + targetHost
-			}
-			if uri, err := url.Parse(targetHost); err == nil {
-				if e, ok := serverMap[uri.Host]; ok {
-					e.ServeHTTP(w, r)
-					return
-				}
-			}
+		if targetHost == "" {
+			logger.Warn("Missing target parameter")
+			http.Error(w, "Missing target parameter", http.StatusBadRequest)
+			return
 		}
-		http.Error(w, "Unable to find target", http.StatusNotFound)
+
+		parsed, err := url.Parse(targetHost)
+		if err != nil {
+			logger.Warn("Invalid target parameter", "target", targetHost, "error", err)
+			http.Error(w, "Invalid target parameter", http.StatusBadRequest)
+			return
+		}
+
+		fullURI := targetHost
+		if parsed.User == nil && exporterOpts.User != "" {
+			fullURI = BuildURI(targetHost, exporterOpts.User, exporterOpts.Password)
+		}
+
+		uri, err := url.Parse(fullURI)
+		if err != nil {
+			logger.Warn("Invalid full URI", "target", targetHost, "error", err)
+			http.Error(w, "Invalid target parameter", http.StatusBadRequest)
+			return
+		}
+
+		if handler, ok := serverMap[uri.Host]; ok {
+			logger.Debug("Serving from static serverMap", "host", uri.Host)
+			handler.ServeHTTP(w, r)
+			return
+		}
+
+		cacheMutex.Lock()
+		exp, ok := exportersCache[fullURI]
+		cacheMutex.Unlock()
+
+		if !ok {
+			logger.Info("Creating new exporter for target", "target", targetHost)
+			opts := *exporterOpts
+			opts.URI = fullURI
+			opts.Logger = logger
+
+			exp = New(&opts)
+
+			cacheMutex.Lock()
+			exportersCache[fullURI] = exp
+			cacheMutex.Unlock()
+		} else {
+			logger.Debug("Serving from cache", "target", targetHost)
+		}
+
+		exp.Handler().ServeHTTP(w, r)
 	}
 }
 
