@@ -221,7 +221,7 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: <<MONGODB-EXPORTER-HOSTNAME>>:9121
+        replacement: <<MONGODB-EXPORTER-HOSTNAME>>:9216
 ```
 
 ## Usage Reference
