@@ -64,7 +64,8 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, exporterOpts *Opts, l
 
 		if targetHost == "" {
 			if len(exporters) > 0 {
-				exporters[0].Handler().ServeHTTP(w, r)
+				defaultExporter := exporters[0]
+				defaultExporter.Handler().ServeHTTP(w, r)
 				return
 			}
 
