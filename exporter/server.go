@@ -117,7 +117,7 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, exporterOpts *Opts, l
 }
 
 // multiTargetHandler returns a handler that scrapes metrics from a target specified by the 'target' query parameter.
-// It completes the URI and caches dynamic exporters by target.
+// It validates the URI and caches dynamic exporters by target.
 func multiTargetHandler(serverMap ServerMap, exporterOpts *Opts, exportersCache map[string]*Exporter, cacheMutex *sync.Mutex, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		targetHost := r.URL.Query().Get("target")
