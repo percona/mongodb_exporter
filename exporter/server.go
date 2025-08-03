@@ -63,13 +63,11 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, exporterOpts *Opts, l
 		targetHost := r.URL.Query().Get("target")
 
 		if targetHost == "" {
-			// Serve local and cached exporter metrics
 			if len(exporters) > 0 {
 				exporters[0].Handler().ServeHTTP(w, r)
 				return
 			}
 
-			// No local exporters, try to serve first cached exporter
 			cacheMutex.Lock()
 			defer cacheMutex.Unlock()
 			for _, exp := range exportersCache {
