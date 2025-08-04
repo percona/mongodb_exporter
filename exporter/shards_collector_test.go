@@ -35,7 +35,7 @@ func TestShardsCollector(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
-	c := newShardsCollector(ctx, client, promslog.New(&promslog.Config{}), false)
+	c := newShardsCollector(ctx, client, promslog.New(&promslog.Config{}), false, true)
 
 	reg := prometheus.NewPedanticRegistry()
 	if err := reg.Register(c); err != nil {

@@ -80,12 +80,13 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 		ch <- metric
 	}
 
+	if !d.scanEachCollChunkOk {
+		return
+	}
+
 	databaseNames, err := client.ListDatabaseNames(d.ctx, bson.D{})
 	if err != nil {
 		logger.Error("cannot get database names", "error", err)
-	}
-	if !d.scanEachCollChunkOk {
-		return
 	}
 	for _, database := range databaseNames {
 		collections := d.getCollectionsForDBName(database)
