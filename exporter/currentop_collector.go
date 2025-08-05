@@ -84,7 +84,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 		{Key: "op", Value: bson.D{{Key: "$ne", Value: ""}}},
 		{Key: "ns", Value: bson.D{
 			{Key: "$ne", Value: ""},
-			{Key: "$not", Value: bson.D{{Key: "$regex", Value: "^admin.*|^local.*"}}},
+			{Key: "$regex", Value: "/^(?!(admin|local)).*/"},
 		}},
 	}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
