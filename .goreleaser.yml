@@ -21,28 +21,6 @@ builds:
       - -v
     ldflags:
         - -s -w -X main.version=v{{.Version}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
-  - binary: mongodb_exporter-gssapi
-    id: mongodb_exporter-gssapi
-    env:
-      - CGO_ENABLED=1
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm
-      - arm64
-    goarm:
-      - 7
-    ignore:
-      - goos: darwin
-        goarch: arm
-    flags:
-      - -v
-      - -tags=gssapi
-    ldflags:
-        - -s -w -X main.version=v{{.Version}} -X main.commit={{.ShortCommit}} -X main.buildDate={{.Date}}
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
     wrap_in_directory: true
