@@ -2133,6 +2133,65 @@
       "uri": "statistics:"
     }
   },
+  "connPoolStats" : {
+    "start" : "2025-08-04T07:10:00.002Z",
+    "numClientConnections" : 24,
+    "numAScopedConnections" : 0,
+    "totalInUse" : 0,
+    "totalAvailable" : 156,
+    "totalCreated" : 143694,
+    "totalRefreshing" : 0,
+    "replicaSets" : {
+      "shard_001" : {
+        "hosts" : [
+          {
+            "addr" : "1.1.1.1:36001",
+            "ok" : true,
+            "ismaster" : true,
+            "hidden" : false,
+            "secondary" : false,
+            "pingTimeMillis" : 0
+          },
+          {
+            "addr" : "2.2.2.2:36001",
+            "ok" : true,
+            "ismaster" : false,
+            "hidden" : false,
+            "secondary" : true,
+            "pingTimeMillis" : 0
+          }
+        ]
+      },
+      "configsvr" : {
+        "hosts" : [
+          {
+            "addr" : "3.3.3.3:27001",
+            "ok" : true,
+            "ismaster" : true,
+            "hidden" : false,
+            "secondary" : false,
+            "pingTimeMillis" : 0
+          },
+          {
+            "addr" : "4.4.4.4:27001",
+            "ok" : true,
+            "ismaster" : false,
+            "hidden" : false,
+            "secondary" : true,
+            "pingTimeMillis" : 0
+          },
+          {
+            "addr" : "5.5.5.5:27001",
+            "ok" : true,
+            "ismaster" : false,
+            "hidden" : false,
+            "secondary" : true,
+            "pingTimeMillis" : 0
+          }
+        ]
+      }
+    }
+  },
   "start": "2020-09-10T14:39:52-03:00",
   "systemMetrics": {
     "cpu": {
