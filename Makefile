@@ -9,6 +9,7 @@ GO_TEST_CODECOV ?=
 BUILD_DATE ?= $(shell date +%FT%T%z)
 GOVERSION ?= $(shell go version | cut -d " " -f3)
 COMPONENT_VERSION ?= $(shell cat VERSION)
+IMAGE_TAG ?= $(shell cat VERSION | cut -c 2-)
 COMPONENT_BRANCH ?= $(shell git describe --always --contains --all)
 PMM_RELEASE_FULLCOMMIT ?= $(shell git rev-parse HEAD)
 GO_BUILD_LDFLAGS = -X main.version=${COMPONENT_VERSION} -X main.buildDate=${BUILD_DATE} -X main.commit=${PMM_RELEASE_FULLCOMMIT} -X main.Branch=${COMPONENT_BRANCH} -X main.GoVersion=${GOVERSION} -s -w
@@ -71,7 +72,10 @@ init:                       ## Install linters
 	cd tools && go generate -x -tags=tools
 
 build:                      ## Build exporter binary using plain go build.
-	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
+	CGO_ENABLED=0 go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
+
+docker-build: build
+	docker build -t ${NAME}:${IMAGE_TAG} .
 
 build-gssapi:                      ## Build exporter binary with GSSAPI support (requires CGO enabled).
 	CGO_ENABLED=1 go build -ldflags="$(GO_BUILD_LDFLAGS)" -tags gssapi  -o $(PMM_RELEASE_PATH)/mongodb_exporter
