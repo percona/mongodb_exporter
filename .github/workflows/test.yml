@@ -66,10 +66,6 @@ jobs:
           env_vars: GO_VERSION,TEST_MONGODB_IMAGE
           fail_ci_if_error: false
 
-      - name: Dry-run GoReleaser
-        run: |
-          make release-dry-run
-
       - name: Run debug commands on failure
         if: ${{ failure() }}
         run: |
