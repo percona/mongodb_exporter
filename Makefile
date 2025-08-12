@@ -1,4 +1,4 @@
-.PHONY: all build clean default help init test format check-license release-dry-run release-dry-run-docker release-dry-run-fast
+.PHONY: all build clean default help init test format check-license release-dry-run
 default: help
 
 GO_TEST_PATH ?= ./...
