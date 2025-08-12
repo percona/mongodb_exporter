@@ -1,4 +1,4 @@
-.PHONY: all build clean default help init test format check-license
+.PHONY: all build clean default help init test format check-license release-dry-run release-dry-run-docker release-dry-run-fast
 default: help
 
 GO_TEST_PATH ?= ./...
@@ -82,6 +82,21 @@ release:                      ## Build the binaries using goreleaser
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-w /go/src/github.com/user/repo \
 		goreleaser/goreleaser release --snapshot --skip=publish --clean
+
+release-dry-run:             ## Build cross-platform binaries locally without publishing
+	@echo "Building cross-platform binaries with GoReleaser..."
+	@if command -v goreleaser >/dev/null 2>&1; then \
+		goreleaser build --snapshot --clean; \
+	else \
+		echo "GoReleaser not found. Installing via Docker..."; \
+		docker run --rm --privileged \
+			-v ${PWD}:/go/src/github.com/percona/mongodb_exporter \
+			-v /var/run/docker.sock:/var/run/docker.sock \
+			-w /go/src/github.com/percona/mongodb_exporter \
+			goreleaser/goreleaser build --snapshot --clean; \
+	fi
+	@find build -name mongodb_exporter -type f | sort
+
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
