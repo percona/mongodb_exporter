@@ -164,7 +164,7 @@ func unique(slice []string) []string {
 }
 
 func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
-	onlyCollectionsNamespaces, err := listAllCollections(ctx, client, nil, nil, true)
+	onlyCollectionsNamespaces, err := listAllCollections(ctx, client, collections, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collecti
 		}
 
 		if _, ok := namespaces[collection]; !ok {
-			return nil, errors.Errorf("namespace %s is a view and cannot be used for collstats/indexstats", collection)
+			continue
 		}
 
 		filteredCollections = append(filteredCollections, collection)
