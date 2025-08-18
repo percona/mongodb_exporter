@@ -4,6 +4,7 @@ builds:
   - binary: mongodb_exporter
     id: mongodb_exporter
     env:
+      - CGO_ENABLED=0
     goos:
       - linux
       - darwin
