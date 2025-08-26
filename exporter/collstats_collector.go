@@ -78,7 +78,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		collections = fromMapToSlice(onlyCollectionsNamespaces)
 	} else {
 		var err error
-		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
+		collections, err = checkNamespacesForViewsOrNonExist(d.ctx, client, d.collections, logger)
 		if err != nil {
 			logger.Error("cannot list collections", "error", err.Error())
 			return
