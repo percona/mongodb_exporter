@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 
@@ -163,7 +164,7 @@ func unique(slice []string) []string {
 	return list
 }
 
-func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
+func checkNamespacesForViewsOrNonExist(ctx context.Context, client *mongo.Client, collections []string, logger *slog.Logger) ([]string, error) {
 	onlyCollectionsNamespaces, err := listAllCollections(ctx, client, collections, nil, true)
 	if err != nil {
 		return nil, err
@@ -183,6 +184,9 @@ func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collecti
 		}
 
 		if _, ok := namespaces[collection]; !ok {
+			if logger != nil {
+				logger.Warn("namespace is a view or does not exist, cannot be used for collstats/indexstats", "namespace", collection)
+			}
 			continue
 		}
 
