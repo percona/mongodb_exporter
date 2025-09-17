@@ -1,0 +1,79 @@
+name: External PR Trigger
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  trigger-external-pr:
+    runs-on: ubuntu-latest
+    # Only run if the source branch does not have a PMM- prefix
+    if: |
+      !startsWith(github.event.pull_request.head.ref, 'PMM-')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Git Config
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create branch in target repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          TARGET_REPO: ${{ vars.TARGET_REPO_OWNER }}/${{ vars.TARGET_REPO_NAME }}
+          SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          # Clone the target repository
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${TARGET_REPO}.git target-repo
+          cd target-repo
+
+          # Create a new branch based on the PR branch name
+          git checkout -b "mongodb-exporter-external-pr-${SOURCE_BRANCH}"
+
+          # Check if ci.yml exists
+          if [ ! -f "ci.yml" ]; then
+            echo "Creating ci.yml file"
+            mkdir -p $(dirname ci.yml)
+            touch ci.yml
+          fi
+
+          # Modify ci.yml file with PR information
+          cat > ci.yml << EOF
+          # Auto-generated from external PR
+          deps:
+            -name: mongodb_exporter
+              url: https://github.com/${GITHUB_REPOSITORY}
+              branch: ${SOURCE_BRANCH}
+          EOF
+
+          # Commit changes
+          git add ci.yml
+          git commit -m "Update ci.yml for external PR #${PR_NUMBER} from ${PR_AUTHOR}"
+
+          # Push the new branch
+          git push origin "external-pr-${SOURCE_BRANCH}"
+
+      - name: Create Pull Request in target repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          TARGET_REPO: ${{ vars.TARGET_REPO_OWNER }}/${{ vars.TARGET_REPO_NAME }}
+          SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          # Create PR using GitHub CLI
+          gh pr create \
+            --repo "${TARGET_REPO}" \
+            --title "External PR: ${{ github.event.pull_request.title }}" \
+            --body "This PR was automatically generated from external pull request #${PR_NUMBER} by @${PR_AUTHOR} in ${{ github.repository }} (branch: ${SOURCE_BRANCH}).
+
+          Original PR: ${{ github.event.pull_request.html_url }}
+
+          ## Original PR Description
+          ${{ github.event.pull_request.body }}" \
+            --base main \
+            --head "external-pr-${SOURCE_BRANCH}"
