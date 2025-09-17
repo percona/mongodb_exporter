@@ -2,14 +2,19 @@ name: External PR Trigger
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - "**"
+      - "!main"
 
 jobs:
   trigger-external-pr:
     runs-on: ubuntu-latest
     # Only run if the source branch does not have a PMM- prefix
     if: |
-      !startsWith(github.event.pull_request.head.ref, 'PMM-')
+      (github.event_name == 'pull_request' && !startsWith(github.event.pull_request.head.ref, 'PMM-')) ||
+      (github.event_name == 'push' && !startsWith(github.ref_name, 'PMM-'))
 
     steps:
       - name: Checkout repository
@@ -20,19 +25,39 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Set variables based on event type
+        id: set-vars
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "source_branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "pr_author=${{ github.event.pull_request.user.login }}" >> $GITHUB_OUTPUT
+            echo "pr_title=${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
+            echo "pr_url=${{ github.event.pull_request.html_url }}" >> $GITHUB_OUTPUT
+            echo "pr_body=${{ github.event.pull_request.body }}" >> $GITHUB_OUTPUT
+          else
+            echo "source_branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "pr_number=N/A" >> $GITHUB_OUTPUT
+            echo "pr_author=${{ github.actor }}" >> $GITHUB_OUTPUT
+            echo "pr_title=Push to ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "pr_url=${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "pr_body=Automated PR for push to branch ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create branch in target repository
         env:
           GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
           TARGET_REPO: ${{ vars.TARGET_REPO_OWNER }}/${{ vars.TARGET_REPO_NAME }}
-          SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          SOURCE_BRANCH: ${{ steps.set-vars.outputs.source_branch }}
+          PR_NUMBER: ${{ steps.set-vars.outputs.pr_number }}
+          PR_AUTHOR: ${{ steps.set-vars.outputs.pr_author }}
         run: |
           # Clone the target repository
           git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${TARGET_REPO}.git target-repo
           cd target-repo
 
           # Create a new branch based on the PR branch name
-          git checkout -b "mongodb-exporter-external-pr-${SOURCE_BRANCH}"
+          git checkout -b "external-pr-${SOURCE_BRANCH}"
 
           # Check if ci.yml exists
           if [ ! -f "ci.yml" ]; then
@@ -44,36 +69,100 @@ jobs:
           # Modify ci.yml file with PR information
           cat > ci.yml << EOF
           # Auto-generated from external PR
-          deps:
-            -name: mongodb_exporter
-              url: https://github.com/${GITHUB_REPOSITORY}
-              branch: ${SOURCE_BRANCH}
+          external_pr:
+            source_repo: ${{ github.repository }}
+            pr_number: ${PR_NUMBER}
+            pr_author: ${PR_AUTHOR}
+            pr_branch: ${SOURCE_BRANCH}
+            pr_title: ${{ steps.set-vars.outputs.pr_title }}
+            pr_url: ${{ steps.set-vars.outputs.pr_url }}
+            triggered_at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            event_type: ${{ github.event_name }}
+            commit_sha: ${{ github.sha }}
           EOF
 
           # Commit changes
           git add ci.yml
-          git commit -m "Update ci.yml for external PR #${PR_NUMBER} from ${PR_AUTHOR}"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            git commit -m "Update ci.yml for external PR #${PR_NUMBER} from ${PR_AUTHOR}"
+          else
+            git commit -m "Update ci.yml for push to ${SOURCE_BRANCH} by ${PR_AUTHOR}"
+          fi
 
           # Push the new branch
-          git push origin "mongodb-exporter-external-pr-${SOURCE_BRANCH}"
+          git push origin "external-pr-${SOURCE_BRANCH}"
 
-      - name: Create Pull Request in target repository
+      - name: Check if PR already exists in target repository
+        id: check-pr
         env:
           GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
           TARGET_REPO: ${{ vars.TARGET_REPO_OWNER }}/${{ vars.TARGET_REPO_NAME }}
-          SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          SOURCE_BRANCH: ${{ steps.set-vars.outputs.source_branch }}
+        run: |
+          # Check if a PR already exists for this branch
+          EXISTING_PR=$(gh pr list --repo "${TARGET_REPO}" --head "external-pr-${SOURCE_BRANCH}" --json number --jq '.[0].number' || echo "")
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR already exists: #${EXISTING_PR}"
+            echo "pr_exists=true" >> $GITHUB_OUTPUT
+            echo "existing_pr_number=${EXISTING_PR}" >> $GITHUB_OUTPUT
+          else
+            echo "No existing PR found"
+            echo "pr_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request in target repository
+        if: steps.check-pr.outputs.pr_exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          TARGET_REPO: ${{ vars.TARGET_REPO_OWNER }}/${{ vars.TARGET_REPO_NAME }}
+          SOURCE_BRANCH: ${{ steps.set-vars.outputs.source_branch }}
+          PR_NUMBER: ${{ steps.set-vars.outputs.pr_number }}
+          PR_AUTHOR: ${{ steps.set-vars.outputs.pr_author }}
+          PR_TITLE: ${{ steps.set-vars.outputs.pr_title }}
+          PR_URL: ${{ steps.set-vars.outputs.pr_url }}
+          PR_BODY: ${{ steps.set-vars.outputs.pr_body }}
         run: |
           # Create PR using GitHub CLI
-          gh pr create \
-            --repo "${TARGET_REPO}" \
-            --title "External PR: ${{ github.event.pull_request.title }}" \
-            --body "This PR was automatically generated from external pull request #${PR_NUMBER} by @${PR_AUTHOR} in ${{ github.repository }} (branch: ${SOURCE_BRANCH}).
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            TITLE="External PR: ${PR_TITLE}"
+            BODY="This PR was automatically generated from external pull request #${PR_NUMBER} by @${PR_AUTHOR} in ${{ github.repository }} (branch: ${SOURCE_BRANCH}).
 
-          Original PR: ${{ github.event.pull_request.html_url }}
+          Original PR: ${PR_URL}
 
           ## Original PR Description
-          ${{ github.event.pull_request.body }}" \
+          ${PR_BODY}"
+          else
+            TITLE="External Push: ${SOURCE_BRANCH}"
+            BODY="This PR was automatically generated from a push to branch ${SOURCE_BRANCH} by @${PR_AUTHOR} in ${{ github.repository }}.
+
+          Branch: ${PR_URL}
+
+          ## Push Details
+          - Pusher: @${PR_AUTHOR}
+          - Commit: ${{ github.sha }}
+          - Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          fi
+
+          gh pr create \
+            --repo "${TARGET_REPO}" \
+            --title "${TITLE}" \
+            --body "${BODY}" \
             --base main \
             --head "external-pr-${SOURCE_BRANCH}"
+
+      - name: Update existing PR in target repository
+        if: steps.check-pr.outputs.pr_exists == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          TARGET_REPO: ${{ vars.TARGET_REPO_OWNER }}/${{ vars.TARGET_REPO_NAME }}
+          EXISTING_PR: ${{ steps.check-pr.outputs.existing_pr_number }}
+          SOURCE_BRANCH: ${{ steps.set-vars.outputs.source_branch }}
+        run: |
+          echo "PR #${EXISTING_PR} already exists in ${TARGET_REPO} for branch external-pr-${SOURCE_BRANCH}"
+          echo "The branch has been updated with the latest changes."
+
+          # Optionally, add a comment to the existing PR
+          gh pr comment ${EXISTING_PR} \
+            --repo "${TARGET_REPO}" \
+            --body "Branch updated with new changes from ${{ github.event_name }} event at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
