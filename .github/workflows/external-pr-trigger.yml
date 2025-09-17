@@ -55,7 +55,7 @@ jobs:
           git commit -m "Update ci.yml for external PR #${PR_NUMBER} from ${PR_AUTHOR}"
 
           # Push the new branch
-          git push origin "external-pr-${SOURCE_BRANCH}"
+          git push origin "mongodb-exporter-external-pr-${SOURCE_BRANCH}"
 
       - name: Create Pull Request in target repository
         env:
