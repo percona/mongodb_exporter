@@ -3,10 +3,6 @@ name: External PR Trigger
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - "**"
-      - "!main"
 
 jobs:
   trigger-external-pr:
