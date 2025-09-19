@@ -55,26 +55,12 @@ jobs:
           # Create a new branch based on the PR branch name
           git checkout -b "external-pr-${SOURCE_BRANCH}"
 
-          # Check if ci.yml exists
-          if [ ! -f "ci.yml" ]; then
-            echo "Creating ci.yml file"
-            mkdir -p $(dirname ci.yml)
-            touch ci.yml
-          fi
-
           # Modify ci.yml file with PR information
           cat > ci.yml << EOF
-          # Auto-generated from external PR
-          external_pr:
-            source_repo: ${{ github.repository }}
-            pr_number: ${PR_NUMBER}
-            pr_author: ${PR_AUTHOR}
-            pr_branch: ${SOURCE_BRANCH}
-            pr_title: ${{ steps.set-vars.outputs.pr_title }}
-            pr_url: ${{ steps.set-vars.outputs.pr_url }}
-            triggered_at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            event_type: ${{ github.event_name }}
-            commit_sha: ${{ github.sha }}
+          deps:
+            - name: mongodb_exporter
+              url: https://github.com/${GITHUB_REPOSITORY}
+              branch: ${SOURCE_BRANCH}
           EOF
 
           # Commit changes
