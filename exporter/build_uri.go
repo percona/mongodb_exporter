@@ -24,6 +24,7 @@ import (
 	"strings"
 )
 
+// ParseURIList parses a list of MongoDB connection URIs.
 func ParseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []string { //nolint:gocognit,cyclop
 	var URIs []string
 
@@ -109,6 +110,7 @@ func buildURIManually(uri string, user string, password string) string {
 	return uri
 }
 
+// BuildURI builds a MongoDB connection URI from the given base URI, user, and password.
 func BuildURI(uri string, user string, password string) string {
 	defaultPrefix := "mongodb://" // default prefix
 
