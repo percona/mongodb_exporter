@@ -24,6 +24,8 @@ import (
 	"strings"
 )
 
+const mongoScheme = "mongodb://"
+
 // ParseURIList parses a list of MongoDB connection URIs.
 func ParseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []string { //nolint:gocognit,cyclop
 	var URIs []string
@@ -35,32 +37,28 @@ func ParseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []st
 	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
 	for _, URI := range uriList {
 		matches := matchRegexp.FindStringSubmatch(URI)
-		if matches != nil {
-			if realURI != "" {
-				// Add the previous host buffer to the url list as we met the scheme part
-				URIs = append(URIs, realURI)
-				realURI = ""
-			}
-			if matches[1] == "" {
-				realURI = URI
-			} else {
-				// There can be only one host in SRV connection string
-				if splitCluster {
-					// In splitCluster mode we get srv connection string from SRV recors
-					URI = GetSeedListFromSRV(URI, logger)
-				}
-				URIs = append(URIs, URI)
-			}
-		} else {
+		if matches == nil {
 			if realURI == "" {
-				URIs = append(URIs, "mongodb://"+URI)
+				URIs = append(URIs, mongoScheme+URI)
 			} else {
 				realURI += "," + URI
 			}
+			continue
 		}
-	}
-	if realURI != "" {
-		URIs = append(URIs, realURI)
+
+		if realURI != "" {
+			URIs = append(URIs, realURI)
+			realURI = ""
+		}
+		if matches[1] == "" {
+			realURI = URI
+			continue
+		}
+
+		if splitCluster {
+			URI = GetSeedListFromSRV(URI, logger)
+		}
+		URIs = append(URIs, URI)
 	}
 
 	if splitCluster {
@@ -72,7 +70,7 @@ func ParseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []st
 				log.Fatalf("Failed to parse URI %s: %v", hosturl, err)
 			}
 			for _, host := range strings.Split(urlParsed.Host, ",") {
-				targetURI := "mongodb://"
+				targetURI := mongoScheme
 				if urlParsed.User != nil {
 					targetURI += urlParsed.User.String() + "@"
 				}
@@ -88,10 +86,11 @@ func ParseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []st
 		}
 		return separateURIs
 	}
+
 	return URIs
 }
 
-// buildURIManually builds the URI manually by checking if the user and password are supplied
+// buildURIManually builds the URI manually by checking if the user and password are supplied.
 func buildURIManually(uri string, user string, password string) string {
 	uriArray := strings.SplitN(uri, "://", 2) //nolint:mnd
 	prefix := uriArray[0] + "://"
@@ -112,7 +111,7 @@ func buildURIManually(uri string, user string, password string) string {
 
 // BuildURI builds a MongoDB connection URI from the given base URI, user, and password.
 func BuildURI(uri string, user string, password string) string {
-	defaultPrefix := "mongodb://" // default prefix
+	defaultPrefix := mongoScheme // default prefix
 
 	if !strings.HasPrefix(uri, defaultPrefix) && !strings.HasPrefix(uri, "mongodb+srv://") {
 		uri = defaultPrefix + uri
