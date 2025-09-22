@@ -1,4 +1,4 @@
-ARG TEST_MONGODB_IMAGE=mongo:4.4
+ARG TEST_MONGODB_IMAGE=mongo:6.0
 FROM ${TEST_MONGODB_IMAGE}
 USER root
 COPY test-setup/secret/keyfile /opt/keyfile

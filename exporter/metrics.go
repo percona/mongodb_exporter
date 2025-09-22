@@ -309,6 +309,10 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	}
 
 	for k, val := range m {
+		// histogram metrics are currently unsupported (PMM-14337)
+		if k == "histograms" {
+			continue
+		}
 		nextPrefix := prefix + k
 
 		l := make(map[string]string)
