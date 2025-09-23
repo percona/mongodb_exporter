@@ -395,7 +395,7 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 			continue
 		}
 
-		// use the replicaset or server name as a label
+		// use the replicaset or server name or addr as a label
 		if name, ok := s["name"].(string); ok {
 			labels["member_idx"] = name
 		}
@@ -404,6 +404,9 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 		}
 		if host, ok := s["host"].(string); ok {
 			labels["member_idx"] = host
+		}
+		if addr, ok := s["addr"].(string); ok {
+			labels["member_addr"] = addr
 		}
 
 		metrics = append(metrics, makeMetrics(prefix, s, labels, compatibleMode)...)
