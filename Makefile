@@ -1,4 +1,4 @@
-.PHONY: all build clean default help init test format check-license
+.PHONY: all build clean default help init test format check-license release-dry-run
 default: help
 
 GO_TEST_PATH ?= ./...
@@ -9,6 +9,7 @@ GO_TEST_CODECOV ?=
 BUILD_DATE ?= $(shell date +%FT%T%z)
 GOVERSION ?= $(shell go version | cut -d " " -f3)
 COMPONENT_VERSION ?= $(shell cat VERSION)
+IMAGE_TAG ?= $(shell cat VERSION | cut -c 2-)
 COMPONENT_BRANCH ?= $(shell git describe --always --contains --all)
 PMM_RELEASE_FULLCOMMIT ?= $(shell git rev-parse HEAD)
 GO_BUILD_LDFLAGS = -X main.version=${COMPONENT_VERSION} -X main.buildDate=${BUILD_DATE} -X main.commit=${PMM_RELEASE_FULLCOMMIT} -X main.Branch=${COMPONENT_BRANCH} -X main.GoVersion=${GOVERSION} -s -w
@@ -17,7 +18,7 @@ REPO ?= percona/$(NAME)
 GORELEASER_FLAGS ?=
 UID ?= $(shell id -u)
 
-export TEST_MONGODB_IMAGE?=mongo:4.4
+export TEST_MONGODB_IMAGE?=mongo:6.0
 export TEST_MONGODB_ADMIN_USERNAME?=
 export TEST_MONGODB_ADMIN_PASSWORD?=
 export TEST_MONGODB_USERNAME?=
@@ -71,7 +72,10 @@ init:                       ## Install linters
 	cd tools && go generate -x -tags=tools
 
 build:                      ## Build exporter binary using plain go build.
-	go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
+	CGO_ENABLED=0 go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
+
+docker-build: build
+	docker build -t ${NAME}:${IMAGE_TAG} .
 
 build-gssapi:                      ## Build exporter binary with GSSAPI support (requires CGO enabled).
 	CGO_ENABLED=1 go build -ldflags="$(GO_BUILD_LDFLAGS)" -tags gssapi  -o $(PMM_RELEASE_PATH)/mongodb_exporter
@@ -82,6 +86,21 @@ release:                      ## Build the binaries using goreleaser
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-w /go/src/github.com/user/repo \
 		goreleaser/goreleaser release --snapshot --skip=publish --clean
+
+release-dry-run:             ## Build cross-platform binaries locally without publishing
+	@echo "Building cross-platform binaries with GoReleaser..."
+	@if command -v goreleaser >/dev/null 2>&1; then \
+		goreleaser build --snapshot --clean; \
+	else \
+		echo "GoReleaser not found. Installing via Docker..."; \
+		docker run --rm --privileged \
+			-v ${PWD}:/go/src/github.com/percona/mongodb_exporter \
+			-v /var/run/docker.sock:/var/run/docker.sock \
+			-w /go/src/github.com/percona/mongodb_exporter \
+			goreleaser/goreleaser build --snapshot --clean; \
+	fi
+	@find build -name mongodb_exporter -type f | sort
+
 
 FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 

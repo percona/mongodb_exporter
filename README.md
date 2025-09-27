@@ -21,7 +21,7 @@ Currently, these metric sources are implemented:
 
 ## Supported MongoDB versions
 
-The exporter works with Percona Server for MongoDB and MongoDB Community or Enterprise Edition versions 4.4 and newer. Older versions might also work but are not tested anymore.
+The exporter works with Percona Server for MongoDB and MongoDB Community or Enterprise Edition versions 6.0 and newer. Older versions might also work but are not tested anymore.
 
 ## Info on Percona MongoDB exporter versions
 
