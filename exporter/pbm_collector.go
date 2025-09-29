@@ -190,6 +190,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 				"opid":   backup.OPID,
 				"status": string(backup.Status),
 				"name":   backup.Name,
+				"type":   string(backup.Type),
 			}),
 		)
 
@@ -200,6 +201,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 				"opid":   backup.OPID,
 				"status": string(backup.Status),
 				"name":   backup.Name,
+				"type":   string(backup.Type),
 			}),
 		)
 
@@ -218,6 +220,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 				"opid":   backup.OPID,
 				"status": string(backup.Status),
 				"name":   backup.Name,
+				"type":   string(backup.Type),
 			}),
 		)
 	}
