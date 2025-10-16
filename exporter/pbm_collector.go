@@ -51,17 +51,8 @@ const (
 
 func createPBMMetric(name, help string, value float64, labels map[string]string) prometheus.Metric { //nolint:ireturn
 	const prefix = "mongodb_pbm_"
-
-	// Log what we're creating
-	fullName := prefix + name
-
-	// Create the descriptor with labels as constant labels (4th parameter)
-	d := prometheus.NewDesc(fullName, help, nil, labels)
-
-	// Create the metric
-	metric := prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
-
-	return metric
+	d := prometheus.NewDesc(prefix+name, help, nil, labels)
+	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, value)
 }
 
 func newPbmCollector(ctx context.Context, client *mongo.Client, mongoURI string, logger *slog.Logger) *pbmCollector {
@@ -184,49 +175,27 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 }
 
 func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger) []prometheus.Metric {
-	l.Info("===== Starting PBM backups metrics collection =====")
-
 	currentNode, err := util.MyRole(ctx, p.base.client)
 	if err != nil {
 		l.Error("failed to get current node info", "error", err.Error())
 		return nil
 	}
-	l.Info("Current node info", "me", currentNode.Me, "is_master", currentNode.IsMaster, "is_secondary", currentNode.Secondary, "primary", currentNode.Primary)
 
 	backupsList, err := pbmClient.GetAllBackups(ctx)
 	if err != nil {
 		l.Error("failed to get PBM backup list", "error", err.Error())
 		return nil
 	}
-	l.Info("Retrieved backups list", "total_backups", len(backupsList))
 
 	metrics := make([]prometheus.Metric, 0, len(backupsList))
 
-	for idx, backup := range backupsList {
-		l.Info("===== Processing backup =====",
-			"backup_index", idx,
-			"name", backup.Name,
-			"opid", backup.OPID,
-			"status", backup.Status,
-			"size", backup.Size,
-			"replsets_count", len(backup.Replsets))
-
+	for _, backup := range backupsList {
 		// Iterate through replsets in the backup metadata
-		for i, replset := range backup.Replsets {
-			l.Info("--- Processing replset ---",
-				"replset_index", i,
-				"replset_name", replset.Name,
-				"replset_node", replset.Node)
-
+		for _, replset := range backup.Replsets {
 			// Determine if this is the current node
 			self := "0"
 			if replset.Node == currentNode.Me {
-				l.Info("This replset node matches current node", "node", replset.Node)
 				self = "1"
-			} else {
-				l.Info("This replset node does NOT match current node",
-					"replset_node", replset.Node,
-					"current_node", currentNode.Me)
 			}
 
 			labels := map[string]string{
@@ -238,28 +207,16 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 				"self":        self,
 			}
 
-			l.Info("Created labels map for backup metrics")
-			l.Info("  Label: opid", "value", labels["opid"])
-			l.Info("  Label: status", "value", labels["status"])
-			l.Info("  Label: name", "value", labels["name"])
-			l.Info("  Label: host", "value", labels["host"])
-			l.Info("  Label: replica_set", "value", labels["replica_set"])
-			l.Info("  Label: self", "value", labels["self"])
-
-			l.Info("Creating backup_size_bytes metric", "size", backup.Size)
-			metric1 := createPBMMetric("backup_size_bytes",
+			metrics = append(metrics, createPBMMetric("backup_size_bytes",
 				"Size of PBM backup",
-				float64(backup.Size), labels)
-			metrics = append(metrics, metric1)
-			l.Info("Added backup_size_bytes metric", "total_metrics", len(metrics))
+				float64(backup.Size), labels),
+			)
 
 			// Add backup_last_transition_ts metric
-			l.Info("Creating backup_last_transition_ts metric", "timestamp", backup.LastTransitionTS)
-			metric2 := createPBMMetric("backup_last_transition_ts",
+			metrics = append(metrics, createPBMMetric("backup_last_transition_ts",
 				"Last transition timestamp of PBM backup (seconds since epoch)",
-				float64(backup.LastTransitionTS), labels)
-			metrics = append(metrics, metric2)
-			l.Info("Added backup_last_transition_ts metric", "total_metrics", len(metrics))
+				float64(backup.LastTransitionTS), labels),
+			)
 
 			var endTime int64
 			switch pbmAgentStatus(backup.Status) {
@@ -270,16 +227,12 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 			}
 
 			duration := time.Unix(endTime-backup.StartTS, 0).Unix()
-			l.Info("Creating backup_duration_seconds metric", "duration", duration, "start_ts", backup.StartTS, "end_time", endTime)
-			metric3 := createPBMMetric("backup_duration_seconds",
+			metrics = append(metrics, createPBMMetric("backup_duration_seconds",
 				"Duration of PBM backup",
-				float64(duration), labels)
-			metrics = append(metrics, metric3)
-			l.Info("Added backup_duration_seconds metric", "total_metrics", len(metrics))
+				float64(duration), labels),
+			)
 		}
 	}
-
-	l.Info("===== Finished PBM backups metrics collection =====", "total_metrics_created", len(metrics))
 	return metrics
 }
 
