@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/mongo"
 
+	"github.com/percona/mongodb_exporter/internal/proto"
 	"github.com/percona/mongodb_exporter/internal/util"
 )
 
@@ -113,8 +114,14 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 			"PBM PITR backups are enabled for the cluster",
 			float64(pitrEnabledMetric), nil))
 
-		metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, pbmClient, logger)...)
-		metrics = append(metrics, p.pbmAgentMetrics(p.ctx, pbmClient, logger)...)
+		// Get current node info once for both agent and backup metrics
+		currentNode, err := util.MyRole(p.ctx, p.base.client)
+		if err != nil {
+			logger.Error("failed to get current node info", "error", err.Error())
+		} else {
+			metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, pbmClient, logger, currentNode)...)
+			metrics = append(metrics, p.pbmAgentMetrics(p.ctx, pbmClient, logger, currentNode)...)
+		}
 	}
 
 	metrics = append(metrics, createPBMMetric("cluster_backup_configured",
@@ -126,13 +133,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger) []prometheus.Metric {
-	currentNode, err := util.MyRole(ctx, p.base.client)
-	if err != nil {
-		l.Error("failed to get current node info", "error", err.Error())
-		return nil
-	}
-
+func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger, currentNode *proto.HelloResponse) []prometheus.Metric {
 	clusterStatus, err := cli.ClusterStatus(ctx, pbmClient, cli.RSConfGetter(p.mongoURI))
 	if err != nil {
 		l.Error("failed to get cluster status", "error", err.Error())
@@ -174,13 +175,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 	return metrics
 }
 
-func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger) []prometheus.Metric {
-	currentNode, err := util.MyRole(ctx, p.base.client)
-	if err != nil {
-		l.Error("failed to get current node info", "error", err.Error())
-		return nil
-	}
-
+func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger, currentNode *proto.HelloResponse) []prometheus.Metric {
 	backupsList, err := pbmClient.GetAllBackups(ctx)
 	if err != nil {
 		l.Error("failed to get PBM backup list", "error", err.Error())
