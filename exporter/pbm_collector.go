@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/mongo"
 
+	"github.com/percona/mongodb_exporter/internal/proto"
 	"github.com/percona/mongodb_exporter/internal/util"
 )
 
@@ -113,8 +114,14 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 			"PBM PITR backups are enabled for the cluster",
 			float64(pitrEnabledMetric), nil))
 
-		metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, pbmClient, logger)...)
-		metrics = append(metrics, p.pbmAgentMetrics(p.ctx, pbmClient, logger)...)
+		// Get current node info once for both agent and backup metrics
+		currentNode, err := util.MyRole(p.ctx, p.base.client)
+		if err != nil {
+			logger.Error("failed to get current node info", "error", err.Error())
+		} else {
+			metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, pbmClient, logger, currentNode)...)
+			metrics = append(metrics, p.pbmAgentMetrics(p.ctx, pbmClient, logger, currentNode)...)
+		}
 	}
 
 	metrics = append(metrics, createPBMMetric("cluster_backup_configured",
@@ -126,13 +133,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger) []prometheus.Metric {
-	currentNode, err := util.MyRole(ctx, p.base.client)
-	if err != nil {
-		l.Error("failed to get current node info", "error", err.Error())
-		return nil
-	}
-
+func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger, currentNode *proto.HelloResponse) []prometheus.Metric {
 	clusterStatus, err := cli.ClusterStatus(ctx, pbmClient, cli.RSConfGetter(p.mongoURI))
 	if err != nil {
 		l.Error("failed to get cluster status", "error", err.Error())
@@ -174,7 +175,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Clien
 	return metrics
 }
 
-func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger) []prometheus.Metric {
+func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger, currentNode *proto.HelloResponse) []prometheus.Metric {
 	backupsList, err := pbmClient.GetAllBackups(ctx)
 	if err != nil {
 		l.Error("failed to get PBM backup list", "error", err.Error())
@@ -184,42 +185,48 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 	metrics := make([]prometheus.Metric, 0, len(backupsList))
 
 	for _, backup := range backupsList {
-		metrics = append(metrics, createPBMMetric("backup_size_bytes",
-			"Size of PBM backup",
-			float64(backup.Size), map[string]string{
-				"opid":   backup.OPID,
-				"status": string(backup.Status),
-				"name":   backup.Name,
-			}),
-		)
+		// Iterate through replsets in the backup metadata
+		for _, replset := range backup.Replsets {
+			// Determine if this is the current node
+			self := "0"
+			if replset.Node == currentNode.Me {
+				self = "1"
+			}
 
-		// Add backup_last_transition_ts metric
-		metrics = append(metrics, createPBMMetric("backup_last_transition_ts",
-			"Last transition timestamp of PBM backup (seconds since epoch)",
-			float64(backup.LastTransitionTS), map[string]string{
-				"opid":   backup.OPID,
-				"status": string(backup.Status),
-				"name":   backup.Name,
-			}),
-		)
+			labels := map[string]string{
+				"opid":        backup.OPID,
+				"status":      string(backup.Status),
+				"name":        backup.Name,
+				"host":        replset.Node,
+				"replica_set": replset.Name,
+				"self":        self,
+			}
 
-		var endTime int64
-		switch pbmAgentStatus(backup.Status) {
-		case statusDone, statusCancelled, statusError, statusDown:
-			endTime = backup.LastTransitionTS
-		default:
-			endTime = time.Now().Unix()
+			metrics = append(metrics, createPBMMetric("backup_size_bytes",
+				"Size of PBM backup",
+				float64(backup.Size), labels),
+			)
+
+			// Add backup_last_transition_ts metric
+			metrics = append(metrics, createPBMMetric("backup_last_transition_ts",
+				"Last transition timestamp of PBM backup (seconds since epoch)",
+				float64(backup.LastTransitionTS), labels),
+			)
+
+			var endTime int64
+			switch pbmAgentStatus(backup.Status) {
+			case statusDone, statusCancelled, statusError, statusDown:
+				endTime = backup.LastTransitionTS
+			default:
+				endTime = time.Now().Unix()
+			}
+
+			duration := time.Unix(endTime-backup.StartTS, 0).Unix()
+			metrics = append(metrics, createPBMMetric("backup_duration_seconds",
+				"Duration of PBM backup",
+				float64(duration), labels),
+			)
 		}
-
-		duration := time.Unix(endTime-backup.StartTS, 0).Unix()
-		metrics = append(metrics, createPBMMetric("backup_duration_seconds",
-			"Duration of PBM backup",
-			float64(duration), map[string]string{
-				"opid":   backup.OPID,
-				"status": string(backup.Status),
-				"name":   backup.Name,
-			}),
-		)
 	}
 	return metrics
 }
