@@ -200,6 +200,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 				"host":        replset.Node,
 				"replica_set": replset.Name,
 				"self":        self,
+				"type":        string(backup.Type),
 			}
 
 			metrics = append(metrics, createPBMMetric("backup_size_bytes",
