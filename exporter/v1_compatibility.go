@@ -819,7 +819,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 		}
 	}
 
-	if nodeType != typeArbiter {
+	if nodeType == typeMongod {
 		metrics = append(metrics, myState(ctx, client))
 		if replSetGetStatus, ok := m["replSetGetStatus"].(bson.M); ok {
 			if rm := replSetMetrics(replSetGetStatus, l); rm != nil {
@@ -827,12 +827,10 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 			}
 		}
 
-		if nodeType != typeMongos {
-			if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
-				l.Warn("cannot create metrics for oplog", "error", err)
-			} else {
-				metrics = append(metrics, opLogMetrics...)
-			}
+		if opLogMetrics, err := oplogStatus(ctx, client); err != nil {
+			l.Warn("cannot create metrics for oplog", "error", err)
+		} else {
+			metrics = append(metrics, opLogMetrics...)
 		}
 	}
 
