@@ -26,9 +26,71 @@ import (
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
+
+func TestCollStatsCollectorAccountIndexes(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClient(ctx, t)
+
+	database := client.Database("testdb")
+	database.Drop(ctx) //nolint
+
+	defer func() {
+		err := database.Drop(ctx)
+		assert.NoError(t, err)
+	}()
+
+	collName := "test_collection_account"
+	coll := database.Collection(collName)
+
+	// Insert some data
+	_, err := coll.InsertOne(ctx, bson.M{"account_id": 1, "count": 10})
+	assert.NoError(t, err)
+	_, err = coll.InsertOne(ctx, bson.M{"account_id": 2, "count": 20})
+	assert.NoError(t, err)
+
+	// Create indexes
+	indexModel := mongo.IndexModel{
+		Keys:    bson.D{{Key: "account_id", Value: 1}},
+		Options: options.Index().SetName("test_index_account"),
+	}
+	_, err = coll.Indexes().CreateOne(ctx, indexModel)
+	assert.NoError(t, err)
+
+	indexModel = mongo.IndexModel{
+		Keys:    bson.D{{Key: "count", Value: 1}},
+		Options: options.Index().SetName("test_index_count"),
+	}
+	_, err = coll.Indexes().CreateOne(ctx, indexModel)
+	assert.NoError(t, err)
+
+	ti := labelsGetterMock{}
+
+	collection := []string{"testdb.test_collection_account"}
+	logger := promslog.New(&promslog.Config{})
+	c := newCollectionStatsCollector(ctx, client, logger, false, ti, collection, false)
+
+	// Expected metrics (simplified, adjust values as needed)
+	expected := strings.NewReader(`
+       # HELP mongodb_collstats_storageStats_indexSizes collstats.storageStats.indexSizes
+       # TYPE mongodb_collstats_storageStats_indexSizes untyped
+       mongodb_collstats_storageStats_indexSizes{collection="test_collection_account",database="testdb",index_name="_id_"} 4096
+       mongodb_collstats_storageStats_indexSizes{collection="test_collection_account",database="testdb",index_name="test_index_account"} 20480
+       mongodb_collstats_storageStats_indexSizes{collection="test_collection_account",database="testdb",index_name="test_index_count"} 20480
+       `)
+
+	filter := []string{
+		"mongodb_collstats_storageStats_indexSizes",
+	}
+	err = testutil.CollectAndCompare(c, expected, filter...)
+	assert.NoError(t, err)
+}
 
 func TestCollStatsCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

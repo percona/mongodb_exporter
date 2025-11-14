@@ -150,7 +150,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		for _, metric := range makeMetrics("top", mm, labels, d.compatibleMode) {
+		for _, metric := range makeMetrics(client, "top", mm, labels, d.compatibleMode) {
 			ch <- metric
 		}
 	}

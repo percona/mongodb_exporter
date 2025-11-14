@@ -104,7 +104,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 				if !success {
 					continue
 				}
-				for _, metric := range makeMetrics(prefix, primitive.M{"count": chunks}, labels, d.compatible) {
+				for _, metric := range makeMetrics(client, prefix, primitive.M{"count": chunks}, labels, d.compatible) {
 					ch <- metric
 				}
 			}

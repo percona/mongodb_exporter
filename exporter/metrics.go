@@ -16,7 +16,10 @@
 package exporter
 
 import (
+	"context"
+	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +28,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -204,9 +208,58 @@ func nameAndLabel(prefix, name string) (string, string) {
 	return prometheusize(prefix + name), ""
 }
 
+func allReservedNames(client *mongo.Client) ([]string, error) {
+	ctx := context.Background()
+	reservedNames := []string{}
+	dbs, err := client.ListDatabaseNames(ctx, struct{}{})
+	if err != nil {
+		return reservedNames, err
+	}
+
+	for _, dbName := range dbs {
+		fmt.Printf("Database: %s\n", dbName)
+		db := client.Database(dbName)
+		collCursor, err := db.ListCollections(ctx, struct{}{})
+		if err != nil {
+			return reservedNames, err
+		}
+		defer collCursor.Close(ctx)
+		for collCursor.Next(ctx) {
+			var collInfo struct {
+				Name string `bson:"name"`
+				Type string `bson:"type"`
+			}
+			if err := collCursor.Decode(&collInfo); err != nil {
+				return reservedNames, err
+			}
+			reservedNames = append(reservedNames, collInfo.Name)
+			if collInfo.Type == "view" {
+				continue // skip views
+			}
+			coll := db.Collection(collInfo.Name)
+			cursor, err := coll.Indexes().List(ctx)
+			if err != nil {
+				continue // skip if cannot list indexes
+			}
+			defer cursor.Close(ctx)
+			for cursor.Next(ctx) {
+				var indexDoc map[string]interface{}
+				if err := cursor.Decode(&indexDoc); err != nil {
+					continue
+				}
+				if name, ok := indexDoc["name"].(string); ok {
+					reservedNames = append(reservedNames, name)
+				}
+			}
+		}
+	}
+
+	return reservedNames, nil
+}
+
 // makeRawMetric creates a Prometheus metric based on the parameters we collected by
 // traversing the MongoDB structures returned by the collector functions.
-func makeRawMetric(prefix, name string, value interface{}, labels map[string]string) (*rawMetric, error) {
+func makeRawMetric(reservedNames []string, prefix, name string, value interface{}, labels map[string]string) (*rawMetric, error) {
 	f, err := asFloat64(value)
 	if err != nil {
 		return nil, err
@@ -220,8 +273,10 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 	fqName, label := nameAndLabel(prefix, name)
 
 	metricType := prometheus.UntypedValue
-	if strings.HasSuffix(strings.ToLower(name), "count") {
-		metricType = prometheus.CounterValue
+	if !slices.Contains(reservedNames, name) {
+		if strings.HasSuffix(strings.ToLower(name), "count") {
+			metricType = prometheus.CounterValue
+		}
 	}
 
 	rm := &rawMetric{
@@ -301,7 +356,7 @@ func metricHelp(prefix, name string) string {
 	return name
 }
 
-func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
+func makeMetrics(client *mongo.Client, prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
 	var res []prometheus.Metric
 
 	if prefix != "" {
@@ -327,15 +382,21 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		}
 		switch v := val.(type) {
 		case bson.M:
-			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
+			res = append(res, makeMetrics(client, nextPrefix, v, l, compatibleMode)...)
 		case map[string]interface{}:
-			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
+			res = append(res, makeMetrics(client, nextPrefix, v, l, compatibleMode)...)
 		case primitive.A:
-			res = append(res, processSlice(nextPrefix, v, l, compatibleMode)...)
+			res = append(res, processSlice(client, nextPrefix, v, l, compatibleMode)...)
 		case []interface{}:
 			continue
 		default:
-			rm, err := makeRawMetric(prefix, k, v, l)
+			reservedNames, err := allReservedNames(client)
+			if err != nil {
+				fmt.Printf("\n\n\n cannot get reserved names: %v \n\n\n", err)
+				continue
+			}
+
+			rm, err := makeRawMetric(reservedNames, prefix, k, v, l)
 			if err != nil {
 				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 				res = append(res, invalidMetric)
@@ -376,7 +437,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
 // and each member is represented by a map[string]interface{}.
-func processSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
+func processSlice(client *mongo.Client, prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 	labels := make(map[string]string)
 	for name, value := range commonLabels {
@@ -406,7 +467,7 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 			labels["member_idx"] = host
 		}
 
-		metrics = append(metrics, makeMetrics(prefix, s, labels, compatibleMode)...)
+		metrics = append(metrics, makeMetrics(client, prefix, s, labels, compatibleMode)...)
 	}
 
 	return metrics

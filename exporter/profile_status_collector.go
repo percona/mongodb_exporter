@@ -88,7 +88,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 		logger.Debug("profile response from MongoDB:")
 		debugResult(logger, primitive.M{db: m})
 
-		for _, metric := range makeMetrics("profile_slow_query", m, labels, d.compatibleMode) {
+		for _, metric := range makeMetrics(client, "profile_slow_query", m, labels, d.compatibleMode) {
 			ch <- metric
 		}
 	}
