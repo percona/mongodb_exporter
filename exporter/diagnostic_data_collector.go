@@ -126,7 +126,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			m = b
 		}
 
-		metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
+		metrics = makeMetrics(client, "", m, d.topologyInfo.baseLabels(), d.compatibleMode)
 		metrics = append(metrics, locksMetrics(logger, m)...)
 
 		securityMetric, err := d.getSecurityMetricFromLineOptions(client)
