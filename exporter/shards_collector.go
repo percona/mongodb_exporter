@@ -91,7 +91,6 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 				_, c := splitNamespace(id)
 				collections = append(collections, c)
 			}
-
 		}
 	}
 	reservedNames, err := GetAllIndexesForCollections(d.ctx, client, collections)
