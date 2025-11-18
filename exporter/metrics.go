@@ -364,52 +364,50 @@ func makeMetrics(reservedNames []string, prefix string, m bson.M, labels map[str
 		} else {
 			l = labels
 		}
-		switch v := val.(type) {
-		case bson.M:
-			res = append(res, makeMetrics(reservedNames, nextPrefix, v, l, compatibleMode)...)
-		case map[string]interface{}:
-			res = append(res, makeMetrics(reservedNames, nextPrefix, v, l, compatibleMode)...)
-		case primitive.A:
-			res = append(res, processSlice(reservedNames, nextPrefix, v, l, compatibleMode)...)
-		case []interface{}:
-			continue
-		default:
-			rm, err := makeRawMetric(reservedNames, prefix, k, v, l)
+		res = append(res, handleMetricSwitch(reservedNames, prefix, nextPrefix, k, val, l, compatibleMode)...)
+	}
+	return res
+}
+
+// Helper for switch block from makeMetrics
+func handleMetricSwitch(reservedNames []string, prefix, nextPrefix, k string, val interface{}, l map[string]string, compatibleMode bool) []prometheus.Metric {
+	var res []prometheus.Metric
+	switch v := val.(type) {
+	case bson.M:
+		res = append(res, makeMetrics(reservedNames, nextPrefix, v, l, compatibleMode)...)
+	case map[string]interface{}:
+		res = append(res, makeMetrics(reservedNames, nextPrefix, v, l, compatibleMode)...)
+	case primitive.A:
+		res = append(res, processSlice(reservedNames, nextPrefix, v, l, compatibleMode)...)
+	case []interface{}:
+		// skip
+	default:
+		rm, err := makeRawMetric(reservedNames, prefix, k, v, l)
+		if err != nil {
+			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			res = append(res, invalidMetric)
+			return res
+		}
+		if rm == nil {
+			return res
+		}
+		metrics := []*rawMetric{rm}
+		if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
+			metrics = renamedMetrics
+		}
+		for _, m := range metrics {
+			metric, err := rawToPrometheusMetric(m)
 			if err != nil {
 				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 				res = append(res, invalidMetric)
 				continue
 			}
-
-			// makeRawMetric returns a nil metric for some data types like strings
-			// because we cannot extract data from all types
-			if rm == nil {
-				continue
-			}
-
-			metrics := []*rawMetric{rm}
-
-			if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
-				metrics = renamedMetrics
-			}
-
-			for _, m := range metrics {
-				metric, err := rawToPrometheusMetric(m)
-				if err != nil {
-					invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-					res = append(res, invalidMetric)
-					continue
-				}
-
-				res = append(res, metric)
-
-				if compatibleMode {
-					res = appendCompatibleMetric(res, m)
-				}
+			res = append(res, metric)
+			if compatibleMode {
+				res = appendCompatibleMetric(res, m)
 			}
 		}
 	}
-
 	return res
 }
 
