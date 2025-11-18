@@ -82,6 +82,24 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 	if err != nil {
 		logger.Error("cannot get database names", "error", err)
 	}
+
+	collections := make([]string, 0, len(databaseNames))
+	for _, database := range databaseNames {
+		colls := d.getCollectionsForDBName(database)
+		for _, coll := range colls {
+			if id, ok := coll["_id"].(string); ok {
+				_, c := splitNamespace(id)
+				collections = append(collections, c)
+			}
+
+		}
+	}
+	reservedNames, err := GetAllIndexesForCollections(d.ctx, client, collections)
+	if err != nil {
+		logger.Error("cannot get all indexes for collections", "error", err.Error())
+		return
+	}
+
 	for _, database := range databaseNames {
 		collections := d.getCollectionsForDBName(database)
 		for _, row := range collections {
@@ -104,7 +122,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 				if !success {
 					continue
 				}
-				for _, metric := range makeMetrics(prefix, primitive.M{"count": chunks}, labels, d.compatible) {
+				for _, metric := range makeMetrics(reservedNames, prefix, primitive.M{"count": chunks}, labels, d.compatible) {
 					ch <- metric
 				}
 			}

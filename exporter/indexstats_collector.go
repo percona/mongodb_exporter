@@ -85,6 +85,12 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
+	reservedNames, err := GetAllIndexesForCollections(d.ctx, client, collections)
+	if err != nil {
+		logger.Error("cannot get all indexes for collections", "error", err.Error())
+		return
+	}
+
 	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
 		if len(parts) < 2 { //nolint:gomnd
@@ -137,7 +143,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 			labels["key_name"] = indexName
 
 			metrics := sanitizeMetrics(metric)
-			for _, metric := range makeMetrics(prefix, metrics, labels, false) {
+			for _, metric := range makeMetrics(reservedNames, prefix, metrics, labels, false) {
 				ch <- metric
 			}
 		}

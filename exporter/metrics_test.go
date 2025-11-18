@@ -166,7 +166,7 @@ func TestMakeRawMetric(t *testing.T) {
 			}
 		}
 
-		m, err := makeRawMetric(prefix, name, tc.value, nil)
+		m, err := makeRawMetric(nil, prefix, name, tc.value, nil)
 
 		assert.NoError(t, err)
 		assert.Equal(t, want, m)
