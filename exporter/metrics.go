@@ -311,7 +311,7 @@ func GetAllIndexesForCollections(ctx context.Context, client *mongo.Client, coll
 	var indexNames []string
 
 	for _, dbCollection := range collections {
-		parts := strings.SplitN(dbCollection, ".", 2)
+		parts := strings.SplitN(dbCollection, ".", 2) //nolint:mnd
 		if len(parts) != 2 {
 			continue // skip invalid format
 		}
@@ -324,7 +324,7 @@ func GetAllIndexesForCollections(ctx context.Context, client *mongo.Client, coll
 			// skip collections where indexes cannot be listed (e.g., views, system collections)
 			continue
 		}
-		defer cursor.Close(ctx)
+		defer cursor.Close(ctx) //nolint:errcheck
 
 		for cursor.Next(ctx) {
 			var idxDoc struct {
