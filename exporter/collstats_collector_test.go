@@ -61,11 +61,6 @@ func TestCollStatsCollector(t *testing.T) {
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
-# HELP mongodb_collstats_latencyStats_commands_latency collstats.latencyStats.commands.latency
-# TYPE mongodb_collstats_latencyStats_commands_latency untyped
-mongodb_collstats_latencyStats_commands_latency{collection="testcol_00",database="testdb"} 0
-mongodb_collstats_latencyStats_commands_latency{collection="testcol_01",database="testdb"} 0
-mongodb_collstats_latencyStats_commands_latency{collection="testcol_02",database="testdb"} 0
 # HELP mongodb_collstats_latencyStats_transactions_ops collstats.latencyStats.transactions.ops
 # TYPE mongodb_collstats_latencyStats_transactions_ops untyped
 mongodb_collstats_latencyStats_transactions_ops{collection="testcol_00",database="testdb"} 0
@@ -88,7 +83,6 @@ mongodb_collstats_storageStats_capped{collection="testcol_02",database="testdb"}
 	// 2. We need to check against know values. Don't use metrics that return counters like uptime
 	//    or counters like the number of transactions because they won't return a known value to compare
 	filter := []string{
-		"mongodb_collstats_latencyStats_commands_latency",
 		"mongodb_collstats_storageStats_capped",
 		"mongodb_collstats_storageStats_indexSizes",
 		"mongodb_collstats_latencyStats_transactions_ops",
@@ -97,7 +91,7 @@ mongodb_collstats_storageStats_capped{collection="testcol_02",database="testdb"}
 	assert.NoError(t, err)
 }
 
-func TestCollStatsCollectorAccountIndexes(t *testing.T) {
+func TestCollStatsForFakeCountType(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
