@@ -309,7 +309,6 @@ func metricHelp(prefix, name string) string {
 // GetAllIndexesForCollections returns all index names for the given list of "db.collection" strings.
 func GetAllIndexesForCollections(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
 	var indexNames []string
-
 	for _, dbCollection := range collections {
 		parts := strings.SplitN(dbCollection, ".", 2) //nolint:mnd
 		if len(parts) != 2 {
@@ -321,8 +320,7 @@ func GetAllIndexesForCollections(ctx context.Context, client *mongo.Client, coll
 		coll := client.Database(dbName).Collection(collName)
 		cursor, err := coll.Indexes().List(ctx)
 		if err != nil {
-			// skip collections where indexes cannot be listed (e.g., views, system collections)
-			continue
+			continue // skip collections where indexes cannot be listed (e.g., views, system collections)
 		}
 		defer cursor.Close(ctx) //nolint:errcheck
 
@@ -369,7 +367,6 @@ func makeMetrics(reservedNames []string, prefix string, m bson.M, labels map[str
 	return res
 }
 
-// Helper for switch block from makeMetrics
 func handleMetricSwitch(reservedNames []string, prefix, nextPrefix, k string, val interface{}, l map[string]string, compatibleMode bool) []prometheus.Metric {
 	var res []prometheus.Metric
 	switch v := val.(type) {
@@ -408,6 +405,7 @@ func handleMetricSwitch(reservedNames []string, prefix, nextPrefix, k string, va
 			}
 		}
 	}
+
 	return res
 }
 

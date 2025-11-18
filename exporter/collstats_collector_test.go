@@ -109,13 +109,11 @@ func TestCollStatsForFakeCountType(t *testing.T) {
 	collName := "test_collection_account"
 	coll := database.Collection(collName)
 
-	// Insert some data
 	_, err := coll.InsertOne(ctx, bson.M{"account_id": 1, "count": 10})
 	require.NoError(t, err)
 	_, err = coll.InsertOne(ctx, bson.M{"account_id": 2, "count": 20})
 	require.NoError(t, err)
 
-	// Create indexes
 	indexModel := mongo.IndexModel{
 		Keys:    bson.D{{Key: "account_id", Value: 1}},
 		Options: options.Index().SetName("test_index_account"),
@@ -136,7 +134,6 @@ func TestCollStatsForFakeCountType(t *testing.T) {
 	logger := promslog.New(&promslog.Config{})
 	c := newCollectionStatsCollector(ctx, client, logger, false, ti, collection, false)
 
-	// Expected metrics (simplified, adjust values as needed)
 	expected := strings.NewReader(`
        # HELP mongodb_collstats_storageStats_indexSizes collstats.storageStats.indexSizes
        # TYPE mongodb_collstats_storageStats_indexSizes untyped
