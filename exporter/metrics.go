@@ -325,13 +325,13 @@ func GetAllIndexesForCollections(ctx context.Context, client *mongo.Client, coll
 		defer cursor.Close(ctx) //nolint:errcheck
 
 		for cursor.Next(ctx) {
-			var idxDoc struct {
+			var indexDoc struct {
 				Name string `bson:"name"`
 			}
-			if err := cursor.Decode(&idxDoc); err != nil {
+			if err := cursor.Decode(&indexDoc); err != nil {
 				continue
 			}
-			indexNames = append(indexNames, idxDoc.Name)
+			indexNames = append(indexNames, indexDoc.Name)
 		}
 	}
 
@@ -385,6 +385,9 @@ func handleMetricSwitch(reservedNames []string, prefix, nextPrefix, k string, va
 			res = append(res, invalidMetric)
 			return res
 		}
+
+		// makeRawMetric returns a nil metric for some data types like strings
+		// because we cannot extract data from all types
 		if rm == nil {
 			return res
 		}
@@ -392,6 +395,7 @@ func handleMetricSwitch(reservedNames []string, prefix, nextPrefix, k string, va
 		if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
 			metrics = renamedMetrics
 		}
+
 		for _, m := range metrics {
 			metric, err := rawToPrometheusMetric(m)
 			if err != nil {
