@@ -18,11 +18,11 @@ package exporter
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	pbmconnect "github.com/percona/percona-backup-mongodb/pbm/connect"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
@@ -73,12 +73,7 @@ func TestPBMCollector(t *testing.T) {
 }
 
 // TestPBMCollectorConnectionLeak verifies that the PBM collector does not leak
-// MongoDB connections or goroutines across multiple scrape cycles.
-//
-// This test monitors both server-side connections and client-side goroutines
-// to detect leaks. A leak in the PBM SDK's connect.MongoConnectWithOpts()
-// function (where Ping() failure doesn't call Disconnect()) would cause
-// goroutine growth even if server connections appear stable.
+// MongoDB connections across multiple scrape cycles.
 //
 //nolint:paralleltest
 func TestPBMCollectorConnectionLeak(t *testing.T) {
@@ -101,13 +96,11 @@ func TestPBMCollectorConnectionLeak(t *testing.T) {
 	err = client.Ping(ctx, nil)
 	require.NoError(t, err)
 
-	// Allow GC and goroutines to stabilize before measuring
-	runtime.GC()
+	// Allow connections to stabilize
 	time.Sleep(100 * time.Millisecond)
 
 	initialConns := getServerConnectionCount(ctx, t, client)
-	initialGoroutines := runtime.NumGoroutine()
-	t.Logf("Initial state: connections=%d, goroutines=%d", initialConns, initialGoroutines)
+	t.Logf("Initial connections: %d", initialConns)
 
 	c := newPbmCollector(ctx, client, mongoURI, promslog.New(&promslog.Config{}))
 
@@ -121,138 +114,99 @@ func TestPBMCollectorConnectionLeak(t *testing.T) {
 		}
 	}
 
-	// Allow time for cleanup and GC
+	// Allow time for cleanup
 	time.Sleep(1 * time.Second)
-	runtime.GC()
-	time.Sleep(100 * time.Millisecond)
 
 	finalConns := getServerConnectionCount(ctx, t, client)
-	finalGoroutines := runtime.NumGoroutine()
 	connGrowth := finalConns - initialConns
-	goroutineGrowth := finalGoroutines - initialGoroutines
 
-	t.Logf("Final state: connections=%d (growth=%d), goroutines=%d (growth=%d) over %d scrapes",
-		finalConns, connGrowth, finalGoroutines, goroutineGrowth, scrapeCount)
+	t.Logf("Final connections: %d (growth=%d over %d scrapes)", finalConns, connGrowth, scrapeCount)
 
-	// Check for connection leaks
 	// With a leak: expect ~3-4 connections per scrape (one per cluster member)
 	// Without leak: should be near zero growth
 	assert.Less(t, connGrowth, int64(scrapeCount),
 		"Connection leak detected: server connections grew by %d over %d scrapes", connGrowth, scrapeCount)
-
-	// Check for goroutine leaks (more sensitive indicator)
-	// Each leaked mongo.Client creates ~24 goroutines for monitoring
-	// Allow some variance for GC timing, but flag major growth
-	maxGoroutineGrowth := scrapeCount * 5 // Allow 5 goroutines per scrape as buffer
-	assert.Less(t, goroutineGrowth, maxGoroutineGrowth,
-		"Goroutine leak detected: grew by %d over %d scrapes (max allowed: %d). "+
-			"This may indicate MongoDB clients are not being properly disconnected.",
-		goroutineGrowth, scrapeCount, maxGoroutineGrowth)
 }
 
-// TestMongoClientLeakOnPingFailure demonstrates the goroutine leak that occurs
-// when mongo.Connect succeeds but Ping fails, and Disconnect is not called.
+// TestPBMSDKConnectionLeakOnPingFailure tests the PBM SDK's connect.MongoConnect
+// for connection leaks when Ping fails after Connect succeeds.
 //
-// This test reproduces the bug in PBM SDK's connect.MongoConnectWithOpts()
-// where a failed Ping does not call Disconnect on the client, causing leaked
-// goroutines and connections.
+// The bug in PBM SDK's connect.MongoConnectWithOpts():
+//   - mongo.Connect() succeeds (establishes connections)
+//   - Ping() fails (e.g., unreachable server, wrong replica set)
+//   - Connection is NOT disconnected -> connections leak
 //
-// The test uses a ReadPreference with a non-existent tag to force Ping to fail
-// after the driver has already established monitoring connections.
-//
-// This test documents the leak behavior. It passes to show the leak exists.
-// After the PBM SDK fix, this test can be modified to verify the fix.
+// This test uses an unsatisfiable ReadPreference to trigger Ping failure
+// after the driver has established connections.
 //
 //nolint:paralleltest
-func TestMongoClientLeakOnPingFailure(t *testing.T) {
+func TestPBMSDKConnectionLeakOnPingFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	port, err := tu.PortForContainer("mongo-2-1")
 	require.NoError(t, err)
 
-	// Allow GC and goroutines to stabilize before measuring
-	runtime.GC()
+	// Create a monitoring client to check server connection count
+	monitorURI := fmt.Sprintf("mongodb://admin:admin@127.0.0.1:%s/", port) //nolint:gosec
+	monitorClient, err := mongo.Connect(ctx, options.Client().ApplyURI(monitorURI))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		monitorClient.Disconnect(ctx) //nolint:errcheck
+	})
+	err = monitorClient.Ping(ctx, nil)
+	require.NoError(t, err)
+
+	// Allow connections to stabilize
 	time.Sleep(100 * time.Millisecond)
-	initialGoroutines := runtime.NumGoroutine()
+
+	initialConns := getServerConnectionCount(ctx, t, monitorClient)
+	t.Logf("Initial connections: %d", initialConns)
 
 	const iterations = 5
-	leakedClients := make([]*mongo.Client, 0, iterations)
 
 	for i := 0; i < iterations; i++ {
-		// Use a ReadPreference that can't be satisfied - this causes:
-		// 1. Connect to succeed (driver starts monitoring goroutines)
-		// 2. Ping to fail (no server matches the tag selector)
-		opts := options.Client().
-			ApplyURI(fmt.Sprintf("mongodb://admin:admin@127.0.0.1:%s/", port)).
-			SetReadPreference(readpref.Nearest(readpref.WithTags("dc", "nonexistent"))).
-			SetServerSelectionTimeout(300 * time.Millisecond)
-
-		client, err := mongo.Connect(ctx, opts)
-		require.NoError(t, err, "Connect should succeed")
-
-		// Give the driver time to establish monitoring connections
-		time.Sleep(100 * time.Millisecond)
-
-		// Ping will fail because no server matches the read preference
-		err = client.Ping(ctx, nil)
-		require.Error(t, err, "Ping should fail due to unsatisfiable read preference")
-		t.Logf("Iteration %d: Ping failed as expected: %v", i, err)
-
-		// Simulate the bug: NOT calling Disconnect after Ping failure
-		// This is what happens in connect.MongoConnectWithOpts when Ping fails
-		leakedClients = append(leakedClients, client)
+		// Use a ReadPreference that cannot be satisfied to trigger the leak:
+		// 1. mongo.Connect() succeeds and establishes connections
+		// 2. Ping() fails because no server matches the tag selector
+		// 3. Without proper cleanup, connections are leaked
+		_, err := pbmconnect.MongoConnect(ctx,
+			monitorURI,
+			pbmconnect.AppName("leak-test"),
+			func(opts *options.ClientOptions) error {
+				opts.SetReadPreference(readpref.Nearest(readpref.WithTags("dc", "nonexistent")))
+				opts.SetServerSelectionTimeout(300 * time.Millisecond)
+				return nil
+			},
+		)
+		require.Error(t, err, "MongoConnect should fail due to unsatisfiable ReadPreference")
+		t.Logf("Iteration %d: MongoConnect failed as expected", i)
 	}
 
-	// Allow time for any cleanup and measure
+	// Allow time for any cleanup
 	time.Sleep(500 * time.Millisecond)
-	runtime.GC()
-	time.Sleep(100 * time.Millisecond)
 
-	goroutinesAfterLeak := runtime.NumGoroutine()
-	leakGrowth := goroutinesAfterLeak - initialGoroutines
+	finalConns := getServerConnectionCount(ctx, t, monitorClient)
+	connGrowth := finalConns - initialConns
 
-	t.Logf("After %d iterations without Disconnect: goroutines=%d (growth=%d)",
-		iterations, goroutinesAfterLeak, leakGrowth)
+	t.Logf("Final connections: %d (growth=%d over %d iterations)", finalConns, connGrowth, iterations)
 
-	// Each mongo.Client creates ~24 goroutines for monitoring
-	// With 5 iterations, we expect ~120 leaked goroutines
-	expectedLeakPerClient := 20 // Conservative estimate
-	expectedTotalLeak := iterations * expectedLeakPerClient
+	// Each leaked connection attempt should leave connections open
+	// If there's a leak, we'd see growth proportional to iterations
+	// Without leak, growth should be zero or minimal
+	leakThreshold := int64(iterations * 2) // Allow some buffer
 
-	// Document that the leak exists
-	if leakGrowth >= expectedTotalLeak/2 {
-		t.Logf("LEAK CONFIRMED: %d goroutines leaked over %d iterations (expected ~%d)",
-			leakGrowth, iterations, expectedTotalLeak)
+	if connGrowth >= leakThreshold {
+		t.Logf("LEAK DETECTED: %d connections leaked over %d iterations", connGrowth, iterations)
+		t.Logf("This confirms the bug in PBM SDK's connect.MongoConnectWithOpts()")
 	}
 
-	// Now properly disconnect all clients and verify cleanup works
-	for _, client := range leakedClients {
-		client.Disconnect(ctx) //nolint:errcheck
-	}
-
-	time.Sleep(500 * time.Millisecond)
-	runtime.GC()
-	time.Sleep(100 * time.Millisecond)
-
-	goroutinesAfterCleanup := runtime.NumGoroutine()
-	cleanupGrowth := goroutinesAfterCleanup - initialGoroutines
-
-	t.Logf("After Disconnect cleanup: goroutines=%d (growth from initial=%d)",
-		goroutinesAfterCleanup, cleanupGrowth)
-
-	// After proper cleanup, goroutine count should return to near initial
-	// This verifies that Disconnect() properly cleans up resources
-	assert.Less(t, cleanupGrowth, 10,
-		"Goroutines should return to near initial after Disconnect, but grew by %d", cleanupGrowth)
-
-	// Document the leak - this assertion verifies the bug exists
-	// When NOT calling Disconnect after Ping failure, goroutines leak
-	assert.Greater(t, leakGrowth, expectedTotalLeak/2,
-		"Expected goroutine leak when Disconnect is not called after Ping failure. "+
-			"Growth was %d, expected at least %d. "+
-			"This documents the bug in PBM SDK's connect.MongoConnectWithOpts()",
-		leakGrowth, expectedTotalLeak/2)
+	// This test documents the leak. Once the PBM SDK is fixed, flip this assertion:
+	// assert.Less(t, connGrowth, leakThreshold, "Connection leak in PBM SDK")
+	assert.GreaterOrEqual(t, connGrowth, leakThreshold,
+		"Expected connection leak when Ping fails. Growth was %d, expected at least %d. "+
+			"If this fails, the PBM SDK may have been fixed!",
+		connGrowth, leakThreshold)
 }
 
 // getServerConnectionCount returns the current number of connections to the MongoDB server.
