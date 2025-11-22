@@ -85,6 +85,12 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
+	reservedNames, err := GetAllIndexesForCollections(d.ctx, client, collections)
+	if err != nil {
+		logger.Error("cannot get all indexes for collections", "error", err.Error())
+		return
+	}
+
 	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
 		if len(parts) < 2 { //nolint:gomnd
@@ -151,7 +157,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 				labels["shard"] = shard
 			}
 
-			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {
+			for _, metric := range makeMetrics(reservedNames, prefix, metrics, labels, d.compatibleMode) {
 				ch <- metric
 			}
 		}

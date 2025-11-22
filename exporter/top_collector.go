@@ -139,6 +139,17 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 			  and pass the namespace as a label to the makeMetrics function.
 	*/
 
+	collections := make([]string, 0, len(totals))
+	for namespace := range totals {
+		_, coll := splitNamespace(namespace)
+		collections = append(collections, coll)
+	}
+	reservedNames, err := GetAllIndexesForCollections(d.ctx, client, collections)
+	if err != nil {
+		logger.Error("cannot get all indexes for collections", "error", err.Error())
+		return
+	}
+
 	for namespace, metrics := range totals {
 		labels := d.topologyInfo.baseLabels()
 		db, coll := splitNamespace(namespace)
@@ -150,7 +161,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		for _, metric := range makeMetrics("top", mm, labels, d.compatibleMode) {
+		for _, metric := range makeMetrics(reservedNames, "top", mm, labels, d.compatibleMode) {
 			ch <- metric
 		}
 	}

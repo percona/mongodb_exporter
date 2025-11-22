@@ -16,7 +16,9 @@
 package exporter
 
 import (
+	"context"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -206,7 +209,7 @@ func nameAndLabel(prefix, name string) (string, string) {
 
 // makeRawMetric creates a Prometheus metric based on the parameters we collected by
 // traversing the MongoDB structures returned by the collector functions.
-func makeRawMetric(prefix, name string, value interface{}, labels map[string]string) (*rawMetric, error) {
+func makeRawMetric(reservedNames []string, prefix, name string, value interface{}, labels map[string]string) (*rawMetric, error) {
 	f, err := asFloat64(value)
 	if err != nil {
 		return nil, err
@@ -220,8 +223,10 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 	fqName, label := nameAndLabel(prefix, name)
 
 	metricType := prometheus.UntypedValue
-	if strings.HasSuffix(strings.ToLower(name), "count") {
-		metricType = prometheus.CounterValue
+	if !slices.Contains(reservedNames, name) {
+		if strings.HasSuffix(strings.ToLower(name), "count") {
+			metricType = prometheus.CounterValue
+		}
 	}
 
 	rm := &rawMetric{
@@ -301,7 +306,39 @@ func metricHelp(prefix, name string) string {
 	return name
 }
 
-func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
+// GetAllIndexesForCollections returns all index names for the given list of "db.collection" strings.
+func GetAllIndexesForCollections(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
+	var indexNames []string
+	for _, dbCollection := range collections {
+		parts := strings.SplitN(dbCollection, ".", 2) //nolint:mnd
+		if len(parts) != 2 {
+			continue // skip invalid format
+		}
+		dbName := parts[0]
+		collName := parts[1]
+
+		coll := client.Database(dbName).Collection(collName)
+		cursor, err := coll.Indexes().List(ctx)
+		if err != nil {
+			continue // skip collections where indexes cannot be listed (e.g., views, system collections)
+		}
+		defer cursor.Close(ctx) //nolint:errcheck
+
+		for cursor.Next(ctx) {
+			var indexDoc struct {
+				Name string `bson:"name"`
+			}
+			if err := cursor.Decode(&indexDoc); err != nil {
+				continue
+			}
+			indexNames = append(indexNames, indexDoc.Name)
+		}
+	}
+
+	return indexNames, nil
+}
+
+func makeMetrics(reservedNames []string, prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
 	var res []prometheus.Metric
 
 	if prefix != "" {
@@ -325,48 +362,50 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		} else {
 			l = labels
 		}
-		switch v := val.(type) {
-		case bson.M:
-			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
-		case map[string]interface{}:
-			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
-		case primitive.A:
-			res = append(res, processSlice(nextPrefix, v, l, compatibleMode)...)
-		case []interface{}:
-			continue
-		default:
-			rm, err := makeRawMetric(prefix, k, v, l)
+		res = append(res, handleMetricSwitch(reservedNames, prefix, nextPrefix, k, val, l, compatibleMode)...)
+	}
+	return res
+}
+
+func handleMetricSwitch(reservedNames []string, prefix, nextPrefix, k string, val interface{}, l map[string]string, compatibleMode bool) []prometheus.Metric {
+	var res []prometheus.Metric
+	switch v := val.(type) {
+	case bson.M:
+		res = append(res, makeMetrics(reservedNames, nextPrefix, v, l, compatibleMode)...)
+	case map[string]interface{}:
+		res = append(res, makeMetrics(reservedNames, nextPrefix, v, l, compatibleMode)...)
+	case primitive.A:
+		res = append(res, processSlice(reservedNames, nextPrefix, v, l, compatibleMode)...)
+	case []interface{}:
+		// skip
+	default:
+		rm, err := makeRawMetric(reservedNames, prefix, k, v, l)
+		if err != nil {
+			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			res = append(res, invalidMetric)
+			return res
+		}
+
+		// makeRawMetric returns a nil metric for some data types like strings
+		// because we cannot extract data from all types
+		if rm == nil {
+			return res
+		}
+		metrics := []*rawMetric{rm}
+		if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
+			metrics = renamedMetrics
+		}
+
+		for _, m := range metrics {
+			metric, err := rawToPrometheusMetric(m)
 			if err != nil {
 				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 				res = append(res, invalidMetric)
 				continue
 			}
-
-			// makeRawMetric returns a nil metric for some data types like strings
-			// because we cannot extract data from all types
-			if rm == nil {
-				continue
-			}
-
-			metrics := []*rawMetric{rm}
-
-			if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
-				metrics = renamedMetrics
-			}
-
-			for _, m := range metrics {
-				metric, err := rawToPrometheusMetric(m)
-				if err != nil {
-					invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-					res = append(res, invalidMetric)
-					continue
-				}
-
-				res = append(res, metric)
-
-				if compatibleMode {
-					res = appendCompatibleMetric(res, m)
-				}
+			res = append(res, metric)
+			if compatibleMode {
+				res = appendCompatibleMetric(res, m)
 			}
 		}
 	}
@@ -376,7 +415,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
 // and each member is represented by a map[string]interface{}.
-func processSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
+func processSlice(reservedNames []string, prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 	labels := make(map[string]string)
 	for name, value := range commonLabels {
@@ -406,7 +445,7 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 			labels["member_idx"] = host
 		}
 
-		metrics = append(metrics, makeMetrics(prefix, s, labels, compatibleMode)...)
+		metrics = append(metrics, makeMetrics(reservedNames, prefix, s, labels, compatibleMode)...)
 	}
 
 	return metrics
