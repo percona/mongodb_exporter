@@ -29,17 +29,19 @@ import (
 )
 
 type shardsCollector struct {
-	ctx        context.Context
-	base       *baseCollector
-	compatible bool
+	ctx                 context.Context
+	base                *baseCollector
+	compatible          bool
+	scanEachCollChunkOk bool
 }
 
 // newShardsCollector creates collector collecting metrics about chunks for shards Mongo.
-func newShardsCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, compatibleMode bool) *shardsCollector {
+func newShardsCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, compatibleMode bool, scanEachCollChunkOk bool) *shardsCollector {
 	return &shardsCollector{
-		ctx:        ctx,
-		base:       newBaseCollector(client, logger.With("collector", "shards")),
-		compatible: compatibleMode,
+		ctx:                 ctx,
+		base:                newBaseCollector(client, logger.With("collector", "shards")),
+		compatible:          compatibleMode,
+		scanEachCollChunkOk: scanEachCollChunkOk,
 	}
 }
 
@@ -76,6 +78,10 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 
 	for _, metric := range metrics {
 		ch <- metric
+	}
+
+	if !d.scanEachCollChunkOk {
+		return
 	}
 
 	databaseNames, err := client.ListDatabaseNames(d.ctx, bson.D{})
