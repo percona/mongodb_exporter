@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -220,7 +221,10 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 	fqName, label := nameAndLabel(prefix, name)
 
 	metricType := prometheus.UntypedValue
-	if strings.HasSuffix(strings.ToLower(name), "count") {
+
+	// reservedPrefixes are used for metrics that might include the word ‘count’ in their name but are not actual counters.
+	reservedPrefixes := []string{"collstats.storageStats.indexSizes."}
+	if !slices.Contains(reservedPrefixes, prefix) && strings.HasSuffix(strings.ToLower(name), "count") {
 		metricType = prometheus.CounterValue
 	}
 
