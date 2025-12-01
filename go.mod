@@ -18,7 +18,7 @@ require (
 require github.com/foxcpp/go-mockdns v1.1.0
 
 require (
-	github.com/hashicorp/go-version v1.7.0
+	github.com/hashicorp/go-version v1.8.0
 	github.com/percona/percona-backup-mongodb v1.8.1-0.20250429102026-063dab6cc946
 )
 
