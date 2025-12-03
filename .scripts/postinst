@@ -10,6 +10,6 @@ useradd --system \
         --comment "MongoDB Exporter" \
         mongodb_exporter
 
-systemctl daemon-reload > dev/null || exit $?
+systemctl --system daemon-reload >/dev/null || true
 
 exit 0
