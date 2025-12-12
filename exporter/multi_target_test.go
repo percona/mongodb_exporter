@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"sync"
 	"testing"
 
 	"github.com/prometheus/common/promslog"
@@ -69,9 +70,21 @@ func TestMultiTarget(t *testing.T) {
 		"mongodb_up{cluster_role=\"\"} 0\n",
 	}
 
+	exportersCache := make(map[string]*Exporter)
+	var cacheMutex sync.Mutex
+
+	for _, e := range exporters {
+		cacheMutex.Lock()
+		exportersCache[e.opts.URI] = e
+		cacheMutex.Unlock()
+	}
+
 	// Test all targets
 	for sn, opt := range opts {
-		assert.HTTPBodyContains(t, multiTargetHandler(serverMap), "GET", fmt.Sprintf("?target=%s", opt.URI), nil, expected[sn])
+		t.Run(fmt.Sprintf("target_%d", sn), func(t *testing.T) {
+			handler := multiTargetHandler(serverMap, opt, exportersCache, &cacheMutex, log)
+			assert.HTTPBodyContains(t, handler, "GET", fmt.Sprintf("?target=%s", opt.URI), nil, expected[sn])
+		})
 	}
 }
 
