@@ -2,13 +2,15 @@
 
 set -e
 
-echo "Creating user and group..."
-
-useradd --system \
+# creating mongodb_exporter user if he isn't already there
+if ! getent passwd mongodb_exporter >/dev/null; then
+    useradd \
+        --system \
         --no-create-home \
         --shell /sbin/nologin \
         --comment "MongoDB Exporter" \
-        mongodb_exporter
+        mongodb_exporter >/dev/null
+fi
 
 systemctl --system daemon-reload >/dev/null || true
 
