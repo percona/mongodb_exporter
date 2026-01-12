@@ -15,7 +15,7 @@ require (
 	go.mongodb.org/mongo-driver v1.17.6
 )
 
-require github.com/foxcpp/go-mockdns v1.1.0
+require github.com/foxcpp/go-mockdns v1.2.0
 
 require (
 	github.com/hashicorp/go-version v1.8.0
