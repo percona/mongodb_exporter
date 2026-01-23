@@ -37,9 +37,6 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 
 	client := tu.DefaultTestClient(ctx, t)
 
-	// -----------------------
-	// Setup test database
-	// -----------------------
 	database := client.Database("testdb")
 	_ = database.Drop(ctx)
 
@@ -78,9 +75,6 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 	<-ch
 	time.Sleep(1 * time.Second)
 
-	// -----------------------
-	// 1. Slow query metric
-	// -----------------------
 	slowQueryMetrics := []string{
 		"mongodb_currentop_query_uptime",
 	}
@@ -88,27 +82,21 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 	count := testutil.CollectAndCount(c, slowQueryMetrics...)
 	assert.True(t, count > 0)
 
-	// -----------------------
-	// 2. fsync lock metric
-	// -----------------------
 	adminDB := client.Database("admin")
 
 	fsyncMetrics := []string{
 		"mongodb_currentop_fsync_lock_state",
 	}
 
-	// initial state (unlocked)
 	count = testutil.CollectAndCount(c, fsyncMetrics...)
 	assert.Equal(t, 1, count)
 
-	// lock
 	err := adminDB.RunCommand(ctx, bson.D{
 		{Key: "fsync", Value: 1},
 		{Key: "lock", Value: true},
 	}).Err()
 	assert.NoError(t, err)
 
-	// always unlock
 	defer func() {
 		_ = adminDB.RunCommand(ctx, bson.D{
 			{Key: "fsyncUnlock", Value: 1},
@@ -117,11 +105,9 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	// locked state
 	count = testutil.CollectAndCount(c, fsyncMetrics...)
 	assert.Equal(t, 1, count)
 
-	// unlock
 	err = adminDB.RunCommand(ctx, bson.D{
 		{Key: "fsyncUnlock", Value: 1},
 	}).Err()
@@ -129,7 +115,6 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	// unlocked again
 	count = testutil.CollectAndCount(c, fsyncMetrics...)
 	assert.Equal(t, 1, count)
 

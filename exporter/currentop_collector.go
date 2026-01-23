@@ -72,11 +72,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	if d.currentopslowtime != "" {
 		slowtime, err := time.ParseDuration(d.currentopslowtime)
 		if err != nil {
-			logger.Error(
-				"Failed to parse currentop slowtime, slow query metrics disabled",
-				"value", d.currentopslowtime,
-				"error", err,
-			)
+			logger.Error("Failed to parse currentop slowtime, slow query metrics disabled", "value", d.currentopslowtime, "error", err)
 		} else {
 			slowQueriesEnabled = true
 			slowtimems = slowtime.Microseconds()
@@ -155,7 +151,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 				logger.Error(fmt.Sprintf("Invalid type string assertion for 'desc': %T", bsonMapElement))
 				continue
 			}
-			microsecs_running, ok := bsonMapElement["microsecs_running"].(int64)
+			microsecsRunning, ok := bsonMapElement["microsecs_running"].(int64)
 			if !ok {
 				logger.Error(fmt.Sprintf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement))
 				continue
@@ -163,7 +159,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 			lv := []string{strconv.Itoa(int(opid)), op, desc, db, collection, namespace}
 
-			ch <- prometheus.MustNewConstMetric(pd, prometheus.GaugeValue, float64(microsecs_running), lv...)
+			ch <- prometheus.MustNewConstMetric(pd, prometheus.GaugeValue, float64(microsecsRunning), lv...)
 		}
 	}
 
@@ -174,27 +170,9 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 		nil,
 	)
 
-	// ---- fsync lock metrics (GLOBAL STATE) ----
-	if fsyncLock, ok := r["fsyncLock"].(bool); ok {
-		if fsyncLock {
-			ch <- prometheus.MustNewConstMetric(
-				currentOpFsyncLockStateDesc,
-				prometheus.GaugeValue,
-				1,
-			)
-		} else {
-			ch <- prometheus.MustNewConstMetric(
-				currentOpFsyncLockStateDesc,
-				prometheus.GaugeValue,
-				0,
-			)
-		}
-	} else {
-		// field missing -> treat as unlocked
-		ch <- prometheus.MustNewConstMetric(
-			currentOpFsyncLockStateDesc,
-			prometheus.GaugeValue,
-			0,
-		)
+	fsyncIsLocked := 0.0
+	if v, ok := r["fsyncLock"].(bool); ok && v {
+		fsyncIsLocked = 1.0
 	}
+	ch <- prometheus.MustNewConstMetric(currentOpFsyncLockStateDesc, prometheus.GaugeValue, fsyncIsLocked)
 }
