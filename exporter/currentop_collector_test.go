@@ -25,44 +25,26 @@ import (
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 func TestCurrentopCollectorMetrics(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel, client, database, adminDB := setupCurrentopTest(t)
 	defer cancel()
-
-	var wg sync.WaitGroup
-
-	client := tu.DefaultTestClient(ctx, t)
-
-	database := client.Database("testdb")
-	_ = database.Drop(ctx)
-
 	defer func() {
 		err := database.Drop(ctx)
 		assert.NoError(t, err)
 	}()
 
+	var wg sync.WaitGroup
 	ch := make(chan struct{})
 	wg.Add(1)
-
-	// Generate slow operation
-	go func() {
-		defer wg.Done()
-		coll := "testcol_01"
-		for j := 0; j < 100; j++ { //nolint:intrange // false positive
-			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
-			assert.NoError(t, err)
-		}
-		ch <- struct{}{}
-		_, _ = database.Collection(coll).Find(ctx, bson.M{"$where": "function() {return sleep(100)}"})
-	}()
+	go generateSlowOperation(ctx, t, &wg, ch, database)
 
 	ti := labelsGetterMock{}
 	st := "0s"
-
 	c := newCurrentopCollector(
 		ctx,
 		client,
@@ -75,20 +57,45 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 	<-ch
 	time.Sleep(1 * time.Second)
 
+	assertSlowQueryMetricsCollected(t, c)
+	assertFsyncLockStateMetrics(t, ctx, c, adminDB)
+
+	wg.Wait()
+}
+
+func setupCurrentopTest(t *testing.T) (context.Context, context.CancelFunc, *mongo.Client, *mongo.Database, *mongo.Database) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	client := tu.DefaultTestClient(ctx, t)
+	database := client.Database("testdb")
+	_ = database.Drop(ctx)
+	adminDB := client.Database("admin")
+	return ctx, cancel, client, database, adminDB
+}
+
+func generateSlowOperation(ctx context.Context, t *testing.T, wg *sync.WaitGroup, ch chan struct{}, database *mongo.Database) {
+	defer wg.Done()
+	coll := "testcol_01"
+	for j := 0; j < 100; j++ { //nolint:intrange // false positive
+		_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
+		assert.NoError(t, err)
+	}
+	ch <- struct{}{}
+	_, _ = database.Collection(coll).Find(ctx, bson.M{"$where": "function() {return sleep(100)}"})
+}
+
+func assertSlowQueryMetricsCollected(t *testing.T, c *currentopCollector) {
 	slowQueryMetrics := []string{
 		"mongodb_currentop_query_uptime",
 	}
-
 	count := testutil.CollectAndCount(c, slowQueryMetrics...)
-	assert.True(t, count > 0)
+	assert.Positive(t, count)
+}
 
-	adminDB := client.Database("admin")
-
+func assertFsyncLockStateMetrics(t *testing.T, ctx context.Context, c *currentopCollector, adminDB *mongo.Database) {
 	fsyncMetrics := []string{
 		"mongodb_currentop_fsync_lock_state",
 	}
-
-	count = testutil.CollectAndCount(c, fsyncMetrics...)
+	count := testutil.CollectAndCount(c, fsyncMetrics...)
 	assert.Equal(t, 1, count)
 
 	err := adminDB.RunCommand(ctx, bson.D{
@@ -104,7 +111,6 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 	}()
 
 	time.Sleep(500 * time.Millisecond)
-
 	count = testutil.CollectAndCount(c, fsyncMetrics...)
 	assert.Equal(t, 1, count)
 
@@ -114,9 +120,6 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 	assert.NoError(t, err)
 
 	time.Sleep(500 * time.Millisecond)
-
 	count = testutil.CollectAndCount(c, fsyncMetrics...)
 	assert.Equal(t, 1, count)
-
-	wg.Wait()
 }

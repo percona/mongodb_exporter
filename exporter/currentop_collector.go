@@ -110,57 +110,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	debugResult(logger, r)
 
 	if slowQueriesEnabled {
-		inprog, ok := r["inprog"].(primitive.A)
-
-		if !ok {
-			logger.Error(fmt.Sprintf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"]))
-			ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
-				ErrInvalidOrMissingInprogEntry)
-		}
-
-		labels := d.topologyInfo.baseLabels()
-		ln := []string{"opid", "op", "desc", "database", "collection", "ns"}
-		const name = "mongodb_currentop_query_uptime"
-		pd := prometheus.NewDesc(name, " mongodb_currentop_query_uptime currentop_query", ln, labels)
-
-		for _, bsonMap := range inprog {
-
-			bsonMapElement, ok := bsonMap.(primitive.M)
-			if !ok {
-				logger.Error(fmt.Sprintf("Invalid type primitive.M assertion for bsonMap: %T", bsonMapElement))
-				continue
-			}
-			opid, ok := bsonMapElement["opid"].(int32)
-			if !ok {
-				logger.Error(fmt.Sprintf("Invalid type int32 assertion for 'opid': %T", bsonMapElement))
-				continue
-			}
-			namespace, ok := bsonMapElement["ns"].(string)
-			if !ok {
-				logger.Error(fmt.Sprintf("Invalid type string assertion for 'ns': %T", bsonMapElement))
-				continue
-			}
-			db, collection := splitNamespace(namespace)
-			op, ok := bsonMapElement["op"].(string)
-			if !ok {
-				logger.Error(fmt.Sprintf("Invalid type string assertion for 'op': %T", bsonMapElement))
-				continue
-			}
-			desc, ok := bsonMapElement["desc"].(string)
-			if !ok {
-				logger.Error(fmt.Sprintf("Invalid type string assertion for 'desc': %T", bsonMapElement))
-				continue
-			}
-			microsecsRunning, ok := bsonMapElement["microsecs_running"].(int64)
-			if !ok {
-				logger.Error(fmt.Sprintf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement))
-				continue
-			}
-
-			lv := []string{strconv.Itoa(int(opid)), op, desc, db, collection, namespace}
-
-			ch <- prometheus.MustNewConstMetric(pd, prometheus.GaugeValue, float64(microsecsRunning), lv...)
-		}
+		d.collectSlowQueries(ch, r)
 	}
 
 	currentOpFsyncLockStateDesc := prometheus.NewDesc(
@@ -175,4 +125,65 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 		fsyncIsLocked = 1.0
 	}
 	ch <- prometheus.MustNewConstMetric(currentOpFsyncLockStateDesc, prometheus.GaugeValue, fsyncIsLocked)
+}
+
+// collectSlowQueries extracts and emits metrics for slow queries from the currentOp response.
+func (d *currentopCollector) collectSlowQueries(ch chan<- prometheus.Metric, r primitive.M) {
+	logger := d.base.logger
+
+	inprog, ok := r["inprog"].(primitive.A)
+	if !ok {
+		logger.Error(fmt.Sprintf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"]))
+		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
+			ErrInvalidOrMissingInprogEntry)
+		return
+	}
+
+	labels := d.topologyInfo.baseLabels()
+	ln := []string{"opid", "op", "desc", "database", "collection", "ns"}
+	const name = "mongodb_currentop_query_uptime"
+	pd := prometheus.NewDesc(name, " mongodb_currentop_query_uptime currentop_query", ln, labels)
+
+	for _, bsonMap := range inprog {
+		bsonMapElement, ok := bsonMap.(primitive.M)
+		if !ok {
+			logger.Error(fmt.Sprintf("Invalid type primitive.M assertion for bsonMap: %T", bsonMapElement))
+
+			continue
+		}
+		opid, ok := bsonMapElement["opid"].(int32)
+		if !ok {
+			logger.Error(fmt.Sprintf("Invalid type int32 assertion for 'opid': %T", bsonMapElement))
+
+			continue
+		}
+		namespace, ok := bsonMapElement["ns"].(string)
+		if !ok {
+			logger.Error(fmt.Sprintf("Invalid type string assertion for 'ns': %T", bsonMapElement))
+
+			continue
+		}
+		db, collection := splitNamespace(namespace)
+		op, ok := bsonMapElement["op"].(string)
+		if !ok {
+			logger.Error(fmt.Sprintf("Invalid type string assertion for 'op': %T", bsonMapElement))
+
+			continue
+		}
+		desc, ok := bsonMapElement["desc"].(string)
+		if !ok {
+			logger.Error(fmt.Sprintf("Invalid type string assertion for 'desc': %T", bsonMapElement))
+
+			continue
+		}
+		microsecsRunning, ok := bsonMapElement["microsecs_running"].(int64)
+		if !ok {
+			logger.Error(fmt.Sprintf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement))
+
+			continue
+		}
+
+		lv := []string{strconv.Itoa(int(opid)), op, desc, db, collection, namespace}
+		ch <- prometheus.MustNewConstMetric(pd, prometheus.GaugeValue, float64(microsecsRunning), lv...)
+	}
 }
