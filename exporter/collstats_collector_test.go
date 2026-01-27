@@ -34,7 +34,7 @@ import (
 )
 
 func TestCollStatsCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)

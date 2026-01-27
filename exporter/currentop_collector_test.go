@@ -31,6 +31,7 @@ import (
 )
 
 func TestCurrentopCollectorMetrics(t *testing.T) {
+	t.Parallel()
 	ctx, cancel, client, database, adminDB := setupCurrentopTest(t)
 	defer cancel()
 	defer func() {
@@ -58,13 +59,14 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	assertSlowQueryMetricsCollected(t, c)
-	assertFsyncLockStateMetrics(t, ctx, c, adminDB)
+	assertFsyncLockStateMetrics(ctx, t, c, adminDB)
 
 	wg.Wait()
 }
 
 func setupCurrentopTest(t *testing.T) (context.Context, context.CancelFunc, *mongo.Client, *mongo.Database, *mongo.Database) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	client := tu.DefaultTestClient(ctx, t)
 	database := client.Database("testdb")
 	_ = database.Drop(ctx)
@@ -73,6 +75,7 @@ func setupCurrentopTest(t *testing.T) (context.Context, context.CancelFunc, *mon
 }
 
 func generateSlowOperation(ctx context.Context, t *testing.T, wg *sync.WaitGroup, ch chan struct{}, database *mongo.Database) {
+	t.Helper()
 	defer wg.Done()
 	coll := "testcol_01"
 	for j := 0; j < 100; j++ { //nolint:intrange // false positive
@@ -84,6 +87,7 @@ func generateSlowOperation(ctx context.Context, t *testing.T, wg *sync.WaitGroup
 }
 
 func assertSlowQueryMetricsCollected(t *testing.T, c *currentopCollector) {
+	t.Helper()
 	slowQueryMetrics := []string{
 		"mongodb_currentop_query_uptime",
 	}
@@ -91,7 +95,8 @@ func assertSlowQueryMetricsCollected(t *testing.T, c *currentopCollector) {
 	assert.Positive(t, count)
 }
 
-func assertFsyncLockStateMetrics(t *testing.T, ctx context.Context, c *currentopCollector, adminDB *mongo.Database) {
+func assertFsyncLockStateMetrics(ctx context.Context, t *testing.T, c *currentopCollector, adminDB *mongo.Database) {
+	t.Helper()
 	fsyncMetrics := []string{
 		"mongodb_currentop_fsync_lock_state",
 	}
