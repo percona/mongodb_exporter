@@ -31,7 +31,6 @@ import (
 )
 
 func TestCurrentopCollectorMetrics(t *testing.T) {
-	t.Parallel()
 	ctx, cancel, client, database, adminDB := setupCurrentopTest(t)
 	defer cancel()
 	defer func() {
