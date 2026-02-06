@@ -218,7 +218,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 		registry.MustRegister(cc)
 	}
 
-	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && limitsOk && requestOpts.EnableCurrentopMetrics && e.opts.CurrentOpSlowTime != "" {
+	if e.opts.EnableCurrentopMetrics && nodeType != typeMongos && requestOpts.EnableCurrentopMetrics {
 		coc := newCurrentopCollector(ctx, client, e.opts.Logger,
 			e.opts.CompatibleMode, topologyInfo, e.opts.CurrentOpSlowTime)
 		registry.MustRegister(coc)
