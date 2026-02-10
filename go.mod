@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/AlekSi/pointer v1.2.0
-	github.com/alecthomas/kong v1.13.0
+	github.com/alecthomas/kong v1.14.0
 	github.com/percona/exporter_shared v0.7.6
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/common v0.67.5
 	github.com/prometheus/exporter-toolkit v0.15.1
 	github.com/stretchr/testify v1.11.1
-	go.mongodb.org/mongo-driver v1.17.6
+	go.mongodb.org/mongo-driver v1.17.9
 )
 
 require github.com/foxcpp/go-mockdns v1.2.0
