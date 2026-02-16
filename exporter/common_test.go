@@ -198,13 +198,14 @@ func TestCheckNamespacesForViews(t *testing.T) {
 	setupDB(ctx, t, client)
 	defer cleanupDB(ctx, client)
 
-	t.Run("Views in provided collection list (should fail)", func(t *testing.T) {
-		_, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.view01"})
-		assert.EqualError(t, err, "namespace testdb01.view01 is a view and cannot be used for collstats/indexstats")
+	t.Run("Views or non-exist namespace in provided collection list (should fail)", func(t *testing.T) {
+		filtered, err := checkNamespacesForViewsOrNonExist(ctx, client, []string{"testdb01.col01", "testdb01.system.views", "testdb01.non_existent"}, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"testdb01.col01"}, filtered)
 	})
 
 	t.Run("No Views in provided collection list", func(t *testing.T) {
-		filtered, err := checkNamespacesForViews(ctx, client, []string{"testdb01.col01", "testdb01.system.views"})
+		filtered, err := checkNamespacesForViewsOrNonExist(ctx, client, []string{"testdb01.col01", "testdb01.system.views"}, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"testdb01.col01", "testdb01.system.views"}, filtered)
 	})
