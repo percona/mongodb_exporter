@@ -337,7 +337,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		case primitive.A:
 			res = append(res, processSlice(nextPrefix, v, l, compatibleMode)...)
 		case []interface{}:
-			continue
+			res = append(res, processSlice(nextPrefix, v, l, compatibleMode)...)
 		default:
 			rm, err := makeRawMetric(prefix, k, v, l)
 			if err != nil {
