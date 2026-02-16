@@ -84,6 +84,8 @@ type Opts struct {
 
 	URI      string
 	NodeName string
+	User     string
+	Password string
 }
 
 var (
