@@ -43,6 +43,7 @@ dockers:
   - "ghcr.io/percona/mongodb_exporter:{{.Major}}.{{.Minor}}-amd64"
   - "ghcr.io/percona/mongodb_exporter:{{.Version}}-amd64"
   dockerfile: Dockerfile
+  use: buildx
   build_flag_templates:
     - "--pull"
     - "--platform=linux/amd64"
