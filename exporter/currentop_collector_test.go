@@ -29,7 +29,7 @@ import (
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
-func TestCurrentopCollector(t *testing.T) {
+func TestCurrentopCollectorMetrics(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -44,8 +44,11 @@ func TestCurrentopCollector(t *testing.T) {
 		err := database.Drop(ctx)
 		assert.NoError(t, err)
 	}()
+
 	ch := make(chan struct{})
 	wg.Add(1)
+
+	// Generate slow operation
 	go func() {
 		defer wg.Done()
 		coll := "testcol_01"
@@ -60,25 +63,60 @@ func TestCurrentopCollector(t *testing.T) {
 	ti := labelsGetterMock{}
 	st := "0s"
 
-	c := newCurrentopCollector(ctx, client, promslog.New(&promslog.Config{}), false, ti, st)
+	c := newCurrentopCollector(
+		ctx,
+		client,
+		promslog.New(&promslog.Config{}),
+		false,
+		ti,
+		st,
+	)
 
-	// Filter metrics by reason:
-	// 1. The result will be different on different hardware
-	// 2. Can't check labels like 'decs' and 'opid' because they don't return a known value for comparison
-	// It looks like:
-	// # HELP mongodb_currentop_query_uptime currentop_query.
-	// # TYPE mongodb_currentop_query_uptime untyped
-	// mongodb_currentop_query_uptime{collection="testcol_00",database="testdb",decs="conn6365",ns="testdb.testcol_00",op="insert",opid="448307"} 2524
+	<-ch
+	time.Sleep(1 * time.Second)
 
-	filter := []string{
+	slowQueryMetrics := []string{
 		"mongodb_currentop_query_uptime",
 	}
 
-	<-ch
-
-	time.Sleep(1 * time.Second)
-
-	count := testutil.CollectAndCount(c, filter...)
+	count := testutil.CollectAndCount(c, slowQueryMetrics...)
 	assert.True(t, count > 0)
+
+	adminDB := client.Database("admin")
+
+	fsyncMetrics := []string{
+		"mongodb_currentop_fsync_lock_state",
+	}
+
+	count = testutil.CollectAndCount(c, fsyncMetrics...)
+	assert.Equal(t, 1, count)
+
+	err := adminDB.RunCommand(ctx, bson.D{
+		{Key: "fsync", Value: 1},
+		{Key: "lock", Value: true},
+	}).Err()
+	assert.NoError(t, err)
+
+	defer func() {
+		_ = adminDB.RunCommand(ctx, bson.D{
+			{Key: "fsyncUnlock", Value: 1},
+		}).Err()
+	}()
+
+	time.Sleep(500 * time.Millisecond)
+
+	count = testutil.CollectAndCount(c, fsyncMetrics...)
+	assert.Equal(t, 1, count)
+
+	err = adminDB.RunCommand(ctx, bson.D{
+		{Key: "fsyncUnlock", Value: 1},
+	}).Err()
+	assert.NoError(t, err)
+
+	time.Sleep(500 * time.Millisecond)
+
+	count = testutil.CollectAndCount(c, fsyncMetrics...)
+	assert.Equal(t, 1, count)
+
 	wg.Wait()
 }
