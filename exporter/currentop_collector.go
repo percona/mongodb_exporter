@@ -65,28 +65,38 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 	logger := d.base.logger
 	client := d.base.client
-	slowtime, err := time.ParseDuration(d.currentopslowtime)
-	if err != nil {
-		logger.Error("Failed to parse slowtime", "error", err)
-		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-		return
-	}
-	slowtimems := slowtime.Microseconds()
 
-	// Get all requests that are being processed except system requests (admin and local).
-	cmd := bson.D{
-		{Key: "currentOp", Value: true},
-		{Key: "active", Value: true},
-		{Key: "microsecs_running", Value: bson.D{
-			{Key: "$exists", Value: true},
-			{Key: "$gte", Value: slowtimems},
-		}},
-		{Key: "op", Value: bson.D{{Key: "$ne", Value: ""}}},
-		{Key: "ns", Value: bson.D{
-			{Key: "$ne", Value: ""},
-			{Key: "$not", Value: bson.D{{Key: "$regex", Value: "^admin.*|^local.*"}}},
-		}},
+	slowQueriesEnabled := false
+	var slowtimems int64
+
+	if d.currentopslowtime != "" {
+		slowtime, err := time.ParseDuration(d.currentopslowtime)
+		if err != nil {
+			logger.Error("Failed to parse currentop slowtime, slow query metrics disabled", "value", d.currentopslowtime, "error", err)
+		} else {
+			slowQueriesEnabled = true
+			slowtimems = slowtime.Microseconds()
+		}
 	}
+
+	cmd := bson.D{{Key: "currentOp", Value: true}}
+
+	if slowQueriesEnabled {
+		// Get all requests that are being processed except system requests (admin and local).
+		cmd = append(cmd,
+			bson.E{Key: "active", Value: true},
+			bson.E{Key: "op", Value: bson.D{{Key: "$ne", Value: ""}}},
+			bson.E{Key: "ns", Value: bson.D{
+				{Key: "$ne", Value: ""},
+				{Key: "$not", Value: bson.D{{Key: "$regex", Value: "^admin.*|^local.*"}}},
+			}},
+			bson.E{Key: "microsecs_running", Value: bson.D{
+				{Key: "$exists", Value: true},
+				{Key: "$gte", Value: slowtimems},
+			}},
+		)
+	}
+
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
 	var r primitive.M
@@ -99,55 +109,70 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debug("currentop response from MongoDB:")
 	debugResult(logger, r)
 
-	inprog, ok := r["inprog"].(primitive.A)
+	if slowQueriesEnabled {
+		inprog, ok := r["inprog"].(primitive.A)
 
-	if !ok {
-		logger.Error(fmt.Sprintf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"]))
-		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
-			ErrInvalidOrMissingInprogEntry)
+		if !ok {
+			logger.Error(fmt.Sprintf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"]))
+			ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
+				ErrInvalidOrMissingInprogEntry)
+		}
+
+		labels := d.topologyInfo.baseLabels()
+		ln := []string{"opid", "op", "desc", "database", "collection", "ns"}
+		const name = "mongodb_currentop_query_uptime"
+		pd := prometheus.NewDesc(name, " mongodb_currentop_query_uptime currentop_query", ln, labels)
+
+		for _, bsonMap := range inprog {
+
+			bsonMapElement, ok := bsonMap.(primitive.M)
+			if !ok {
+				logger.Error(fmt.Sprintf("Invalid type primitive.M assertion for bsonMap: %T", bsonMapElement))
+				continue
+			}
+			opid, ok := bsonMapElement["opid"].(int32)
+			if !ok {
+				logger.Error(fmt.Sprintf("Invalid type int32 assertion for 'opid': %T", bsonMapElement))
+				continue
+			}
+			namespace, ok := bsonMapElement["ns"].(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("Invalid type string assertion for 'ns': %T", bsonMapElement))
+				continue
+			}
+			db, collection := splitNamespace(namespace)
+			op, ok := bsonMapElement["op"].(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("Invalid type string assertion for 'op': %T", bsonMapElement))
+				continue
+			}
+			desc, ok := bsonMapElement["desc"].(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("Invalid type string assertion for 'desc': %T", bsonMapElement))
+				continue
+			}
+			microsecsRunning, ok := bsonMapElement["microsecs_running"].(int64)
+			if !ok {
+				logger.Error(fmt.Sprintf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement))
+				continue
+			}
+
+			lv := []string{strconv.Itoa(int(opid)), op, desc, db, collection, namespace}
+
+			ch <- prometheus.MustNewConstMetric(pd, prometheus.GaugeValue, float64(microsecsRunning), lv...)
+		}
 	}
 
-	labels := d.topologyInfo.baseLabels()
-	ln := []string{"opid", "op", "desc", "database", "collection", "ns"}
-	const name = "mongodb_currentop_query_uptime"
-	pd := prometheus.NewDesc(name, " mongodb_currentop_query_uptime currentop_query", ln, labels)
+	currentOpFsyncLockStateDesc := prometheus.NewDesc(
+		"mongodb_currentop_fsync_lock_state",
+		"Whether MongoDB is currently fsync locked (1 = locked, 0 = unlocked)",
+		nil,
+		nil,
+	)
 
-	for _, bsonMap := range inprog {
-
-		bsonMapElement, ok := bsonMap.(primitive.M)
-		if !ok {
-			logger.Error(fmt.Sprintf("Invalid type primitive.M assertion for bsonMap: %T", bsonMapElement))
-			continue
-		}
-		opid, ok := bsonMapElement["opid"].(int32)
-		if !ok {
-			logger.Error(fmt.Sprintf("Invalid type int32 assertion for 'opid': %T", bsonMapElement))
-			continue
-		}
-		namespace, ok := bsonMapElement["ns"].(string)
-		if !ok {
-			logger.Error(fmt.Sprintf("Invalid type string assertion for 'ns': %T", bsonMapElement))
-			continue
-		}
-		db, collection := splitNamespace(namespace)
-		op, ok := bsonMapElement["op"].(string)
-		if !ok {
-			logger.Error(fmt.Sprintf("Invalid type string assertion for 'op': %T", bsonMapElement))
-			continue
-		}
-		desc, ok := bsonMapElement["desc"].(string)
-		if !ok {
-			logger.Error(fmt.Sprintf("Invalid type string assertion for 'desc': %T", bsonMapElement))
-			continue
-		}
-		microsecs_running, ok := bsonMapElement["microsecs_running"].(int64)
-		if !ok {
-			logger.Error(fmt.Sprintf("Invalid type int64 assertion for 'microsecs_running': %T", bsonMapElement))
-			continue
-		}
-
-		lv := []string{strconv.Itoa(int(opid)), op, desc, db, collection, namespace}
-
-		ch <- prometheus.MustNewConstMetric(pd, prometheus.GaugeValue, float64(microsecs_running), lv...)
+	fsyncIsLocked := 0.0
+	if v, ok := r["fsyncLock"].(bool); ok && v {
+		fsyncIsLocked = 1.0
 	}
+	ch <- prometheus.MustNewConstMetric(currentOpFsyncLockStateDesc, prometheus.GaugeValue, fsyncIsLocked)
 }

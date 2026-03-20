@@ -77,7 +77,7 @@ type GlobalFlags struct {
 
 	ProfileTimeTS int `name:"collector.profile-time-ts" help:"Set time for scrape slow queries." default:"30"`
 
-	CurrentOpSlowTime string `name:"collector.currentopmetrics-slow-time" help:"Set minimum time for registration queries." default:"1m"`
+	CurrentOpSlowTime string `name:"collector.currentopmetrics-slow-time" help:"Set minimum time for registration queries." default:"5m"`
 
 	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections" negatable:""`
 	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" negatable:""`
