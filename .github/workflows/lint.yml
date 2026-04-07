@@ -12,11 +12,18 @@ on:
       - v[0-9]+.[0-9]+.[0-9]+*
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint Check
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
