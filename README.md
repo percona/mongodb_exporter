@@ -1,6 +1,6 @@
 # MongoDB exporter
 [![Release](https://img.shields.io/github/release/percona/mongodb_exporter.svg?style=flat)](https://github.com/percona/mongodb_exporter/releases/latest)
-[![Build Status](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/percona/mongodb_exporter/actions/workflows/go.yml?query=branch%3Amain)
+[![Build Status](https://github.com/percona/mongodb_exporter/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/percona/mongodb_exporter/actions/workflows/build.yml?query=branch%3Amain)
 [![codecov.io Code Coverage](https://img.shields.io/codecov/c/github/percona/mongodb_exporter.svg?maxAge=2592000)](https://codecov.io/github/percona/mongodb_exporter?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/mongodb_exporter)](https://goreportcard.com/report/github.com/percona/mongodb_exporter)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/percona/mongodb_exporter/badge)](https://scorecard.dev/viewer/?uri=github.com/percona/mongodb_exporter)
