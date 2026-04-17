@@ -314,6 +314,9 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	}
 
 	for k, val := range m {
+		if isWiredTigerLSMStat(k) {
+			continue
+		}
 		nextPrefix := prefix + k
 
 		l := make(map[string]string)
@@ -570,4 +573,26 @@ var specialConversions = []conversion{ //nolint:gochecknoglobals
 			"write_totalTickets": "write",
 		},
 	},
+}
+
+// isWiredTigerLSMStat reports whether a bson key corresponds to a
+// WiredTiger LSM-tree stat. MongoDB never uses LSM (it hardcodes
+// type=file B-Tree), so the counters WiredTiger exposes under LSM are
+// always zero in any deployment and just waste per-target series
+// budget. The patterns cover both shapes the walker can see:
+//
+//   - the "LSM" sub-map itself inside storageStats.wiredTiger,
+//     storageStats.indexDetails.<index>, oplog stats, etc; skipping
+//     at this node drops the whole subtree in one go.
+//   - leaf keys that already got flattened into "LSM_..." form before
+//     we got here (e.g. LSM_bloom_filter_hits).
+//   - the one serverStatus counter whose name embeds "lsm_manager"
+//     (connection_close_yielded_for_lsm_manager_shutdown).
+//
+// See percona/mongodb_exporter#1247.
+func isWiredTigerLSMStat(name string) bool {
+	if name == "LSM" || strings.HasPrefix(name, "LSM_") {
+		return true
+	}
+	return strings.Contains(strings.ToLower(name), "lsm_manager")
 }
