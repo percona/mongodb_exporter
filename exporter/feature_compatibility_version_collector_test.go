@@ -50,17 +50,19 @@ func TestFCVCollector(t *testing.T) {
 	var mversion string
 
 	mmv := fmt.Sprintf("%d.%d", v.Segments()[0], v.Segments()[1])
-	switch {
-	case mmv == "5.0":
+	switch mmv {
+	case "5.0":
 		mversion = "4.4"
-	case mmv == "4.4":
+	case "4.4":
 		mversion = "4.2"
-	case mmv == "6.0":
+	case "6.0":
 		mversion = "5.0"
-	case mmv == "7.0":
+	case "7.0":
 		mversion = "6.0"
-	case mmv == "8.0":
+	case "8.0":
 		mversion = "7.0"
+	case "8.2":
+		mversion = "8.0"
 	default:
 		mversion = mmv
 	}
