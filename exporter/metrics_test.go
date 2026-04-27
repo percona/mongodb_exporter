@@ -21,9 +21,21 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+type staticCollector []prometheus.Metric
+
+func (c staticCollector) Describe(chan<- *prometheus.Desc) {}
+
+func (c staticCollector) Collect(ch chan<- prometheus.Metric) {
+	for _, metric := range c {
+		ch <- metric
+	}
+}
 
 // Test metric renaming and labeling.
 func TestMetricName(t *testing.T) {
@@ -214,4 +226,50 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 		m := metricRenameAndLabel(tc.in, specialConversions)
 		assert.Equal(t, m[0], tc.want)
 	}
+}
+
+// Histogram buckets must not trigger "was collected before with the same name and label values".
+func TestHistogramMetricsDoNotCollide(t *testing.T) {
+	metrics := makeMetrics("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
+		"sbeMicros": primitive.A{
+			bson.M{"lowerBound": int64(0), "count": int64(3)},
+			bson.M{"lowerBound": int64(1024), "count": int64(7)},
+		},
+	}, nil, true)
+
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(staticCollector(metrics))
+
+	gatheredMetrics, err := reg.Gather()
+	assert.NoError(t, err, "metrics with the same name and labels must not be exported")
+
+	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
+	for _, metric := range gatheredMetrics {
+		metricsByName[metric.GetName()] = metric
+	}
+
+	assert.NotContains(t, metricsByName, "mongodb_ss_metrics_query_multiPlanner_histograms_sbeMicros_lowerBound")
+
+	bucketCounts, ok := metricsByName["mongodb_ss_metrics_query_multiPlanner_histograms_sbeMicros_count"]
+	if !assert.True(t, ok) {
+		return
+	}
+
+	if !assert.Len(t, bucketCounts.Metric, 2) {
+		return
+	}
+
+	valuesByBound := make(map[string]float64, len(bucketCounts.Metric))
+	for _, metric := range bucketCounts.Metric {
+		labels := make(map[string]string, len(metric.Label))
+		for _, label := range metric.Label {
+			labels[label.GetName()] = label.GetValue()
+		}
+		valuesByBound[labels["lower_bound"]] = metric.GetCounter().GetValue()
+	}
+
+	assert.Equal(t, map[string]float64{
+		"0":    3,
+		"1024": 7,
+	}, valuesByBound)
 }

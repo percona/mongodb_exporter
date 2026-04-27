@@ -16,6 +16,7 @@
 package exporter
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -313,10 +314,6 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	}
 
 	for k, val := range m {
-		// histogram metrics are currently unsupported (PMM-14337)
-		if k == "histograms" {
-			continue
-		}
 		nextPrefix := prefix + k
 
 		l := make(map[string]string)
@@ -335,43 +332,14 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		case map[string]interface{}:
 			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
 		case primitive.A:
-			res = append(res, processSlice(nextPrefix, v, l, compatibleMode)...)
+			res = append(res, processMetricSlice(nextPrefix, v, l, compatibleMode)...)
 		case []interface{}:
+			if isHistogramBucketSlice(nextPrefix, v) {
+				res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
+			}
 			continue
 		default:
-			rm, err := makeRawMetric(prefix, k, v, l)
-			if err != nil {
-				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-				res = append(res, invalidMetric)
-				continue
-			}
-
-			// makeRawMetric returns a nil metric for some data types like strings
-			// because we cannot extract data from all types
-			if rm == nil {
-				continue
-			}
-
-			metrics := []*rawMetric{rm}
-
-			if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
-				metrics = renamedMetrics
-			}
-
-			for _, m := range metrics {
-				metric, err := rawToPrometheusMetric(m)
-				if err != nil {
-					invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-					res = append(res, invalidMetric)
-					continue
-				}
-
-				res = append(res, metric)
-
-				if compatibleMode {
-					res = appendCompatibleMetric(res, m)
-				}
-			}
+			res = appendMetricValue(res, prefix, k, v, l, compatibleMode)
 		}
 	}
 
@@ -388,14 +356,8 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 	}
 
 	for _, item := range v {
-		var s map[string]interface{}
-
-		switch i := item.(type) {
-		case map[string]interface{}:
-			s = i
-		case primitive.M:
-			s = map[string]interface{}(i)
-		default:
+		s, ok := asMetricMap(item)
+		if !ok {
 			continue
 		}
 
@@ -414,6 +376,104 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 	}
 
 	return metrics
+}
+
+func processMetricSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
+	if isHistogramBucketSlice(prefix, v) {
+		return processHistogramSlice(prefix, v, commonLabels, compatibleMode)
+	}
+
+	return processSlice(prefix, v, commonLabels, compatibleMode)
+}
+
+func appendMetricValue(metrics []prometheus.Metric, prefix, name string, value interface{}, labels map[string]string, compatibleMode bool) []prometheus.Metric {
+	rm, err := makeRawMetric(prefix, name, value, labels)
+	if err != nil {
+		invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		return append(metrics, invalidMetric)
+	}
+
+	// makeRawMetric returns a nil metric for some data types like strings
+	// because we cannot extract data from all types
+	if rm == nil {
+		return metrics
+	}
+
+	rawMetrics := []*rawMetric{rm}
+	if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
+		rawMetrics = renamedMetrics
+	}
+
+	for _, rawMetric := range rawMetrics {
+		metric, err := rawToPrometheusMetric(rawMetric)
+		if err != nil {
+			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			metrics = append(metrics, invalidMetric)
+			continue
+		}
+
+		metrics = append(metrics, metric)
+		if compatibleMode {
+			metrics = appendCompatibleMetric(metrics, rawMetric)
+		}
+	}
+
+	return metrics
+}
+
+func processHistogramSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
+	metrics := make([]prometheus.Metric, 0, len(v))
+	for _, item := range v {
+		bucket, ok := asMetricMap(item)
+		if !ok {
+			continue
+		}
+
+		labels := make(map[string]string, len(commonLabels)+1)
+		for name, value := range commonLabels {
+			labels[name] = value
+		}
+
+		labels["lower_bound"] = fmt.Sprint(bucket["lowerBound"])
+		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
+	}
+
+	return metrics
+}
+
+func isHistogramBucketSlice(prefix string, v []interface{}) bool {
+	if len(v) == 0 {
+		return false
+	}
+	if !slices.Contains(strings.Split(prefix, "."), "histograms") {
+		return false
+	}
+
+	for _, item := range v {
+		bucket, ok := asMetricMap(item)
+		if !ok {
+			return false
+		}
+		if _, ok := bucket["lowerBound"]; !ok {
+			return false
+		}
+		if _, ok := bucket["count"]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func asMetricMap(item interface{}) (map[string]interface{}, bool) {
+	switch value := item.(type) {
+	case map[string]interface{}:
+		return value, true
+	case primitive.M:
+		return map[string]interface{}(value), true
+	default:
+		return nil, false
+	}
 }
 
 type conversion struct {
