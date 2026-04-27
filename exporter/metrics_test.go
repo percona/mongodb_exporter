@@ -29,7 +29,11 @@ import (
 
 type staticCollector []prometheus.Metric
 
-func (c staticCollector) Describe(chan<- *prometheus.Desc) {}
+func (c staticCollector) Describe(ch chan<- *prometheus.Desc) {
+	for _, metric := range c {
+		ch <- metric.Desc()
+	}
+}
 
 func (c staticCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, metric := range c {
