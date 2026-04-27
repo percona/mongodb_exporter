@@ -230,6 +230,8 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 
 // Histogram buckets must not trigger "was collected before with the same name and label values".
 func TestHistogramMetricsDoNotCollide(t *testing.T) {
+	t.Parallel()
+
 	metrics := makeMetrics("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
 		"sbeMicros": primitive.A{
 			bson.M{"lowerBound": int64(0), "count": int64(3)},
@@ -255,14 +257,15 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 		return
 	}
 
-	if !assert.Len(t, bucketCounts.Metric, 2) {
+	bucketCountMetrics := bucketCounts.GetMetric()
+	if !assert.Len(t, bucketCountMetrics, 2) {
 		return
 	}
 
-	valuesByBound := make(map[string]float64, len(bucketCounts.Metric))
-	for _, metric := range bucketCounts.Metric {
-		labels := make(map[string]string, len(metric.Label))
-		for _, label := range metric.Label {
+	valuesByBound := make(map[string]float64, len(bucketCountMetrics))
+	for _, metric := range bucketCountMetrics {
+		labels := make(map[string]string, len(metric.GetLabel()))
+		for _, label := range metric.GetLabel() {
 			labels[label.GetName()] = label.GetValue()
 		}
 		valuesByBound[labels["lower_bound"]] = metric.GetCounter().GetValue()
