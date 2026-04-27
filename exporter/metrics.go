@@ -445,7 +445,7 @@ func isHistogramBucketSlice(prefix string, v []interface{}) bool {
 	if len(v) == 0 {
 		return false
 	}
-	if !slices.Contains(strings.Split(prefix, "."), "histograms") {
+	if !strings.Contains(prefix, ".histograms.") && !strings.HasSuffix(prefix, ".histograms") {
 		return false
 	}
 
