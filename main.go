@@ -17,11 +17,9 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -119,7 +117,7 @@ func main() {
 	}
 
 	if len(opts.URI) == 0 {
-		ctx.Fatalf("No MongoDB hosts were specified. You must specify the host(s) with the --mongodb.uri command argument or the MONGODB_URI environment variable")
+		ctx.Printf("No MongoDB hosts specified. You can specify the host(s) with the --mongodb.uri command argument or the MONGODB_URI environment variable")
 	}
 
 	if opts.TimeoutOffset <= 0 {
@@ -134,24 +132,13 @@ func main() {
 		WebListenAddress:  opts.WebListenAddress,
 		TLSConfigPath:     opts.TLSConfigPath,
 	}
-	exporter.RunWebServer(serverOpts, buildServers(opts, logger), logger)
+
+	exporterOpts := buildOpts(opts)
+
+	exporter.RunWebServer(serverOpts, buildServers(opts, logger, exporterOpts), exporterOpts, logger)
 }
 
-func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exporter {
-	uri = buildURI(uri, opts.User, opts.Password)
-	log.Debug("Connection URI", "uri", uri)
-
-	uriParsed, _ := url.Parse(uri)
-	var nodeName string
-	switch {
-	case uriParsed == nil:
-		nodeName = ""
-	case uriParsed.Port() != "":
-		nodeName = net.JoinHostPort(uriParsed.Hostname(), uriParsed.Port())
-	default:
-		nodeName = uriParsed.Host
-	}
-
+func buildOpts(opts GlobalFlags) *exporter.Opts {
 	collStatsNamespaces := []string{}
 	if opts.CollStatsNamespaces != "" {
 		collStatsNamespaces = strings.Split(opts.CollStatsNamespaces, ",")
@@ -160,14 +147,12 @@ func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exp
 	if opts.IndexStatsCollections != "" {
 		indexStatsCollections = strings.Split(opts.IndexStatsCollections, ",")
 	}
-	exporterOpts := &exporter.Opts{
+
+	return &exporter.Opts{
 		CollStatsNamespaces:   collStatsNamespaces,
 		CompatibleMode:        opts.CompatibleMode,
 		DiscoveringMode:       opts.DiscoveringMode,
 		IndexStatsCollections: indexStatsCollections,
-		Logger:                log,
-		URI:                   uri,
-		NodeName:              nodeName,
 		GlobalConnPool:        opts.GlobalConnPool,
 		DirectConnect:         opts.DirectConnect,
 		ConnectTimeoutMS:      opts.ConnectTimeoutMS,
@@ -195,122 +180,44 @@ func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exp
 		CollectAll:             opts.CollectAll,
 		ProfileTimeTS:          opts.ProfileTimeTS,
 		CurrentOpSlowTime:      opts.CurrentOpSlowTime,
-	}
 
-	return exporter.New(exporterOpts)
+		User:     opts.User,
+		Password: opts.Password,
+	}
 }
 
-func buildServers(opts GlobalFlags, logger *slog.Logger) []*exporter.Exporter {
-	URIs := parseURIList(opts.URI, logger, opts.SplitCluster)
+func buildExporter(baseOpts *exporter.Opts, uri string, log *slog.Logger) *exporter.Exporter {
+	uri = exporter.BuildURI(uri, baseOpts.User, baseOpts.Password)
+	log.Debug("Connection URI", "uri", uri)
+
+	uriParsed, _ := url.Parse(uri)
+	var nodeName string
+	if uriParsed != nil {
+		if uriParsed.Port() != "" {
+			nodeName = net.JoinHostPort(uriParsed.Hostname(), uriParsed.Port())
+		} else {
+			nodeName = uriParsed.Host
+		}
+	}
+
+	exporterOpts := *baseOpts
+	exporterOpts.URI = uri
+	exporterOpts.Logger = log
+	exporterOpts.NodeName = nodeName
+
+	return exporter.New(&exporterOpts)
+}
+
+func buildServers(opts GlobalFlags, logger *slog.Logger, baseOpts *exporter.Opts) []*exporter.Exporter {
+	if len(opts.URI) == 0 {
+		return []*exporter.Exporter{}
+	}
+
+	URIs := exporter.ParseURIList(opts.URI, logger, opts.SplitCluster)
 	servers := make([]*exporter.Exporter, len(URIs))
-	for serverIdx := range URIs {
-		servers[serverIdx] = buildExporter(opts, URIs[serverIdx], logger)
+	for i, uri := range URIs {
+		servers[i] = buildExporter(baseOpts, uri, logger)
 	}
 
 	return servers
-}
-
-func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []string { //nolint:gocognit,cyclop
-	var URIs []string
-
-	// If server URI is prefixed with mongodb scheme string, then every next URI in
-	// line not prefixed with mongodb scheme string is a part of cluster. Otherwise,
-	// treat it as a standalone server
-	realURI := ""
-	matchRegexp := regexp.MustCompile(`^mongodb(\+srv)?://`)
-	for _, URI := range uriList {
-		matches := matchRegexp.FindStringSubmatch(URI)
-		if matches != nil {
-			if realURI != "" {
-				// Add the previous host buffer to the url list as we met the scheme part
-				URIs = append(URIs, realURI)
-				realURI = ""
-			}
-			if matches[1] == "" {
-				realURI = URI
-			} else {
-				// There can be only one host in SRV connection string
-				if splitCluster {
-					// In splitCluster mode we get srv connection string from SRV recors
-					URI = exporter.GetSeedListFromSRV(URI, logger)
-				}
-				URIs = append(URIs, URI)
-			}
-		} else {
-			if realURI == "" {
-				URIs = append(URIs, "mongodb://"+URI)
-			} else {
-				realURI += "," + URI
-			}
-		}
-	}
-	if realURI != "" {
-		URIs = append(URIs, realURI)
-	}
-
-	if splitCluster {
-		// In this mode we split cluster strings into separate targets
-		separateURIs := []string{}
-		for _, hosturl := range URIs {
-			urlParsed, err := url.Parse(hosturl)
-			if err != nil {
-				log.Fatalf("Failed to parse URI %s: %v", hosturl, err)
-			}
-			for _, host := range strings.Split(urlParsed.Host, ",") {
-				targetURI := "mongodb://"
-				if urlParsed.User != nil {
-					targetURI += urlParsed.User.String() + "@"
-				}
-				targetURI += host
-				if urlParsed.Path != "" {
-					targetURI += urlParsed.Path
-				}
-				if urlParsed.RawQuery != "" {
-					targetURI += "?" + urlParsed.RawQuery
-				}
-				separateURIs = append(separateURIs, targetURI)
-			}
-		}
-		return separateURIs
-	}
-	return URIs
-}
-
-// buildURIManually builds the URI manually by checking if the user and password are supplied
-func buildURIManually(uri string, user string, password string) string {
-	uriArray := strings.SplitN(uri, "://", 2) //nolint:mnd
-	prefix := uriArray[0] + "://"
-	uri = uriArray[1]
-
-	// IF user@pass not contained in uri AND custom user and pass supplied in arguments
-	// DO concat a new uri with user and pass arguments value
-	if !strings.Contains(uri, "@") && user != "" && password != "" {
-		// add user and pass to the uri
-		uri = fmt.Sprintf("%s:%s@%s", user, password, uri)
-	}
-
-	// add back prefix after adding the user and pass
-	uri = prefix + uri
-
-	return uri
-}
-
-func buildURI(uri string, user string, password string) string {
-	defaultPrefix := "mongodb://" // default prefix
-
-	if !strings.HasPrefix(uri, defaultPrefix) && !strings.HasPrefix(uri, "mongodb+srv://") {
-		uri = defaultPrefix + uri
-	}
-	parsedURI, err := url.Parse(uri)
-	if err != nil {
-		// PMM generates URI with escaped path to socket file, so url.Parse fails
-		// in this case we build URI manually
-		return buildURIManually(uri, user, password)
-	}
-
-	if parsedURI.User == nil && user != "" && password != "" {
-		parsedURI.User = url.UserPassword(user, password)
-	}
-
-	return parsedURI.String()
 }
