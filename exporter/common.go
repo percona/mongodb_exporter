@@ -178,7 +178,7 @@ func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collecti
 
 	filteredCollections := []string{}
 	for _, collection := range removeEmptyStrings(collections) {
-		if len(strings.Split(collection, ".")) < 2 { //nolint:gomnd
+		if len(strings.Split(collection, ".")) < 2 { //nolint:mnd
 			continue
 		}
 
@@ -260,7 +260,8 @@ func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includ
 
 func splitNamespace(ns string) (database, collection string) {
 	parts := strings.Split(ns, ".")
-	if len(parts) < 2 { // there is no collection?
+	// there is no collection?
+	if len(parts) < 2 { //nolint:mnd
 		return parts[0], ""
 	}
 

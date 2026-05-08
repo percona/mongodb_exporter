@@ -44,6 +44,7 @@ jobs:
           go_version_file: ${{ github.workspace }}/go.mod
           reporter: github-pr-review
           fail_level: error
+          filter_mode: added
           cache: false
           golangci_lint_flags: "--config=.golangci.yml"
           golangci_lint_version: v2.12.2
