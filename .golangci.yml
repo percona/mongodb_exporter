@@ -9,6 +9,7 @@ linters:
     - exhaustruct
     - varnamelen
     - gochecknoglobals # we need globals for better performance, we use them for mapping, and we don't mutate them, so it's safe.
+    - wsl_v5
   settings:
     depguard:
       rules:
