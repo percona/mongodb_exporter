@@ -1,3 +1,8 @@
+Release 0.41.0
+ 
+- Update grpc version to 1.79.3
+- Update dependencies
+
 Release 0.40.0-bugsnag2
 
 - Update Go version
