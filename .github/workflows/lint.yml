@@ -49,6 +49,6 @@ jobs:
           golangci_lint_flags: "--config=.golangci.yml"
           golangci_lint_version: v2.12.2
 
-      - name: Run checks/linters
+      - name: Run license check
         run: |
           make check-license
