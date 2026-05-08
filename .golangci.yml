@@ -2,7 +2,10 @@ version: "2"
 
 linters:
   default: all
+  enable:
+    - gomodguard_v2
   disable:
+    - gomodguard # replaced by gomodguard_v2
     - lll
     - testpackage
     - wsl

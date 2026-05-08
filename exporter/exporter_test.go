@@ -289,7 +289,6 @@ func TestMongoUpMetric(t *testing.T) {
 	ctx := context.Background()
 
 	type testcase struct {
-		name        string
 		URI         string
 		clusterRole string
 		Want        int
