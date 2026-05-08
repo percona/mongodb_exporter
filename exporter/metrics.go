@@ -591,8 +591,10 @@ var specialConversions = []conversion{ //nolint:gochecknoglobals
 //
 // See percona/mongodb_exporter#1247.
 func isWiredTigerLSMStat(name string) bool {
-	if name == "LSM" || strings.HasPrefix(name, "LSM_") {
-		return true
-	}
-	return strings.Contains(strings.ToLower(name), "lsm_manager")
+	lowerName := strings.ToLower(name)
+
+	return name == "LSM" ||
+		strings.HasPrefix(name, "LSM_") ||
+		strings.Contains(lowerName, "lsm_manager") ||
+		strings.Contains(lowerName, "lsm manager")
 }
