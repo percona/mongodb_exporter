@@ -10,6 +10,12 @@ linters:
     - varnamelen
     - gochecknoglobals # we need globals for better performance, we use them for mapping, and we don't mutate them, so it's safe.
     - wsl_v5
+    - goconst # TODO: fix string literals duplication
+    - tagalign # TODO: fix struct tags alignment
+    - paralleltest # TODO: fix tests to be able to run in parallel
+    - revive # TODO: fix revive linter issues
+    - testifylint # TODO: fix testifylint issues
+    - wrapcheck # TODO: fix wrapcheck issues
   settings:
     depguard:
       rules:

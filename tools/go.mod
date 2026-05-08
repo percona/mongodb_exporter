@@ -2,11 +2,7 @@ module github.com/percona/mongodb_exporter/tools
 
 go 1.26.2
 
-require (
-	github.com/daixiang0/gci v0.14.0
-	github.com/golangci/golangci-lint/v2 v2.12.2
-	mvdan.cc/gofumpt v0.9.2
-)
+require github.com/golangci/golangci-lint/v2 v2.12.2
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.3.0 // indirect
@@ -61,6 +57,7 @@ require (
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/curioswitch/go-reassign v0.3.0 // indirect
+	github.com/daixiang0/gci v0.14.0 // indirect
 	github.com/dave/dst v0.27.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/denis-tingaikin/go-header v0.5.0 // indirect
@@ -218,5 +215,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.7.0 // indirect
+	mvdan.cc/gofumpt v0.9.2 // indirect
 	mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15 // indirect
 )
