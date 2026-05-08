@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
@@ -313,4 +314,32 @@ func TestAsMetricMapHandlesBSONM(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, int64(1024), bucket["lowerBound"])
 	assert.Equal(t, int64(7), bucket["count"])
+}
+
+func TestMakeMetricsSkipsWiredTigerLSMStats(t *testing.T) {
+	t.Parallel()
+
+	metrics := helpers.ReadMetrics(makeMetrics("serverStatus.wiredTiger", bson.M{
+		"cache": bson.M{
+			"bytes currently in the cache": int32(42),
+		},
+		"LSM": bson.M{
+			"bloom filter hits": int32(1),
+		},
+		"LSM_bloom_filter_hits": int32(2),
+		"thread-yield": bson.M{
+			"connection close yielded for lsm manager shutdown": int32(3),
+			"page acquire time sleeping (usecs)":                int32(4),
+		},
+	}, nil, false))
+
+	names := make(map[string]struct{}, len(metrics))
+	for _, metric := range metrics {
+		names[metric.Name] = struct{}{}
+	}
+
+	assert.Contains(t, names, "mongodb_ss_wt_cache_bytes_currently_in_the_cache")
+	assert.Contains(t, names, "mongodb_ss_wt_thread_yield_page_acquire_time_sleeping_usecs")
+	assert.NotContains(t, names, "mongodb_ss_wt_LSM_bloom_filter_hits")
+	assert.NotContains(t, names, "mongodb_ss_wt_thread_yield_connection_close_yielded_for_lsm_manager_shutdown")
 }
