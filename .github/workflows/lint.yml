@@ -42,8 +42,16 @@ jobs:
           make format
           git diff --exit-code
 
+      - name: Run code linters
+        uses: reviewdog/action-golangci-lint@c76cceaaab89abe74e649d2e34c6c9adc26662d2 # v2.10.0
+        with:
+          go_version_file: ${{ github.workspace }}/go.mod
+          reporter: github-pr-review
+          fail_level: error
+          cache: false
+          golangci_lint_flags: "--config=.golangci.yml"
+          golangci_lint_version: v2.12.2
+
       - name: Run checks/linters
         run: |
-          # use GITHUB_TOKEN because only it has access to GitHub Checks API
-          bin/golangci-lint run --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
           make check-license
