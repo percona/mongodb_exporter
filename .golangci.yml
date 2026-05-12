@@ -1,50 +1,36 @@
----
-linters-settings:
-  # prevent import of "errors" instead of "github.com/pkg/errors"
-  depguard:
-    rules:
-      # Name of a rule.
-      main:
-        # Packages that are not allowed where the value is a suggestion.
-        deny:
-          - pkg: "errors"
-            desc: Should be replaced by github.com/pkg/errors package
-
-  lll:
-    line-length: 140
-    tab-width: 4
-
-  unused:
-    check-exported: false
-
-  unparam:
-    check-exported: true
-
-  goimports:
-    # put imports beginning with prefix after 3rd-party packages;
-    # it's a comma-separated list of prefixes
-    local-prefixes: github.com/percona/mongodb_exporter
+version: "2"
 
 linters:
-  enable-all: true
+  default: all
+  enable:
+    - gomodguard_v2
   disable:
-      - lll
-      - unused
-      - testpackage
-      - wsl
-      - exhaustruct
-      - varnamelen
-      - gochecknoglobals # we need globals for better performance, we use them for mapping, and we don't mutate them, so it's safe.
-      - maligned          #deprecated
-      - scopelint         #deprecated
-      - golint            #deprecated
-      - interfacer        #deprecated
-issues:
-  exclude-use-default: false
-  exclude:
-    # gas: Duplicated errcheck checks
-    - 'G104: Errors unhandled'
-  exclude-rules:
-  - path: _test\.go
-    linters:
-    - unused
+    - exhaustruct
+    - gochecknoglobals # we need globals for better performance, we use them for mapping, and we don't mutate them, so it's safe.
+    - gomodguard # replaced by gomodguard_v2
+    - lll
+    - testpackage
+    - varnamelen
+    - wsl
+    - wsl_v5
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: "github.com/pkg/errors"
+              desc: Use errors package
+    unparam:
+      check-exported: true
+  exclusions:
+    rules:
+      # gosec G104: Errors unhandled
+      - text: 'G104'
+        linters:
+          - gosec
+
+formatters:
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/percona/mongodb_exporter
