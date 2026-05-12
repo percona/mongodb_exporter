@@ -147,15 +147,15 @@ func TestMakeRawMetric(t *testing.T) {
 	prefix := "serverStatus.transactions."
 	name := "retriedCommandsCount"
 	testCases := []struct {
-		value   interface{}
+		value   any
 		wantVal *float64
 	}{
 		{value: true, wantVal: pointer.ToFloat64(1)},
 		{value: false, wantVal: pointer.ToFloat64(0)},
 		{value: int32(1), wantVal: pointer.ToFloat64(1)},
 		{value: int64(2), wantVal: pointer.ToFloat64(2)},
-		{value: float32(1.23), wantVal: pointer.ToFloat64(float64(float32(1.23)))},
-		{value: float64(1.23), wantVal: pointer.ToFloat64(1.23)},
+		{value: float32(1.23), wantVal: new(float64(float32(1.23)))},
+		{value: float64(1.23), wantVal: new(1.23)},
 		{value: primitive.A{}, wantVal: nil},
 		{value: primitive.Timestamp{T: 123, I: 456}, wantVal: pointer.ToFloat64(123)},
 		{value: "zapp", wantVal: nil},
