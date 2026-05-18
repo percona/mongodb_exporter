@@ -81,13 +81,14 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
 		if err != nil {
 			logger.Error("cannot list collections", "error", err.Error())
+
 			return
 		}
 	}
 
 	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
-		if len(parts) < 2 { //nolint:gomnd
+		if len(parts) < 2 { //nolint:mnd
 			continue
 		}
 

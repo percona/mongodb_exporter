@@ -21,9 +21,25 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+type staticCollector []prometheus.Metric
+
+func (c staticCollector) Describe(ch chan<- *prometheus.Desc) {
+	for _, metric := range c {
+		ch <- metric.Desc()
+	}
+}
+
+func (c staticCollector) Collect(ch chan<- prometheus.Metric) {
+	for _, metric := range c {
+		ch <- metric
+	}
+}
 
 // Test metric renaming and labeling.
 func TestMetricName(t *testing.T) {
@@ -131,15 +147,15 @@ func TestMakeRawMetric(t *testing.T) {
 	prefix := "serverStatus.transactions."
 	name := "retriedCommandsCount"
 	testCases := []struct {
-		value   interface{}
+		value   any
 		wantVal *float64
 	}{
 		{value: true, wantVal: pointer.ToFloat64(1)},
 		{value: false, wantVal: pointer.ToFloat64(0)},
 		{value: int32(1), wantVal: pointer.ToFloat64(1)},
 		{value: int64(2), wantVal: pointer.ToFloat64(2)},
-		{value: float32(1.23), wantVal: pointer.ToFloat64(float64(float32(1.23)))},
-		{value: float64(1.23), wantVal: pointer.ToFloat64(1.23)},
+		{value: float32(1.23), wantVal: new(float64(float32(1.23)))},
+		{value: float64(1.23), wantVal: new(1.23)},
 		{value: primitive.A{}, wantVal: nil},
 		{value: primitive.Timestamp{T: 123, I: 456}, wantVal: pointer.ToFloat64(123)},
 		{value: "zapp", wantVal: nil},
@@ -214,4 +230,53 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 		m := metricRenameAndLabel(tc.in, specialConversions)
 		assert.Equal(t, m[0], tc.want)
 	}
+}
+
+// Histogram buckets must not trigger "was collected before with the same name and label values".
+func TestHistogramMetricsDoNotCollide(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
+		"sbeMicros": primitive.A{
+			bson.M{"lowerBound": int64(0), "count": int64(3)},
+			bson.M{"lowerBound": int64(1024), "count": int64(7)},
+		},
+	}, nil, true)
+
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(staticCollector(metrics))
+
+	gatheredMetrics, err := reg.Gather()
+	assert.NoError(t, err, "metrics with the same name and labels must not be exported")
+
+	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
+	for _, metric := range gatheredMetrics {
+		metricsByName[metric.GetName()] = metric
+	}
+
+	assert.NotContains(t, metricsByName, "mongodb_ss_metrics_query_multiPlanner_histograms_sbeMicros_lowerBound")
+
+	bucketCounts, ok := metricsByName["mongodb_ss_metrics_query_multiPlanner_histograms_sbeMicros_count"]
+	if !assert.True(t, ok) {
+		return
+	}
+
+	bucketCountMetrics := bucketCounts.GetMetric()
+	if !assert.Len(t, bucketCountMetrics, 2) {
+		return
+	}
+
+	valuesByBound := make(map[string]float64, len(bucketCountMetrics))
+	for _, metric := range bucketCountMetrics {
+		labels := make(map[string]string, len(metric.GetLabel()))
+		for _, label := range metric.GetLabel() {
+			labels[label.GetName()] = label.GetValue()
+		}
+		valuesByBound[labels["lower_bound"]] = metric.GetCounter().GetValue()
+	}
+
+	assert.Equal(t, map[string]float64{
+		"0":    3,
+		"1024": 7,
+	}, valuesByBound)
 }
