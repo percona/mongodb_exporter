@@ -1178,7 +1178,7 @@ func chunksBalancerRunning(ctx context.Context, client *mongo.Client) (prometheu
 	}
 
 	value := float64(0)
-	if !m.InBalancerRound {
+	if m.InBalancerRound {
 		value = 1
 	}
 
