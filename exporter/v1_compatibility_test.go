@@ -211,6 +211,36 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 	assert.Equal(t, want, nm)
 }
 
+func TestBalancerRunningValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		inBalancerRound  bool
+		expected         float64
+	}{
+		{
+			name:            "balancer running",
+			inBalancerRound: true,
+			expected:        1,
+		},
+		{
+			name:            "balancer not running",
+			inBalancerRound: false,
+			expected:        0,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := balancerRunningValue(tt.inBalancerRound)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
 func TestMongosMetrics(t *testing.T) {
 	t.Parallel()
 	t.Run("test mongodb_mongos_sharding_balancer_enabled metric", func(t *testing.T) {
