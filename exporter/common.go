@@ -258,7 +258,8 @@ func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includ
 	return count, nil
 }
 
-func splitNamespace(ns string) (database, collection string) {
+// splitNamespace splits the namespace into database and collection.
+func splitNamespace(ns string) (string, string) {
 	parts := strings.Split(ns, ".")
 	// there is no collection?
 	if len(parts) < 2 { //nolint:mnd
