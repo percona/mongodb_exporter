@@ -1184,7 +1184,7 @@ func chunksBalancerRunning(ctx context.Context, client *mongo.Client) (prometheu
 		return nil, err
 	}
 
-	value := balancerRunningValue(m.inBalancerRound)
+	value := balancerRunningValue(m.InBalancerRound)
 
 
 	name := "mongodb_mongos_sharding_chunks_is_balancer_running"
