@@ -108,6 +108,25 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			logger.Error("cannot decode getDiagnosticData", "error", err)
 		}
 
+		// For mongos, getDiagnosticData returns empty data, so fall back to serverStatus
+		if nodeType == typeMongos && len(m) == 0 {
+			logger.Debug("getDiagnosticData returned empty data for mongos, falling back to serverStatus")
+			serverStatusCmd := bson.D{{Key: "serverStatus", Value: "1"}}
+			serverStatusRes := client.Database("admin").RunCommand(d.ctx, serverStatusCmd)
+			if serverStatusRes.Err() != nil {
+				logger.Error("failed to run serverStatus command for mongos", "error", serverStatusRes.Err())
+			} else {
+				var serverStatusData bson.M
+				if err := serverStatusRes.Decode(&serverStatusData); err != nil {
+					logger.Error("cannot decode serverStatus for mongos", "error", err)
+				} else {
+					// Wrap serverStatus data in the expected structure for makeMetrics
+					m = bson.M{"serverStatus": serverStatusData}
+					logger.Debug("Successfully retrieved serverStatus data for mongos")
+				}
+			}
+		}
+
 		logger.Debug("getDiagnosticData result")
 		debugResult(logger, m)
 

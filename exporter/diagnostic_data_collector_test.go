@@ -254,6 +254,43 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 }
 
+func TestMongosDiagnosticDataCollectorMetrics(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClientMongoS(ctx, t)
+
+	logLevel := promslog.NewLevel()
+	err := logLevel.Set("debug")
+	require.NoError(t, err)
+	logger := promslog.New(&promslog.Config{
+		Level: logLevel,
+	})
+	ti := newTopologyInfo(ctx, client, logger)
+
+	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
+	require.NoError(t, err)
+
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
+
+	reg := prometheus.NewRegistry()
+	err = reg.Register(c)
+	require.NoError(t, err)
+	metrics := helpers.CollectMetrics(c)
+	actualMetrics := helpers.ReadMetrics(metrics)
+	filters := []string{
+		"mongodb_ss_connections",
+	}
+	actualMetrics = filterMetrics(actualMetrics, filters)
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+	metricNames := getMetricNames(actualLines)
+
+	sort.Strings(filters)
+	for _, want := range filters {
+		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
+	}
+}
+
 // errorCountHandler is a custom handler that keeps tracks of the number of errors and warnings that were logged.
 // it discards all errors of other levels.
 type errorCountHandler struct {
