@@ -43,6 +43,10 @@ type ServerOpts struct {
 	DisableDefaultRegistry bool
 }
 
+// Label added by /scrapeall to identify the monitored MongoDB target.
+// Use a non-Prometheus-reserved name so Prometheus does not rewrite it.
+const scrapeAllInstanceLabel = "mongo_instance"
+
 // RunWebServer runs the main web-server
 func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
 	mux := http.NewServeMux()
@@ -104,7 +108,7 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 }
 
 // OverallTargetsHandler is a handler to scrape all the targets in one request.
-// Adds instance label to each metric.
+// Adds a MongoDB-target label to each metric.
 func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		seconds, err := strconv.Atoi(r.Header.Get("X-Prometheus-Scrape-Timeout-Seconds"))
@@ -153,12 +157,7 @@ func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.Hand
 				registry.MustRegister(gc)
 			}
 
-			hostlabels := prometheus.Labels{}
-			if e.opts.NodeName != "" {
-				hostlabels["instance"] = e.opts.NodeName
-			}
-
-			gw := NewGathererWrapper(registry, hostlabels)
+			gw := NewGathererWrapper(registry, scrapeAllHostLabels(e.opts.NodeName))
 			gatherers = append(gatherers, gw)
 		}
 
@@ -170,6 +169,14 @@ func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.Hand
 
 		h.ServeHTTP(w, r)
 	}
+}
+
+func scrapeAllHostLabels(nodeName string) prometheus.Labels {
+	hostlabels := prometheus.Labels{}
+	if nodeName != "" {
+		hostlabels[scrapeAllInstanceLabel] = nodeName
+	}
+	return hostlabels
 }
 
 func buildServerMap(exporters []*Exporter, log *slog.Logger) ServerMap {
