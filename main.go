@@ -49,6 +49,7 @@ type GlobalFlags struct {
 	WebListenAddress      string   `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
 	WebTelemetryPath      string   `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
 	TLSConfigPath         string   `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
+	TLSReload			  bool     `name:"mongodb.tls-reload" help:"Enable TLS certificate reloading" negatable:"" default:"true"`
 	TimeoutOffset         int      `name:"web.timeout-offset" help:"Offset to subtract from the request timeout in seconds" default:"1"`
 	LogLevel              string   `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 	ConnectTimeoutMS      int      `name:"mongodb.connect-timeout-ms" help:"Connection timeout in milliseconds" default:"5000"`
@@ -195,6 +196,7 @@ func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exp
 		CollectAll:             opts.CollectAll,
 		ProfileTimeTS:          opts.ProfileTimeTS,
 		CurrentOpSlowTime:      opts.CurrentOpSlowTime,
+		TLSReload:              opts.TLSReload,
 	}
 
 	return exporter.New(exporterOpts)
