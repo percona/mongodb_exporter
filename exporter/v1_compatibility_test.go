@@ -215,9 +215,9 @@ func TestBalancerRunningValue(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name             string
-		inBalancerRound  bool
-		expected         float64
+		name            string
+		inBalancerRound bool
+		expected        float64
 	}{
 		{
 			name:            "balancer running",
