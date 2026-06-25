@@ -82,8 +82,9 @@ type Opts struct {
 
 	Logger *slog.Logger
 
-	URI      string
-	NodeName string
+	URI       string
+	NodeName  string
+	TLSReload bool
 }
 
 var (
@@ -423,6 +424,12 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
+	}
+
+	if opts.TLSReload {
+		if err := installReloadableTLS(opts.URI, clientOpts); err != nil {
+			return nil, fmt.Errorf("tls reload setup: %w", err)
+		}
 	}
 
 	clientOpts.SetDirect(opts.DirectConnect)
