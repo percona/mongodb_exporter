@@ -211,9 +211,38 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 	assert.Equal(t, want, nm)
 }
 
+func TestBalancerRunningValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		inBalancerRound bool
+		expected        float64
+	}{
+		{
+			name:            "balancer running",
+			inBalancerRound: true,
+			expected:        1,
+		},
+		{
+			name:            "balancer not running",
+			inBalancerRound: false,
+			expected:        0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := balancerRunningValue(tt.inBalancerRound)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
 func TestMongosMetrics(t *testing.T) {
 	t.Parallel()
-	t.Run("test mongodb_mongos_sharding_chunks_is_balancer_running metric", func(t *testing.T) {
+	t.Run("test mongodb_mongos_sharding_balancer_enabled metric", func(t *testing.T) {
 		type bss struct {
 			Mode string `bson:"mode"`
 		}
@@ -241,6 +270,39 @@ func TestMongosMetrics(t *testing.T) {
 
 		expected := 0
 		if bs.Mode == "full" {
+			expected = 1
+		}
+		assert.Equal(t, float64(expected), m.GetGauge().GetValue()) //nolint
+	})
+
+	t.Run("test mongodb_mongos_sharding_chunks_is_balancer_running metric", func(t *testing.T) {
+		type bss struct {
+			InBalancerRound bool `bson:"inBalancerRound"`
+		}
+
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		port, err := tu.PortForContainer("mongos")
+		require.NoError(t, err)
+		client := tu.TestClient(ctx, port, t)
+
+		var bs bss
+		cmd := bson.D{{Key: "balancerStatus", Value: "1"}}
+		err = client.Database("admin").RunCommand(ctx, cmd).Decode(&bs)
+		require.NoError(t, err)
+
+		var metric prometheus.Metric
+		var m dto.Metric
+		metric, err = chunksBalancerRunning(ctx, client)
+		assert.NoError(t, err)
+
+		err = metric.Write(&m)
+		assert.NoError(t, err)
+
+		expected := 0
+		if bs.InBalancerRound {
 			expected = 1
 		}
 		assert.Equal(t, float64(expected), m.GetGauge().GetValue()) //nolint
