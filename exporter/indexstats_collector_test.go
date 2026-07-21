@@ -86,6 +86,8 @@ mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_na
 }
 
 func TestIndexStatsLabels(t *testing.T) {
+	t.Parallel()
+
 	first := indexStatsLabels(
 		map[string]string{"cl_role": "mongos"},
 		"testdb",
@@ -119,6 +121,8 @@ func TestIndexStatsLabels(t *testing.T) {
 }
 
 func TestIndexStatsLabelsWithoutShard(t *testing.T) {
+	t.Parallel()
+
 	labels := indexStatsLabels(
 		map[string]string{},
 		"testdb",
