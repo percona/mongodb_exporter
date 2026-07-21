@@ -85,6 +85,55 @@ mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_na
 	assert.NoError(t, err)
 }
 
+func TestIndexStatsLabels(t *testing.T) {
+	first := indexStatsLabels(
+		map[string]string{"cl_role": "mongos"},
+		"testdb",
+		"orders",
+		"_id_",
+		bson.M{"shard": "shard-0"},
+	)
+	second := indexStatsLabels(
+		map[string]string{"cl_role": "mongos"},
+		"testdb",
+		"orders",
+		"_id_",
+		bson.M{"shard": "shard-1"},
+	)
+
+	assert.Equal(t, map[string]string{
+		"cl_role":    "mongos",
+		"database":   "testdb",
+		"collection": "orders",
+		"key_name":   "_id_",
+		"shard":      "shard-0",
+	}, first)
+	assert.Equal(t, map[string]string{
+		"cl_role":    "mongos",
+		"database":   "testdb",
+		"collection": "orders",
+		"key_name":   "_id_",
+		"shard":      "shard-1",
+	}, second)
+	assert.NotEqual(t, first, second)
+}
+
+func TestIndexStatsLabelsWithoutShard(t *testing.T) {
+	labels := indexStatsLabels(
+		map[string]string{},
+		"testdb",
+		"orders",
+		"_id_",
+		bson.M{},
+	)
+
+	assert.Equal(t, map[string]string{
+		"database":   "testdb",
+		"collection": "orders",
+		"key_name":   "_id_",
+	}, labels)
+}
+
 func TestDescendingIndexOverride(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
