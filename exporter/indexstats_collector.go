@@ -145,7 +145,7 @@ func indexStatsLabels(labels map[string]string, database, collection, indexName 
 	labels["database"] = database
 	labels["collection"] = collection
 	labels["key_name"] = indexName
-	if shard, ok := metric["shard"].(string); ok {
+	if shard, ok := metric["shard"].(string); ok && shard != "" {
 		labels["shard"] = shard
 	}
 
