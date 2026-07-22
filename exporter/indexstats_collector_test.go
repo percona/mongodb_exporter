@@ -70,12 +70,12 @@ func TestIndexStatsCollector(t *testing.T) {
 	expected := strings.NewReader(`
 # HELP mongodb_indexstats_accesses_ops indexstats.accesses.ops
 # TYPE mongodb_indexstats_accesses_ops untyped
-mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_",shard="rs1"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="idx_01",shard="rs1"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_",shard="rs1"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="idx_01",shard="rs1"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_",shard="rs1"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="idx_01",shard="rs1"} 0` +
+mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="idx_01"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="idx_01"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_"} 0
+mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="idx_01"} 0` +
 		"\n")
 
 	filter := []string{
@@ -128,7 +128,7 @@ func TestIndexStatsLabelsWithoutShard(t *testing.T) {
 		"testdb",
 		"orders",
 		"_id_",
-		bson.M{},
+		bson.M{"shard": ""},
 	)
 
 	assert.Equal(t, map[string]string{
@@ -173,15 +173,15 @@ func TestDescendingIndexOverride(t *testing.T) {
 	expected := strings.NewReader(`
   # HELP mongodb_indexstats_accesses_ops indexstats.accesses.ops
   # TYPE mongodb_indexstats_accesses_ops untyped
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_",shard="rs1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_1",shard="rs1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_DESC",shard="rs1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_",shard="rs1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_1",shard="rs1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_DESC",shard="rs1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_",shard="rs1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_1",shard="rs1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_DESC",shard="rs1"} 0` + "\n")
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_"} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_1"} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_DESC"} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_"} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_1"} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_DESC"} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_"} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_1"} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_DESC"} 0` + "\n")
 
 	filter := []string{
 		"mongodb_indexstats_accesses_ops",
