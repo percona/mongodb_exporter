@@ -241,7 +241,7 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 			bson.M{"lowerBound": int64(0), "count": int64(3)},
 			bson.M{"lowerBound": int64(1024), "count": int64(7)},
 		},
-	}, nil, true)
+	}, nil, true, true)
 
 	reg := prometheus.NewPedanticRegistry()
 	reg.MustRegister(staticCollector(metrics))
@@ -279,4 +279,38 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 		"0":    3,
 		"1024": 7,
 	}, valuesByBound)
+}
+
+func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("serverStatus.metrics.query.multiPlanner", bson.M{
+		"histograms": bson.M{
+			"sbeMicros": primitive.A{
+				bson.M{"lowerBound": int64(0), "count": int64(3)},
+				bson.M{"lowerBound": int64(1024), "count": int64(7)},
+			},
+		},
+	}, nil, true, false)
+
+	assert.Empty(t, metrics)
+
+	metrics = makeMetrics("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
+		"sbeMicros": primitive.A{
+			bson.M{"lowerBound": int64(0), "count": int64(3)},
+			bson.M{"lowerBound": int64(1024), "count": int64(7)},
+		},
+	}, nil, true, false)
+
+	assert.Empty(t, metrics)
+}
+
+func TestAsMetricMapHandlesBSONM(t *testing.T) {
+	t.Parallel()
+
+	bucket, ok := asMetricMap(bson.M{"lowerBound": int64(1024), "count": int64(7)})
+
+	assert.True(t, ok)
+	assert.Equal(t, int64(1024), bucket["lowerBound"])
+	assert.Equal(t, int64(7), bucket["count"])
 }

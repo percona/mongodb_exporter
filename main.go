@@ -53,20 +53,21 @@ type GlobalFlags struct {
 	LogLevel              string   `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
 	ConnectTimeoutMS      int      `name:"mongodb.connect-timeout-ms" help:"Connection timeout in milliseconds" default:"5000"`
 
-	EnableExporterMetrics    bool `name:"collector.exporter-metrics" help:"Enable collecting metrics about the exporter itself (process_*, go_*)" negatable:"" default:"True"`
-	EnableDiagnosticData     bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
-	EnableReplicasetStatus   bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
-	EnableReplicasetConfig   bool `name:"collector.replicasetconfig" help:"Enable collecting metrics from replSetGetConfig"`
-	EnableDBStats            bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
-	EnableDBStatsFreeStorage bool `name:"collector.dbstatsfreestorage" help:"Enable collecting free space metrics from dbStats"`
-	EnableTopMetrics         bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
-	EnableCurrentopMetrics   bool `name:"collector.currentopmetrics" help:"Enable collecting metrics currentop admin command"`
-	EnableIndexStats         bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
-	EnableCollStats          bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
-	EnableProfile            bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
-	EnableFCV                bool `name:"collector.fcv" help:"Enable Feature Compatibility Version collector"`
-	EnableShards             bool `help:"Enable collecting metrics from sharded Mongo clusters about chunks" name:"collector.shards"`
-	EnablePBM                bool `help:"Enable collecting metrics from Percona Backup for MongoDB" name:"collector.pbm"`
+	EnableExporterMetrics          bool `name:"collector.exporter-metrics" help:"Enable collecting metrics about the exporter itself (process_*, go_*)" negatable:"" default:"True"`
+	EnableDiagnosticData           bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
+	EnableDiagnosticDataHistograms bool `name:"collector.diagnosticdata-histograms" help:"Enable collecting histogram bucket metrics from getDiagnosticData"`
+	EnableReplicasetStatus         bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
+	EnableReplicasetConfig         bool `name:"collector.replicasetconfig" help:"Enable collecting metrics from replSetGetConfig"`
+	EnableDBStats                  bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
+	EnableDBStatsFreeStorage       bool `name:"collector.dbstatsfreestorage" help:"Enable collecting free space metrics from dbStats"`
+	EnableTopMetrics               bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
+	EnableCurrentopMetrics         bool `name:"collector.currentopmetrics" help:"Enable collecting metrics currentop admin command"`
+	EnableIndexStats               bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
+	EnableCollStats                bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
+	EnableProfile                  bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
+	EnableFCV                      bool `name:"collector.fcv" help:"Enable Feature Compatibility Version collector"`
+	EnableShards                   bool `help:"Enable collecting metrics from sharded Mongo clusters about chunks" name:"collector.shards"`
+	EnablePBM                      bool `help:"Enable collecting metrics from Percona Backup for MongoDB" name:"collector.pbm"`
 
 	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
 
@@ -173,20 +174,21 @@ func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exp
 		ConnectTimeoutMS:      opts.ConnectTimeoutMS,
 		TimeoutOffset:         opts.TimeoutOffset,
 
-		DisableDefaultRegistry:   !opts.EnableExporterMetrics,
-		EnableDiagnosticData:     opts.EnableDiagnosticData,
-		EnableReplicasetStatus:   opts.EnableReplicasetStatus,
-		EnableReplicasetConfig:   opts.EnableReplicasetConfig,
-		EnableCurrentopMetrics:   opts.EnableCurrentopMetrics,
-		EnableTopMetrics:         opts.EnableTopMetrics,
-		EnableDBStats:            opts.EnableDBStats,
-		EnableDBStatsFreeStorage: opts.EnableDBStatsFreeStorage,
-		EnableIndexStats:         opts.EnableIndexStats,
-		EnableCollStats:          opts.EnableCollStats,
-		EnableProfile:            opts.EnableProfile,
-		EnableShards:             opts.EnableShards,
-		EnableFCV:                opts.EnableFCV,
-		EnablePBMMetrics:         opts.EnablePBM,
+		DisableDefaultRegistry:         !opts.EnableExporterMetrics,
+		EnableDiagnosticData:           opts.EnableDiagnosticData,
+		EnableDiagnosticDataHistograms: opts.EnableDiagnosticDataHistograms,
+		EnableReplicasetStatus:         opts.EnableReplicasetStatus,
+		EnableReplicasetConfig:         opts.EnableReplicasetConfig,
+		EnableCurrentopMetrics:         opts.EnableCurrentopMetrics,
+		EnableTopMetrics:               opts.EnableTopMetrics,
+		EnableDBStats:                  opts.EnableDBStats,
+		EnableDBStatsFreeStorage:       opts.EnableDBStatsFreeStorage,
+		EnableIndexStats:               opts.EnableIndexStats,
+		EnableCollStats:                opts.EnableCollStats,
+		EnableProfile:                  opts.EnableProfile,
+		EnableShards:                   opts.EnableShards,
+		EnableFCV:                      opts.EnableFCV,
+		EnablePBMMetrics:               opts.EnablePBM,
 
 		EnableOverrideDescendingIndex: opts.EnableOverrideDescendingIndex,
 

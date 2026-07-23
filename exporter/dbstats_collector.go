@@ -100,7 +100,7 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 		// to differentiate metrics between different databases.
 		labels["database"] = db
 
-		newMetrics := makeMetrics(prefix, dbStats, labels, d.compatibleMode)
+		newMetrics := makeMetrics(prefix, dbStats, labels, d.compatibleMode, false)
 		for _, metric := range newMetrics {
 			ch <- metric
 		}

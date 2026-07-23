@@ -152,7 +152,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 				labels["shard"] = shard
 			}
 
-			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {
+			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode, false) {
 				ch <- metric
 			}
 		}

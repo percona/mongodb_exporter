@@ -306,7 +306,11 @@ func metricHelp(prefix, name string) string {
 	return name
 }
 
-func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
+func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
+	if !includeHistograms && isHistogramPath(prefix) {
+		return nil
+	}
+
 	var res []prometheus.Metric
 
 	if prefix != "" {
@@ -314,6 +318,10 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	}
 
 	for k, val := range m {
+		if k == "histograms" && !includeHistograms {
+			continue
+		}
+
 		nextPrefix := prefix + k
 
 		l := make(map[string]string)
@@ -328,13 +336,13 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		}
 		switch v := val.(type) {
 		case bson.M:
-			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
+			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case map[string]interface{}:
-			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
+			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case primitive.A:
-			res = append(res, processMetricSlice(nextPrefix, v, l, compatibleMode)...)
+			res = append(res, processMetricSlice(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case []interface{}:
-			if isHistogramBucketSlice(nextPrefix, v) {
+			if includeHistograms && isHistogramBucketSlice(nextPrefix, v) {
 				res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
 			}
 			continue
@@ -348,7 +356,7 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
 // and each member is represented by a map[string]interface{}.
-func processSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
+func processSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 	labels := make(map[string]string)
 	for name, value := range commonLabels {
@@ -372,18 +380,18 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 			labels["member_idx"] = host
 		}
 
-		metrics = append(metrics, makeMetrics(prefix, s, labels, compatibleMode)...)
+		metrics = append(metrics, makeMetrics(prefix, s, labels, compatibleMode, includeHistograms)...)
 	}
 
 	return metrics
 }
 
-func processMetricSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
-	if isHistogramBucketSlice(prefix, v) {
+func processMetricSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
+	if includeHistograms && isHistogramBucketSlice(prefix, v) {
 		return processHistogramSlice(prefix, v, commonLabels, compatibleMode)
 	}
 
-	return processSlice(prefix, v, commonLabels, compatibleMode)
+	return processSlice(prefix, v, commonLabels, compatibleMode, includeHistograms)
 }
 
 func appendMetricValue(metrics []prometheus.Metric, prefix, name string, value interface{}, labels map[string]string, compatibleMode bool) []prometheus.Metric {
@@ -445,7 +453,7 @@ func isHistogramBucketSlice(prefix string, v []interface{}) bool {
 	if len(v) == 0 {
 		return false
 	}
-	if !strings.Contains(prefix, ".histograms.") && !strings.HasSuffix(prefix, ".histograms") {
+	if !isHistogramPath(prefix) {
 		return false
 	}
 
@@ -463,6 +471,10 @@ func isHistogramBucketSlice(prefix string, v []interface{}) bool {
 	}
 
 	return true
+}
+
+func isHistogramPath(prefix string) bool {
+	return prefix == "histograms" || strings.Contains(prefix, ".histograms.") || strings.HasSuffix(prefix, ".histograms")
 }
 
 func asMetricMap(item interface{}) (map[string]interface{}, bool) {
