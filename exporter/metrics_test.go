@@ -236,7 +236,7 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 func TestHistogramMetricsDoNotCollide(t *testing.T) {
 	t.Parallel()
 
-	metrics := makeMetrics("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
+	metrics := makeMetricsWithHistograms("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
 		"sbeMicros": primitive.A{
 			bson.M{"lowerBound": int64(0), "count": int64(3)},
 			bson.M{"lowerBound": int64(1024), "count": int64(7)},
@@ -291,7 +291,7 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 				bson.M{"lowerBound": int64(1024), "count": int64(7)},
 			},
 		},
-	}, nil, true, false)
+	}, nil, true)
 
 	assert.Empty(t, metrics)
 
@@ -300,7 +300,7 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 			bson.M{"lowerBound": int64(0), "count": int64(3)},
 			bson.M{"lowerBound": int64(1024), "count": int64(7)},
 		},
-	}, nil, true, false)
+	}, nil, true)
 
 	assert.Empty(t, metrics)
 }

@@ -137,7 +137,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 			labels["key_name"] = indexName
 
 			metrics := sanitizeMetrics(metric)
-			for _, metric := range makeMetrics(prefix, metrics, labels, false, false) {
+			for _, metric := range makeMetrics(prefix, metrics, labels, false) {
 				ch <- metric
 			}
 		}

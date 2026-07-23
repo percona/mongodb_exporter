@@ -81,7 +81,7 @@ func (d *replSetGetStatusCollector) collect(ch chan<- prometheus.Metric) {
 	logger.Debug("replSetGetStatus result:")
 	debugResult(logger, m)
 
-	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode, false) {
+	for _, metric := range makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric
 	}
 }
