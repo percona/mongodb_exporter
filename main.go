@@ -39,51 +39,51 @@ var (
 
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
-	User                  string   `name:"mongodb.user" help:"monitor user, need clusterMonitor role in admin db and read role in local db" env:"MONGODB_USER" placeholder:"monitorUser"`
-	Password              string   `name:"mongodb.password" help:"monitor user password" env:"MONGODB_PASSWORD" placeholder:"monitorPassword"`
-	CollStatsNamespaces   string   `name:"mongodb.collstats-colls" help:"List of comma separared databases.collections to get $collStats" placeholder:"db1,db2.col2"`
-	IndexStatsCollections string   `name:"mongodb.indexstats-colls" help:"List of comma separared databases.collections to get $indexStats" placeholder:"db1.col1,db2.col2"`
-	URI                   []string `name:"mongodb.uri" help:"MongoDB connection URI" env:"MONGODB_URI" placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
-	GlobalConnPool        bool     `name:"mongodb.global-conn-pool" help:"Use global connection pool instead of creating new pool for each http request." negatable:""`
-	DirectConnect         bool     `name:"mongodb.direct-connect" help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." default:"true" negatable:""`
-	WebListenAddress      string   `name:"web.listen-address" help:"Address to listen on for web interface and telemetry" default:":9216"`
-	WebTelemetryPath      string   `name:"web.telemetry-path" help:"Metrics expose path" default:"/metrics"`
-	TLSConfigPath         string   `name:"web.config" help:"Path to the file having Prometheus TLS config for basic auth"`
-	TimeoutOffset         int      `name:"web.timeout-offset" help:"Offset to subtract from the request timeout in seconds" default:"1"`
-	LogLevel              string   `name:"log.level" help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" enum:"debug,info,warn,error,fatal" default:"error"`
-	ConnectTimeoutMS      int      `name:"mongodb.connect-timeout-ms" help:"Connection timeout in milliseconds" default:"5000"`
+	User                  string   `env:"MONGODB_USER"                                                                    help:"monitor user, need clusterMonitor role in admin db and read role in local db"                                                            name:"mongodb.user"                                                                                        placeholder:"monitorUser"`
+	Password              string   `env:"MONGODB_PASSWORD"                                                                help:"monitor user password"                                                                                                                   name:"mongodb.password"                                                                                    placeholder:"monitorPassword"`
+	CollStatsNamespaces   string   `help:"List of comma separared databases.collections to get $collStats"                name:"mongodb.collstats-colls"                                                                                                                 placeholder:"db1,db2.col2"`
+	IndexStatsCollections string   `help:"List of comma separared databases.collections to get $indexStats"               name:"mongodb.indexstats-colls"                                                                                                                placeholder:"db1.col1,db2.col2"`
+	URI                   []string `env:"MONGODB_URI"                                                                     help:"MongoDB connection URI"                                                                                                                  name:"mongodb.uri"                                                                                         placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
+	GlobalConnPool        bool     `help:"Use global connection pool instead of creating new pool for each http request." name:"mongodb.global-conn-pool"                                                                                                                negatable:""`
+	DirectConnect         bool     `default:"true"                                                                        help:"Whether or not a direct connect should be made. Direct connections are not valid if multiple hosts are specified or an SRV URI is used." name:"mongodb.direct-connect"                                                                              negatable:""`
+	WebListenAddress      string   `default:":9216"                                                                       help:"Address to listen on for web interface and telemetry"                                                                                    name:"web.listen-address"`
+	WebTelemetryPath      string   `default:"/metrics"                                                                    help:"Metrics expose path"                                                                                                                     name:"web.telemetry-path"`
+	TLSConfigPath         string   `help:"Path to the file having Prometheus TLS config for basic auth"                   name:"web.config"`
+	TimeoutOffset         int      `default:"1"                                                                           help:"Offset to subtract from the request timeout in seconds"                                                                                  name:"web.timeout-offset"`
+	LogLevel              string   `default:"error"                                                                       enum:"debug,info,warn,error,fatal"                                                                                                             help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" name:"log.level"`
+	ConnectTimeoutMS      int      `default:"5000"                                                                        help:"Connection timeout in milliseconds"                                                                                                      name:"mongodb.connect-timeout-ms"`
 
-	EnableExporterMetrics          bool `name:"collector.exporter-metrics" help:"Enable collecting metrics about the exporter itself (process_*, go_*)" negatable:"" default:"True"`
-	EnableDiagnosticData           bool `name:"collector.diagnosticdata" help:"Enable collecting metrics from getDiagnosticData"`
-	EnableDiagnosticDataHistograms bool `name:"collector.diagnosticdata-histograms" help:"Enable collecting histogram bucket metrics from getDiagnosticData"`
-	EnableReplicasetStatus         bool `name:"collector.replicasetstatus" help:"Enable collecting metrics from replSetGetStatus"`
-	EnableReplicasetConfig         bool `name:"collector.replicasetconfig" help:"Enable collecting metrics from replSetGetConfig"`
-	EnableDBStats                  bool `name:"collector.dbstats" help:"Enable collecting metrics from dbStats"`
-	EnableDBStatsFreeStorage       bool `name:"collector.dbstatsfreestorage" help:"Enable collecting free space metrics from dbStats"`
-	EnableTopMetrics               bool `name:"collector.topmetrics" help:"Enable collecting metrics from top admin command"`
-	EnableCurrentopMetrics         bool `name:"collector.currentopmetrics" help:"Enable collecting metrics currentop admin command"`
-	EnableIndexStats               bool `name:"collector.indexstats" help:"Enable collecting metrics from $indexStats"`
-	EnableCollStats                bool `name:"collector.collstats" help:"Enable collecting metrics from $collStats"`
-	EnableProfile                  bool `name:"collector.profile" help:"Enable collecting metrics from profile"`
-	EnableFCV                      bool `name:"collector.fcv" help:"Enable Feature Compatibility Version collector"`
+	EnableExporterMetrics          bool `default:"True"                                                            help:"Enable collecting metrics about the exporter itself (process_*, go_*)" name:"collector.exporter-metrics" negatable:""`
+	EnableDiagnosticData           bool `help:"Enable collecting metrics from getDiagnosticData"                   name:"collector.diagnosticdata"`
+	EnableDiagnosticDataHistograms bool `help:"Enable collecting histogram bucket metrics from getDiagnosticData"  name:"collector.diagnosticdata-histograms"`
+	EnableReplicasetStatus         bool `help:"Enable collecting metrics from replSetGetStatus"                    name:"collector.replicasetstatus"`
+	EnableReplicasetConfig         bool `help:"Enable collecting metrics from replSetGetConfig"                    name:"collector.replicasetconfig"`
+	EnableDBStats                  bool `help:"Enable collecting metrics from dbStats"                             name:"collector.dbstats"`
+	EnableDBStatsFreeStorage       bool `help:"Enable collecting free space metrics from dbStats"                  name:"collector.dbstatsfreestorage"`
+	EnableTopMetrics               bool `help:"Enable collecting metrics from top admin command"                   name:"collector.topmetrics"`
+	EnableCurrentopMetrics         bool `help:"Enable collecting metrics currentop admin command"                  name:"collector.currentopmetrics"`
+	EnableIndexStats               bool `help:"Enable collecting metrics from $indexStats"                         name:"collector.indexstats"`
+	EnableCollStats                bool `help:"Enable collecting metrics from $collStats"                          name:"collector.collstats"`
+	EnableProfile                  bool `help:"Enable collecting metrics from profile"                             name:"collector.profile"`
+	EnableFCV                      bool `help:"Enable Feature Compatibility Version collector"                     name:"collector.fcv"`
 	EnableShards                   bool `help:"Enable collecting metrics from sharded Mongo clusters about chunks" name:"collector.shards"`
-	EnablePBM                      bool `help:"Enable collecting metrics from Percona Backup for MongoDB" name:"collector.pbm"`
+	EnablePBM                      bool `help:"Enable collecting metrics from Percona Backup for MongoDB"          name:"collector.pbm"`
 
-	EnableOverrideDescendingIndex bool `name:"metrics.overridedescendingindex" help:"Enable descending index name override to replace -1 with _DESC"`
+	EnableOverrideDescendingIndex bool `help:"Enable descending index name override to replace -1 with _DESC" name:"metrics.overridedescendingindex"`
 
-	CollectAll bool `name:"collect-all" help:"Enable all collectors. Same as specifying all --collector.<name>"`
+	CollectAll bool `help:"Enable all collectors. Same as specifying all --collector.<name>" name:"collect-all"`
 
-	CollStatsLimit         int  `name:"collector.collstats-limit" help:"Disable collstats, dbstats, topmetrics and indexstats collector if there are more than <n> collections. 0=No limit" default:"0"`
-	CollStatsEnableDetails bool `name:"collector.collstats-enable-details" help:"Enable collecting index details and wired tiger metrics from $collStats" default:"false"`
+	CollStatsLimit         int  `default:"0"     help:"Disable collstats, dbstats, topmetrics and indexstats collector if there are more than <n> collections. 0=No limit" name:"collector.collstats-limit"`
+	CollStatsEnableDetails bool `default:"false" help:"Enable collecting index details and wired tiger metrics from $collStats"                                            name:"collector.collstats-enable-details"`
 
-	ProfileTimeTS int `name:"collector.profile-time-ts" help:"Set time for scrape slow queries." default:"30"`
+	ProfileTimeTS int `default:"30" help:"Set time for scrape slow queries." name:"collector.profile-time-ts"`
 
-	CurrentOpSlowTime string `name:"collector.currentopmetrics-slow-time" help:"Set minimum time for registration queries." default:"5m"`
+	CurrentOpSlowTime string `default:"5m" help:"Set minimum time for registration queries." name:"collector.currentopmetrics-slow-time"`
 
-	DiscoveringMode bool `name:"discovering-mode" help:"Enable autodiscover collections" negatable:""`
-	CompatibleMode  bool `name:"compatible-mode" help:"Enable old mongodb-exporter compatible metrics" negatable:""`
-	Version         bool `name:"version" help:"Show version and exit"`
-	SplitCluster    bool `name:"split-cluster" help:"Treat each node in cluster as a separate target" negatable:"" default:"false"`
+	DiscoveringMode bool `help:"Enable autodiscover collections"                name:"discovering-mode"                                negatable:""`
+	CompatibleMode  bool `help:"Enable old mongodb-exporter compatible metrics" name:"compatible-mode"                                 negatable:""`
+	Version         bool `help:"Show version and exit"                          name:"version"`
+	SplitCluster    bool `default:"false"                                       help:"Treat each node in cluster as a separate target" name:"split-cluster" negatable:""`
 }
 
 func main() {
