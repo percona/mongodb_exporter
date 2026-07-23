@@ -28,9 +28,6 @@ linters:
       - text: 'G104'
         linters:
           - gosec
-      - path: _test\.go
-        linters:
-          - goconst
 
 formatters:
   settings:
