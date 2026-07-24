@@ -25,7 +25,7 @@ import (
 	"github.com/AlekSi/pointer"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -50,7 +50,7 @@ func TestIndexStatsCollector(t *testing.T) {
 		collection := fmt.Sprintf("testcol_%02d", i)
 		for j := 0; j < 10; j++ {
 			_, err := database.Collection(collection).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 		mod := mongo.IndexModel{
 			Keys: bson.M{
@@ -60,7 +60,7 @@ func TestIndexStatsCollector(t *testing.T) {
 			},
 		}
 		_, err := database.Collection(collection).Indexes().CreateOne(ctx, mod)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
@@ -82,7 +82,7 @@ mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_na
 		"mongodb_indexstats_accesses_ops",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestIndexStatsLabels(t *testing.T) {
@@ -103,14 +103,14 @@ func TestIndexStatsLabels(t *testing.T) {
 		bson.M{"shard": "shard-1"},
 	)
 
-	assert.Equal(t, map[string]string{
+	require.Equal(t, map[string]string{
 		"cl_role":    "mongos",
 		"database":   "testdb",
 		"collection": "orders",
 		"key_name":   "_id_",
 		"shard":      "shard-0",
 	}, first)
-	assert.Equal(t, map[string]string{
+	require.Equal(t, map[string]string{
 		"cl_role":    "mongos",
 		"database":   "testdb",
 		"collection": "orders",
@@ -133,7 +133,7 @@ func TestIndexStatsLabelsWithoutShard(t *testing.T) {
 			bson.M{},
 		)
 
-		assert.Equal(t, map[string]string{
+		require.Equal(t, map[string]string{
 			"database":   "testdb",
 			"collection": "orders",
 			"key_name":   "_id_",
@@ -151,7 +151,7 @@ func TestIndexStatsLabelsWithoutShard(t *testing.T) {
 			bson.M{"shard": ""},
 		)
 
-		assert.Equal(t, map[string]string{
+		require.Equal(t, map[string]string{
 			"database":   "testdb",
 			"collection": "orders",
 			"key_name":   "_id_",
@@ -175,16 +175,16 @@ func TestDescendingIndexOverride(t *testing.T) {
 		collection := fmt.Sprintf("testcol_%02d", i)
 		for j := 0; j < 10; j++ {
 			_, err := database.Collection(collection).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 
 		descendingMod := mongo.IndexModel{Keys: bson.M{"f1": -1}}
 		_, err := database.Collection(collection).Indexes().CreateOne(ctx, descendingMod)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ascendingMod := mongo.IndexModel{Keys: bson.M{"f1": 1}}
 		_, err = database.Collection(collection).Indexes().CreateOne(ctx, ascendingMod)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
@@ -208,7 +208,7 @@ func TestDescendingIndexOverride(t *testing.T) {
 		"mongodb_indexstats_accesses_ops",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestSanitize(t *testing.T) {
@@ -240,7 +240,7 @@ func TestSanitize(t *testing.T) {
 			"building": float64(1),
 		}
 		got := sanitizeMetrics(in)
-		assert.Equal(t, want, got)
+		require.Equal(t, want, got)
 	})
 
 	t.Run("Without building", func(t *testing.T) {
@@ -269,6 +269,6 @@ func TestSanitize(t *testing.T) {
 			},
 		}
 		got := sanitizeMetrics(in)
-		assert.Equal(t, want, got)
+		require.Equal(t, want, got)
 	})
 }
