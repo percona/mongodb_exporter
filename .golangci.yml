@@ -14,6 +14,8 @@ linters:
     - wsl
     - wsl_v5
   settings:
+    cyclop:
+      max-complexity: 15
     depguard:
       rules:
         main:
