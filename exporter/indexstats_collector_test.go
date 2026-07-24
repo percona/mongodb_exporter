@@ -155,7 +155,6 @@ func TestIndexStatsLabelsWithoutShard(t *testing.T) {
 			"database":   "testdb",
 			"collection": "orders",
 			"key_name":   "_id_",
-			"shard":      "",
 		}, labels)
 	})
 }

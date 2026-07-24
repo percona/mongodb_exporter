@@ -148,7 +148,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		labels["collection"] = collection
 
 		for _, metrics := range stats {
-			if shard, ok := metrics["shard"].(string); ok {
+			if shard, ok := metrics["shard"].(string); ok && shard != "" {
 				labels["shard"] = shard
 			}
 
