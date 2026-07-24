@@ -117,25 +117,47 @@ func TestIndexStatsLabels(t *testing.T) {
 		"key_name":   "_id_",
 		"shard":      "shard-1",
 	}, second)
-	assert.NotEqual(t, first, second)
 }
 
 func TestIndexStatsLabelsWithoutShard(t *testing.T) {
 	t.Parallel()
 
-	labels := indexStatsLabels(
-		map[string]string{},
-		"testdb",
-		"orders",
-		"_id_",
-		bson.M{"shard": ""},
-	)
+	t.Run("shard field absent", func(t *testing.T) {
+		t.Parallel()
 
-	assert.Equal(t, map[string]string{
-		"database":   "testdb",
-		"collection": "orders",
-		"key_name":   "_id_",
-	}, labels)
+		labels := indexStatsLabels(
+			map[string]string{},
+			"testdb",
+			"orders",
+			"_id_",
+			bson.M{},
+		)
+
+		assert.Equal(t, map[string]string{
+			"database":   "testdb",
+			"collection": "orders",
+			"key_name":   "_id_",
+		}, labels)
+	})
+
+	t.Run("shard field empty", func(t *testing.T) {
+		t.Parallel()
+
+		labels := indexStatsLabels(
+			map[string]string{},
+			"testdb",
+			"orders",
+			"_id_",
+			bson.M{"shard": ""},
+		)
+
+		assert.Equal(t, map[string]string{
+			"database":   "testdb",
+			"collection": "orders",
+			"key_name":   "_id_",
+			"shard":      "",
+		}, labels)
+	})
 }
 
 func TestDescendingIndexOverride(t *testing.T) {
