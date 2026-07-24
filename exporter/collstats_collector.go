@@ -148,14 +148,19 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		labels["collection"] = collection
 
 		for _, metrics := range stats {
-			if shard, ok := metrics["shard"].(string); ok && shard != "" {
-				labels["shard"] = shard
-			}
+			setShardLabel(labels, metrics)
 
 			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {
 				ch <- metric
 			}
 		}
+	}
+}
+
+func setShardLabel(labels map[string]string, metrics bson.M) {
+	delete(labels, "shard")
+	if shard, ok := metrics["shard"].(string); ok && shard != "" {
+		labels["shard"] = shard
 	}
 }
 
