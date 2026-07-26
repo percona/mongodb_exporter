@@ -52,7 +52,7 @@ func TestGetEncryptionInfo(t *testing.T) {
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
-	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo, false)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(fmt.Sprintf(`

@@ -54,20 +54,21 @@ type Opts struct {
 	GlobalConnPool         bool
 	TimeoutOffset          int
 
-	CollectAll               bool
-	EnableDBStats            bool
-	EnableDBStatsFreeStorage bool
-	EnableDiagnosticData     bool
-	EnableReplicasetStatus   bool
-	EnableReplicasetConfig   bool
-	EnableCurrentopMetrics   bool
-	EnableTopMetrics         bool
-	EnableIndexStats         bool
-	EnableCollStats          bool
-	EnableProfile            bool
-	EnableShards             bool
-	EnableFCV                bool // Feature Compatibility Version.
-	EnablePBMMetrics         bool
+	CollectAll                     bool
+	EnableDBStats                  bool
+	EnableDBStatsFreeStorage       bool
+	EnableDiagnosticData           bool
+	EnableDiagnosticDataHistograms bool
+	EnableReplicasetStatus         bool
+	EnableReplicasetConfig         bool
+	EnableCurrentopMetrics         bool
+	EnableTopMetrics               bool
+	EnableIndexStats               bool
+	EnableCollStats                bool
+	EnableProfile                  bool
+	EnableShards                   bool
+	EnableFCV                      bool // Feature Compatibility Version.
+	EnablePBMMetrics               bool
 
 	EnableOverrideDescendingIndex bool
 
@@ -208,7 +209,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	if e.opts.EnableDiagnosticData && requestOpts.EnableDiagnosticData {
 		ddc := newDiagnosticDataCollector(ctx, client, e.opts.Logger,
-			e.opts.CompatibleMode, topologyInfo, dbBuildInfo)
+			e.opts.CompatibleMode, topologyInfo, dbBuildInfo, e.opts.EnableDiagnosticDataHistograms)
 		registry.MustRegister(ddc)
 	}
 
