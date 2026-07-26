@@ -157,6 +157,16 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// setShardLabel sets the optional "shard" label from a single $collStats document.
+// The caller reuses one labels map for every document of a collection, so a stale
+// shard from a previous document must be removed first, otherwise a document
+// without a shard would silently inherit it.
+//
+// Empty and absent shards are both treated as "no shard": via mongos every user
+// collection reports a non-empty shard, while system databases (excluded from
+// discovery) may report an empty or missing one. Mixing labelled and unlabelled
+// series of the same metric name in one scrape would break the whole family, so
+// the label must be all-or-nothing per scrape.
 func setShardLabel(labels map[string]string, metrics bson.M) {
 	delete(labels, "shard")
 	if shard, ok := metrics["shard"].(string); ok && shard != "" {
