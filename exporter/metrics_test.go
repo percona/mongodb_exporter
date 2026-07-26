@@ -305,6 +305,89 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	assert.Empty(t, metrics)
 }
 
+// serverStatus.opLatencies exposes its buckets under "histogram" with a "micros" boundary,
+// which used to be flattened into one metric per bucket sharing the same name and labels.
+func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetricsWithHistograms("serverStatus", bson.M{
+		"opLatencies": bson.M{
+			"reads": bson.M{
+				"latency": int64(120),
+				"ops":     int64(4),
+				"histogram": primitive.A{
+					bson.M{"micros": int64(1), "count": int64(3)},
+					bson.M{"micros": int64(2048), "count": int64(7)},
+				},
+			},
+		},
+	}, nil, false, true)
+
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(staticCollector(metrics))
+
+	gatheredMetrics, err := reg.Gather()
+	assert.NoError(t, err, "metrics with the same name and labels must not be exported")
+
+	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
+	for _, metric := range gatheredMetrics {
+		metricsByName[metric.GetName()] = metric
+	}
+
+	assert.NotContains(t, metricsByName, "mongodb_ss_opLatencies_reads_histogram_micros")
+
+	bucketCounts, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
+	if !assert.True(t, ok) {
+		return
+	}
+
+	valuesByBound := make(map[string]float64, len(bucketCounts.GetMetric()))
+	for _, metric := range bucketCounts.GetMetric() {
+		for _, label := range metric.GetLabel() {
+			if label.GetName() == "micros" {
+				valuesByBound[label.GetValue()] = metric.GetCounter().GetValue()
+			}
+		}
+	}
+
+	assert.Equal(t, map[string]float64{
+		"1":    3,
+		"2048": 7,
+	}, valuesByBound)
+}
+
+func TestOpLatenciesHistogramMetricsAreSkippedByDefault(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("serverStatus.opLatencies.reads", bson.M{
+		"latency": int64(120),
+		"histogram": primitive.A{
+			bson.M{"micros": int64(1), "count": int64(3)},
+			bson.M{"micros": int64(2048), "count": int64(7)},
+		},
+	}, nil, false)
+
+	// The latency metric is renamed and labeled by specialConversions, the buckets are dropped.
+	assert.Equal(t, []string{"mongodb_ss_opLatencies_latency"}, gatheredMetricNames(t, metrics))
+}
+
+func gatheredMetricNames(t *testing.T, metrics []prometheus.Metric) []string {
+	t.Helper()
+
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(staticCollector(metrics))
+
+	gatheredMetrics, err := reg.Gather()
+	assert.NoError(t, err)
+
+	names := make([]string, 0, len(gatheredMetrics))
+	for _, metric := range gatheredMetrics {
+		names = append(names, metric.GetName())
+	}
+
+	return names
+}
+
 func TestAsMetricMapHandlesBSONM(t *testing.T) {
 	t.Parallel()
 

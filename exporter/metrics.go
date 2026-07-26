@@ -433,16 +433,37 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 			continue
 		}
 
+		boundKey, boundLabel, ok := histogramBound(bucket)
+		if !ok {
+			continue
+		}
+
 		labels := make(map[string]string, len(commonLabels)+1)
 		for name, value := range commonLabels {
 			labels[name] = value
 		}
 
-		labels["lower_bound"] = fmt.Sprint(bucket["lowerBound"])
+		labels[boundLabel] = fmt.Sprint(bucket[boundKey])
 		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
 	}
 
 	return metrics
+}
+
+// histogramBound returns the field holding the bucket boundary and the label exposing it.
+// getDiagnosticData uses two shapes: {lowerBound, count} under "histograms" nodes and
+// {micros, count} under the "histogram" arrays of serverStatus.opLatencies.
+func histogramBound(bucket map[string]any) (string, string, bool) {
+	for _, bound := range []struct{ key, label string }{
+		{"lowerBound", "lower_bound"},
+		{"micros", "micros"},
+	} {
+		if _, ok := bucket[bound.key]; ok {
+			return bound.key, bound.label, true
+		}
+	}
+
+	return "", "", false
 }
 
 func isHistogramBucketSlice(prefix string, v []any) bool {
@@ -458,7 +479,7 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 		if !ok {
 			return false
 		}
-		if _, ok := bucket["lowerBound"]; !ok {
+		if _, _, ok := histogramBound(bucket); !ok {
 			return false
 		}
 		if _, ok := bucket["count"]; !ok {
@@ -470,7 +491,11 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 }
 
 func isHistogramPath(prefix string) bool {
-	return prefix == "histograms" || strings.Contains(prefix, ".histograms.") || strings.HasSuffix(prefix, ".histograms") //nolint:goconst
+	return isPathNode(prefix, "histograms") || isPathNode(prefix, "histogram")
+}
+
+func isPathNode(prefix, node string) bool {
+	return prefix == node || strings.Contains(prefix, "."+node+".") || strings.HasSuffix(prefix, "."+node)
 }
 
 func asMetricMap(item any) (map[string]any, bool) {
