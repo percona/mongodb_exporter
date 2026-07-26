@@ -269,6 +269,25 @@ func splitNamespace(ns string) (string, string) {
 	return parts[0], strings.Join(parts[1:], ".")
 }
 
+// setShardLabel sets the optional "shard" label from a single $collStats or
+// $indexStats document. Callers may reuse one labels map across documents, so a
+// stale shard from a previous document is removed first, otherwise a document
+// without a shard would silently inherit it.
+//
+// Empty and absent shards are both treated as "no shard". Whether the label is
+// present has to be the same for every document of a metric name within one
+// scrape: the descriptors are built from these labels, and a registry rejects a
+// collector describing one fully-qualified name with two different label sets,
+// which makes the whole scrape fail. That holds in practice because $collStats
+// and $indexStats report a shard for every document through mongos and for none
+// of them otherwise.
+func setShardLabel(labels map[string]string, doc bson.M) {
+	delete(labels, "shard")
+	if shard, ok := doc["shard"].(string); ok && shard != "" {
+		labels["shard"] = shard
+	}
+}
+
 func fromMapToSlice(databases map[string][]string) []string {
 	var collections []string
 	for db, cols := range databases {

@@ -141,22 +141,12 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// indexStatsLabels builds the label set for a single $indexStats document. Unlike
-// collstats, the caller passes a fresh baseLabels() map per document, so there is
-// no stale shard to remove here.
-//
-// Empty and absent shards are both treated as "no shard": via mongos every user
-// collection reports a non-empty shard, while system databases (excluded from
-// discovery) may report an empty or missing one. Mixing labelled and unlabelled
-// series of the same metric name in one scrape would break the whole family, so
-// the label must be all-or-nothing per scrape.
+// indexStatsLabels builds the label set for a single $indexStats document.
 func indexStatsLabels(labels map[string]string, database, collection, indexName string, metric bson.M) map[string]string {
 	labels["database"] = database
 	labels["collection"] = collection
 	labels["key_name"] = indexName
-	if shard, ok := metric["shard"].(string); ok && shard != "" {
-		labels["shard"] = shard
-	}
+	setShardLabel(labels, metric)
 
 	return labels
 }

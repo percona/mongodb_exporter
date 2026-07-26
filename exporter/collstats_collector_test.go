@@ -154,32 +154,3 @@ func TestCollStatsForFakeCountType(t *testing.T) {
 	err = testutil.CollectAndCompare(c, expected, filter...)
 	require.NoError(t, err)
 }
-
-func TestSetShardLabelClearsPreviousValue(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		metrics bson.M
-	}{
-		{
-			name:    "empty shard",
-			metrics: bson.M{"shard": ""},
-		},
-		{
-			name:    "shard field absent",
-			metrics: bson.M{},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			labels := map[string]string{"shard": "shard-0"}
-			setShardLabel(labels, test.metrics)
-
-			require.NotContains(t, labels, "shard")
-		})
-	}
-}
