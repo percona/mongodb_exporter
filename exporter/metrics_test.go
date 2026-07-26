@@ -305,6 +305,79 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	assert.Empty(t, metrics)
 }
 
+// ethtool reports several counters per queue whose names differ only in leading spaces,
+// which used to produce one metric name with two different help strings.
+func TestKeysCollidingAfterSanitizationStayDistinct(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("systemMetrics.ethtool", bson.M{
+		"ens192": bson.M{
+			"     giant hdr": int64(11),
+			"  giant hdr":    int64(22),
+			"tx queue":       int64(33),
+		},
+	}, nil, false)
+
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(staticCollector(metrics))
+
+	gatheredMetrics, err := reg.Gather()
+	if !assert.NoError(t, err, "colliding keys must not break the whole scrape") {
+		return
+	}
+
+	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
+	for _, metric := range gatheredMetrics {
+		metricsByName[metric.GetName()] = metric
+	}
+
+	assert.Contains(t, metricsByName, "mongodb_sys_ethtool_ens192_tx_queue")
+
+	collided, ok := metricsByName["mongodb_sys_ethtool_ens192_giant_hdr"]
+	if !assert.True(t, ok) {
+		return
+	}
+
+	valuesByIndex := make(map[string]float64, len(collided.GetMetric()))
+	for _, metric := range collided.GetMetric() {
+		for _, label := range metric.GetLabel() {
+			if label.GetName() == collisionLabel {
+				valuesByIndex[label.GetValue()] = metric.GetUntyped().GetValue()
+			}
+		}
+	}
+
+	// Sorted by the raw key, so the one with more leading spaces comes first.
+	assert.Equal(t, map[string]float64{
+		"0": 11,
+		"1": 22,
+	}, valuesByIndex)
+}
+
+func TestMetricHelpNormalizesSpaces(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, metricHelp("systemMetrics.ethtool.ens192.", "  giant hdr"),
+		metricHelp("systemMetrics.ethtool.ens192.", "     giant hdr"))
+
+	// Help strings without redundant whitespace must be left untouched.
+	assert.Equal(t, "local.oplog.rs.stats.wiredTiger.btree.fixed-record size",
+		metricHelp("local.oplog.rs.stats.wiredTiger.btree.", "fixed-record size"))
+	assert.Equal(t, "serverStatus.connections", metricHelp("serverStatus.connections.", "current"))
+}
+
+func TestCollidingKeyIndexes(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, collidingKeyIndexes(bson.M{"a b": int64(1), "c d": int64(2)}))
+	assert.Nil(t, collidingKeyIndexes(bson.M{"plain": int64(1)}))
+	assert.Equal(t, map[string]int{"a b": 0, "a_b": 1}, collidingKeyIndexes(bson.M{
+		"a b":   int64(1),
+		"a_b":   int64(2),
+		"other": int64(3),
+	}))
+}
+
 func TestAsMetricMapHandlesBSONM(t *testing.T) {
 	t.Parallel()
 

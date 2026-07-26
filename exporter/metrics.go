@@ -20,9 +20,11 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,6 +34,9 @@ import (
 
 const (
 	exporterPrefix = "mongodb_"
+
+	// collisionLabel keeps document fields apart when they sanitize to the same metric name.
+	collisionLabel = "metric_idx"
 )
 
 type rawMetric struct {
@@ -301,10 +306,34 @@ func metricHelp(prefix, name string) string {
 		return strings.TrimSuffix(prefix, ".")
 	}
 	if prefix != "" {
-		return prefix + name
+		return normalizeSpaces(prefix + name)
 	}
 
-	return name
+	return normalizeSpaces(name)
+}
+
+// normalizeSpaces collapses whitespace runs and trims the edges. prometheusize maps keys
+// differing only in whitespace to the same metric name, so the help has to be normalized
+// as well or the registry rejects the descriptors as inconsistent.
+func normalizeSpaces(s string) string {
+	if !hasRedundantSpaces(s) {
+		return s
+	}
+
+	return strings.Join(strings.Fields(s), " ")
+}
+
+func hasRedundantSpaces(s string) bool {
+	previousIsSpace := true
+	for _, r := range s {
+		isSpace := unicode.IsSpace(r)
+		if isSpace && previousIsSpace {
+			return true
+		}
+		previousIsSpace = isSpace
+	}
+
+	return previousIsSpace && s != ""
 }
 
 func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
@@ -317,6 +346,8 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 	if prefix != "" {
 		prefix += "."
 	}
+
+	collidingKeys := collidingKeyIndexes(m)
 
 	for k, val := range m {
 		nextPrefix := prefix + k
@@ -331,6 +362,9 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 			nextPrefix = prefix + label
 		} else {
 			l = labels
+		}
+		if idx, ok := collidingKeys[k]; ok {
+			l = withCollisionIndex(l, idx)
 		}
 		switch v := val.(type) {
 		case bson.M:
@@ -350,6 +384,78 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 	}
 
 	return res
+}
+
+// collidingKeyIndexes returns an index for every key of a document that is not unique once
+// sanitized. MongoDB can report several fields whose names differ only in characters that
+// prometheusize collapses, for example the "giant hdr" counters that ethtool exposes per
+// queue with a different amount of leading spaces. Without the index they would be exported
+// as the very same series and the registry would reject the whole scrape. Keys are sorted
+// because the BSON document order is lost when it is decoded into a map, and the index has
+// to stay stable between scrapes.
+func collidingKeyIndexes(m bson.M) map[string]int {
+	if len(m) < 2 {
+		return nil
+	}
+
+	firstKeyByMetricName := make(map[string]string, len(m))
+	var collidingKeys map[string][]string
+
+	for k := range m {
+		metricName := sanitizeKey(k)
+
+		first, seen := firstKeyByMetricName[metricName]
+		if !seen {
+			firstKeyByMetricName[metricName] = k
+			continue
+		}
+
+		if collidingKeys == nil {
+			collidingKeys = make(map[string][]string, 1)
+		}
+		if _, started := collidingKeys[metricName]; !started {
+			collidingKeys[metricName] = []string{first}
+		}
+		collidingKeys[metricName] = append(collidingKeys[metricName], k)
+	}
+
+	if collidingKeys == nil {
+		return nil
+	}
+
+	indexes := make(map[string]int, len(collidingKeys)*2)
+	for _, keys := range collidingKeys {
+		slices.Sort(keys)
+		for idx, k := range keys {
+			indexes[k] = idx
+		}
+	}
+
+	return indexes
+}
+
+func withCollisionIndex(labels map[string]string, idx int) map[string]string {
+	distinct := make(map[string]string, len(labels)+1)
+	maps.Copy(distinct, labels)
+	distinct[collisionLabel] = strconv.Itoa(idx)
+
+	return distinct
+}
+
+var sanitizedKeyCache = sync.Map{}
+
+// sanitizeKey turns a document field into the part of the metric name it ends up in.
+// The result is cached because the set of field names MongoDB reports is small and the
+// collision check walks all of them on every scrape.
+func sanitizeKey(k string) string {
+	if sanitized, ok := sanitizedKeyCache.Load(k); ok {
+		return sanitized.(string)
+	}
+
+	sanitized := specialCharsRe.ReplaceAllString(k, "_")
+	sanitizedKeyCache.Store(strings.Clone(k), sanitized)
+
+	return sanitized
 }
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
