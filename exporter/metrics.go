@@ -407,6 +407,7 @@ func collidingKeyIndexes(m bson.M) map[string]int {
 		first, seen := firstKeyByMetricName[metricName]
 		if !seen {
 			firstKeyByMetricName[metricName] = k
+
 			continue
 		}
 

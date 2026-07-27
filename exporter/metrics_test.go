@@ -23,6 +23,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -322,9 +323,7 @@ func TestKeysCollidingAfterSanitizationStayDistinct(t *testing.T) {
 	reg.MustRegister(staticCollector(metrics))
 
 	gatheredMetrics, err := reg.Gather()
-	if !assert.NoError(t, err, "colliding keys must not break the whole scrape") {
-		return
-	}
+	require.NoError(t, err, "colliding keys must not break the whole scrape")
 
 	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
 	for _, metric := range gatheredMetrics {
