@@ -62,16 +62,20 @@ func TestMultiTarget(t *testing.T) {
 	log := promslog.New(&promslog.Config{})
 	serverMap := buildServerMap(exporters, log)
 
-	expected := []string{
-		"mongodb_up{cluster_role=\"mongod\"} 1\n",
-		"mongodb_up{cluster_role=\"mongod\"} 1\n",
-		"mongodb_up{cluster_role=\"mongod\"} 1\n",
-		"mongodb_up{cluster_role=\"\"} 0\n",
+	expected := []*regexp.Regexp{
+		regexp.MustCompile(`mongodb_up\s*\{cluster_role="mongod"\} 1\n`),
+		regexp.MustCompile(`mongodb_up\s*\{cluster_role="mongod"\} 1\n`),
+		regexp.MustCompile(`mongodb_up\s*\{cluster_role="mongod"\} 1\n`),
+		regexp.MustCompile(`mongodb_up\s*\{cluster_role=""\} 0\n`),
 	}
 
 	// Test all targets
 	for sn, opt := range opts {
-		assert.HTTPBodyContains(t, multiTargetHandler(serverMap), "GET", fmt.Sprintf("?target=%s", opt.URI), nil, expected[sn])
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("?target=%s", opt.URI), nil)
+
+		multiTargetHandler(serverMap)(rr, req)
+		assert.Regexp(t, expected[sn], rr.Body.String())
 	}
 }
 
