@@ -28,7 +28,7 @@ import (
 func TestSystemMetricsCollisionsFromFixture(t *testing.T) {
 	t.Parallel()
 
-	systemMetrics, ok := loadFixture(t, diagnosticData83Fixture)["systemMetrics"].(bson.M)
+	systemMetrics, ok := loadDiagnosticData83Fixture(t)["systemMetrics"].(bson.M)
 	require.True(t, ok)
 
 	labels := map[string]string{"cl_id": "", "cl_role": ""}

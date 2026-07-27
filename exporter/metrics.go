@@ -394,7 +394,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 // because the BSON document order is lost when it is decoded into a map, and the index has
 // to stay stable between scrapes.
 func collidingKeyIndexes(m bson.M) map[string]int {
-	if len(m) < 2 {
+	if len(m) <= 1 {
 		return nil
 	}
 
@@ -423,7 +423,7 @@ func collidingKeyIndexes(m bson.M) map[string]int {
 		return nil
 	}
 
-	indexes := make(map[string]int, len(collidingKeys)*2)
+	indexes := make(map[string]int)
 	for _, keys := range collidingKeys {
 		slices.Sort(keys)
 		for idx, k := range keys {
@@ -449,7 +449,9 @@ var sanitizedKeyCache = sync.Map{}
 // collision check walks all of them on every scrape.
 func sanitizeKey(k string) string {
 	if sanitized, ok := sanitizedKeyCache.Load(k); ok {
-		return sanitized.(string)
+		if sanitizedString, ok := sanitized.(string); ok {
+			return sanitizedString
+		}
 	}
 
 	sanitized := specialCharsRe.ReplaceAllString(k, "_")
