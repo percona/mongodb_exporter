@@ -31,7 +31,9 @@ import (
 )
 
 const (
-	exporterPrefix = "mongodb_"
+	exporterPrefix         = "mongodb_"
+	histogramLowerBoundKey = "lowerBound"
+	histogramMicrosKey     = "micros"
 )
 
 type rawMetric struct {
@@ -455,8 +457,8 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 // {micros, count} under the "histogram" arrays of serverStatus.opLatencies.
 func histogramBound(bucket map[string]any) (string, string, bool) {
 	for _, bound := range []struct{ key, label string }{
-		{"lowerBound", "lower_bound"},
-		{"micros", "micros"},
+		{histogramLowerBoundKey, "lower_bound"},
+		{histogramMicrosKey, histogramMicrosKey},
 	} {
 		if _, ok := bucket[bound.key]; ok {
 			return bound.key, bound.label, true

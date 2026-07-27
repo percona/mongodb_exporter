@@ -17,7 +17,6 @@ package exporter
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,19 +25,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// diagnosticData83Fixture is a getDiagnosticData reply captured from the MongoDB 8.3.2
+// diagnosticData83FixturePath is a getDiagnosticData reply captured from the MongoDB 8.3.2
 // instance of https://github.com/percona/mongodb_exporter/issues/1285, trimmed to the
 // subtrees the tests below need.
-const diagnosticData83Fixture = "get_diagnostic_data_8.3.json"
+const diagnosticData83FixturePath = "testdata/get_diagnostic_data_8.3.json"
 
-// loadFixture reads a captured command reply. Extended JSON is used instead of
+// loadDiagnosticData83Fixture reads the captured command reply. Extended JSON is used instead of
 // encoding/json because the driver decodes arrays into primitive.A while encoding/json
 // produces []any, which makeMetrics silently walks past. A fixture parsed the plain way
 // hides everything array shaped, histogram buckets included.
-func loadFixture(t *testing.T, name string) bson.M {
+func loadDiagnosticData83Fixture(t *testing.T) bson.M {
 	t.Helper()
 
-	buf, err := os.ReadFile(filepath.Join("testdata/", name))
+	buf, err := os.ReadFile(diagnosticData83FixturePath)
 	require.NoError(t, err)
 
 	var m bson.M

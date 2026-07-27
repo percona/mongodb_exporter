@@ -28,7 +28,7 @@ import (
 func TestServerStatusHistogramsFromFixture(t *testing.T) {
 	t.Parallel()
 
-	serverStatus, ok := loadFixture(t, diagnosticData83Fixture)["serverStatus"].(bson.M)
+	serverStatus, ok := loadDiagnosticData83Fixture(t)["serverStatus"].(bson.M)
 	require.True(t, ok)
 
 	labels := map[string]string{"cl_id": "", "cl_role": ""}
@@ -37,7 +37,7 @@ func TestServerStatusHistogramsFromFixture(t *testing.T) {
 	opLatencyBuckets, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
 	require.True(t, ok)
 	assert.ElementsMatch(t, []string{"0", "8", "64", "512", "3072", "8192", "24576", "65536", "131072"},
-		labelValues(opLatencyBuckets, "micros"))
+		labelValues(opLatencyBuckets, histogramMicrosKey))
 	assert.NotContains(t, metricsByName, "mongodb_ss_opLatencies_reads_histogram_micros")
 
 	plannerBuckets, ok := metricsByName["mongodb_ss_metrics_query_multiPlanner_histograms_classicWorks_count"]
@@ -48,7 +48,7 @@ func TestServerStatusHistogramsFromFixture(t *testing.T) {
 func TestServerStatusHistogramsFromFixtureAreSkippedByDefault(t *testing.T) {
 	t.Parallel()
 
-	serverStatus, ok := loadFixture(t, diagnosticData83Fixture)["serverStatus"].(bson.M)
+	serverStatus, ok := loadDiagnosticData83Fixture(t)["serverStatus"].(bson.M)
 	require.True(t, ok)
 
 	labels := map[string]string{"cl_id": "", "cl_role": ""}

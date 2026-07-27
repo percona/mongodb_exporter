@@ -23,6 +23,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -238,8 +239,8 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 
 	metrics := makeMetricsWithHistograms("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
 		"sbeMicros": primitive.A{
-			bson.M{"lowerBound": int64(0), "count": int64(3)},
-			bson.M{"lowerBound": int64(1024), "count": int64(7)},
+			bson.M{histogramLowerBoundKey: int64(0), "count": int64(3)},
+			bson.M{histogramLowerBoundKey: int64(1024), "count": int64(7)},
 		},
 	}, nil, true, true)
 
@@ -247,7 +248,7 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 	reg.MustRegister(staticCollector(metrics))
 
 	gatheredMetrics, err := reg.Gather()
-	assert.NoError(t, err, "metrics with the same name and labels must not be exported")
+	require.NoError(t, err, "metrics with the same name and labels must not be exported")
 
 	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
 	for _, metric := range gatheredMetrics {
@@ -287,8 +288,8 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	metrics := makeMetrics("serverStatus.metrics.query.multiPlanner", bson.M{
 		"histograms": bson.M{
 			"sbeMicros": primitive.A{
-				bson.M{"lowerBound": int64(0), "count": int64(3)},
-				bson.M{"lowerBound": int64(1024), "count": int64(7)},
+				bson.M{histogramLowerBoundKey: int64(0), "count": int64(3)},
+				bson.M{histogramLowerBoundKey: int64(1024), "count": int64(7)},
 			},
 		},
 	}, nil, true)
@@ -297,8 +298,8 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 
 	metrics = makeMetrics("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
 		"sbeMicros": primitive.A{
-			bson.M{"lowerBound": int64(0), "count": int64(3)},
-			bson.M{"lowerBound": int64(1024), "count": int64(7)},
+			bson.M{histogramLowerBoundKey: int64(0), "count": int64(3)},
+			bson.M{histogramLowerBoundKey: int64(1024), "count": int64(7)},
 		},
 	}, nil, true)
 
@@ -316,8 +317,8 @@ func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
 				"latency": int64(120),
 				"ops":     int64(4),
 				"histogram": primitive.A{
-					bson.M{"micros": int64(1), "count": int64(3)},
-					bson.M{"micros": int64(2048), "count": int64(7)},
+					bson.M{histogramMicrosKey: int64(1), "count": int64(3)},
+					bson.M{histogramMicrosKey: int64(2048), "count": int64(7)},
 				},
 			},
 		},
@@ -327,7 +328,7 @@ func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
 	reg.MustRegister(staticCollector(metrics))
 
 	gatheredMetrics, err := reg.Gather()
-	assert.NoError(t, err, "metrics with the same name and labels must not be exported")
+	require.NoError(t, err, "metrics with the same name and labels must not be exported")
 
 	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
 	for _, metric := range gatheredMetrics {
@@ -344,7 +345,7 @@ func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
 	valuesByBound := make(map[string]float64, len(bucketCounts.GetMetric()))
 	for _, metric := range bucketCounts.GetMetric() {
 		for _, label := range metric.GetLabel() {
-			if label.GetName() == "micros" {
+			if label.GetName() == histogramMicrosKey {
 				valuesByBound[label.GetValue()] = metric.GetCounter().GetValue()
 			}
 		}
@@ -362,8 +363,8 @@ func TestOpLatenciesHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	metrics := makeMetrics("serverStatus.opLatencies.reads", bson.M{
 		"latency": int64(120),
 		"histogram": primitive.A{
-			bson.M{"micros": int64(1), "count": int64(3)},
-			bson.M{"micros": int64(2048), "count": int64(7)},
+			bson.M{histogramMicrosKey: int64(1), "count": int64(3)},
+			bson.M{histogramMicrosKey: int64(2048), "count": int64(7)},
 		},
 	}, nil, false)
 
@@ -378,7 +379,7 @@ func gatheredMetricNames(t *testing.T, metrics []prometheus.Metric) []string {
 	reg.MustRegister(staticCollector(metrics))
 
 	gatheredMetrics, err := reg.Gather()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	names := make([]string, 0, len(gatheredMetrics))
 	for _, metric := range gatheredMetrics {
@@ -391,9 +392,9 @@ func gatheredMetricNames(t *testing.T, metrics []prometheus.Metric) []string {
 func TestAsMetricMapHandlesBSONM(t *testing.T) {
 	t.Parallel()
 
-	bucket, ok := asMetricMap(bson.M{"lowerBound": int64(1024), "count": int64(7)})
+	bucket, ok := asMetricMap(bson.M{histogramLowerBoundKey: int64(1024), "count": int64(7)})
 
 	assert.True(t, ok)
-	assert.Equal(t, int64(1024), bucket["lowerBound"])
+	assert.Equal(t, int64(1024), bucket[histogramLowerBoundKey])
 	assert.Equal(t, int64(7), bucket["count"])
 }
