@@ -23,8 +23,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const diagnosticData83Fixture = "get_diagnostic_data_8.3.json"
-
 // A MongoDB 8.3 reply carries both bucket shapes: the "histogram" arrays of
 // serverStatus.opLatencies and the "histograms" nodes under serverStatus.metrics.query.
 func TestServerStatusHistogramsFromFixture(t *testing.T) {

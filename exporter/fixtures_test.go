@@ -26,6 +26,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+// diagnosticData83Fixture is a getDiagnosticData reply captured from the MongoDB 8.3.2
+// instance of https://github.com/percona/mongodb_exporter/issues/1285, trimmed to the
+// subtrees the tests below need.
+const diagnosticData83Fixture = "get_diagnostic_data_8.3.json"
+
 // loadFixture reads a captured command reply. Extended JSON is used instead of
 // encoding/json because the driver decodes arrays into primitive.A while encoding/json
 // produces []any, which makeMetrics silently walks past. A fixture parsed the plain way
