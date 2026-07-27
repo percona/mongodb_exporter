@@ -1,0 +1,666 @@
+{
+  "serverStatus": {
+    "opLatencies": {
+      "commands": {
+        "histogram": [
+          {
+            "micros": 0,
+            "count": 0
+          },
+          {
+            "micros": 8,
+            "count": 37370
+          },
+          {
+            "micros": 64,
+            "count": 99126
+          },
+          {
+            "micros": 512,
+            "count": 9424
+          },
+          {
+            "micros": 3072,
+            "count": 474
+          },
+          {
+            "micros": 8192,
+            "count": 22
+          },
+          {
+            "micros": 24576,
+            "count": 6
+          },
+          {
+            "micros": 65536,
+            "count": 2
+          },
+          {
+            "micros": 131072,
+            "count": 0
+          }
+        ],
+        "latency": 28664744,
+        "ops": 146424,
+        "queryableEncryptionLatencyMicros": 0
+      },
+      "reads": {
+        "histogram": [
+          {
+            "micros": 0,
+            "count": 0
+          },
+          {
+            "micros": 8,
+            "count": 0
+          },
+          {
+            "micros": 64,
+            "count": 16737
+          },
+          {
+            "micros": 512,
+            "count": 947
+          },
+          {
+            "micros": 3072,
+            "count": 351
+          },
+          {
+            "micros": 8192,
+            "count": 77
+          },
+          {
+            "micros": 24576,
+            "count": 54
+          },
+          {
+            "micros": 65536,
+            "count": 13
+          },
+          {
+            "micros": 131072,
+            "count": 21
+          }
+        ],
+        "latency": 16098564,
+        "ops": 18200,
+        "queryableEncryptionLatencyMicros": 0
+      },
+      "writes": {
+        "histogram": [
+          {
+            "micros": 0,
+            "count": 0
+          },
+          {
+            "micros": 8,
+            "count": 0
+          },
+          {
+            "micros": 64,
+            "count": 1
+          },
+          {
+            "micros": 512,
+            "count": 6
+          },
+          {
+            "micros": 3072,
+            "count": 4
+          },
+          {
+            "micros": 8192,
+            "count": 1
+          },
+          {
+            "micros": 24576,
+            "count": 1
+          },
+          {
+            "micros": 65536,
+            "count": 0
+          },
+          {
+            "micros": 131072,
+            "count": 0
+          }
+        ],
+        "latency": 118235,
+        "ops": 13,
+        "queryableEncryptionLatencyMicros": 0
+      },
+      "transactions": {
+        "histogram": [
+          {
+            "micros": 0,
+            "count": 0
+          },
+          {
+            "micros": 8,
+            "count": 0
+          },
+          {
+            "micros": 64,
+            "count": 0
+          },
+          {
+            "micros": 512,
+            "count": 0
+          },
+          {
+            "micros": 3072,
+            "count": 0
+          },
+          {
+            "micros": 8192,
+            "count": 0
+          },
+          {
+            "micros": 24576,
+            "count": 0
+          },
+          {
+            "micros": 65536,
+            "count": 0
+          },
+          {
+            "micros": 131072,
+            "count": 0
+          }
+        ],
+        "latency": 0,
+        "ops": 0,
+        "queryableEncryptionLatencyMicros": 0
+      }
+    },
+    "metrics": {
+      "query": {
+        "allowDiskUseFalse": 0,
+        "deleteManyCount": 1,
+        "deleteOneNonTargetedShardedCount": 0,
+        "deleteOneTargetedShardedCount": 0,
+        "deleteOneUnshardedCount": 0,
+        "deleteOneWithoutShardKeyWithIdCount": 0,
+        "deleteOneWithoutShardKeyWithIdRetryCount": 0,
+        "externalRetryableWriteCount": 4,
+        "findAndModifyNonTargetedShardedCount": 0,
+        "findAndModifyTargetedShardedCount": 0,
+        "findAndModifyUnshardedCount": 0,
+        "internalRetryableWriteCount": 0,
+        "nonRetryableDeleteOneWithoutShardKeyWithIdCount": 0,
+        "nonRetryableUpdateOneWithoutShardKeyWithIdCount": 0,
+        "recordIdDeduplicationSwitchedToRoaring": 0,
+        "retryableInternalTransactionCount": 0,
+        "totalSlowQueryLogs": 24,
+        "updateDeleteManyDocumentsMaxCount": 1,
+        "updateDeleteManyDocumentsTotalCount": 1,
+        "updateDeleteManyDurationMaxMs": 2,
+        "updateDeleteManyDurationTotalMs": 2,
+        "updateManyCount": 0,
+        "updateOneNonTargetedShardedCount": 0,
+        "updateOneOpStyleBroadcastWithExactIDCount": 0,
+        "updateOneTargetedShardedCount": 0,
+        "updateOneUnshardedCount": 0,
+        "updateOneWithoutShardKeyWithIdCount": 0,
+        "updateOneWithoutShardKeyWithIdRetryCount": 0,
+        "bucketAuto": {
+          "spilledBytes": 0,
+          "spilledDataStorageSize": 0,
+          "spilledRecords": 0,
+          "spills": 0
+        },
+        "cbr": {
+          "choseWinningPlan": 0,
+          "count": 0,
+          "micros": 0,
+          "numPlans": 0,
+          "numPlansFailedCostEstimation": 0,
+          "numPlansTiedCostEstimation": 0,
+          "samplingMicros": 0,
+          "histograms": {
+            "micros": [
+              {
+                "lowerBound": 0,
+                "count": 0
+              },
+              {
+                "lowerBound": 1024,
+                "count": 0
+              },
+              {
+                "lowerBound": 4096,
+                "count": 0
+              },
+              {
+                "lowerBound": 16384,
+                "count": 0
+              },
+              {
+                "lowerBound": 65536,
+                "count": 0
+              },
+              {
+                "lowerBound": 262144,
+                "count": 0
+              },
+              {
+                "lowerBound": 1048576,
+                "count": 0
+              },
+              {
+                "lowerBound": 4194304,
+                "count": 0
+              },
+              {
+                "lowerBound": 16777216,
+                "count": 0
+              },
+              {
+                "lowerBound": 67108864,
+                "count": 0
+              },
+              {
+                "lowerBound": 268435456,
+                "count": 0
+              },
+              {
+                "lowerBound": 1073741824,
+                "count": 0
+              }
+            ],
+            "numPlans": [
+              {
+                "lowerBound": 0,
+                "count": 0
+              },
+              {
+                "lowerBound": 2,
+                "count": 0
+              },
+              {
+                "lowerBound": 4,
+                "count": 0
+              },
+              {
+                "lowerBound": 8,
+                "count": 0
+              },
+              {
+                "lowerBound": 16,
+                "count": 0
+              },
+              {
+                "lowerBound": 32,
+                "count": 0
+              }
+            ],
+            "samplingMicros": [
+              {
+                "lowerBound": 0,
+                "count": 0
+              },
+              {
+                "lowerBound": 1024,
+                "count": 0
+              },
+              {
+                "lowerBound": 4096,
+                "count": 0
+              },
+              {
+                "lowerBound": 16384,
+                "count": 0
+              },
+              {
+                "lowerBound": 65536,
+                "count": 0
+              },
+              {
+                "lowerBound": 262144,
+                "count": 0
+              },
+              {
+                "lowerBound": 1048576,
+                "count": 0
+              },
+              {
+                "lowerBound": 4194304,
+                "count": 0
+              },
+              {
+                "lowerBound": 16777216,
+                "count": 0
+              },
+              {
+                "lowerBound": 67108864,
+                "count": 0
+              },
+              {
+                "lowerBound": 268435456,
+                "count": 0
+              },
+              {
+                "lowerBound": 1073741824,
+                "count": 0
+              }
+            ]
+          }
+        },
+        "expressionSimplifier": {
+          "abortedTooLarge": 0,
+          "notSimplified": 3265,
+          "simplified": 0,
+          "trivial": 2636
+        },
+        "geoNear": {
+          "spilledBytes": 0,
+          "spilledDataStorageSize": 0,
+          "spilledRecords": 0,
+          "spills": 0
+        },
+        "graphLookup": {
+          "spilledBytes": 0,
+          "spilledDataStorageSize": 0,
+          "spilledRecords": 0,
+          "spills": 0
+        },
+        "group": {
+          "spilledBytes": 0,
+          "spilledDataStorageSize": 0,
+          "spilledRecords": 0,
+          "spills": 0
+        },
+        "hashJoin": {
+          "spilledBytes": 0,
+          "spilledDataStorageSize": 0,
+          "spilledRecords": 0,
+          "spills": 0
+        },
+        "lookup": {
+          "dynamicIndexedLoopJoin": 0,
+          "hashLookup": 0,
+          "hashLookupSpillToDisk": 0,
+          "hashLookupSpillToDiskBytes": 0,
+          "hashLookupSpilledBytes": 0,
+          "hashLookupSpilledDataStorageSize": 0,
+          "hashLookupSpilledRecords": 0,
+          "hashLookupSpills": 0,
+          "indexedLoopJoin": 0,
+          "nestedLoopJoin": 0
+        },
+        "multiPlanner": {
+          "allPlansHitMemoryLimit": 0,
+          "choseWinningPlan": 0,
+          "classicCount": 0,
+          "classicMicros": 0,
+          "classicNumPlans": 0,
+          "classicWorks": 0,
+          "histograms": {
+            "classicMicros": [
+              {
+                "lowerBound": 0,
+                "count": 0
+              },
+              {
+                "lowerBound": 1024,
+                "count": 0
+              },
+              {
+                "lowerBound": 4096,
+                "count": 0
+              },
+              {
+                "lowerBound": 16384,
+                "count": 0
+              },
+              {
+                "lowerBound": 65536,
+                "count": 0
+              },
+              {
+                "lowerBound": 262144,
+                "count": 0
+              },
+              {
+                "lowerBound": 1048576,
+                "count": 0
+              },
+              {
+                "lowerBound": 4194304,
+                "count": 0
+              },
+              {
+                "lowerBound": 16777216,
+                "count": 0
+              },
+              {
+                "lowerBound": 67108864,
+                "count": 0
+              },
+              {
+                "lowerBound": 268435456,
+                "count": 0
+              },
+              {
+                "lowerBound": 1073741824,
+                "count": 0
+              }
+            ],
+            "classicNumPlans": [
+              {
+                "lowerBound": 0,
+                "count": 0
+              },
+              {
+                "lowerBound": 2,
+                "count": 0
+              },
+              {
+                "lowerBound": 4,
+                "count": 0
+              },
+              {
+                "lowerBound": 8,
+                "count": 0
+              },
+              {
+                "lowerBound": 16,
+                "count": 0
+              },
+              {
+                "lowerBound": 32,
+                "count": 0
+              }
+            ],
+            "classicWorks": [
+              {
+                "lowerBound": 0,
+                "count": 0
+              },
+              {
+                "lowerBound": 128,
+                "count": 0
+              },
+              {
+                "lowerBound": 256,
+                "count": 0
+              },
+              {
+                "lowerBound": 512,
+                "count": 0
+              },
+              {
+                "lowerBound": 1024,
+                "count": 0
+              },
+              {
+                "lowerBound": 2048,
+                "count": 0
+              },
+              {
+                "lowerBound": 4096,
+                "count": 0
+              },
+              {
+                "lowerBound": 8192,
+                "count": 0
+              },
+              {
+                "lowerBound": 16384,
+                "count": 0
+              },
+              {
+                "lowerBound": 32768,
+                "count": 0
+              }
+            ]
+          },
+          "rateLimiter": {
+            "allowed": 0,
+            "delayed": 0,
+            "released": 0
+          },
+          "stoppingCondition": {
+            "hitEof": 0,
+            "hitResultsLimit": 0,
+            "hitWorksLimit": 0
+          }
+        },
+        "planCache": {
+          "totalQueryShapes": 0,
+          "totalSizeEstimateBytes": 0,
+          "classic": {
+            "cached_plans_evicted": 0,
+            "hits": 0,
+            "inactive_cached_plans_replaced": 0,
+            "misses": 481,
+            "replanned": 0,
+            "replanned_plan_is_cached_plan": 0,
+            "skipped": 2292
+          },
+          "sbe": {
+            "cached_plans_evicted": 0,
+            "hits": 0,
+            "inactive_cached_plans_replaced": 0,
+            "misses": 0,
+            "replanned": 0,
+            "replanned_plan_is_cached_plan": 0,
+            "skipped": 0
+          }
+        },
+        "planning": {
+          "invocationCount": 505,
+          "fastPath": {
+            "express": 2409,
+            "idHack": 72
+          }
+        },
+        "queryFramework": {
+          "aggregate": {
+            "classicHybrid": 7,
+            "classicOnly": 1439,
+            "sbeHybrid": 2,
+            "sbeOnly": 11
+          },
+          "find": {
+            "classic": 2699,
+            "sbe": 0
+          }
+        },
+        "recordIdDeduplication": {
+          "IXSCAN": {
+            "deduplicatedBytes": 0,
+            "deduplicatedRecords": 0
+          },
+          "OR": {
+            "deduplicatedBytes": 0,
+            "deduplicatedRecords": 0
+          },
+          "SORT_MERGE": {
+            "deduplicatedBytes": 0,
+            "deduplicatedRecords": 0
+          },
+          "unique": {
+            "deduplicatedBytes": 0,
+            "deduplicatedRecords": 0
+          },
+          "unique_roaring": {
+            "deduplicatedBytes": 0,
+            "deduplicatedRecords": 0
+          }
+        },
+        "setWindowFields": {
+          "spilledBytes": 0,
+          "spilledDataStorageSize": 0,
+          "spilledRecords": 0,
+          "spills": 0
+        },
+        "sort": {
+          "spillToDisk": 0,
+          "spillToDiskBytes": 0,
+          "totalBytesSorted": 17274146,
+          "totalKeysSorted": 3440
+        },
+        "subPlanner": {
+          "classicChoseWinningPlan": 0
+        },
+        "textOr": {
+          "spilledBytes": 0,
+          "spilledDataStorageSize": 0,
+          "spilledRecords": 0,
+          "spills": 0
+        }
+      }
+    }
+  },
+  "systemMetrics": {
+    "ethtool": {
+      "ens192": {
+        "Tx Queue#": 0,
+        "  TSO pkts tx": 0,
+        "  TSO bytes tx": -102,
+        "  ucast pkts tx": -102,
+        "  ucast bytes tx": 78,
+        "  mcast pkts tx": 0,
+        "  mcast bytes tx": 0,
+        "  bcast pkts tx": 0,
+        "  bcast bytes tx": 0,
+        "  pkts tx err": 0,
+        "  pkts tx discard": -10,
+        "  drv dropped tx total": -59,
+        "     too many frags": -89,
+        "     giant hdr": 104,
+        "     hdr err": 0,
+        "     tso": 0,
+        "  ring full": 0,
+        "  pkts linearized": 0,
+        "  hdr cloned": 0,
+        "  giant hdr": 0,
+        "  xdp xmit": 0,
+        "  xdp xmit err": 0,
+        "Rx Queue#": -113,
+        "  LRO pkts rx": 4,
+        "  LRO byte rx": 0,
+        "  ucast pkts rx": 0,
+        "  ucast bytes rx": 0,
+        "  mcast pkts rx": 0,
+        "  mcast bytes rx": 0,
+        "  bcast pkts rx": 0,
+        "  bcast bytes rx": 0,
+        "  pkts rx OOB": 0,
+        "  pkts rx err": 0,
+        "  drv dropped rx total": 0,
+        "     err": 0,
+        "     fcs": 0,
+        "  rx buf alloc fail": 0,
+        "     xdp packets": 0,
+        "     xdp tx": 0,
+        "     xdp redirects": 0,
+        "     xdp drops": 0,
+        "     xdp aborted": 0,
+        "tx timeout count": 0
+      }
+    }
+  }
+}
