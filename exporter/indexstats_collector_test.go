@@ -27,6 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -72,12 +73,12 @@ func TestIndexStatsCollector(t *testing.T) {
 	expected := strings.NewReader(`
 # HELP mongodb_indexstats_accesses_ops indexstats.accesses.ops
 # TYPE mongodb_indexstats_accesses_ops untyped
-mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="idx_01"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="idx_01"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="idx_01"} 0` +
+mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="idx_01",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="idx_01",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="idx_01",shard=""} 0` +
 		"\n")
 
 	filter := []string{
@@ -212,15 +213,15 @@ func TestDescendingIndexOverride(t *testing.T) {
 	expected := strings.NewReader(`
   # HELP mongodb_indexstats_accesses_ops indexstats.accesses.ops
   # TYPE mongodb_indexstats_accesses_ops untyped
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_DESC"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_DESC"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_DESC"} 0` + "\n")
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_1",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_DESC",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_1",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_DESC",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_1",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_DESC",shard=""} 0` + "\n")
 
 	filter := []string{
 		"mongodb_indexstats_accesses_ops",
@@ -258,7 +259,7 @@ func TestSanitize(t *testing.T) {
 			"building": float64(1),
 		}
 		got := sanitizeMetrics(in)
-		require.Equal(t, want, got)
+		assert.Equal(t, want, got)
 	})
 
 	t.Run("Without building", func(t *testing.T) {
@@ -287,6 +288,6 @@ func TestSanitize(t *testing.T) {
 			},
 		}
 		got := sanitizeMetrics(in)
-		require.Equal(t, want, got)
+		assert.Equal(t, want, got)
 	})
 }

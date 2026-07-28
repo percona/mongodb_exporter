@@ -205,12 +205,12 @@ func TestSetShardLabel(t *testing.T) {
 		{
 			name: "empty shard",
 			doc:  bson.M{"shard": ""},
-			want: map[string]string{"database": "testdb"},
+			want: map[string]string{"database": "testdb", "shard": ""},
 		},
 		{
 			name: "shard field absent",
 			doc:  bson.M{},
-			want: map[string]string{"database": "testdb"},
+			want: map[string]string{"database": "testdb", "shard": ""},
 		},
 	}
 
