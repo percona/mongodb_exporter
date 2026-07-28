@@ -103,7 +103,7 @@ func buildServerMap(exporters []*Exporter, log *logrus.Logger) ServerMap {
 		if url, err := url.Parse(e.opts.URI); err == nil {
 			servers[url.Host] = e.Handler()
 		} else {
-			log.Errorf("Unable to parse addr %s as url: %s", e.opts.URI, err)
+			log.Errorf("Unable to parse MongoDB URI as URL: %v", err)
 		}
 	}
 

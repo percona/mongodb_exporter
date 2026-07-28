@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -31,6 +32,19 @@ var (
 	commit    string
 	buildDate string
 )
+
+// redactURI returns a URI with credentials redacted for safe logging.
+// It extracts just the host portion of the URI, or returns a redacted version if parsing fails.
+func redactURI(uri string) string {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "[redacted]"
+	}
+	if u.Host != "" {
+		return u.Host
+	}
+	return "[redacted]"
+}
 
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
@@ -130,7 +144,7 @@ func main() {
 
 func buildExporter(opts GlobalFlags, uri string, log *logrus.Logger) *exporter.Exporter {
 	uri = buildURI(uri, opts.User, opts.Password)
-	log.Debugf("Connection URI: %s", uri)
+	log.Debugf("Connecting to MongoDB host: %s", redactURI(uri))
 
 	exporterOpts := &exporter.Opts{
 		CollStatsNamespaces:   strings.Split(opts.CollStatsNamespaces, ","),
@@ -174,7 +188,7 @@ func buildServers(opts GlobalFlags, log *logrus.Logger) []*exporter.Exporter {
 		URI := opts.URI[serverIdx]
 
 		if !strings.HasPrefix(URI, "mongodb") {
-			log.Debugf("Prepending mongodb:// to the URI %s", URI)
+			log.Debugf("URI scheme not specified, prepending mongodb://")
 			URI = "mongodb://" + URI
 		}
 
