@@ -92,7 +92,7 @@ mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_na
 // shard for the same index. Without the shard label they all collapse into one
 // series and the duplicates are dropped.
 //
-//nolint:paralleltest,funlen
+//nolint:paralleltest
 func TestIndexStatsCollectorSharded(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -106,31 +106,7 @@ func TestIndexStatsCollectorSharded(t *testing.T) {
 	database.Drop(ctx)       //nolint:errcheck
 	defer database.Drop(ctx) //nolint:errcheck
 
-	admin := client.Database("admin")
-
-	var shardList struct {
-		Shards []bson.M `bson:"shards"`
-	}
-	if err := admin.RunCommand(ctx, bson.D{{Key: "listShards", Value: 1}}).Decode(&shardList); err != nil {
-		t.Skipf("cannot list shards: %v", err)
-	}
-	if len(shardList.Shards) < 2 {
-		t.Skipf("the test cluster has %d shards, at least 2 are needed", len(shardList.Shards))
-	}
-
-	if err := admin.RunCommand(ctx, bson.D{{Key: "enableSharding", Value: dbName}}).Err(); err != nil {
-		t.Skipf("cannot enable sharding on %s: %v", dbName, err)
-	}
-
-	// A hashed shard key on an empty collection presplits the initial chunks and
-	// spreads them over all shards, so every shard owns chunks of the collection.
-	shardCmd := bson.D{
-		{Key: "shardCollection", Value: namespace},
-		{Key: "key", Value: bson.D{{Key: "_id", Value: "hashed"}}},
-	}
-	if err := admin.RunCommand(ctx, shardCmd).Err(); err != nil {
-		t.Skipf("cannot shard %s: %v", namespace, err)
-	}
+	shardTestCollection(ctx, t, client, dbName, collName)
 
 	docs := make([]any, 0, 100)
 	for i := 0; i < 100; i++ {
@@ -156,10 +132,7 @@ func TestIndexStatsCollectorSharded(t *testing.T) {
 			continue
 		}
 		for _, metric := range family.GetMetric() {
-			labels := make(map[string]string, len(metric.GetLabel()))
-			for _, label := range metric.GetLabel() {
-				labels[label.GetName()] = label.GetValue()
-			}
+			labels := metricLabels(metric)
 
 			require.Equal(t, dbName, labels["database"])
 			require.Equal(t, collName, labels["collection"])
@@ -172,7 +145,8 @@ func TestIndexStatsCollectorSharded(t *testing.T) {
 
 	require.Contains(t, shardsByIndex, "_id_")
 	for indexName, shards := range shardsByIndex {
-		require.Len(t, slices.Compact(slices.Sorted(slices.Values(shards))), len(shards),
+		uniqueShards := slices.Compact(slices.Sorted(slices.Values(shards)))
+		require.Len(t, uniqueShards, len(shards),
 			"index %s exposes the same shard more than once: %v", indexName, shards)
 		require.Greater(t, len(shards), 1, "index %s is exposed for a single shard only: %v", indexName, shards)
 	}

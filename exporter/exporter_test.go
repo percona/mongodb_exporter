@@ -29,9 +29,12 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -46,6 +49,45 @@ func (l labelsGetterMock) baseLabels() map[string]string {
 
 func (l labelsGetterMock) loadLabels(context.Context) error {
 	return nil
+}
+
+// metricLabels flattens the label pairs of a gathered metric into a map.
+func metricLabels(m *dto.Metric) map[string]string {
+	labels := make(map[string]string, len(m.GetLabel()))
+	for _, label := range m.GetLabel() {
+		labels[label.GetName()] = label.GetValue()
+	}
+
+	return labels
+}
+
+// shardTestCollection shards dbName.collName over every shard of the test cluster
+// reached through mongos, so that $collStats and $indexStats report one document
+// per shard. It skips the test only when the cluster itself cannot exercise
+// sharding, meaning it has fewer than two shards.
+func shardTestCollection(ctx context.Context, t *testing.T, client *mongo.Client, dbName, collName string) {
+	t.Helper()
+
+	admin := client.Database("admin")
+
+	var shardList struct {
+		Shards []bson.M `bson:"shards"`
+	}
+	require.NoError(t, admin.RunCommand(ctx, bson.D{{Key: "listShards", Value: 1}}).Decode(&shardList))
+
+	if len(shardList.Shards) < 2 { //nolint:mnd
+		t.Skipf("the test cluster has %d shards, at least 2 are needed", len(shardList.Shards))
+	}
+
+	require.NoError(t, admin.RunCommand(ctx, bson.D{{Key: "enableSharding", Value: dbName}}).Err())
+
+	// A hashed shard key on an empty collection presplits the initial chunks and
+	// spreads them over all shards, so every shard owns chunks of the collection.
+	shardCmd := bson.D{
+		{Key: "shardCollection", Value: dbName + "." + collName},
+		{Key: "key", Value: bson.D{{Key: "_id", Value: "hashed"}}},
+	}
+	require.NoError(t, admin.RunCommand(ctx, shardCmd).Err())
 }
 
 //nolint:funlen

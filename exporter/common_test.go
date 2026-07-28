@@ -212,6 +212,11 @@ func TestSetShardLabel(t *testing.T) {
 			doc:  bson.M{},
 			want: map[string]string{"database": "testdb", "shard": ""},
 		},
+		{
+			name: "shard field is not a string",
+			doc:  bson.M{"shard": 42},
+			want: map[string]string{"database": "testdb", "shard": ""},
+		},
 	}
 
 	for _, test := range tests {

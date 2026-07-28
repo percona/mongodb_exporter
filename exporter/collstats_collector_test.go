@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
@@ -95,6 +96,64 @@ mongodb_collstats_storageStats_capped{collection="testcol_02",database="testdb",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
+}
+
+// Through mongos, a sharded collection reports one $collStats document per
+// shard. Every series must carry the shard it came from, and a shard must never
+// leak from one document into the next.
+//
+//nolint:paralleltest
+func TestCollStatsCollectorSharded(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClientMongoS(ctx, t)
+
+	dbName, collName := "testdb_collstats_sharded", "testcol"
+	namespace := dbName + "." + collName
+
+	database := client.Database(dbName)
+	database.Drop(ctx)       //nolint:errcheck
+	defer database.Drop(ctx) //nolint:errcheck
+
+	shardTestCollection(ctx, t, client, dbName, collName)
+
+	docs := make([]any, 0, 100)
+	for i := 0; i < 100; i++ {
+		docs = append(docs, bson.M{"f1": i})
+	}
+	_, err := database.Collection(collName).InsertMany(ctx, docs)
+	require.NoError(t, err)
+
+	logger := promslog.New(&promslog.Config{})
+	c := newCollectionStatsCollector(ctx, client, logger, false, labelsGetterMock{}, []string{namespace}, false)
+
+	// Register runs Describe, which collects everything, and rejects a metric
+	// name described with two different label sets. That is how a shard label
+	// set for only some of the documents would surface.
+	registry := prometheus.NewPedanticRegistry()
+	require.NoError(t, registry.Register(c))
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	observedShards := make(map[string]struct{})
+	for _, family := range families {
+		if !strings.HasPrefix(family.GetName(), "mongodb_collstats_") {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			labels := metricLabels(metric)
+			if labels["database"] != dbName || labels["collection"] != collName {
+				continue
+			}
+
+			require.NotEmpty(t, labels["shard"], "series without a shard label: %s %v", family.GetName(), labels)
+			observedShards[labels["shard"]] = struct{}{}
+		}
+	}
+
+	require.Greater(t, len(observedShards), 1, "collstats metrics were exposed for a single shard only: %v", observedShards)
 }
 
 func TestCollStatsForFakeCountType(t *testing.T) {
