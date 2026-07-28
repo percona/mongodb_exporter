@@ -108,8 +108,8 @@ func TestIndexStatsCollectorSharded(t *testing.T) {
 
 	shardTestCollection(ctx, t, client, dbName, collName)
 
-	docs := make([]any, 0, 100)
-	for i := 0; i < 100; i++ {
+	docs := make([]any, 0, shardedTestDocs)
+	for i := range shardedTestDocs {
 		docs = append(docs, bson.M{"f1": i})
 	}
 	_, err := database.Collection(collName).InsertMany(ctx, docs)

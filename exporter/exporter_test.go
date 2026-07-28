@@ -61,6 +61,15 @@ func metricLabels(m *dto.Metric) map[string]string {
 	return labels
 }
 
+const (
+	// minTestShards is the number of shards a cluster needs before a test can
+	// observe metrics coming from more than one of them.
+	minTestShards = 2
+	// shardedTestDocs is large enough that every shard of the test cluster ends up
+	// owning documents of the collection.
+	shardedTestDocs = 100
+)
+
 // shardTestCollection shards dbName.collName over every shard of the test cluster
 // reached through mongos, so that $collStats and $indexStats report one document
 // per shard. It skips the test only when the cluster itself cannot exercise
@@ -75,8 +84,8 @@ func shardTestCollection(ctx context.Context, t *testing.T, client *mongo.Client
 	}
 	require.NoError(t, admin.RunCommand(ctx, bson.D{{Key: "listShards", Value: 1}}).Decode(&shardList))
 
-	if len(shardList.Shards) < 2 { //nolint:mnd
-		t.Skipf("the test cluster has %d shards, at least 2 are needed", len(shardList.Shards))
+	if len(shardList.Shards) < minTestShards {
+		t.Skipf("the test cluster has %d shards, at least %d are needed", len(shardList.Shards), minTestShards)
 	}
 
 	require.NoError(t, admin.RunCommand(ctx, bson.D{{Key: "enableSharding", Value: dbName}}).Err())
