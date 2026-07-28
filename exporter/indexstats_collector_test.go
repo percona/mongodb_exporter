@@ -18,11 +18,13 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/AlekSi/pointer"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/require"
@@ -85,78 +87,94 @@ mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_na
 	require.NoError(t, err)
 }
 
-func TestIndexStatsLabels(t *testing.T) {
-	t.Parallel()
+// Through mongos, a sharded collection reports one $indexStats document per
+// shard for the same index. Without the shard label they all collapse into one
+// series and the duplicates are dropped.
+//
+//nolint:paralleltest,funlen
+func TestIndexStatsCollectorSharded(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
 
-	first := indexStatsLabels(
-		map[string]string{"cl_role": "mongos"},
-		"testdb",
-		"orders",
-		"_id_",
-		bson.M{"shard": "shard-0"},
-	)
-	second := indexStatsLabels(
-		map[string]string{"cl_role": "mongos"},
-		"testdb",
-		"orders",
-		"_id_",
-		bson.M{"shard": "shard-1"},
-	)
+	client := tu.DefaultTestClientMongoS(ctx, t)
 
-	require.Equal(t, map[string]string{
-		"cl_role":    "mongos",
-		"database":   "testdb",
-		"collection": "orders",
-		"key_name":   "_id_",
-		"shard":      "shard-0",
-	}, first)
-	require.Equal(t, map[string]string{
-		"cl_role":    "mongos",
-		"database":   "testdb",
-		"collection": "orders",
-		"key_name":   "_id_",
-		"shard":      "shard-1",
-	}, second)
-}
+	dbName, collName := "testdb_indexstats_sharded", "testcol"
+	namespace := dbName + "." + collName
 
-func TestIndexStatsLabelsWithoutShard(t *testing.T) {
-	t.Parallel()
+	database := client.Database(dbName)
+	database.Drop(ctx)       //nolint:errcheck
+	defer database.Drop(ctx) //nolint:errcheck
 
-	t.Run("shard field absent", func(t *testing.T) {
-		t.Parallel()
+	admin := client.Database("admin")
 
-		labels := indexStatsLabels(
-			map[string]string{},
-			"testdb",
-			"orders",
-			"_id_",
-			bson.M{},
-		)
+	var shardList struct {
+		Shards []bson.M `bson:"shards"`
+	}
+	if err := admin.RunCommand(ctx, bson.D{{Key: "listShards", Value: 1}}).Decode(&shardList); err != nil {
+		t.Skipf("cannot list shards: %v", err)
+	}
+	if len(shardList.Shards) < 2 {
+		t.Skipf("the test cluster has %d shards, at least 2 are needed", len(shardList.Shards))
+	}
 
-		require.Equal(t, map[string]string{
-			"database":   "testdb",
-			"collection": "orders",
-			"key_name":   "_id_",
-		}, labels)
-	})
+	if err := admin.RunCommand(ctx, bson.D{{Key: "enableSharding", Value: dbName}}).Err(); err != nil {
+		t.Skipf("cannot enable sharding on %s: %v", dbName, err)
+	}
 
-	t.Run("shard field empty", func(t *testing.T) {
-		t.Parallel()
+	// A hashed shard key on an empty collection presplits the initial chunks and
+	// spreads them over all shards, so every shard owns chunks of the collection.
+	shardCmd := bson.D{
+		{Key: "shardCollection", Value: namespace},
+		{Key: "key", Value: bson.D{{Key: "_id", Value: "hashed"}}},
+	}
+	if err := admin.RunCommand(ctx, shardCmd).Err(); err != nil {
+		t.Skipf("cannot shard %s: %v", namespace, err)
+	}
 
-		labels := indexStatsLabels(
-			map[string]string{},
-			"testdb",
-			"orders",
-			"_id_",
-			bson.M{"shard": ""},
-		)
+	docs := make([]any, 0, 100)
+	for i := 0; i < 100; i++ {
+		docs = append(docs, bson.M{"f1": i})
+	}
+	_, err := database.Collection(collName).InsertMany(ctx, docs)
+	require.NoError(t, err)
 
-		require.Equal(t, map[string]string{
-			"database":   "testdb",
-			"collection": "orders",
-			"key_name":   "_id_",
-		}, labels)
-	})
+	c := newIndexStatsCollector(ctx, client, promslog.New(&promslog.Config{}), false, false, labelsGetterMock{}, []string{namespace})
+
+	// Register runs Describe, which collects everything, and rejects a metric
+	// name described with two different label sets. That is how a shard label
+	// set for only some of the documents would surface.
+	registry := prometheus.NewPedanticRegistry()
+	require.NoError(t, registry.Register(c))
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	shardsByIndex := make(map[string][]string)
+	for _, family := range families {
+		if family.GetName() != "mongodb_indexstats_accesses_ops" {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			labels := make(map[string]string, len(metric.GetLabel()))
+			for _, label := range metric.GetLabel() {
+				labels[label.GetName()] = label.GetValue()
+			}
+
+			require.Equal(t, dbName, labels["database"])
+			require.Equal(t, collName, labels["collection"])
+			require.NotEmpty(t, labels["shard"], "series without a shard label: %v", labels)
+
+			indexName := labels["key_name"]
+			shardsByIndex[indexName] = append(shardsByIndex[indexName], labels["shard"])
+		}
+	}
+
+	require.Contains(t, shardsByIndex, "_id_")
+	for indexName, shards := range shardsByIndex {
+		require.Len(t, slices.Compact(slices.Sorted(slices.Values(shards))), len(shards),
+			"index %s exposes the same shard more than once: %v", indexName, shards)
+		require.Greater(t, len(shards), 1, "index %s is exposed for a single shard only: %v", indexName, shards)
+	}
 }
 
 func TestDescendingIndexOverride(t *testing.T) {

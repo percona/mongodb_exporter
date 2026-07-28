@@ -131,7 +131,11 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the
 			// same, for different collections.
 			prefix := "indexstats"
-			labels := indexStatsLabels(d.topologyInfo.baseLabels(), database, collection, indexName, metric)
+			labels := d.topologyInfo.baseLabels()
+			labels["database"] = database
+			labels["collection"] = collection
+			labels["key_name"] = indexName
+			setShardLabel(labels, metric)
 
 			metrics := sanitizeMetrics(metric)
 			for _, metric := range makeMetrics(prefix, metrics, labels, false) {
@@ -139,16 +143,6 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
-}
-
-// indexStatsLabels builds the label set for a single $indexStats document.
-func indexStatsLabels(labels map[string]string, database, collection, indexName string, metric bson.M) map[string]string {
-	labels["database"] = database
-	labels["collection"] = collection
-	labels["key_name"] = indexName
-	setShardLabel(labels, metric)
-
-	return labels
 }
 
 // According to specs, we should expose only this 2 metrics. 'building' might not exist.
