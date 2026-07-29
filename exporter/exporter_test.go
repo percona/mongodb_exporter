@@ -73,8 +73,10 @@ func metricLabels(m *dto.Metric) map[string]string {
 
 // shardTestCollection shards dbName.collName over every shard of the test cluster
 // reached through mongos, so that $collStats and $indexStats report one document
-// per shard. It skips the test only when the cluster itself cannot exercise
-// sharding, meaning it has fewer than two shards.
+// per shard. Reaching mongos at all means we are on the docker-compose cluster,
+// which setup-shard.sh registers two shards with, so fewer than that is a broken
+// fixture and fails the test. Skipping instead would hide the regression these
+// tests exist to catch: go test reports ok and nobody notices the fix is unguarded.
 func shardTestCollection(ctx context.Context, t *testing.T, client *mongo.Client, dbName, collName string) {
 	t.Helper()
 
@@ -86,7 +88,9 @@ func shardTestCollection(ctx context.Context, t *testing.T, client *mongo.Client
 	require.NoError(t, admin.RunCommand(ctx, bson.D{{Key: "listShards", Value: 1}}).Decode(&shardList))
 
 	if len(shardList.Shards) < minTestShards {
-		t.Skipf("the test cluster has %d shards, at least %d are needed", len(shardList.Shards), minTestShards)
+		t.Fatalf("the test cluster reports %d shards, at least %d are needed; "+
+			"check that shard setup succeeded (docker compose logs mongo-shard-setup)",
+			len(shardList.Shards), minTestShards)
 	}
 
 	require.NoError(t, admin.RunCommand(ctx, bson.D{{Key: "enableSharding", Value: dbName}}).Err())
