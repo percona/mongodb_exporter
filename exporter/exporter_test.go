@@ -28,6 +28,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/promslog"
@@ -37,6 +38,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
+)
+
+const (
+	// minTestShards is the number of shards a cluster needs before a test can
+	// observe metrics coming from more than one of them.
+	minTestShards = 2
+	// shardedTestDocs is large enough that every shard of the test cluster ends up
+	// owning documents of the collection.
+	shardedTestDocs = 100
 )
 
 // Use this for testing because labels like cluster ID are not constant in docker containers
@@ -60,15 +70,6 @@ func metricLabels(m *dto.Metric) map[string]string {
 
 	return labels
 }
-
-const (
-	// minTestShards is the number of shards a cluster needs before a test can
-	// observe metrics coming from more than one of them.
-	minTestShards = 2
-	// shardedTestDocs is large enough that every shard of the test cluster ends up
-	// owning documents of the collection.
-	shardedTestDocs = 100
-)
 
 // shardTestCollection shards dbName.collName over every shard of the test cluster
 // reached through mongos, so that $collStats and $indexStats report one document
@@ -97,6 +98,63 @@ func shardTestCollection(ctx context.Context, t *testing.T, client *mongo.Client
 		{Key: "key", Value: bson.D{{Key: "_id", Value: "hashed"}}},
 	}
 	require.NoError(t, admin.RunCommand(ctx, shardCmd).Err())
+}
+
+// gatherShardedMetrics shards dbName.collName over the test cluster, fills it with documents so
+// that every shard reports on it, and returns what c exposes for it. The collector is expected
+// to be scoped to that one namespace.
+func gatherShardedMetrics(ctx context.Context, t *testing.T, client *mongo.Client,
+	dbName, collName string, c prometheus.Collector,
+) []*dto.MetricFamily {
+	t.Helper()
+
+	shardTestCollection(ctx, t, client, dbName, collName)
+
+	docs := make([]any, 0, shardedTestDocs)
+	for i := range shardedTestDocs {
+		docs = append(docs, bson.M{"f1": i})
+	}
+	_, err := client.Database(dbName).Collection(collName).InsertMany(ctx, docs)
+	require.NoError(t, err)
+
+	// Register runs Describe, which collects everything, and rejects a metric name described
+	// with two different label sets. That is how a shard label set for only some of the
+	// documents would surface.
+	registry := prometheus.NewPedanticRegistry()
+	require.NoError(t, registry.Register(c))
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	return families
+}
+
+// shardedSeriesLabels returns the labels of every series of dbName.collName exposed by the metric
+// families whose name starts with namePrefix, asserting that each of them carries a shard.
+func shardedSeriesLabels(t *testing.T, families []*dto.MetricFamily,
+	namePrefix, dbName, collName string,
+) []map[string]string {
+	t.Helper()
+
+	var series []map[string]string
+	for _, family := range families {
+		if !strings.HasPrefix(family.GetName(), namePrefix) {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			labels := metricLabels(metric)
+			if labels["database"] != dbName || labels["collection"] != collName {
+				continue
+			}
+
+			require.NotEmpty(t, labels["shard"], "series without a shard label: %s %v", family.GetName(), labels)
+			series = append(series, labels)
+		}
+	}
+
+	require.NotEmpty(t, series, "no %s* series for %s.%s", namePrefix, dbName, collName)
+
+	return series
 }
 
 //nolint:funlen

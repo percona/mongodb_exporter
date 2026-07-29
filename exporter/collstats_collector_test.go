@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +50,7 @@ func TestCollStatsCollector(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		coll := fmt.Sprintf("testcol_%02d", i)
 		_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": 1, "f2": "2"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	ti := labelsGetterMock{}
@@ -102,9 +101,11 @@ mongodb_collstats_storageStats_capped{collection="testcol_02",database="testdb",
 // shard. Every series must carry the shard it came from, and a shard must never
 // leak from one document into the next.
 //
+// Not parallel: it enables sharding on the cluster shared with the other tests.
+//
 //nolint:paralleltest
 func TestCollStatsCollectorSharded(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
@@ -116,41 +117,14 @@ func TestCollStatsCollectorSharded(t *testing.T) {
 	database.Drop(ctx)       //nolint:errcheck
 	defer database.Drop(ctx) //nolint:errcheck
 
-	shardTestCollection(ctx, t, client, dbName, collName)
-
-	docs := make([]any, 0, shardedTestDocs)
-	for i := range shardedTestDocs {
-		docs = append(docs, bson.M{"f1": i})
-	}
-	_, err := database.Collection(collName).InsertMany(ctx, docs)
-	require.NoError(t, err)
-
 	logger := promslog.New(&promslog.Config{})
 	c := newCollectionStatsCollector(ctx, client, logger, false, labelsGetterMock{}, []string{namespace}, false)
 
-	// Register runs Describe, which collects everything, and rejects a metric
-	// name described with two different label sets. That is how a shard label
-	// set for only some of the documents would surface.
-	registry := prometheus.NewPedanticRegistry()
-	require.NoError(t, registry.Register(c))
-
-	families, err := registry.Gather()
-	require.NoError(t, err)
+	families := gatherShardedMetrics(ctx, t, client, dbName, collName, c)
 
 	observedShards := make(map[string]struct{})
-	for _, family := range families {
-		if !strings.HasPrefix(family.GetName(), "mongodb_collstats_") {
-			continue
-		}
-		for _, metric := range family.GetMetric() {
-			labels := metricLabels(metric)
-			if labels["database"] != dbName || labels["collection"] != collName {
-				continue
-			}
-
-			require.NotEmpty(t, labels["shard"], "series without a shard label: %s %v", family.GetName(), labels)
-			observedShards[labels["shard"]] = struct{}{}
-		}
+	for _, labels := range shardedSeriesLabels(t, families, "mongodb_collstats_", dbName, collName) {
+		observedShards[labels["shard"]] = struct{}{}
 	}
 
 	require.Greater(t, len(observedShards), 1, "collstats metrics were exposed for a single shard only: %v", observedShards)

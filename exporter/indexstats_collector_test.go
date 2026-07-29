@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
@@ -85,16 +84,18 @@ mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_na
 		"mongodb_indexstats_accesses_ops",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 // Through mongos, a sharded collection reports one $indexStats document per
 // shard for the same index. Without the shard label they all collapse into one
 // series and the duplicates are dropped.
 //
+// Not parallel: it enables sharding on the cluster shared with the other tests.
+//
 //nolint:paralleltest
 func TestIndexStatsCollectorSharded(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
@@ -106,41 +107,14 @@ func TestIndexStatsCollectorSharded(t *testing.T) {
 	database.Drop(ctx)       //nolint:errcheck
 	defer database.Drop(ctx) //nolint:errcheck
 
-	shardTestCollection(ctx, t, client, dbName, collName)
-
-	docs := make([]any, 0, shardedTestDocs)
-	for i := range shardedTestDocs {
-		docs = append(docs, bson.M{"f1": i})
-	}
-	_, err := database.Collection(collName).InsertMany(ctx, docs)
-	require.NoError(t, err)
-
 	c := newIndexStatsCollector(ctx, client, promslog.New(&promslog.Config{}), false, false, labelsGetterMock{}, []string{namespace})
 
-	// Register runs Describe, which collects everything, and rejects a metric
-	// name described with two different label sets. That is how a shard label
-	// set for only some of the documents would surface.
-	registry := prometheus.NewPedanticRegistry()
-	require.NoError(t, registry.Register(c))
-
-	families, err := registry.Gather()
-	require.NoError(t, err)
+	families := gatherShardedMetrics(ctx, t, client, dbName, collName, c)
 
 	shardsByIndex := make(map[string][]string)
-	for _, family := range families {
-		if family.GetName() != "mongodb_indexstats_accesses_ops" {
-			continue
-		}
-		for _, metric := range family.GetMetric() {
-			labels := metricLabels(metric)
-
-			require.Equal(t, dbName, labels["database"])
-			require.Equal(t, collName, labels["collection"])
-			require.NotEmpty(t, labels["shard"], "series without a shard label: %v", labels)
-
-			indexName := labels["key_name"]
-			shardsByIndex[indexName] = append(shardsByIndex[indexName], labels["shard"])
-		}
+	for _, labels := range shardedSeriesLabels(t, families, "mongodb_indexstats_accesses_ops", dbName, collName) {
+		indexName := labels["key_name"]
+		shardsByIndex[indexName] = append(shardsByIndex[indexName], labels["shard"])
 	}
 
 	require.Contains(t, shardsByIndex, "_id_")
@@ -201,7 +175,7 @@ func TestDescendingIndexOverride(t *testing.T) {
 		"mongodb_indexstats_accesses_ops",
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestSanitize(t *testing.T) {
