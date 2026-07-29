@@ -21,6 +21,8 @@ import (
 	"log/slog"
 	"net"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -40,7 +42,9 @@ var (
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
 	User                  string   `env:"MONGODB_USER"                                                                    help:"monitor user, need clusterMonitor role in admin db and read role in local db"                                                            name:"mongodb.user"                                                                                        placeholder:"monitorUser"`
+	UserFile              string   `env:"MONGODB_USER_FILE"                                                               help:"Path to a file containing the monitor user"                                                                                              name:"mongodb.user-file"                                                                                   type:"path"`
 	Password              string   `env:"MONGODB_PASSWORD"                                                                help:"monitor user password"                                                                                                                   name:"mongodb.password"                                                                                    placeholder:"monitorPassword"`
+	PasswordFile          string   `env:"MONGODB_PASSWORD_FILE"                                                           help:"Path to a file containing the monitor user password"                                                                                     name:"mongodb.password-file"                                                                               type:"path"`
 	CollStatsNamespaces   string   `help:"List of comma separared databases.collections to get $collStats"                name:"mongodb.collstats-colls"                                                                                                                 placeholder:"db1,db2.col2"`
 	IndexStatsCollections string   `help:"List of comma separared databases.collections to get $indexStats"               name:"mongodb.indexstats-colls"                                                                                                                placeholder:"db1.col1,db2.col2"`
 	URI                   []string `env:"MONGODB_URI"                                                                     help:"MongoDB connection URI"                                                                                                                  name:"mongodb.uri"                                                                                         placeholder:"mongodb://user:pass@127.0.0.1:27017/admin?ssl=true"`
@@ -107,6 +111,11 @@ func main() {
 		return
 	}
 
+	err := loadCredentialFiles(&opts)
+	if err != nil {
+		ctx.Fatalf("Failed to load MongoDB credentials: %v", err)
+	}
+
 	logLevel := promslog.NewLevel()
 	_ = logLevel.Set(opts.LogLevel)
 	logger := promslog.New(&promslog.Config{
@@ -136,6 +145,40 @@ func main() {
 		TLSConfigPath:     opts.TLSConfigPath,
 	}
 	exporter.RunWebServer(serverOpts, buildServers(opts, logger), logger)
+}
+
+func loadCredentialFiles(opts *GlobalFlags) error {
+	user, err := readCredentialFile(opts.UserFile)
+	if err != nil {
+		return fmt.Errorf("failed to read MongoDB user file %q: %w", opts.UserFile, err)
+	}
+
+	password, err := readCredentialFile(opts.PasswordFile)
+	if err != nil {
+		return fmt.Errorf("failed to read MongoDB password file %q: %w", opts.PasswordFile, err)
+	}
+
+	if opts.UserFile != "" {
+		opts.User = user
+	}
+	if opts.PasswordFile != "" {
+		opts.Password = password
+	}
+
+	return nil
+}
+
+func readCredentialFile(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+
+	contents, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return "", fmt.Errorf("read credential file: %w", err)
+	}
+
+	return strings.TrimSpace(string(contents)), nil
 }
 
 func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exporter {
