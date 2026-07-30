@@ -440,7 +440,7 @@ func allKeysUnambiguous(m bson.M) bool {
 // underscore, and a leading or trailing underscore is dropped.
 func isUnambiguousKey(k string) bool {
 	previousIsUnderscore := true
-	for i := 0; i < len(k); i++ {
+	for i := range len(k) {
 		switch c := k[i]; {
 		case c == '_':
 			if previousIsUnderscore {
