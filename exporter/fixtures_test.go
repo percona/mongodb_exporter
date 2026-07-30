@@ -27,7 +27,8 @@ import (
 
 // diagnosticData83FixturePath is a getDiagnosticData reply captured from the MongoDB 8.3.2
 // instance of https://github.com/percona/mongodb_exporter/issues/1285, trimmed to the
-// subtrees the tests below need.
+// subtrees the tests below need: serverStatus.opLatencies for the "histogram" bucket arrays
+// and serverStatus.metrics.query for the "histograms" nodes.
 const diagnosticData83FixturePath = "testdata/get_diagnostic_data_8.3.json"
 
 // loadDiagnosticData83Fixture reads the captured command reply. Extended JSON is used instead of

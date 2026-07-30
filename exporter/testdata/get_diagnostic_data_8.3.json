@@ -613,54 +613,5 @@
         }
       }
     }
-  },
-  "systemMetrics": {
-    "ethtool": {
-      "ens192": {
-        "Tx Queue#": 0,
-        "  TSO pkts tx": 0,
-        "  TSO bytes tx": -102,
-        "  ucast pkts tx": -102,
-        "  ucast bytes tx": 78,
-        "  mcast pkts tx": 0,
-        "  mcast bytes tx": 0,
-        "  bcast pkts tx": 0,
-        "  bcast bytes tx": 0,
-        "  pkts tx err": 0,
-        "  pkts tx discard": -10,
-        "  drv dropped tx total": -59,
-        "     too many frags": -89,
-        "     giant hdr": 104,
-        "     hdr err": 0,
-        "     tso": 0,
-        "  ring full": 0,
-        "  pkts linearized": 0,
-        "  hdr cloned": 0,
-        "  giant hdr": 0,
-        "  xdp xmit": 0,
-        "  xdp xmit err": 0,
-        "Rx Queue#": -113,
-        "  LRO pkts rx": 4,
-        "  LRO byte rx": 0,
-        "  ucast pkts rx": 0,
-        "  ucast bytes rx": 0,
-        "  mcast pkts rx": 0,
-        "  mcast bytes rx": 0,
-        "  bcast pkts rx": 0,
-        "  bcast bytes rx": 0,
-        "  pkts rx OOB": 0,
-        "  pkts rx err": 0,
-        "  drv dropped rx total": 0,
-        "     err": 0,
-        "     fcs": 0,
-        "  rx buf alloc fail": 0,
-        "     xdp packets": 0,
-        "     xdp tx": 0,
-        "     xdp redirects": 0,
-        "     xdp drops": 0,
-        "     xdp aborted": 0,
-        "tx timeout count": 0
-      }
-    }
   }
 }
