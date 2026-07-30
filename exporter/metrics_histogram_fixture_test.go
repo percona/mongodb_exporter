@@ -37,12 +37,13 @@ func TestServerStatusHistogramsFromFixture(t *testing.T) {
 	opLatencyBuckets, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
 	require.True(t, ok)
 	assert.ElementsMatch(t, []string{"0", "8", "64", "512", "3072", "8192", "24576", "65536", "131072"},
-		labelValues(opLatencyBuckets, histogramMicrosKey))
+		labelValues(opLatencyBuckets, histogramBoundLabel))
 	assert.NotContains(t, metricsByName, "mongodb_ss_opLatencies_reads_histogram_micros")
 
 	plannerBuckets, ok := metricsByName["mongodb_ss_metrics_query_multiPlanner_histograms_classicWorks_count"]
 	require.True(t, ok)
-	assert.Len(t, labelValues(plannerBuckets, "lower_bound"), 10)
+	assert.ElementsMatch(t, []string{"0", "128", "256", "512", "1024", "2048", "4096", "8192", "16384", "32768"},
+		labelValues(plannerBuckets, histogramBoundLabel))
 }
 
 func TestServerStatusHistogramsFromFixtureAreSkippedByDefault(t *testing.T) {

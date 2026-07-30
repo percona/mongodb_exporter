@@ -363,7 +363,7 @@ func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
 	valuesByBound := make(map[string]float64, len(bucketCounts.GetMetric()))
 	for _, metric := range bucketCounts.GetMetric() {
 		for _, label := range metric.GetLabel() {
-			if label.GetName() == histogramMicrosKey {
+			if label.GetName() == histogramBoundLabel {
 				valuesByBound[label.GetValue()] = metric.GetCounter().GetValue()
 			}
 		}
