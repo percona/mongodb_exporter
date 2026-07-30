@@ -21,7 +21,6 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -244,42 +243,18 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 		},
 	}, nil, true, true)
 
-	reg := prometheus.NewPedanticRegistry()
-	reg.MustRegister(staticCollector(metrics))
-
-	gatheredMetrics, err := reg.Gather()
-	require.NoError(t, err, "metrics with the same name and labels must not be exported")
-
-	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
-	for _, metric := range gatheredMetrics {
-		metricsByName[metric.GetName()] = metric
-	}
+	metricsByName := gatherMetrics(t, metrics)
 
 	assert.NotContains(t, metricsByName, "mongodb_ss_metrics_query_multiPlanner_histograms_sbeMicros_lowerBound")
 
 	bucketCounts, ok := metricsByName["mongodb_ss_metrics_query_multiPlanner_histograms_sbeMicros_count"]
-	if !assert.True(t, ok) {
-		return
-	}
-
-	bucketCountMetrics := bucketCounts.GetMetric()
-	if !assert.Len(t, bucketCountMetrics, 2) {
-		return
-	}
-
-	valuesByBound := make(map[string]float64, len(bucketCountMetrics))
-	for _, metric := range bucketCountMetrics {
-		labels := make(map[string]string, len(metric.GetLabel()))
-		for _, label := range metric.GetLabel() {
-			labels[label.GetName()] = label.GetValue()
-		}
-		valuesByBound[labels["lower_bound"]] = metric.GetCounter().GetValue()
-	}
+	require.True(t, ok)
+	assert.Len(t, bucketCounts.GetMetric(), 2)
 
 	assert.Equal(t, map[string]float64{
 		"0":    3,
 		"1024": 7,
-	}, valuesByBound)
+	}, counterValuesByLabel(bucketCounts, "lower_bound"))
 }
 
 func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
@@ -342,37 +317,18 @@ func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
 		},
 	}, nil, false, true)
 
-	reg := prometheus.NewPedanticRegistry()
-	reg.MustRegister(staticCollector(metrics))
-
-	gatheredMetrics, err := reg.Gather()
-	require.NoError(t, err, "metrics with the same name and labels must not be exported")
-
-	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
-	for _, metric := range gatheredMetrics {
-		metricsByName[metric.GetName()] = metric
-	}
+	metricsByName := gatherMetrics(t, metrics)
 
 	assert.NotContains(t, metricsByName, "mongodb_ss_opLatencies_reads_histogram_micros")
 
 	bucketCounts, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
-	if !assert.True(t, ok) {
-		return
-	}
-
-	valuesByBound := make(map[string]float64, len(bucketCounts.GetMetric()))
-	for _, metric := range bucketCounts.GetMetric() {
-		for _, label := range metric.GetLabel() {
-			if label.GetName() == "lower_bound" {
-				valuesByBound[label.GetValue()] = metric.GetCounter().GetValue()
-			}
-		}
-	}
+	require.True(t, ok)
+	assert.Len(t, bucketCounts.GetMetric(), 2)
 
 	assert.Equal(t, map[string]float64{
 		"1":    3,
 		"2048": 7,
-	}, valuesByBound)
+	}, counterValuesByLabel(bucketCounts, "lower_bound"))
 }
 
 func TestOpLatenciesHistogramMetricsAreSkippedByDefault(t *testing.T) {
@@ -388,23 +344,6 @@ func TestOpLatenciesHistogramMetricsAreSkippedByDefault(t *testing.T) {
 
 	// The latency metric is renamed and labeled by specialConversions, the buckets are dropped.
 	assert.Equal(t, []string{"mongodb_ss_opLatencies_latency"}, gatheredMetricNames(t, metrics))
-}
-
-func gatheredMetricNames(t *testing.T, metrics []prometheus.Metric) []string {
-	t.Helper()
-
-	reg := prometheus.NewPedanticRegistry()
-	reg.MustRegister(staticCollector(metrics))
-
-	gatheredMetrics, err := reg.Gather()
-	require.NoError(t, err)
-
-	names := make([]string, 0, len(gatheredMetrics))
-	for _, metric := range gatheredMetrics {
-		names = append(names, metric.GetName())
-	}
-
-	return names
 }
 
 func TestAsMetricMapHandlesBSONM(t *testing.T) {

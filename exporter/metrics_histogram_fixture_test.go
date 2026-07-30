@@ -32,7 +32,7 @@ func TestServerStatusHistogramsFromFixture(t *testing.T) {
 	require.True(t, ok)
 
 	labels := map[string]string{"cl_id": "", "cl_role": ""}
-	metricsByName := gatherFixtureMetrics(t, makeMetricsWithHistograms("serverStatus", serverStatus, labels, false, true))
+	metricsByName := gatherMetrics(t, makeMetricsWithHistograms("serverStatus", serverStatus, labels, false, true))
 
 	opLatencyBuckets, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
 	require.True(t, ok)
@@ -53,7 +53,7 @@ func TestServerStatusHistogramsFromFixtureAreSkippedByDefault(t *testing.T) {
 	require.True(t, ok)
 
 	labels := map[string]string{"cl_id": "", "cl_role": ""}
-	metricsByName := gatherFixtureMetrics(t, makeMetrics("serverStatus", serverStatus, labels, false))
+	metricsByName := gatherMetrics(t, makeMetrics("serverStatus", serverStatus, labels, false))
 
 	for name := range metricsByName {
 		assert.NotContains(t, name, "histogram")

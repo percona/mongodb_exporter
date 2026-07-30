@@ -47,23 +47,46 @@ func loadDiagnosticData83Fixture(t *testing.T) bson.M {
 	return m
 }
 
-// gatherFixtureMetrics exports the metrics the way the registry does at scrape time, so
+// gatherFamilies exports the metrics the way the registry does at scrape time, so
 // duplicated series and inconsistent descriptors fail the test instead of the scrape.
-func gatherFixtureMetrics(t *testing.T, metrics []prometheus.Metric) map[string]*dto.MetricFamily {
+func gatherFamilies(t *testing.T, metrics []prometheus.Metric) []*dto.MetricFamily {
 	t.Helper()
 
 	reg := prometheus.NewPedanticRegistry()
 	require.NoError(t, reg.Register(staticCollector(metrics)), "descriptors must be consistent")
 
-	gatheredMetrics, err := reg.Gather()
+	families, err := reg.Gather()
 	require.NoError(t, err, "metrics must be exported only once")
 
-	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
-	for _, metric := range gatheredMetrics {
-		metricsByName[metric.GetName()] = metric
+	return families
+}
+
+// gatherMetrics exports the metrics and indexes the families by name.
+func gatherMetrics(t *testing.T, metrics []prometheus.Metric) map[string]*dto.MetricFamily {
+	t.Helper()
+
+	families := gatherFamilies(t, metrics)
+
+	metricsByName := make(map[string]*dto.MetricFamily, len(families))
+	for _, family := range families {
+		metricsByName[family.GetName()] = family
 	}
 
 	return metricsByName
+}
+
+// gatheredMetricNames returns the exported metric names, in the order Gather sorts them.
+func gatheredMetricNames(t *testing.T, metrics []prometheus.Metric) []string {
+	t.Helper()
+
+	families := gatherFamilies(t, metrics)
+
+	names := make([]string, 0, len(families))
+	for _, family := range families {
+		names = append(names, family.GetName())
+	}
+
+	return names
 }
 
 // labelValues returns the value of the given label for every series of a metric family.
@@ -73,6 +96,20 @@ func labelValues(family *dto.MetricFamily, name string) []string {
 		for _, label := range metric.GetLabel() {
 			if label.GetName() == name {
 				values = append(values, label.GetValue())
+			}
+		}
+	}
+
+	return values
+}
+
+// counterValuesByLabel maps each value of the given label to the counter value of its series.
+func counterValuesByLabel(family *dto.MetricFamily, name string) map[string]float64 {
+	values := make(map[string]float64, len(family.GetMetric()))
+	for _, metric := range family.GetMetric() {
+		for _, label := range metric.GetLabel() {
+			if label.GetName() == name {
+				values[label.GetValue()] = metric.GetCounter().GetValue()
 			}
 		}
 	}
