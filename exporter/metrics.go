@@ -20,11 +20,9 @@ import (
 	"maps"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,8 +33,9 @@ import (
 const (
 	exporterPrefix = "mongodb_"
 
-	// collisionLabel keeps document fields apart when they sanitize to the same metric name.
-	collisionLabel = "metric_idx"
+	// collisionLabel carries the document field a metric was built from. It is set only when
+	// several fields of one document map to the same metric name, and it keeps them apart.
+	collisionLabel = "metric_field"
 )
 
 type rawMetric struct {
@@ -306,34 +305,10 @@ func metricHelp(prefix, name string) string {
 		return strings.TrimSuffix(prefix, ".")
 	}
 	if prefix != "" {
-		return normalizeSpaces(prefix + name)
+		return prefix + name
 	}
 
-	return normalizeSpaces(name)
-}
-
-// normalizeSpaces collapses whitespace runs and trims the edges. prometheusize maps keys
-// differing only in whitespace to the same metric name, so the help has to be normalized
-// as well or the registry rejects the descriptors as inconsistent.
-func normalizeSpaces(s string) string {
-	if !hasRedundantSpaces(s) {
-		return s
-	}
-
-	return strings.Join(strings.Fields(s), " ")
-}
-
-func hasRedundantSpaces(s string) bool {
-	previousIsSpace := true
-	for _, r := range s {
-		isSpace := unicode.IsSpace(r)
-		if isSpace && previousIsSpace {
-			return true
-		}
-		previousIsSpace = isSpace
-	}
-
-	return previousIsSpace && s != ""
+	return name
 }
 
 func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
@@ -350,13 +325,21 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 	// Fields that are exported as a label value never become a part of the metric name, so they
 	// cannot collide. Indexing them anyway would give the collision label to a part of the
 	// family only, which the registry rejects as inconsistent label names.
-	var collidingKeys map[string]int
+	var colliding map[string]string
 	if !keyBecomesLabelValue(prefix) {
-		collidingKeys = collidingKeyIndexes(prefix, m)
+		colliding = collidingFields(prefix, m)
 	}
 
 	for k, val := range m {
-		nextPrefix := prefix + k
+		// A field sharing its metric name with a sibling is exported under the name of the
+		// canonical field of the group, so that the whole group agrees on the name and on the
+		// help. The collision label carries the real field and keeps the series apart.
+		name, isColliding := k, false
+		if canonical, ok := colliding[k]; ok {
+			name, isColliding = canonical, true
+		}
+
+		nextPrefix := prefix + name
 		if !includeHistograms && isHistogramPath(nextPrefix) {
 			continue
 		}
@@ -369,8 +352,8 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 		} else {
 			l = labels
 		}
-		if idx, ok := collidingKeys[k]; ok {
-			l = withCollisionIndex(l, idx)
+		if isColliding {
+			l = withCollisionLabel(l, k)
 		}
 		switch v := val.(type) {
 		case bson.M:
@@ -385,7 +368,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 			}
 			continue
 		default:
-			res = appendMetricValue(res, prefix, k, v, l, compatibleMode)
+			res = appendMetricValue(res, prefix, name, v, l, compatibleMode)
 		}
 	}
 
@@ -404,42 +387,43 @@ func keyBecomesLabelValue(prefix string) bool {
 	return ok
 }
 
-// collidingKeyIndexes returns an index for every key of a document that does not end up with
-// a unique metric name. MongoDB can report several fields whose names differ only in characters
-// that prometheusize collapses, for example the "giant hdr" counters that ethtool exposes with
-// a different amount of leading spaces. Without the index they would be exported as the very
-// same series and the registry would reject the whole scrape. The name is built with
-// prometheusize itself, because anything less than the full mapping misses collisions: keys
-// differing only in a trailing special character or in a run of underscores share a name too.
-// Keys are sorted because the BSON document order is lost when it is decoded into a map, and
-// the index has to stay stable between scrapes.
-func collidingKeyIndexes(prefix string, m bson.M) map[string]int {
+// collidingFields maps every field of a document that does not end up with a unique metric name
+// to the canonical field of its group. MongoDB can report several fields whose names differ only
+// in characters that prometheusize collapses, for example the "giant hdr" counters that ethtool
+// exposes with a different amount of leading spaces. Exported as they are, they would be the very
+// same series and the registry would reject the whole scrape, so the group is exported under one
+// name and the collision label keeps its members apart. The name is built with prometheusize
+// itself, because anything less than the full mapping misses collisions: fields differing only in
+// a trailing special character or in a run of underscores share a name too. The canonical field is
+// the lowest one, because the BSON document order is lost when it is decoded into a map and the
+// name has to stay the same between scrapes.
+func collidingFields(prefix string, m bson.M) map[string]string {
 	if len(m) <= 1 || allKeysUnambiguous(m) {
 		return nil
 	}
 
-	keysByMetricName := make(map[string][]string, len(m))
+	fieldsByMetricName := make(map[string][]string, len(m))
 	for k := range m {
 		metricName := prometheusize(prefix + k)
-		keysByMetricName[metricName] = append(keysByMetricName[metricName], k)
+		fieldsByMetricName[metricName] = append(fieldsByMetricName[metricName], k)
 	}
 
-	var indexes map[string]int
-	for _, keys := range keysByMetricName {
-		if len(keys) == 1 {
+	var canonical map[string]string
+	for _, fields := range fieldsByMetricName {
+		if len(fields) == 1 {
 			continue
 		}
 
-		if indexes == nil {
-			indexes = make(map[string]int, len(keys))
+		if canonical == nil {
+			canonical = make(map[string]string, len(fields))
 		}
-		slices.Sort(keys)
-		for idx, k := range keys {
-			indexes[k] = idx
+		first := slices.Min(fields)
+		for _, k := range fields {
+			canonical[k] = first
 		}
 	}
 
-	return indexes
+	return canonical
 }
 
 // allKeysUnambiguous reports whether every key of a document already looks like the metric name
@@ -479,10 +463,10 @@ func isUnambiguousKey(k string) bool {
 	return !previousIsUnderscore
 }
 
-func withCollisionIndex(labels map[string]string, idx int) map[string]string {
+func withCollisionLabel(labels map[string]string, field string) map[string]string {
 	distinct := make(map[string]string, len(labels)+1)
 	maps.Copy(distinct, labels)
-	distinct[collisionLabel] = strconv.Itoa(idx)
+	distinct[collisionLabel] = field
 
 	return distinct
 }

@@ -36,7 +36,8 @@ func TestSystemMetricsCollisionsFromFixture(t *testing.T) {
 
 	collided, ok := metricsByName["mongodb_sys_ethtool_ens192_giant_hdr"]
 	require.True(t, ok)
-	assert.ElementsMatch(t, []string{"0", "1"}, labelValues(collided, collisionLabel))
+	assert.ElementsMatch(t, []string{"     giant hdr", "  giant hdr"},
+		labelValues(collided, collisionLabel))
 
 	// Counters with a unique name keep their plain identity.
 	unique, ok := metricsByName["mongodb_sys_ethtool_ens192_ucast_pkts_tx"]

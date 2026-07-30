@@ -337,55 +337,65 @@ func TestKeysCollidingAfterSanitizationStayDistinct(t *testing.T) {
 		return
 	}
 
-	valuesByIndex := make(map[string]float64, len(collided.GetMetric()))
+	valuesByField := make(map[string]float64, len(collided.GetMetric()))
 	for _, metric := range collided.GetMetric() {
 		for _, label := range metric.GetLabel() {
 			if label.GetName() == collisionLabel {
-				valuesByIndex[label.GetValue()] = metric.GetUntyped().GetValue()
+				valuesByField[label.GetValue()] = metric.GetUntyped().GetValue()
 			}
 		}
 	}
 
-	// Sorted by the raw key, so the one with more leading spaces comes first.
+	// The label carries the field the value came from, so the series stay identifiable and do
+	// not get renumbered when MongoDB stops reporting one of them.
 	assert.Equal(t, map[string]float64{
-		"0": 11,
-		"1": 22,
-	}, valuesByIndex)
+		"     giant hdr": 11,
+		"  giant hdr":    22,
+	}, valuesByField)
 }
 
-func TestMetricHelpNormalizesSpaces(t *testing.T) {
+// Sanitization collapses every special character, not only whitespace, so fields differing in any
+// of them share one metric name and therefore have to share one help string as well.
+func TestCollidingFieldsShareOneDescriptor(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, metricHelp("systemMetrics.ethtool.ens192.", "  giant hdr"),
-		metricHelp("systemMetrics.ethtool.ens192.", "     giant hdr"))
+	metrics := makeMetrics("systemMetrics.ethtool", bson.M{
+		"ens192": bson.M{
+			"giant hdr":  int64(11),
+			"giant-hdr":  int64(22),
+			"giant hdr#": int64(33),
+		},
+	}, nil, false)
 
-	// Help strings without redundant whitespace must be left untouched.
-	assert.Equal(t, "local.oplog.rs.stats.wiredTiger.btree.fixed-record size",
-		metricHelp("local.oplog.rs.stats.wiredTiger.btree.", "fixed-record size"))
-	assert.Equal(t, "serverStatus.connections", metricHelp("serverStatus.connections.", "current"))
+	collided, ok := gatherFixtureMetrics(t, metrics)["mongodb_sys_ethtool_ens192_giant_hdr"]
+	require.True(t, ok)
+	assert.Equal(t, "systemMetrics.ethtool.ens192.giant hdr", collided.GetHelp())
+	assert.ElementsMatch(t, []string{"giant hdr", "giant-hdr", "giant hdr#"},
+		labelValues(collided, collisionLabel))
 }
 
-func TestCollidingKeyIndexes(t *testing.T) {
+func TestCollidingFields(t *testing.T) {
 	t.Parallel()
 
-	assert.Nil(t, collidingKeyIndexes("systemMetrics.", bson.M{"a b": int64(1), "c d": int64(2)}))
-	assert.Nil(t, collidingKeyIndexes("systemMetrics.", bson.M{"plain": int64(1)}))
-	assert.Nil(t, collidingKeyIndexes("systemMetrics.", bson.M{"a_b": int64(1), "c_d": int64(2)}))
-	assert.Equal(t, map[string]int{"a b": 0, "a_b": 1}, collidingKeyIndexes("systemMetrics.", bson.M{
-		"a b":   int64(1),
-		"a_b":   int64(2),
-		"other": int64(3),
-	}))
+	assert.Nil(t, collidingFields("systemMetrics.", bson.M{"a b": int64(1), "c d": int64(2)}))
+	assert.Nil(t, collidingFields("systemMetrics.", bson.M{"plain": int64(1)}))
+	assert.Nil(t, collidingFields("systemMetrics.", bson.M{"a_b": int64(1), "c_d": int64(2)}))
+	assert.Equal(t, map[string]string{"a b": "a b", "a_b": "a b"},
+		collidingFields("systemMetrics.", bson.M{
+			"a b":   int64(1),
+			"a_b":   int64(2),
+			"other": int64(3),
+		}))
 
-	// prometheusize also drops a trailing underscore and collapses underscore runs, so keys
+	// prometheusize also drops a trailing underscore and collapses underscore runs, so fields
 	// differing only there end up sharing one metric name.
-	assert.Equal(t, map[string]int{"giant hdr": 0, "giant hdr#": 1},
-		collidingKeyIndexes("systemMetrics.ethtool.ens192.", bson.M{
+	assert.Equal(t, map[string]string{"giant hdr": "giant hdr", "giant hdr#": "giant hdr"},
+		collidingFields("systemMetrics.ethtool.ens192.", bson.M{
 			"giant hdr":  int64(1),
 			"giant hdr#": int64(2),
 		}))
-	assert.Equal(t, map[string]int{"a__b": 0, "a_b": 1},
-		collidingKeyIndexes("systemMetrics.", bson.M{"a__b": int64(1), "a_b": int64(2)}))
+	assert.Equal(t, map[string]string{"a__b": "a__b", "a_b": "a__b"},
+		collidingFields("systemMetrics.", bson.M{"a__b": int64(1), "a_b": int64(2)}))
 }
 
 // Index names are user controlled and two of them can sanitize to the same string. They are
