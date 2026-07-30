@@ -44,3 +44,30 @@ func TestSystemMetricsCollisionsFromFixture(t *testing.T) {
 	require.True(t, ok)
 	assert.Empty(t, labelValues(unique, collisionLabel))
 }
+
+// The whole captured reply has to survive a scrape, not only the ethtool subtree, and it is the
+// only place where the 8.3 payload is walked with histograms enabled.
+func TestDiagnosticData83Gathers(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name              string
+		includeHistograms bool
+	}{
+		{name: "without histograms"},
+		{name: "with histograms", includeHistograms: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			labels := map[string]string{"cl_id": "", "cl_role": ""}
+			metricsByName := gatherFixtureMetrics(t, makeMetricsWithHistograms("",
+				loadDiagnosticData83Fixture(t), labels, false, tc.includeHistograms))
+
+			assert.Contains(t, metricsByName, "mongodb_sys_ethtool_ens192_giant_hdr")
+
+			_, ok := metricsByName["mongodb_ss_metrics_query_cbr_histograms_micros_count"]
+			assert.Equal(t, tc.includeHistograms, ok, "histogram buckets follow the flag")
+		})
+	}
+}
