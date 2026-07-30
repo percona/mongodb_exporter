@@ -46,7 +46,7 @@ func TestServerStatusHistogramsFromFixture(t *testing.T) {
 	assert.Equal(t, map[string]float64{
 		"0": 0, "8": 0, "64": 16737, "512": 947, "3072": 351,
 		"8192": 77, "24576": 54, "65536": 13, "131072": 21,
-	}, counterValuesByLabel(opLatencyBuckets, "lower_bound"))
+	}, countsByLowerBound(opLatencyBuckets))
 	assert.NotContains(t, metricsByName, "mongodb_ss_opLatencies_reads_histogram_micros")
 
 	plannerBuckets, ok := metricsByName["mongodb_ss_metrics_query_multiPlanner_histograms_classicWorks_count"]

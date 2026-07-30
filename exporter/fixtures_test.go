@@ -103,12 +103,12 @@ func labelValues(family *dto.MetricFamily, name string) []string {
 	return values
 }
 
-// counterValuesByLabel maps each value of the given label to the counter value of its series.
-func counterValuesByLabel(family *dto.MetricFamily, name string) map[string]float64 {
+// countsByLowerBound maps each bucket bound of a histogram family to the count of its series.
+func countsByLowerBound(family *dto.MetricFamily) map[string]float64 {
 	values := make(map[string]float64, len(family.GetMetric()))
 	for _, metric := range family.GetMetric() {
 		for _, label := range metric.GetLabel() {
-			if label.GetName() == name {
+			if label.GetName() == histogramBoundLabel {
 				values[label.GetValue()] = metric.GetCounter().GetValue()
 			}
 		}

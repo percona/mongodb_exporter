@@ -254,7 +254,7 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 	assert.Equal(t, map[string]float64{
 		"0":    3,
 		"1024": 7,
-	}, counterValuesByLabel(bucketCounts, "lower_bound"))
+	}, countsByLowerBound(bucketCounts))
 }
 
 func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
@@ -328,7 +328,7 @@ func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
 	assert.Equal(t, map[string]float64{
 		"1":    3,
 		"2048": 7,
-	}, counterValuesByLabel(bucketCounts, "lower_bound"))
+	}, countsByLowerBound(bucketCounts))
 }
 
 // The bucket metrics carry the "mongodb_ss_opLatencies" prefix that specialConversions and the
@@ -357,7 +357,7 @@ func TestOpLatenciesHistogramMetricsInCompatibleMode(t *testing.T) {
 	assert.Equal(t, map[string]float64{
 		"1":    3,
 		"2048": 7,
-	}, counterValuesByLabel(bucketCounts, "lower_bound"))
+	}, countsByLowerBound(bucketCounts))
 
 	// The buckets get no op_type series and no v1 compatible twin of their own.
 	assert.Empty(t, labelValues(bucketCounts, "op_type"))
