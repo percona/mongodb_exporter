@@ -306,6 +306,24 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	assert.Empty(t, metrics)
 }
 
+// Only the buckets are gated by includeHistograms. A node named "histogram" that holds
+// something else must be collected like any other node.
+func TestNonBucketHistogramNodeIsNotSkipped(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("serverStatus.someFeature", bson.M{
+		"histogram": bson.M{
+			"enabled":   int64(1),
+			"sizeBytes": int64(42),
+		},
+	}, nil, false)
+
+	assert.ElementsMatch(t, []string{
+		"mongodb_ss_someFeature_histogram_enabled",
+		"mongodb_ss_someFeature_histogram_sizeBytes",
+	}, gatheredMetricNames(t, metrics))
+}
+
 // serverStatus.opLatencies exposes its buckets under "histogram" with a "micros" boundary,
 // which used to be flattened into one metric per bucket sharing the same name and labels.
 func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {

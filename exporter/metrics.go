@@ -322,7 +322,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 
 	for k, val := range m {
 		nextPrefix := prefix + k
-		if !includeHistograms && isHistogramPath(nextPrefix) {
+		if !includeHistograms && isHistogramBucketValue(nextPrefix, val) {
 			continue
 		}
 
@@ -466,6 +466,22 @@ func histogramBound(bucket map[string]any) (string, string, bool) {
 	}
 
 	return "", "", false
+}
+
+// isHistogramBucketValue reports whether the value holds histogram buckets, so that
+// includeHistograms gates the buckets themselves rather than every node that happens to be
+// named "histogram" or "histograms". Only the diagnostic data collector can enable them,
+// every other collector passes includeHistograms=false; see the "latencyStats" request of
+// the collstats collector and PMM-9568.
+func isHistogramBucketValue(prefix string, val any) bool {
+	switch v := val.(type) {
+	case primitive.A:
+		return isHistogramBucketSlice(prefix, v)
+	case []any:
+		return isHistogramBucketSlice(prefix, v)
+	default:
+		return false
+	}
 }
 
 func isHistogramBucketSlice(prefix string, v []any) bool {
