@@ -311,47 +311,25 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 func TestKeysCollidingAfterSanitizationStayDistinct(t *testing.T) {
 	t.Parallel()
 
-	metrics := makeMetrics("systemMetrics.ethtool", bson.M{
+	metricsByName := gatherMetrics(t, makeMetrics("systemMetrics.ethtool", bson.M{
 		"ens192": bson.M{
 			"     giant hdr": int64(11),
 			"  giant hdr":    int64(22),
 			"tx queue":       int64(33),
 		},
-	}, nil, false)
-
-	reg := prometheus.NewPedanticRegistry()
-	reg.MustRegister(staticCollector(metrics))
-
-	gatheredMetrics, err := reg.Gather()
-	require.NoError(t, err, "colliding keys must not break the whole scrape")
-
-	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
-	for _, metric := range gatheredMetrics {
-		metricsByName[metric.GetName()] = metric
-	}
+	}, nil, false))
 
 	assert.Contains(t, metricsByName, "mongodb_sys_ethtool_ens192_tx_queue")
 
 	collided, ok := metricsByName["mongodb_sys_ethtool_ens192_giant_hdr"]
-	if !assert.True(t, ok) {
-		return
-	}
-
-	valuesByField := make(map[string]float64, len(collided.GetMetric()))
-	for _, metric := range collided.GetMetric() {
-		for _, label := range metric.GetLabel() {
-			if label.GetName() == collisionLabel {
-				valuesByField[label.GetValue()] = metric.GetUntyped().GetValue()
-			}
-		}
-	}
+	require.True(t, ok)
 
 	// The label carries the field the value came from, so the series stay identifiable and do
 	// not get renumbered when MongoDB stops reporting one of them.
 	assert.Equal(t, map[string]float64{
 		"     giant hdr": 11,
 		"  giant hdr":    22,
-	}, valuesByField)
+	}, valuesByLabel(collided, collisionLabel))
 }
 
 // Sanitization collapses every special character, not only whitespace, so fields differing in any
@@ -367,11 +345,60 @@ func TestCollidingFieldsShareOneDescriptor(t *testing.T) {
 		},
 	}, nil, false)
 
-	collided, ok := gatherFixtureMetrics(t, metrics)["mongodb_sys_ethtool_ens192_giant_hdr"]
+	collided, ok := gatherMetrics(t, metrics)["mongodb_sys_ethtool_ens192_giant_hdr"]
 	require.True(t, ok)
 	assert.Equal(t, "systemMetrics.ethtool.ens192.giant hdr", collided.GetHelp())
 	assert.ElementsMatch(t, []string{"giant hdr", "giant-hdr", "giant hdr#"},
 		labelValues(collided, collisionLabel))
+}
+
+// The vmxnet3 NIC of the reported host exposes two "giant hdr" counters that differ only
+// in leading whitespace, which used to make the whole systemMetrics tree unexportable.
+func TestSystemMetricsCollisionsFromFixture(t *testing.T) {
+	t.Parallel()
+
+	systemMetrics, ok := loadDiagnosticData83Fixture(t)["systemMetrics"].(bson.M)
+	require.True(t, ok)
+
+	labels := map[string]string{"cl_id": "", "cl_role": ""}
+	metricsByName := gatherMetrics(t, makeMetrics("systemMetrics", systemMetrics, labels, false))
+
+	collided, ok := metricsByName["mongodb_sys_ethtool_ens192_giant_hdr"]
+	require.True(t, ok)
+	assert.ElementsMatch(t, []string{"     giant hdr", "  giant hdr"},
+		labelValues(collided, collisionLabel))
+
+	// Counters with a unique name keep their plain identity.
+	unique, ok := metricsByName["mongodb_sys_ethtool_ens192_ucast_pkts_tx"]
+	require.True(t, ok)
+	assert.Empty(t, labelValues(unique, collisionLabel))
+}
+
+// The whole captured reply has to survive a scrape, not only the ethtool subtree, and it is the
+// only place where the 8.3 payload is walked with histograms enabled.
+func TestDiagnosticData83Gathers(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name              string
+		includeHistograms bool
+	}{
+		{name: "without histograms"},
+		{name: "with histograms", includeHistograms: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			labels := map[string]string{"cl_id": "", "cl_role": ""}
+			metricsByName := gatherMetrics(t, makeMetricsWithHistograms("",
+				loadDiagnosticData83Fixture(t), labels, false, tc.includeHistograms))
+
+			assert.Contains(t, metricsByName, "mongodb_sys_ethtool_ens192_giant_hdr")
+
+			_, ok := metricsByName["mongodb_ss_metrics_query_cbr_histograms_micros_count"]
+			assert.Equal(t, tc.includeHistograms, ok, "histogram buckets follow the flag")
+		})
+	}
 }
 
 func TestCollidingFields(t *testing.T) {
@@ -412,7 +439,7 @@ func TestFieldsExportedAsLabelValuesAreNotIndexed(t *testing.T) {
 		},
 	}, nil, false)
 
-	sizes, ok := gatherFixtureMetrics(t, metrics)["mongodb_collstats_storageStats_indexSizes"]
+	sizes, ok := gatherMetrics(t, metrics)["mongodb_collstats_storageStats_indexSizes"]
 	require.True(t, ok)
 	assert.ElementsMatch(t, []string{"a.b_1", "a_b_1", "c_1"}, labelValues(sizes, "index_name"))
 	assert.Empty(t, labelValues(sizes, collisionLabel))

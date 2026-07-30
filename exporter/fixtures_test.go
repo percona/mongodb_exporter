@@ -46,9 +46,9 @@ func loadDiagnosticData83Fixture(t *testing.T) bson.M {
 	return m
 }
 
-// gatherFixtureMetrics exports the metrics the way the registry does at scrape time, so
-// duplicated series and inconsistent descriptors fail the test instead of the scrape.
-func gatherFixtureMetrics(t *testing.T, metrics []prometheus.Metric) map[string]*dto.MetricFamily {
+// gatherMetrics exports the metrics the way the registry does at scrape time, so duplicated
+// series and inconsistent descriptors fail the test instead of the scrape.
+func gatherMetrics(t *testing.T, metrics []prometheus.Metric) map[string]*dto.MetricFamily {
 	t.Helper()
 
 	reg := prometheus.NewPedanticRegistry()
@@ -72,6 +72,21 @@ func labelValues(family *dto.MetricFamily, name string) []string {
 		for _, label := range metric.GetLabel() {
 			if label.GetName() == name {
 				values = append(values, label.GetValue())
+			}
+		}
+	}
+
+	return values
+}
+
+// valuesByLabel returns the value of every series of a metric family, keyed by the value the
+// given label has on that series.
+func valuesByLabel(family *dto.MetricFamily, name string) map[string]float64 {
+	values := make(map[string]float64, len(family.GetMetric()))
+	for _, metric := range family.GetMetric() {
+		for _, label := range metric.GetLabel() {
+			if label.GetName() == name {
+				values[label.GetValue()] = metric.GetUntyped().GetValue()
 			}
 		}
 	}
