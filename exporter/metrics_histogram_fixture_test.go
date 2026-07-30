@@ -34,10 +34,19 @@ func TestServerStatusHistogramsFromFixture(t *testing.T) {
 	labels := map[string]string{"cl_id": "", "cl_role": ""}
 	metricsByName := gatherMetrics(t, makeMetricsWithHistograms("serverStatus", serverStatus, labels, false, true))
 
+	// Every op type keeps its own bucket family.
+	for _, opType := range []string{"reads", "writes", "commands", "transactions"} {
+		assert.Contains(t, metricsByName, "mongodb_ss_opLatencies_"+opType+"_histogram_count", opType)
+	}
+
+	// Each bound keeps the count it was captured with, so a bound paired with the wrong count
+	// fails here rather than showing up as a plausible looking heatmap.
 	opLatencyBuckets, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
 	require.True(t, ok)
-	assert.ElementsMatch(t, []string{"0", "8", "64", "512", "3072", "8192", "24576", "65536", "131072"},
-		labelValues(opLatencyBuckets, "lower_bound"))
+	assert.Equal(t, map[string]float64{
+		"0": 0, "8": 0, "64": 16737, "512": 947, "3072": 351,
+		"8192": 77, "24576": 54, "65536": 13, "131072": 21,
+	}, counterValuesByLabel(opLatencyBuckets, "lower_bound"))
 	assert.NotContains(t, metricsByName, "mongodb_ss_opLatencies_reads_histogram_micros")
 
 	plannerBuckets, ok := metricsByName["mongodb_ss_metrics_query_multiPlanner_histograms_classicWorks_count"]

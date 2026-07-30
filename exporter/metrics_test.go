@@ -331,6 +331,40 @@ func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
 	}, counterValuesByLabel(bucketCounts, "lower_bound"))
 }
 
+// The bucket metrics carry the "mongodb_ss_opLatencies" prefix that specialConversions and the
+// v1 conversions match on, and compatibleMode exports a second series set from the same raw
+// metric. Neither may rename the buckets onto the op_type series.
+func TestOpLatenciesHistogramMetricsInCompatibleMode(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetricsWithHistograms("serverStatus", bson.M{
+		"opLatencies": bson.M{
+			"reads": bson.M{
+				"latency": int64(120),
+				"ops":     int64(4),
+				"histogram": primitive.A{
+					bson.M{"micros": int64(1), "count": int64(3)},
+					bson.M{"micros": int64(2048), "count": int64(7)},
+				},
+			},
+		},
+	}, nil, true, true)
+
+	metricsByName := gatherMetrics(t, metrics)
+
+	bucketCounts, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
+	require.True(t, ok)
+	assert.Equal(t, map[string]float64{
+		"1":    3,
+		"2048": 7,
+	}, counterValuesByLabel(bucketCounts, "lower_bound"))
+
+	// The buckets get no op_type series and no v1 compatible twin of their own.
+	assert.Empty(t, labelValues(bucketCounts, "op_type"))
+	assert.Equal(t, []string{"reads"}, labelValues(metricsByName["mongodb_ss_opLatencies_latency"], "op_type"))
+	assert.Len(t, metricsByName["mongodb_mongod_op_latencies_latency_total"].GetMetric(), 1)
+}
+
 func TestOpLatenciesHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	t.Parallel()
 
