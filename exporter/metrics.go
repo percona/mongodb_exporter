@@ -347,7 +347,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 		prefix += "."
 	}
 
-	collidingKeys := collidingKeyIndexes(m)
+	collidingKeys := collidingKeyIndexes(prefix, m)
 
 	for k, val := range m {
 		nextPrefix := prefix + k
@@ -386,46 +386,35 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 	return res
 }
 
-// collidingKeyIndexes returns an index for every key of a document that is not unique once
-// sanitized. MongoDB can report several fields whose names differ only in characters that
-// prometheusize collapses, for example the "giant hdr" counters that ethtool exposes per
-// queue with a different amount of leading spaces. Without the index they would be exported
-// as the very same series and the registry would reject the whole scrape. Keys are sorted
-// because the BSON document order is lost when it is decoded into a map, and the index has
-// to stay stable between scrapes.
-func collidingKeyIndexes(m bson.M) map[string]int {
-	if len(m) <= 1 {
+// collidingKeyIndexes returns an index for every key of a document that does not end up with
+// a unique metric name. MongoDB can report several fields whose names differ only in characters
+// that prometheusize collapses, for example the "giant hdr" counters that ethtool exposes with
+// a different amount of leading spaces. Without the index they would be exported as the very
+// same series and the registry would reject the whole scrape. The name is built with
+// prometheusize itself, because anything less than the full mapping misses collisions: keys
+// differing only in a trailing special character or in a run of underscores share a name too.
+// Keys are sorted because the BSON document order is lost when it is decoded into a map, and
+// the index has to stay stable between scrapes.
+func collidingKeyIndexes(prefix string, m bson.M) map[string]int {
+	if len(m) <= 1 || allKeysUnambiguous(m) {
 		return nil
 	}
 
-	firstKeyByMetricName := make(map[string]string, len(m))
-	var collidingKeys map[string][]string
-
+	keysByMetricName := make(map[string][]string, len(m))
 	for k := range m {
-		metricName := sanitizeKey(k)
+		metricName := prometheusize(prefix + k)
+		keysByMetricName[metricName] = append(keysByMetricName[metricName], k)
+	}
 
-		first, seen := firstKeyByMetricName[metricName]
-		if !seen {
-			firstKeyByMetricName[metricName] = k
-
+	var indexes map[string]int
+	for _, keys := range keysByMetricName {
+		if len(keys) == 1 {
 			continue
 		}
 
-		if collidingKeys == nil {
-			collidingKeys = make(map[string][]string, 1)
+		if indexes == nil {
+			indexes = make(map[string]int, len(keys))
 		}
-		if _, started := collidingKeys[metricName]; !started {
-			collidingKeys[metricName] = []string{first}
-		}
-		collidingKeys[metricName] = append(collidingKeys[metricName], k)
-	}
-
-	if collidingKeys == nil {
-		return nil
-	}
-
-	indexes := make(map[string]int)
-	for _, keys := range collidingKeys {
 		slices.Sort(keys)
 		for idx, k := range keys {
 			indexes[k] = idx
@@ -435,30 +424,49 @@ func collidingKeyIndexes(m bson.M) map[string]int {
 	return indexes
 }
 
+// allKeysUnambiguous reports whether every key of a document already looks like the metric name
+// part it maps to. Such keys cannot collide with each other, because prometheusize leaves their
+// tail untouched and a document cannot hold the same key twice. Almost everything MongoDB
+// reports qualifies, so this keeps the collision check off the hot path.
+func allKeysUnambiguous(m bson.M) bool {
+	for k := range m {
+		if !isUnambiguousKey(k) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isUnambiguousKey reports whether k passes through prometheusize unchanged, that is whether it
+// is a non empty sequence of alphanumeric groups joined by single underscores. Anything else can
+// be mapped onto another key: special characters and underscore runs collapse into a single
+// underscore, and a leading or trailing underscore is dropped.
+func isUnambiguousKey(k string) bool {
+	previousIsUnderscore := true
+	for i := 0; i < len(k); i++ {
+		switch c := k[i]; {
+		case c == '_':
+			if previousIsUnderscore {
+				return false
+			}
+			previousIsUnderscore = true
+		case c >= '0' && c <= '9', c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z':
+			previousIsUnderscore = false
+		default:
+			return false
+		}
+	}
+
+	return !previousIsUnderscore
+}
+
 func withCollisionIndex(labels map[string]string, idx int) map[string]string {
 	distinct := make(map[string]string, len(labels)+1)
 	maps.Copy(distinct, labels)
 	distinct[collisionLabel] = strconv.Itoa(idx)
 
 	return distinct
-}
-
-var sanitizedKeyCache = sync.Map{}
-
-// sanitizeKey turns a document field into the part of the metric name it ends up in.
-// The result is cached because the set of field names MongoDB reports is small and the
-// collision check walks all of them on every scrape.
-func sanitizeKey(k string) string {
-	if sanitized, ok := sanitizedKeyCache.Load(k); ok {
-		if sanitizedString, ok := sanitized.(string); ok {
-			return sanitizedString
-		}
-	}
-
-	sanitized := specialCharsRe.ReplaceAllString(k, "_")
-	sanitizedKeyCache.Store(strings.Clone(k), sanitized)
-
-	return sanitized
 }
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members

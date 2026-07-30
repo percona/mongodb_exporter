@@ -368,13 +368,37 @@ func TestMetricHelpNormalizesSpaces(t *testing.T) {
 func TestCollidingKeyIndexes(t *testing.T) {
 	t.Parallel()
 
-	assert.Nil(t, collidingKeyIndexes(bson.M{"a b": int64(1), "c d": int64(2)}))
-	assert.Nil(t, collidingKeyIndexes(bson.M{"plain": int64(1)}))
-	assert.Equal(t, map[string]int{"a b": 0, "a_b": 1}, collidingKeyIndexes(bson.M{
+	assert.Nil(t, collidingKeyIndexes("systemMetrics.", bson.M{"a b": int64(1), "c d": int64(2)}))
+	assert.Nil(t, collidingKeyIndexes("systemMetrics.", bson.M{"plain": int64(1)}))
+	assert.Nil(t, collidingKeyIndexes("systemMetrics.", bson.M{"a_b": int64(1), "c_d": int64(2)}))
+	assert.Equal(t, map[string]int{"a b": 0, "a_b": 1}, collidingKeyIndexes("systemMetrics.", bson.M{
 		"a b":   int64(1),
 		"a_b":   int64(2),
 		"other": int64(3),
 	}))
+
+	// prometheusize also drops a trailing underscore and collapses underscore runs, so keys
+	// differing only there end up sharing one metric name.
+	assert.Equal(t, map[string]int{"giant hdr": 0, "giant hdr#": 1},
+		collidingKeyIndexes("systemMetrics.ethtool.ens192.", bson.M{
+			"giant hdr":  int64(1),
+			"giant hdr#": int64(2),
+		}))
+	assert.Equal(t, map[string]int{"a__b": 0, "a_b": 1},
+		collidingKeyIndexes("systemMetrics.", bson.M{"a__b": int64(1), "a_b": int64(2)}))
+}
+
+func TestIsUnambiguousKey(t *testing.T) {
+	t.Parallel()
+
+	for _, k := range []string{"plain", "a_b", "Tx0_queue_1"} {
+		assert.True(t, isUnambiguousKey(k), k)
+	}
+
+	// Everything prometheusize would rewrite has to be reported as ambiguous.
+	for _, k := range []string{"", "_", "a b", "a-b", "a__b", "_a", "a_", "Tx Queue#", "říká"} {
+		assert.False(t, isUnambiguousKey(k), k)
+	}
 }
 
 func TestAsMetricMapHandlesBSONM(t *testing.T) {
