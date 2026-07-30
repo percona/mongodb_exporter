@@ -347,7 +347,13 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 		prefix += "."
 	}
 
-	collidingKeys := collidingKeyIndexes(prefix, m)
+	// Fields that are exported as a label value never become a part of the metric name, so they
+	// cannot collide. Indexing them anyway would give the collision label to a part of the
+	// family only, which the registry rejects as inconsistent label names.
+	var collidingKeys map[string]int
+	if !keyBecomesLabelValue(prefix) {
+		collidingKeys = collidingKeyIndexes(prefix, m)
+	}
 
 	for k, val := range m {
 		nextPrefix := prefix + k
@@ -384,6 +390,18 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 	}
 
 	return res
+}
+
+// keyBecomesLabelValue reports whether the fields of a document under prefix are exported as the
+// value of a label instead of as a part of the metric name.
+func keyBecomesLabelValue(prefix string) bool {
+	if _, ok := nodeToPDMetrics[prefix]; ok {
+		return true
+	}
+
+	_, ok := keyNodesToLabels[prefix]
+
+	return ok
 }
 
 // collidingKeyIndexes returns an index for every key of a document that does not end up with

@@ -388,6 +388,26 @@ func TestCollidingKeyIndexes(t *testing.T) {
 		collidingKeyIndexes("systemMetrics.", bson.M{"a__b": int64(1), "a_b": int64(2)}))
 }
 
+// Index names are user controlled and two of them can sanitize to the same string. They are
+// exported as an index_name label value, so they never collide in the metric name and must not
+// be given a collision label either: only a part of the family would carry it.
+func TestFieldsExportedAsLabelValuesAreNotIndexed(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("collstats.storageStats", bson.M{
+		"indexSizes": bson.M{
+			"a.b_1": int64(11),
+			"a_b_1": int64(22),
+			"c_1":   int64(33),
+		},
+	}, nil, false)
+
+	sizes, ok := gatherFixtureMetrics(t, metrics)["mongodb_collstats_storageStats_indexSizes"]
+	require.True(t, ok)
+	assert.ElementsMatch(t, []string{"a.b_1", "a_b_1", "c_1"}, labelValues(sizes, "index_name"))
+	assert.Empty(t, labelValues(sizes, collisionLabel))
+}
+
 func TestIsUnambiguousKey(t *testing.T) {
 	t.Parallel()
 
