@@ -334,9 +334,9 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 		// A field sharing its metric name with a sibling is exported under the name of the
 		// canonical field of the group, so that the whole group agrees on the name and on the
 		// help. The collision label carries the real field and keeps the series apart.
-		name, isColliding := k, false
+		name, l := k, labels
 		if canonical, ok := colliding[k]; ok {
-			name, isColliding = canonical, true
+			name, l = canonical, withLabel(labels, collisionLabel, k)
 		}
 
 		nextPrefix := prefix + name
@@ -344,17 +344,11 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 			continue
 		}
 
-		l := make(map[string]string)
 		if label, ok := keyNodesToLabels[prefix]; ok {
-			maps.Copy(l, labels)
-			l[label] = k
+			l = withLabel(l, label, k)
 			nextPrefix = prefix + label
-		} else {
-			l = labels
 		}
-		if isColliding {
-			l = withCollisionLabel(l, k)
-		}
+
 		switch v := val.(type) {
 		case bson.M:
 			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
@@ -463,12 +457,14 @@ func isUnambiguousKey(k string) bool {
 	return !previousIsUnderscore
 }
 
-func withCollisionLabel(labels map[string]string, field string) map[string]string {
-	distinct := make(map[string]string, len(labels)+1)
-	maps.Copy(distinct, labels)
-	distinct[collisionLabel] = field
+// withLabel returns a copy of labels with one more label set, so that the map a document shares
+// with its siblings is never modified in place.
+func withLabel(labels map[string]string, name, value string) map[string]string {
+	extended := make(map[string]string, len(labels)+1)
+	maps.Copy(extended, labels)
+	extended[name] = value
 
-	return distinct
+	return extended
 }
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
