@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/AlekSi/pointer v1.2.0
-	github.com/alecthomas/kong v1.15.0
+	github.com/alecthomas/kong v1.16.0
 	github.com/percona/exporter_shared v0.7.6
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
