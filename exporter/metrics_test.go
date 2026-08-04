@@ -23,6 +23,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -303,6 +304,158 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	}, nil, true)
 
 	assert.Empty(t, metrics)
+}
+
+// ethtool reports several counters per queue whose names differ only in leading spaces,
+// which used to produce one metric name with two different help strings.
+func TestKeysCollidingAfterSanitizationStayDistinct(t *testing.T) {
+	t.Parallel()
+
+	metricsByName := gatherMetrics(t, makeMetrics("systemMetrics.ethtool", bson.M{
+		"ens192": bson.M{
+			"     giant hdr": int64(11),
+			"  giant hdr":    int64(22),
+			"tx queue":       int64(33),
+		},
+	}, nil, false))
+
+	assert.Contains(t, metricsByName, "mongodb_sys_ethtool_ens192_tx_queue")
+
+	collided, ok := metricsByName["mongodb_sys_ethtool_ens192_giant_hdr"]
+	require.True(t, ok)
+
+	// The label carries the field the value came from, so the series stay identifiable and do
+	// not get renumbered when MongoDB stops reporting one of them.
+	assert.Equal(t, map[string]float64{
+		"     giant hdr": 11,
+		"  giant hdr":    22,
+	}, valuesByLabel(collided, collisionLabel))
+}
+
+// Sanitization collapses every special character, not only whitespace, so fields differing in any
+// of them share one metric name and therefore have to share one help string as well.
+func TestCollidingFieldsShareOneDescriptor(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("systemMetrics.ethtool", bson.M{
+		"ens192": bson.M{
+			"giant hdr":  int64(11),
+			"giant-hdr":  int64(22),
+			"giant hdr#": int64(33),
+		},
+	}, nil, false)
+
+	collided, ok := gatherMetrics(t, metrics)["mongodb_sys_ethtool_ens192_giant_hdr"]
+	require.True(t, ok)
+	assert.Equal(t, "systemMetrics.ethtool.ens192.giant hdr", collided.GetHelp())
+	assert.ElementsMatch(t, []string{"giant hdr", "giant-hdr", "giant hdr#"},
+		labelValues(collided, collisionLabel))
+}
+
+// The vmxnet3 NIC of the reported host exposes two "giant hdr" counters that differ only
+// in leading whitespace, which used to make the whole systemMetrics tree unexportable.
+func TestSystemMetricsCollisionsFromFixture(t *testing.T) {
+	t.Parallel()
+
+	systemMetrics, ok := loadDiagnosticData83Fixture(t)["systemMetrics"].(bson.M)
+	require.True(t, ok)
+
+	labels := map[string]string{"cl_id": "", "cl_role": ""}
+	metricsByName := gatherMetrics(t, makeMetrics("systemMetrics", systemMetrics, labels, false))
+
+	collided, ok := metricsByName["mongodb_sys_ethtool_ens192_giant_hdr"]
+	require.True(t, ok)
+	assert.ElementsMatch(t, []string{"     giant hdr", "  giant hdr"},
+		labelValues(collided, collisionLabel))
+
+	// Counters with a unique name keep their plain identity.
+	unique, ok := metricsByName["mongodb_sys_ethtool_ens192_ucast_pkts_tx"]
+	require.True(t, ok)
+	assert.Empty(t, labelValues(unique, collisionLabel))
+}
+
+// The whole captured reply has to survive a scrape, not only the ethtool subtree, and it is the
+// only place where the 8.3 payload is walked with histograms enabled.
+func TestDiagnosticData83Gathers(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name              string
+		includeHistograms bool
+	}{
+		{name: "without histograms"},
+		{name: "with histograms", includeHistograms: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			labels := map[string]string{"cl_id": "", "cl_role": ""}
+			metricsByName := gatherMetrics(t, makeMetricsWithHistograms("",
+				loadDiagnosticData83Fixture(t), labels, false, tc.includeHistograms))
+
+			assert.Contains(t, metricsByName, "mongodb_sys_ethtool_ens192_giant_hdr")
+
+			_, ok := metricsByName["mongodb_ss_metrics_query_cbr_histograms_micros_count"]
+			assert.Equal(t, tc.includeHistograms, ok, "histogram buckets follow the flag")
+		})
+	}
+}
+
+func TestCollidingFields(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, collidingFields("systemMetrics.", bson.M{"a b": int64(1), "c d": int64(2)}))
+	assert.Nil(t, collidingFields("systemMetrics.", bson.M{"plain": int64(1)}))
+	assert.Nil(t, collidingFields("systemMetrics.", bson.M{"a_b": int64(1), "c_d": int64(2)}))
+	assert.Equal(t, map[string]string{"a b": "a b", "a_b": "a b"},
+		collidingFields("systemMetrics.", bson.M{
+			"a b":   int64(1),
+			"a_b":   int64(2),
+			"other": int64(3),
+		}))
+
+	// prometheusize also drops a trailing underscore and collapses underscore runs, so fields
+	// differing only there end up sharing one metric name.
+	assert.Equal(t, map[string]string{"giant hdr": "giant hdr", "giant hdr#": "giant hdr"},
+		collidingFields("systemMetrics.ethtool.ens192.", bson.M{
+			"giant hdr":  int64(1),
+			"giant hdr#": int64(2),
+		}))
+	assert.Equal(t, map[string]string{"a__b": "a__b", "a_b": "a__b"},
+		collidingFields("systemMetrics.", bson.M{"a__b": int64(1), "a_b": int64(2)}))
+}
+
+// Index names are user controlled and two of them can sanitize to the same string. They are
+// exported as an index_name label value, so they never collide in the metric name and must not
+// be given a collision label either: only a part of the family would carry it.
+func TestFieldsExportedAsLabelValuesAreNotIndexed(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("collstats.storageStats", bson.M{
+		"indexSizes": bson.M{
+			"a.b_1": int64(11),
+			"a_b_1": int64(22),
+			"c_1":   int64(33),
+		},
+	}, nil, false)
+
+	sizes, ok := gatherMetrics(t, metrics)["mongodb_collstats_storageStats_indexSizes"]
+	require.True(t, ok)
+	assert.ElementsMatch(t, []string{"a.b_1", "a_b_1", "c_1"}, labelValues(sizes, "index_name"))
+	assert.Empty(t, labelValues(sizes, collisionLabel))
+}
+
+func TestIsUnambiguousKey(t *testing.T) {
+	t.Parallel()
+
+	for _, k := range []string{"plain", "a_b", "Tx0_queue_1"} {
+		assert.True(t, isUnambiguousKey(k), k)
+	}
+
+	// Everything prometheusize would rewrite has to be reported as ambiguous.
+	for _, k := range []string{"", "_", "a b", "a-b", "a__b", "_a", "a_", "Tx Queue#", "říká"} {
+		assert.False(t, isUnambiguousKey(k), k)
+	}
 }
 
 func TestAsMetricMapHandlesBSONM(t *testing.T) {
