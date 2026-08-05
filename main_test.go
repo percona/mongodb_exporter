@@ -17,15 +17,120 @@ package main
 
 import (
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/foxcpp/go-mockdns"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
+
+func TestLoadAuthConfig(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "mongodb_exporter.yml")
+	err := os.WriteFile(path, []byte(`
+auth_modules:
+  cloud_mongo:
+    type: userpass
+    userpass:
+      username: metrics
+      password: secret
+    options:
+      auth_source: admin
+      tls: true
+`), 0o600)
+	require.NoError(t, err)
+
+	config, err := loadAuthConfig(path)
+	require.NoError(t, err)
+	assert.Equal(t, "metrics", config.AuthModules["cloud_mongo"].UserPass.Username)
+	assert.Equal(t, "admin", config.AuthModules["cloud_mongo"].Options.AuthSource)
+	assert.True(t, config.AuthModules["cloud_mongo"].Options.TLS)
+}
+
+func TestLoadAuthConfigRejectsInvalidModule(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "mongodb_exporter.yml")
+	err := os.WriteFile(path, []byte(`
+auth_modules:
+  cloud_mongo:
+    type: unsupported
+`), 0o600)
+	require.NoError(t, err)
+
+	_, err = loadAuthConfig(path)
+	assert.ErrorContains(t, err, "cloud_mongo")
+}
+
+func TestBuildDynamicURI(t *testing.T) {
+	t.Parallel()
+
+	module := authModule{
+		Type: userPassAuthType,
+		UserPass: userPass{
+			Username: "metrics",
+			Password: "p@ssword",
+		},
+		Options: authModuleOptions{
+			AuthSource:            "admin",
+			TLS:                   true,
+			TLSInsecureSkipVerify: true,
+		},
+	}
+
+	uri := buildDynamicURI("mongo.example.com:3717", module)
+	assert.Equal(t, "mongodb://metrics:p%40ssword@mongo.example.com:3717/admin?authSource=admin&tls=true&tlsInsecure=true", uri)
+}
+
+func TestResolveAuthModule(t *testing.T) {
+	t.Parallel()
+
+	modules := map[string]authModule{"cloud_mongo": {Type: userPassAuthType}}
+	module, err := resolveAuthModule(modules, "")
+	require.NoError(t, err)
+	assert.Equal(t, userPassAuthType, module.Type)
+
+	_, err = resolveAuthModule(modules, "missing")
+	assert.ErrorContains(t, err, "missing")
+}
+
+func TestValidateTargetConfiguration(t *testing.T) {
+	t.Parallel()
+
+	require.Error(t, validateTargetConfiguration(GlobalFlags{}, authConfig{}))
+	require.NoError(t, validateTargetConfiguration(GlobalFlags{URI: []string{"mongodb://localhost:27017"}}, authConfig{}))
+	require.NoError(t, validateTargetConfiguration(GlobalFlags{}, authConfig{
+		AuthModules: map[string]authModule{"cloud_mongo": {Type: userPassAuthType}},
+	}))
+}
+
+func TestDynamicTargetFactoryRejectsUnknownModule(t *testing.T) {
+	t.Parallel()
+
+	factory := newDynamicTargetFactory(GlobalFlags{}, authConfig{
+		AuthModules: map[string]authModule{"cloud_mongo": {Type: userPassAuthType}},
+	}, promslog.New(&promslog.Config{}))
+
+	_, err := factory("mongo.example.com:3717", "missing")
+	assert.ErrorContains(t, err, "missing")
+}
+
+func TestRedactMongoURI(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t,
+		"mongodb://metrics:xxxxx@mongo.example.com:3717/admin?authSource=admin",
+		redactMongoURI("mongodb://metrics:p%40ssword@mongo.example.com:3717/admin?authSource=admin"),
+	)
+	assert.Equal(t, "<invalid MongoDB URI>", redactMongoURI(":"))
+}
 
 func TestParseURIList(t *testing.T) {
 	t.Parallel()

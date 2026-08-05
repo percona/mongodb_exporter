@@ -20,6 +20,7 @@ require github.com/foxcpp/go-mockdns v1.2.0
 require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/percona/percona-backup-mongodb v1.8.1-0.20251124214042-d06cab743541
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -149,7 +150,6 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/ini.v1 v1.67.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mvdan.cc/gofumpt v0.9.2 // indirect
 )
 

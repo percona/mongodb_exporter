@@ -16,13 +16,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
 	"net"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/alecthomas/kong"
 	"github.com/prometheus/common/promslog"
@@ -37,8 +40,12 @@ var (
 	buildDate string
 )
 
+var errNoMongoTargets = errors.New("no MongoDB targets configured: specify --mongodb.uri, MONGODB_URI, or --config.file with auth_modules")
+
 // GlobalFlags has command line flags to configure the exporter.
 type GlobalFlags struct {
+	ConfigFile string `help:"Path to the dynamic target authentication config file" name:"config.file"`
+
 	User                  string   `env:"MONGODB_USER"                                                                    help:"monitor user, need clusterMonitor role in admin db and read role in local db"                                                            name:"mongodb.user"                                                                                        placeholder:"monitorUser"`
 	Password              string   `env:"MONGODB_PASSWORD"                                                                help:"monitor user password"                                                                                                                   name:"mongodb.password"                                                                                    placeholder:"monitorPassword"`
 	CollStatsNamespaces   string   `help:"List of comma separared databases.collections to get $collStats"                name:"mongodb.collstats-colls"                                                                                                                 placeholder:"db1,db2.col2"`
@@ -119,8 +126,13 @@ func main() {
 		opts.WebTelemetryPath = "/"
 	}
 
-	if len(opts.URI) == 0 {
-		ctx.Fatalf("No MongoDB hosts were specified. You must specify the host(s) with the --mongodb.uri command argument or the MONGODB_URI environment variable")
+	authConfig, err := loadAuthConfig(opts.ConfigFile)
+	if err != nil {
+		ctx.Fatalf("Cannot load auth config: %v", err)
+	}
+	err = validateTargetConfiguration(opts, authConfig)
+	if err != nil {
+		ctx.FatalIfErrorf(err)
 	}
 
 	if opts.TimeoutOffset <= 0 {
@@ -129,18 +141,62 @@ func main() {
 	}
 
 	serverOpts := &exporter.ServerOpts{
-		Path:              opts.WebTelemetryPath,
-		MultiTargetPath:   "/scrape",
-		OverallTargetPath: "/scrapeall",
-		WebListenAddress:  opts.WebListenAddress,
-		TLSConfigPath:     opts.TLSConfigPath,
+		Path:                   opts.WebTelemetryPath,
+		MultiTargetPath:        "/scrape",
+		DynamicTargetPath:      "/probe",
+		OverallTargetPath:      "/scrapeall",
+		WebListenAddress:       opts.WebListenAddress,
+		TLSConfigPath:          opts.TLSConfigPath,
+		DynamicTargetFactory:   newDynamicTargetFactory(opts, authConfig, logger),
+		DisableDefaultRegistry: !opts.EnableExporterMetrics,
 	}
 	exporter.RunWebServer(serverOpts, buildServers(opts, logger), logger)
 }
 
+func validateTargetConfiguration(opts GlobalFlags, config authConfig) error {
+	if len(opts.URI) == 0 && len(config.AuthModules) == 0 {
+		return errNoMongoTargets
+	}
+
+	return nil
+}
+
+func newDynamicTargetFactory(opts GlobalFlags, config authConfig, logger *slog.Logger) exporter.DynamicTargetFactory {
+	if len(config.AuthModules) == 0 {
+		return nil
+	}
+
+	var mu sync.Mutex
+	// ponytail: service-discovery targets are stable; add bounded eviction only if target churn becomes measurable.
+	handlers := make(map[string]http.Handler)
+
+	return func(target, authModule string) (http.Handler, error) {
+		module, err := resolveAuthModule(config.AuthModules, authModule)
+		if err != nil {
+			return nil, err
+		}
+
+		cacheKey := authModule + "\x00" + target
+		mu.Lock()
+		defer mu.Unlock()
+		if handler, ok := handlers[cacheKey]; ok {
+			return handler, nil
+		}
+
+		dynamicOpts := opts
+		dynamicOpts.User = ""
+		dynamicOpts.Password = ""
+		dynamicOpts.URI = nil
+		handler := buildExporter(dynamicOpts, buildDynamicURI(target, module), logger).Handler()
+		handlers[cacheKey] = handler
+
+		return handler, nil
+	}
+}
+
 func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exporter {
 	uri = buildURI(uri, opts.User, opts.Password)
-	log.Debug("Connection URI", "uri", uri)
+	log.Debug("Connection URI", "uri", redactMongoURI(uri))
 
 	uriParsed, _ := url.Parse(uri)
 	var nodeName string
@@ -200,6 +256,15 @@ func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exp
 	}
 
 	return exporter.New(exporterOpts)
+}
+
+func redactMongoURI(rawURI string) string {
+	uri, err := url.Parse(rawURI)
+	if err != nil {
+		return "<invalid MongoDB URI>"
+	}
+
+	return uri.Redacted()
 }
 
 func buildServers(opts GlobalFlags, logger *slog.Logger) []*exporter.Exporter {
