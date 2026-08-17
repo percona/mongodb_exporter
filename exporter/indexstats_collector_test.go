@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -50,7 +52,7 @@ func TestIndexStatsCollector(t *testing.T) {
 		collection := fmt.Sprintf("testcol_%02d", i)
 		for j := 0; j < 10; j++ {
 			_, err := database.Collection(collection).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 		mod := mongo.IndexModel{
 			Keys: bson.M{
@@ -60,7 +62,7 @@ func TestIndexStatsCollector(t *testing.T) {
 			},
 		}
 		_, err := database.Collection(collection).Indexes().CreateOne(ctx, mod)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
@@ -70,12 +72,12 @@ func TestIndexStatsCollector(t *testing.T) {
 	expected := strings.NewReader(`
 # HELP mongodb_indexstats_accesses_ops indexstats.accesses.ops
 # TYPE mongodb_indexstats_accesses_ops untyped
-mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="idx_01"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="idx_01"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_"} 0
-mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="idx_01"} 0` +
+mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="idx_01",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="idx_01",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_",shard=""} 0
+mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="idx_01",shard=""} 0` +
 		"\n")
 
 	filter := []string{
@@ -83,6 +85,45 @@ mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_na
 	}
 	err := testutil.CollectAndCompare(c, expected, filter...)
 	assert.NoError(t, err)
+}
+
+// Through mongos, a sharded collection reports one $indexStats document per
+// shard for the same index. Without the shard label they all collapse into one
+// series and the duplicates are dropped.
+//
+// Not parallel: it enables sharding on the cluster shared with the other tests.
+//
+//nolint:paralleltest
+func TestIndexStatsCollectorSharded(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+
+	client := tu.DefaultTestClientMongoS(ctx, t)
+
+	dbName, collName := "testdb_indexstats_sharded", "testcol"
+	namespace := dbName + "." + collName
+
+	database := client.Database(dbName)
+	database.Drop(ctx)       //nolint:errcheck
+	defer database.Drop(ctx) //nolint:errcheck
+
+	c := newIndexStatsCollector(ctx, client, promslog.New(&promslog.Config{}), false, false, labelsGetterMock{}, []string{namespace})
+
+	families := gatherShardedMetrics(ctx, t, client, dbName, collName, c)
+
+	shardsByIndex := make(map[string][]string)
+	for _, labels := range shardedSeriesLabels(t, families, "mongodb_indexstats_accesses_ops", dbName, collName) {
+		indexName := labels["key_name"]
+		shardsByIndex[indexName] = append(shardsByIndex[indexName], labels["shard"])
+	}
+
+	require.Contains(t, shardsByIndex, "_id_")
+	for indexName, shards := range shardsByIndex {
+		uniqueShards := slices.Compact(slices.Sorted(slices.Values(shards)))
+		require.Len(t, uniqueShards, len(shards),
+			"index %s exposes the same shard more than once: %v", indexName, shards)
+		require.Greater(t, len(shards), 1, "index %s is exposed for a single shard only: %v", indexName, shards)
+	}
 }
 
 func TestDescendingIndexOverride(t *testing.T) {
@@ -101,16 +142,16 @@ func TestDescendingIndexOverride(t *testing.T) {
 		collection := fmt.Sprintf("testcol_%02d", i)
 		for j := 0; j < 10; j++ {
 			_, err := database.Collection(collection).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 
 		descendingMod := mongo.IndexModel{Keys: bson.M{"f1": -1}}
 		_, err := database.Collection(collection).Indexes().CreateOne(ctx, descendingMod)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ascendingMod := mongo.IndexModel{Keys: bson.M{"f1": 1}}
 		_, err = database.Collection(collection).Indexes().CreateOne(ctx, ascendingMod)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	collection := []string{"testdb.testcol_00", "testdb.testcol_01", "testdb.testcol_02"}
@@ -120,15 +161,15 @@ func TestDescendingIndexOverride(t *testing.T) {
 	expected := strings.NewReader(`
   # HELP mongodb_indexstats_accesses_ops indexstats.accesses.ops
   # TYPE mongodb_indexstats_accesses_ops untyped
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_DESC"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_DESC"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_1"} 0
-  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_DESC"} 0` + "\n")
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_1",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_DESC",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_1",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="f1_DESC",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="_id_",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_1",shard=""} 0
+  mongodb_indexstats_accesses_ops{collection="testcol_02",database="testdb",key_name="f1_DESC",shard=""} 0` + "\n")
 
 	filter := []string{
 		"mongodb_indexstats_accesses_ops",

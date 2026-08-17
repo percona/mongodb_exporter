@@ -39,10 +39,12 @@ type diagnosticDataCollector struct {
 
 	compatibleMode bool
 	topologyInfo   labelsGetter
+
+	enableHistograms bool
 }
 
 // newDiagnosticDataCollector creates a collector for diagnostic information.
-func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, compatible bool, topology labelsGetter, buildInfo buildInfo) *diagnosticDataCollector {
+func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logger *slog.Logger, compatible bool, topology labelsGetter, buildInfo buildInfo, enableHistograms bool) *diagnosticDataCollector {
 	logger = logger.With("component", "diagnosticDataCollector")
 	nodeType, err := getNodeType(ctx, client)
 	if err != nil {
@@ -60,6 +62,8 @@ func newDiagnosticDataCollector(ctx context.Context, client *mongo.Client, logge
 
 		compatibleMode: compatible,
 		topologyInfo:   topology,
+
+		enableHistograms: enableHistograms,
 	}
 }
 
@@ -126,7 +130,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			m = b
 		}
 
-		metrics = makeMetrics("", m, d.topologyInfo.baseLabels(), d.compatibleMode)
+		metrics = makeMetricsWithHistograms("", m, d.topologyInfo.baseLabels(), d.compatibleMode, d.enableHistograms)
 		metrics = append(metrics, locksMetrics(logger, m)...)
 
 		securityMetric, err := d.getSecurityMetricFromLineOptions(client)
