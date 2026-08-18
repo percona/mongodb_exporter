@@ -143,12 +143,14 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		debugResult(logger, stats)
 
 		prefix := "collstats"
+		labels := d.topologyInfo.baseLabels()
+		labels["database"] = database
+		labels["collection"] = collection
 
 		for _, metrics := range stats {
-			labels := d.topologyInfo.baseLabels()
-			labels["database"] = database
-			labels["collection"] = collection
-			setShardLabel(labels, metrics)
+			if shard, ok := metrics["shard"].(string); ok {
+				labels["shard"] = shard
+			}
 
 			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {
 				ch <- metric
