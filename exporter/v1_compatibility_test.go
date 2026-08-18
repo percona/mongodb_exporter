@@ -239,7 +239,7 @@ func TestBalancerRunningValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := balancerRunningValue(tt.inBalancerRound)
-			assert.Equal(t, tt.expected, got)
+			assert.InDelta(t, tt.expected, got, 0)
 		})
 	}
 }
