@@ -21,8 +21,8 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -243,42 +243,18 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 		},
 	}, nil, true, true)
 
-	reg := prometheus.NewPedanticRegistry()
-	reg.MustRegister(staticCollector(metrics))
-
-	gatheredMetrics, err := reg.Gather()
-	assert.NoError(t, err, "metrics with the same name and labels must not be exported")
-
-	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
-	for _, metric := range gatheredMetrics {
-		metricsByName[metric.GetName()] = metric
-	}
+	metricsByName := gatherMetrics(t, metrics)
 
 	assert.NotContains(t, metricsByName, "mongodb_ss_metrics_query_multiPlanner_histograms_sbeMicros_lowerBound")
 
 	bucketCounts, ok := metricsByName["mongodb_ss_metrics_query_multiPlanner_histograms_sbeMicros_count"]
-	if !assert.True(t, ok) {
-		return
-	}
-
-	bucketCountMetrics := bucketCounts.GetMetric()
-	if !assert.Len(t, bucketCountMetrics, 2) {
-		return
-	}
-
-	valuesByBound := make(map[string]float64, len(bucketCountMetrics))
-	for _, metric := range bucketCountMetrics {
-		labels := make(map[string]string, len(metric.GetLabel()))
-		for _, label := range metric.GetLabel() {
-			labels[label.GetName()] = label.GetValue()
-		}
-		valuesByBound[labels["lower_bound"]] = metric.GetCounter().GetValue()
-	}
+	require.True(t, ok)
+	assert.Len(t, bucketCounts.GetMetric(), 2)
 
 	assert.Equal(t, map[string]float64{
 		"0":    3,
 		"1024": 7,
-	}, valuesByBound)
+	}, countsByLowerBound(bucketCounts))
 }
 
 func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
@@ -303,6 +279,105 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	}, nil, true)
 
 	assert.Empty(t, metrics)
+}
+
+// Only the buckets are gated by includeHistograms. A node named "histogram" that holds
+// something else must be collected like any other node.
+func TestNonBucketHistogramNodeIsNotSkipped(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("serverStatus.someFeature", bson.M{
+		"histogram": bson.M{
+			"enabled":   int64(1),
+			"sizeBytes": int64(42),
+		},
+	}, nil, false)
+
+	assert.ElementsMatch(t, []string{
+		"mongodb_ss_someFeature_histogram_enabled",
+		"mongodb_ss_someFeature_histogram_sizeBytes",
+	}, gatheredMetricNames(t, metrics))
+}
+
+// serverStatus.opLatencies exposes its buckets under "histogram" with a "micros" boundary,
+// which used to be flattened into one metric per bucket sharing the same name and labels.
+func TestOpLatenciesHistogramMetricsDoNotCollide(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetricsWithHistograms("serverStatus", bson.M{
+		"opLatencies": bson.M{
+			"reads": bson.M{
+				"latency": int64(120),
+				"ops":     int64(4),
+				"histogram": primitive.A{
+					bson.M{"micros": int64(1), "count": int64(3)},
+					bson.M{"micros": int64(2048), "count": int64(7)},
+				},
+			},
+		},
+	}, nil, false, true)
+
+	metricsByName := gatherMetrics(t, metrics)
+
+	assert.NotContains(t, metricsByName, "mongodb_ss_opLatencies_reads_histogram_micros")
+
+	bucketCounts, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
+	require.True(t, ok)
+	assert.Len(t, bucketCounts.GetMetric(), 2)
+
+	assert.Equal(t, map[string]float64{
+		"1":    3,
+		"2048": 7,
+	}, countsByLowerBound(bucketCounts))
+}
+
+// The bucket metrics carry the "mongodb_ss_opLatencies" prefix that specialConversions and the
+// v1 conversions match on, and compatibleMode exports a second series set from the same raw
+// metric. Neither may rename the buckets onto the op_type series.
+func TestOpLatenciesHistogramMetricsInCompatibleMode(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetricsWithHistograms("serverStatus", bson.M{
+		"opLatencies": bson.M{
+			"reads": bson.M{
+				"latency": int64(120),
+				"ops":     int64(4),
+				"histogram": primitive.A{
+					bson.M{"micros": int64(1), "count": int64(3)},
+					bson.M{"micros": int64(2048), "count": int64(7)},
+				},
+			},
+		},
+	}, nil, true, true)
+
+	metricsByName := gatherMetrics(t, metrics)
+
+	bucketCounts, ok := metricsByName["mongodb_ss_opLatencies_reads_histogram_count"]
+	require.True(t, ok)
+	assert.Equal(t, map[string]float64{
+		"1":    3,
+		"2048": 7,
+	}, countsByLowerBound(bucketCounts))
+
+	// The buckets get no op_type series and no v1 compatible twin of their own.
+	assert.Empty(t, labelValues(bucketCounts, "op_type"))
+	assert.Equal(t, []string{"reads"}, labelValues(metricsByName["mongodb_ss_opLatencies_latency"], "op_type"))
+	assert.Len(t, metricsByName["mongodb_mongod_op_latencies_latency_total"].GetMetric(), 1)
+}
+
+func TestOpLatenciesHistogramMetricsAreSkippedByDefault(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("serverStatus.opLatencies.reads", bson.M{
+		"latency": int64(120),
+		"histogram": primitive.A{
+			bson.M{"micros": int64(1), "count": int64(3)},
+			bson.M{"micros": int64(2048), "count": int64(7)},
+		},
+	}, nil, false)
+
+	// The latency metric is renamed and labeled by specialConversions, the buckets are dropped.
+	assert.Equal(t, []string{"mongodb_ss_opLatencies_latency"}, gatheredMetricNames(t, metrics))
 }
 
 func TestAsMetricMapHandlesBSONM(t *testing.T) {
