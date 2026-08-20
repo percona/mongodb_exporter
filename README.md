@@ -199,6 +199,31 @@ The labels are:
 - rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`. 
 Check [the official documentation](https://docs.mongodb.com/manual/reference/replica-states/) for details on replicaset status values.
 
+#### Prometheus Configuration to Scrape Multiple MongoDB Hosts
+The Prometheus documentation [provides](https://prometheus.io/docs/guides/multi-target-exporter/) a good example of multi-target exporters.
+
+To use `mongodb_exporter` in multi-target mode, you can use the `/scrape` endpoint with the `target` parameter.
+
+You can optionally specify initial URIs using `--mongodb.uri` (or `MONGODB_URI`) to preload a set of MongoDB instances, but it is not required. Additional targets can still be queried dynamically via `/scrape?target=...`.
+
+This allows combining static and dynamic target discovery in a flexible way.
+```
+scrape_configs:
+  - job_name: 'mongodb_exporter_targets'
+    metrics_path: /scrape
+    static_configs:
+      - targets:
+          - mongodb://mongo-host1:27017
+          - mongo-host2:27017
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: <<MONGODB-EXPORTER-HOSTNAME>>:9216
+```
+
 ## Usage Reference
 
 See the [Reference Guide](REFERENCE.md) for details on using the exporter.

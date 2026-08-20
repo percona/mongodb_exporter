@@ -24,6 +24,7 @@ import (
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/percona/mongodb_exporter/exporter"
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
@@ -56,7 +57,7 @@ func TestParseURIList(t *testing.T) {
 	}
 	logger := promslog.New(&promslog.Config{})
 	for test, expected := range tests {
-		actual := parseURIList(strings.Split(test, ","), logger, false)
+		actual := exporter.ParseURIList(strings.Split(test, ","), logger, false)
 		assert.Equal(t, expected, actual)
 	}
 }
@@ -95,7 +96,7 @@ func TestSplitCluster(t *testing.T) {
 	defer mockdns.UnpatchNet(net.DefaultResolver)
 
 	for test, expected := range tests {
-		actual := parseURIList(strings.Split(test, ","), logger, true)
+		actual := exporter.ParseURIList(strings.Split(test, ","), logger, true)
 		assert.Equal(t, expected, actual)
 	}
 }
@@ -117,7 +118,7 @@ func TestBuildExporter(t *testing.T) {
 		CompatibleMode: true,
 	}
 	log := promslog.New(&promslog.Config{})
-	buildExporter(opts, "mongodb://usr:pwd@127.0.0.1/", log)
+	buildExporter(buildOpts(opts), "mongodb://usr:pwd@127.0.0.1/", log)
 }
 
 func TestBuildURI(t *testing.T) {
@@ -272,7 +273,7 @@ func TestBuildURI(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.situation, func(t *testing.T) {
-			newURI := buildURI(tc.origin, tc.newUser, tc.newPassword)
+			newURI := exporter.BuildURI(tc.origin, tc.newUser, tc.newPassword)
 			assert.Equal(t, tc.expect, newURI)
 		})
 	}
