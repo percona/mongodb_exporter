@@ -67,6 +67,12 @@ func TestWalkTo(t *testing.T) {
 	}
 }
 
+// lockDesc renders the description a lock metric is expected to have. It is built with the client
+// library rather than hardcoded because prometheus.Desc.String() has no stable format.
+func lockDesc(name string) string {
+	return prometheus.NewDesc(name, name, []string{"lock_mode", "resource"}, nil).String()
+}
+
 func TestMakeLockMetric(t *testing.T) {
 	m := bson.M{
 		"serverStatus": bson.M{
@@ -86,9 +92,7 @@ func TestMakeLockMetric(t *testing.T) {
 		labels: map[string]string{"lock_mode": "r", "resource": "ParallelBatchWriterMode"},
 	}
 
-	want := `Desc{fqName: "mongodb_ss_locks_acquireCount", ` +
-		`help: "mongodb_ss_locks_acquireCount", ` +
-		`constLabels: {}, variableLabels: {lock_mode,resource}}`
+	want := lockDesc("mongodb_ss_locks_acquireCount")
 
 	p, err := makeLockMetric(m, lm)
 	assert.NoError(t, err)
@@ -130,13 +134,13 @@ func TestAddLocksMetrics(t *testing.T) {
 
 	sort.Strings(desc)
 	want := []string{
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireCount\", help: \"mongodb_ss_locks_acquireCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
-		"Desc{fqName: \"mongodb_ss_locks_acquireWaitCount\", help: \"mongodb_ss_locks_acquireWaitCount\", constLabels: {}, variableLabels: {lock_mode,resource}}",
-		"Desc{fqName: \"mongodb_ss_locks_timeAcquiringMicros\", help: \"mongodb_ss_locks_timeAcquiringMicros\", constLabels: {}, variableLabels: {lock_mode,resource}}",
+		lockDesc("mongodb_ss_locks_acquireCount"),
+		lockDesc("mongodb_ss_locks_acquireCount"),
+		lockDesc("mongodb_ss_locks_acquireCount"),
+		lockDesc("mongodb_ss_locks_acquireCount"),
+		lockDesc("mongodb_ss_locks_acquireCount"),
+		lockDesc("mongodb_ss_locks_acquireWaitCount"),
+		lockDesc("mongodb_ss_locks_timeAcquiringMicros"),
 	}
 
 	assert.Equal(t, want, desc)
