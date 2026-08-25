@@ -105,10 +105,10 @@ func TestOverallHandler(t *testing.T) {
 		},
 	}
 	expected := []*regexp.Regexp{
-		regexp.MustCompile(`mongodb_up{[^\}]*instance="standalone"[^\}]*} 1\n`),
-		regexp.MustCompile(`mongodb_up{[^\}]*instance="s1"[^\}]*} 1\n`),
-		regexp.MustCompile(`mongodb_up{[^\}]*instance="s2"[^\}]*} 1\n`),
-		regexp.MustCompile(`mongodb_up{[^\}]*instance="s3"[^\}]*} 0\n`),
+		regexp.MustCompile(`mongodb_up{[^\}]*mongo_instance="standalone"[^\}]*} 1\n`),
+		regexp.MustCompile(`mongodb_up{[^\}]*mongo_instance="s1"[^\}]*} 1\n`),
+		regexp.MustCompile(`mongodb_up{[^\}]*mongo_instance="s2"[^\}]*} 1\n`),
+		regexp.MustCompile(`mongodb_up{[^\}]*mongo_instance="s3"[^\}]*} 0\n`),
 	}
 	exporters := make([]*Exporter, len(opts))
 
