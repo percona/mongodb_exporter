@@ -24,7 +24,14 @@ import (
 // credentialsRE matches the userinfo of a MongoDB connection URI that carries a password. It is
 // used when url.Parse is of no help: either the URI is malformed, or it is quoted inside a longer
 // string such as an error message.
-var credentialsRE = regexp.MustCompile(`(mongodb(?:\+srv)?://)([^\s/?#]*):([^\s/?#]*)@`)
+//
+// The password group is deliberately permissive and greedy. A password may legally contain any of
+// "/", "?", "#", "@" and space, none of which survive url.Parse unescaped, so the malformed URIs
+// this expression exists to handle are exactly the ones that carry them; excluding those bytes
+// would silently pass the password through. Being greedy anchors the match on the last "@", which
+// is what url.Parse itself treats as the end of the userinfo. The cost is over-redaction when a
+// credential-free URI happens to contain a later "@" — harmless next to leaking a password.
+var credentialsRE = regexp.MustCompile(`(mongodb(?:\+srv)?://)([^:@]*):(.*)@`)
 
 // replacement keeps the scheme and the user name and drops the password. It matches what
 // (*url.URL).Redacted does.
