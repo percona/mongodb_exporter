@@ -17,6 +17,7 @@ package redact
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
@@ -279,11 +280,13 @@ func TestErrorRedactsEveryURIInOneMessage(t *testing.T) {
 // "?" and "#" terminate the authority, so url.Parse reports on a URI it has already cut short: for
 // the password "pa#ss" the error reads `parse "mongodb://monitor:pa": invalid port ":pa"`. No "@"
 // survives for the expression to anchor on, so the part of the password before the delimiter stays
-// in the message. The URI logged beside the error is still redacted, and the full password never
-// appears, but the prefix does.
+// in the message. The full password never appears, but the prefix does.
 //
-// Closing this needs a change at the call sites -- logging the redacted URI without the raw parse
-// error -- not a wider pattern here, which could not tell "monitor:pa" from "host:27017".
+// Where the exporter builds the message it sidesteps this by not logging the parse error at all and
+// logging the redacted URI instead. Error remains for messages that come from elsewhere -- PBM
+// wraps the URI it was handed into its own text -- where dropping the error would cost the only
+// diagnostic available. Widening the pattern is not an option: it could not tell "monitor:pa" from
+// "host:27017".
 func TestErrorLeavesTruncatedURIAlone(t *testing.T) {
 	t.Parallel()
 
@@ -295,4 +298,29 @@ func TestErrorLeavesTruncatedURIAlone(t *testing.T) {
 	redacted := Error(err)
 	assert.NotContains(t, redacted, password, "the full password must never survive")
 	assert.Contains(t, redacted, "monitor:pa", "known gap: the prefix before # is still disclosed")
+}
+
+// TestErrorRedactsURIWrappedByThirdParty covers the shape percona-backup-mongodb produces: it
+// quotes the URI it was given and then wraps the *url.Error, which quotes it a second time. Both
+// copies carry the password, and the message reaches a default-level log on every scrape when
+// --collector.pbm is on.
+func TestErrorRedactsURIWrappedByThirdParty(t *testing.T) {
+	t.Parallel()
+
+	for _, password := range []string{"s3cr3t", "pa#ss", specialChars} {
+		t.Run(password, func(t *testing.T) {
+			t.Parallel()
+
+			uri := "mongodb://monitor:" + password + "@%2Ftmp%2Fmongodb.sock/admin"
+			_, parseErr := url.Parse(uri)
+			require.Error(t, parseErr)
+
+			// Reproduces the message built by percona-backup-mongodb.
+			err := fmt.Errorf("parse mongo-uri '%s': %w", uri, parseErr)
+
+			redacted := Error(err)
+			assert.NotContains(t, redacted, password)
+			assert.Contains(t, redacted, "monitor:xxxxx@")
+		})
+	}
 }

@@ -30,7 +30,9 @@ import (
 func GetSeedListFromSRV(uri string, logger *slog.Logger) string { //nolint:cyclop
 	uriParsed, err := url.Parse(uri)
 	if err != nil {
-		log.Fatalf("Failed to parse URI %s: %v", redact.MongoURI(uri), redact.Error(err))
+		// The parse error is not logged: it quotes the URI cut short at the byte url.Parse choked
+		// on, and when that byte is "?" or "#" from the password, the quote keeps the part before.
+		log.Fatalf("Failed to parse URI %s", redact.MongoURI(uri))
 	}
 
 	cname, srvRecords, err := net.LookupSRV("mongodb", "tcp", uriParsed.Hostname())

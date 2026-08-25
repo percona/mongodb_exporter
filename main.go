@@ -257,7 +257,10 @@ func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []st
 		for _, hosturl := range URIs {
 			urlParsed, err := url.Parse(hosturl)
 			if err != nil {
-				log.Fatalf("Failed to parse URI %s: %v", redact.MongoURI(hosturl), redact.Error(err))
+				// The parse error is not logged: it quotes the URI cut short at the byte url.Parse
+				// choked on, and when that byte is "?" or "#" from the password, the quote keeps
+				// the part before.
+				log.Fatalf("Failed to parse URI %s", redact.MongoURI(hosturl))
 			}
 			for _, host := range strings.Split(urlParsed.Host, ",") {
 				targetURI := "mongodb://"
