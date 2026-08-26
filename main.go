@@ -28,6 +28,7 @@ import (
 	"github.com/prometheus/common/promslog"
 
 	"github.com/percona/mongodb_exporter/exporter"
+	"github.com/percona/mongodb_exporter/internal/redact"
 )
 
 //nolint:gochecknoglobals
@@ -140,7 +141,7 @@ func main() {
 
 func buildExporter(opts GlobalFlags, uri string, log *slog.Logger) *exporter.Exporter {
 	uri = buildURI(uri, opts.User, opts.Password)
-	log.Debug("Connection URI", "uri", uri)
+	log.Debug("Connection URI", "uri", redact.MongoURI(uri))
 
 	uriParsed, _ := url.Parse(uri)
 	var nodeName string
@@ -256,7 +257,10 @@ func parseURIList(uriList []string, logger *slog.Logger, splitCluster bool) []st
 		for _, hosturl := range URIs {
 			urlParsed, err := url.Parse(hosturl)
 			if err != nil {
-				log.Fatalf("Failed to parse URI %s: %v", hosturl, err)
+				// The parse error is not logged: it quotes the URI cut short at the byte url.Parse
+				// choked on, and when that byte is "?" or "#" from the password, the quote keeps
+				// the part before.
+				log.Fatalf("Failed to parse URI %s", redact.MongoURI(hosturl))
 			}
 			for _, host := range strings.Split(urlParsed.Host, ",") {
 				targetURI := "mongodb://"
