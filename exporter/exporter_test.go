@@ -262,22 +262,53 @@ func TestConnect(t *testing.T) {
 func newPooledExporter(t *testing.T) *Exporter {
 	t.Helper()
 
-	log := promslog.New(&promslog.Config{}) //nolint:exhaustruct_v5
+	log := promslog.New(&promslog.Config{})
 
-	opts := &Opts{ //nolint:exhaustruct_v5
+	opts := &Opts{
 		Logger:         log,
 		URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 		GlobalConnPool: true,
 		DirectConnect:  true,
 	}
 
-	return &Exporter{ //nolint:exhaustruct_v5
+	return &Exporter{
 		logger:                log,
 		opts:                  opts,
-		clientLock:            make(chan struct{}, 1),
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1,
 	}
+}
+
+// blackHoleMongo returns the address of a listener that accepts connections and never
+// answers, so a driver handshake against it blocks until its own timeout rather than
+// failing fast the way a closed port would. The returned channel is closed once the first
+// connection has been accepted, which is when a connect is provably in flight.
+func blackHoleMongo(t *testing.T) (string, <-chan struct{}) {
+	t.Helper()
+
+	var listenCfg net.ListenConfig
+	listener, err := listenCfg.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close() })
+
+	dialed := make(chan struct{})
+	go func() {
+		first := true
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			if first {
+				close(dialed)
+				first = false
+			}
+			// Hold the connection open and stay silent. The process end closes it.
+			_ = conn
+		}
+	}()
+
+	return listener.Addr().String(), dialed
 }
 
 func TestGlobalConnPoolReplacesDisconnectedClient(t *testing.T) {
@@ -330,39 +361,62 @@ func TestGlobalConnPoolClientOutlivesCreatingScrape(t *testing.T) {
 	assert.NoError(t, second.Ping(t.Context(), nil))
 }
 
-// An unreachable server must not hold clientMu for the whole server-selection timeout:
-// the scrape needs to come back in time to report mongodb_up 0.
-func TestGlobalConnPoolInitialConnectHonoursScrapeDeadline(t *testing.T) {
+// Giving up on the scrape budget must not cancel the connect: a budget shorter than one
+// connect would otherwise leave the pool permanently empty, so every scrape would keep
+// paying for an attempt that can never finish.
+func TestGlobalConnPoolCacheWarmsAfterScrapeGivesUp(t *testing.T) {
 	t.Parallel()
 
 	e := newPooledExporter(t)
-	e.opts.URI = "mongodb://127.0.0.1:1/admin"
-	e.opts.ConnectTimeoutMS = 5000
+	t.Cleanup(func() {
+		e.clientMu.RLock()
+		defer e.clientMu.RUnlock()
 
-	budget := 500 * time.Millisecond
-	ctx, cancel := context.WithTimeout(t.Context(), budget)
-	defer cancel()
+		if e.client != nil {
+			_ = e.client.Disconnect(context.Background())
+		}
+	})
 
-	start := time.Now()
+	// No budget at all, so the scrape cannot wait for the connect it starts.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
 	_, err := e.getClient(ctx)
-	elapsed := time.Since(start)
-
 	require.Error(t, err)
-	assert.Less(t, elapsed, time.Duration(e.opts.ConnectTimeoutMS)*time.Millisecond,
-		"initial connect ignored the scrape deadline and ran to the server-selection timeout")
+
+	require.Eventually(t, func() bool {
+		e.clientMu.RLock()
+		defer e.clientMu.RUnlock()
+
+		return e.client != nil
+	}, 15*time.Second, 50*time.Millisecond,
+		"the connect was cancelled along with the scrape, leaving the pool empty")
 }
 
-// A scrape must not wait out somebody else's connect -- the background connect New starts,
-// or another scrape's -- because waiting on the lock is not covered by the connect's own
-// context bound.
-func TestGlobalConnPoolScrapeGivesUpOnHeldLock(t *testing.T) {
+// A scrape must not wait out a connect somebody else started -- the one New runs in the
+// background, or another scrape's -- even though that connect is deliberately given a
+// budget of its own, longer than any single scrape's.
+func TestGlobalConnPoolScrapeGivesUpOnConnectInFlight(t *testing.T) {
 	t.Parallel()
 
 	e := newPooledExporter(t)
+	addr, dialed := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	e.opts.ConnectTimeoutMS = 3000
 
-	// Stand in for a connect in progress: the lock is held and e.client is still nil.
-	e.clientLock <- struct{}{}
-	t.Cleanup(func() { <-e.clientLock })
+	inFlight := make(chan struct{})
+	go func() {
+		defer close(inFlight)
+		_, _ = e.getClient(context.Background())
+	}()
+
+	// Only once the listener has accepted is a connect provably under way. Without this the
+	// scrape below could win the race and simply do its own connect.
+	select {
+	case <-dialed:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the background connect never dialled")
+	}
 
 	budget := 300 * time.Millisecond
 	ctx, cancel := context.WithTimeout(t.Context(), budget)
@@ -373,8 +427,14 @@ func TestGlobalConnPoolScrapeGivesUpOnHeldLock(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
-	assert.Less(t, elapsed, initialConnectTimeout,
-		"scrape blocked on the client lock instead of giving up with its budget")
+	assert.Less(t, elapsed, 4*budget,
+		"scrape waited for the in-flight connect instead of giving up on its budget")
+
+	select {
+	case <-inFlight:
+	case <-time.After(time.Duration(e.opts.ConnectTimeoutMS) * time.Millisecond * 2):
+		t.Fatal("the background connect never returned")
+	}
 }
 
 func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {

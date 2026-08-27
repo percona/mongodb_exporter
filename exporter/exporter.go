@@ -31,6 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promslog"
 	"go.mongodb.org/mongo-driver/mongo"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
 )
@@ -38,9 +39,11 @@ import (
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
 	client *mongo.Client
-	// clientLock guards client. It is a channel rather than a sync.Mutex so that waiting
-	// for it can honour a scrape's context: see lockClient.
-	clientLock            chan struct{}
+	// clientMu guards the client pointer only. It is never held across a command, so
+	// concurrent scrapes of this target do not wait for each other.
+	clientMu sync.RWMutex
+	// clientGroup collapses concurrent attempts to build client into one connect.
+	clientGroup           singleflight.Group
 	logger                *slog.Logger
 	opts                  *Opts
 	lock                  *sync.Mutex
@@ -98,11 +101,11 @@ var (
 const (
 	defaultCacheSize = 1000
 
-	// initialConnectTimeout bounds the connect New starts in the background. Without it a
-	// server that never answers would hold clientLock for the process lifetime -- forever
-	// if Opts.ConnectTimeoutMS is 0, since connect then asks the driver for no
-	// server-selection timeout at all -- and every scrape would fail on the lock.
-	initialConnectTimeout = 30 * time.Second
+	// defaultConnectTimeout bounds building the pooled client when Opts.ConnectTimeoutMS is
+	// unset. connect would otherwise hand the driver a server-selection timeout of 0, which
+	// it reads as no timeout at all, and an unanswering server would block a connect for the
+	// lifetime of the process.
+	defaultConnectTimeout = 30 * time.Second
 )
 
 // New connects to the database and returns a new Exporter instance.
@@ -119,14 +122,13 @@ func New(opts *Opts) *Exporter {
 	exp := &Exporter{
 		logger:                opts.Logger,
 		opts:                  opts,
-		clientLock:            make(chan struct{}, 1),
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
 	}
 	// Try initial connect. Connection will be retried with every scrape.
+	// getClient bounds the connect itself, so no deadline is imposed here.
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), initialConnectTimeout)
-		defer cancel()
+		ctx := context.Background()
 
 		client, err := exp.getClient(ctx)
 		if err != nil {
@@ -135,10 +137,9 @@ func New(opts *Opts) *Exporter {
 			return
 		}
 
-		// With the global pool this client is the one every later scrape reuses. Without it
-		// the client belongs to nobody, since each scrape builds its own, so leaving it
-		// connected would leak a topology, its monitoring goroutines and a connection for
-		// the lifetime of the process.
+		// With the global pool this client is the one every later scrape reuses. Otherwise
+		// nothing owns it, since each scrape builds its own, so leaving it connected would
+		// leak a topology, its monitoring goroutines and a connection.
 		if exp.opts.GlobalConnPool {
 			return
 		}
@@ -293,62 +294,82 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	return registry
 }
 
+// getClient returns a client to scrape with. Everything below keeps to one rule: a scrape
+// must come back within its own budget, so that a struggling MongoDB is reported as
+// mongodb_up 0 rather than as a scrape Prometheus never gets an answer to.
 func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	if !e.opts.GlobalConnPool {
 		// Create a new client for every scrape. The caller disconnects it.
-		client, err := connect(ctx, e.opts)
-		if err != nil {
-			return nil, err
-		}
-
-		return client, nil
+		return connect(ctx, e.opts)
 	}
 
-	// Get global client. Maybe it must be initialized first.
-	// Initialization is retried with every scrape until it succeeds once.
-	//
-	// Taking the lock honours ctx, which a sync.Mutex could not: whoever holds it may be
-	// inside a connect -- the one New starts in the background, or another scrape's -- and
-	// waiting that out would overrun this scrape's budget, so Prometheus would get nothing
-	// at all instead of mongodb_up 0.
-	select {
-	case e.clientLock <- struct{}{}:
-	case <-ctx.Done():
-		return nil, fmt.Errorf("cannot connect to MongoDB: %w", ctx.Err())
-	}
-	defer func() { <-e.clientLock }()
+	e.clientMu.RLock()
+	client := e.client
+	e.clientMu.RUnlock()
 
-	// If client is already initialized, and Ping is successful -- return it.
-	if e.client != nil {
-		err := e.client.Ping(ctx, nil)
+	// Health-check outside the lock. Holding it across the Ping would make concurrent
+	// scrapes of this target queue behind each other, letting one slow scrape push the
+	// next past its budget.
+	if client != nil {
+		err := client.Ping(ctx, nil)
 		if err == nil {
-			return e.client, nil
+			return client, nil
 		}
 
-		// A disconnected client never recovers, so drop it and let the next scrape build
-		// a new one. Every other error is transient -- an unreachable server, a scrape
-		// that ran out of time -- and the driver reconnects the pool on its own. Tearing
-		// it down would only add connection churn while MongoDB is already struggling.
+		// A disconnected client never recovers, so forget it and let the next scrape build a
+		// new one. Every other error is transient -- an unreachable server, a scrape that ran
+		// out of time -- and the driver reconnects the pool on its own; tearing it down would
+		// only add churn while MongoDB is already struggling.
 		if errors.Is(err, mongo.ErrClientDisconnected) {
 			e.logger.Warn("Dropping disconnected MongoDB client, reconnecting on next scrape")
-			e.client = nil
+			e.clientMu.Lock()
+			if e.client == client {
+				e.client = nil
+			}
+			e.clientMu.Unlock()
 		}
 
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
 	}
 
-	// The scrape context bounds this attempt: connect pings, and on an unreachable server
-	// that ping would otherwise run for the whole server-selection timeout while holding
-	// clientMu, overrunning the scrape budget so Prometheus gets nothing at all instead of
-	// mongodb_up 0. The pooled client still outlives the scrape that created it -- the
-	// driver connects the topology without a context and does not retain this one.
-	client, err := connect(ctx, e.opts)
-	if err != nil {
-		return nil, err
+	// Build the client. Initialization is retried with every scrape until it succeeds once.
+	//
+	// The connect gets its own budget rather than the scrape's: a scrape shorter than one
+	// connect would cancel every attempt and leave the pool permanently empty, so every
+	// scrape would keep paying for a connect that can never finish. Concurrent scrapes
+	// collapse onto that one connect, and each gives up on its own deadline while it
+	// carries on in the background.
+	connectTimeout := time.Duration(e.opts.ConnectTimeoutMS) * time.Millisecond
+	if connectTimeout <= 0 {
+		connectTimeout = defaultConnectTimeout
 	}
-	e.client = client
 
-	return client, nil
+	built := e.clientGroup.DoChan("", func() (any, error) { //nolint:contextcheck
+		connectCtx, cancel := context.WithTimeout(context.Background(), connectTimeout)
+		defer cancel()
+
+		newClient, err := connect(connectCtx, e.opts)
+		if err != nil {
+			return nil, err
+		}
+
+		e.clientMu.Lock()
+		e.client = newClient
+		e.clientMu.Unlock()
+
+		return newClient, nil
+	})
+
+	select {
+	case res := <-built:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+
+		return res.Val.(*mongo.Client), nil //nolint:forcetypeassert
+	case <-ctx.Done():
+		return nil, fmt.Errorf("cannot connect to MongoDB: %w", ctx.Err())
+	}
 }
 
 // Handler returns an http.Handler that serves metrics. Can be used instead of
