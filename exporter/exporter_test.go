@@ -274,6 +274,7 @@ func newPooledExporter(t *testing.T) *Exporter {
 	return &Exporter{ //nolint:exhaustruct_v5
 		logger:                log,
 		opts:                  opts,
+		clientLock:            make(chan struct{}, 1),
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1,
 	}
@@ -349,6 +350,31 @@ func TestGlobalConnPoolInitialConnectHonoursScrapeDeadline(t *testing.T) {
 	require.Error(t, err)
 	assert.Less(t, elapsed, time.Duration(e.opts.ConnectTimeoutMS)*time.Millisecond,
 		"initial connect ignored the scrape deadline and ran to the server-selection timeout")
+}
+
+// A scrape must not wait out somebody else's connect -- the background connect New starts,
+// or another scrape's -- because waiting on the lock is not covered by the connect's own
+// context bound.
+func TestGlobalConnPoolScrapeGivesUpOnHeldLock(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+
+	// Stand in for a connect in progress: the lock is held and e.client is still nil.
+	e.clientLock <- struct{}{}
+	t.Cleanup(func() { <-e.clientLock })
+
+	budget := 300 * time.Millisecond
+	ctx, cancel := context.WithTimeout(t.Context(), budget)
+	defer cancel()
+
+	start := time.Now()
+	_, err := e.getClient(ctx)
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	assert.Less(t, elapsed, initialConnectTimeout,
+		"scrape blocked on the client lock instead of giving up with its budget")
 }
 
 func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {

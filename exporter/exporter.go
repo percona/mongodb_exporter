@@ -37,8 +37,10 @@ import (
 
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
-	client                *mongo.Client
-	clientMu              sync.Mutex
+	client *mongo.Client
+	// clientLock guards client. It is a channel rather than a sync.Mutex so that waiting
+	// for it can honour a scrape's context: see lockClient.
+	clientLock            chan struct{}
 	logger                *slog.Logger
 	opts                  *Opts
 	lock                  *sync.Mutex
@@ -95,6 +97,12 @@ var (
 
 const (
 	defaultCacheSize = 1000
+
+	// initialConnectTimeout bounds the connect New starts in the background. Without it a
+	// server that never answers would hold clientLock for the process lifetime -- forever
+	// if Opts.ConnectTimeoutMS is 0, since connect then asks the driver for no
+	// server-selection timeout at all -- and every scrape would fail on the lock.
+	initialConnectTimeout = 30 * time.Second
 )
 
 // New connects to the database and returns a new Exporter instance.
@@ -108,19 +116,36 @@ func New(opts *Opts) *Exporter {
 		opts.Logger = promslog.New(promslogConfig)
 	}
 
-	ctx := context.Background()
-
 	exp := &Exporter{
 		logger:                opts.Logger,
 		opts:                  opts,
+		clientLock:            make(chan struct{}, 1),
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
 	}
 	// Try initial connect. Connection will be retried with every scrape.
 	go func() {
-		_, err := exp.getClient(ctx)
+		ctx, cancel := context.WithTimeout(context.Background(), initialConnectTimeout)
+		defer cancel()
+
+		client, err := exp.getClient(ctx)
 		if err != nil {
 			exp.logger.Error("Cannot connect to MongoDB", "error", err)
+
+			return
+		}
+
+		// With the global pool this client is the one every later scrape reuses. Without it
+		// the client belongs to nobody, since each scrape builds its own, so leaving it
+		// connected would leak a topology, its monitoring goroutines and a connection for
+		// the lifetime of the process.
+		if exp.opts.GlobalConnPool {
+			return
+		}
+
+		err = client.Disconnect(ctx)
+		if err != nil {
+			exp.logger.Error("Cannot disconnect client", "error", err)
 		}
 	}()
 
@@ -281,8 +306,17 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 
 	// Get global client. Maybe it must be initialized first.
 	// Initialization is retried with every scrape until it succeeds once.
-	e.clientMu.Lock()
-	defer e.clientMu.Unlock()
+	//
+	// Taking the lock honours ctx, which a sync.Mutex could not: whoever holds it may be
+	// inside a connect -- the one New starts in the background, or another scrape's -- and
+	// waiting that out would overrun this scrape's budget, so Prometheus would get nothing
+	// at all instead of mongodb_up 0.
+	select {
+	case e.clientLock <- struct{}{}:
+	case <-ctx.Done():
+		return nil, fmt.Errorf("cannot connect to MongoDB: %w", ctx.Err())
+	}
+	defer func() { <-e.clientLock }()
 
 	// If client is already initialized, and Ping is successful -- return it.
 	if e.client != nil {
