@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -304,6 +305,50 @@ func TestGlobalConnPoolReplacesDisconnectedClient(t *testing.T) {
 	assert.NoError(t, second.Ping(ctx, nil))
 
 	require.NoError(t, second.Disconnect(ctx))
+}
+
+// The pooled client is built during whichever scrape happens to find the cache empty, but
+// it has to outlive that scrape. This holds because the driver connects the topology
+// without a context and does not retain the one passed to mongo.Connect.
+func TestGlobalConnPoolClientOutlivesCreatingScrape(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+
+	scrape, cancel := context.WithCancel(t.Context())
+	first, err := e.getClient(scrape)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+
+	// The scrape that created the client ends.
+	cancel()
+
+	second, err := e.getClient(t.Context())
+	require.NoError(t, err)
+	assert.Same(t, first, second, "pooled client was lost when its creating scrape ended")
+	assert.NoError(t, second.Ping(t.Context(), nil))
+}
+
+// An unreachable server must not hold clientMu for the whole server-selection timeout:
+// the scrape needs to come back in time to report mongodb_up 0.
+func TestGlobalConnPoolInitialConnectHonoursScrapeDeadline(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+	e.opts.URI = "mongodb://127.0.0.1:1/admin"
+	e.opts.ConnectTimeoutMS = 5000
+
+	budget := 500 * time.Millisecond
+	ctx, cancel := context.WithTimeout(t.Context(), budget)
+	defer cancel()
+
+	start := time.Now()
+	_, err := e.getClient(ctx)
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	assert.Less(t, elapsed, time.Duration(e.opts.ConnectTimeoutMS)*time.Millisecond,
+		"initial connect ignored the scrape deadline and ran to the server-selection timeout")
 }
 
 func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {

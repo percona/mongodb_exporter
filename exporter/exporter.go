@@ -303,9 +303,12 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
 	}
 
-	// The pooled client outlives the scrape that happens to create it, so it must not
-	// inherit that scrape's context: cancelling the request would close the shared pool.
-	client, err := connect(context.Background(), e.opts) //nolint:contextcheck
+	// The scrape context bounds this attempt: connect pings, and on an unreachable server
+	// that ping would otherwise run for the whole server-selection timeout while holding
+	// clientMu, overrunning the scrape budget so Prometheus gets nothing at all instead of
+	// mongodb_up 0. The pooled client still outlives the scrape that created it -- the
+	// driver connects the topology without a context and does not retain this one.
+	client, err := connect(ctx, e.opts)
 	if err != nil {
 		return nil, err
 	}
