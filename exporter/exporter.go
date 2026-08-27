@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -268,36 +269,47 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 }
 
 func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
-	if e.opts.GlobalConnPool {
-		// Get global client. Maybe it must be initialized first.
-		// Initialization is retried with every scrape until it succeeds once.
-		e.clientMu.Lock()
-		defer e.clientMu.Unlock()
-
-		// If client is already initialized, and Ping is successful -- return it.
-		if e.client != nil {
-			err := e.client.Ping(ctx, nil)
-			if err != nil {
-				return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
-			}
-
-			return e.client, nil
-		}
-
-		client, err := connect(context.Background(), e.opts)
+	if !e.opts.GlobalConnPool {
+		// Create a new client for every scrape. The caller disconnects it.
+		client, err := connect(ctx, e.opts)
 		if err != nil {
 			return nil, err
 		}
-		e.client = client
 
 		return client, nil
 	}
 
-	// !e.opts.GlobalConnPool: create new client for every scrape.
-	client, err := connect(ctx, e.opts)
+	// Get global client. Maybe it must be initialized first.
+	// Initialization is retried with every scrape until it succeeds once.
+	e.clientMu.Lock()
+	defer e.clientMu.Unlock()
+
+	// If client is already initialized, and Ping is successful -- return it.
+	if e.client != nil {
+		err := e.client.Ping(ctx, nil)
+		if err == nil {
+			return e.client, nil
+		}
+
+		// A disconnected client never recovers, so drop it and let the next scrape build
+		// a new one. Every other error is transient -- an unreachable server, a scrape
+		// that ran out of time -- and the driver reconnects the pool on its own. Tearing
+		// it down would only add connection churn while MongoDB is already struggling.
+		if errors.Is(err, mongo.ErrClientDisconnected) {
+			e.logger.Warn("Dropping disconnected MongoDB client, reconnecting on next scrape")
+			e.client = nil
+		}
+
+		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
+	}
+
+	// The pooled client outlives the scrape that happens to create it, so it must not
+	// inherit that scrape's context: cancelling the request would close the shared pool.
+	client, err := connect(context.Background(), e.opts) //nolint:contextcheck
 	if err != nil {
 		return nil, err
 	}
+	e.client = client
 
 	return client, nil
 }

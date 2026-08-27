@@ -256,6 +256,75 @@ func TestConnect(t *testing.T) {
 	})
 }
 
+// newPooledExporter builds an exporter that reuses one client. It skips New, whose
+// background initial connect would race with tests that drive getClient themselves.
+func newPooledExporter(t *testing.T) *Exporter {
+	t.Helper()
+
+	log := promslog.New(&promslog.Config{}) //nolint:exhaustruct_v5
+
+	opts := &Opts{ //nolint:exhaustruct_v5
+		Logger:         log,
+		URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
+		GlobalConnPool: true,
+		DirectConnect:  true,
+	}
+
+	return &Exporter{ //nolint:exhaustruct_v5
+		logger:                log,
+		opts:                  opts,
+		lock:                  &sync.Mutex{},
+		totalCollectionsCount: -1,
+	}
+}
+
+func TestGlobalConnPoolReplacesDisconnectedClient(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	e := newPooledExporter(t)
+
+	first, err := e.getClient(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, first)
+
+	// Make the cached client permanently unusable. Every later Ping on it fails with
+	// ErrClientDisconnected, no matter how healthy the server is.
+	require.NoError(t, first.Disconnect(ctx))
+
+	// The scrape that discovers it still fails, but it must not leave the dead client
+	// cached, or every later scrape would fail with it too.
+	_, err = e.getClient(ctx)
+	require.Error(t, err)
+	require.Nil(t, e.client, "disconnected client stayed cached")
+
+	second, err := e.getClient(ctx)
+	require.NoError(t, err)
+	assert.NotSame(t, first, second)
+	assert.NoError(t, second.Ping(ctx, nil))
+
+	require.NoError(t, second.Disconnect(ctx))
+}
+
+func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+
+	first, err := e.getClient(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+
+	// A scrape that runs out of time must not cost us the pool: the client is healthy,
+	// only this request is over.
+	expired, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err = e.getClient(expired)
+	require.Error(t, err)
+	assert.Same(t, first, e.client, "healthy client was dropped after a transient error")
+}
+
 // How this test works?
 // When connected to a MongoS instance, the makeRegistry method should skip
 // adding replSetGetStatusCollector. To test that, we try to unregister a
