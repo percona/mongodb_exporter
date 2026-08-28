@@ -6,8 +6,9 @@ linters:
     - gomodguard_v2
   disable:
     - exhaustruct
-    - gochecknoglobals # we need globals for better performance, we use them for mapping, and we don't mutate them, so it's safe.
-    - gomodguard # replaced by gomodguard_v2
+    - exhaustruct_v5    # too annoying, partial structs are fine
+    - gochecknoglobals  # we need globals for better performance, we use them for mapping, and we don't mutate them, so it's safe.
+    - gomodguard        # replaced by gomodguard_v2
     - lll
     - testpackage
     - varnamelen
