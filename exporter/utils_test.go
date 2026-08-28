@@ -17,9 +17,17 @@ package exporter
 
 import (
 	"strings"
+	"time"
 
 	"github.com/percona/exporter_shared/helpers"
 )
+
+// testTimeout bounds a whole test: connecting to the cluster, building its
+// fixtures and asserting on them. It matches the driver's default server
+// selection timeout, so an unreachable server surfaces the driver's own
+// diagnostic rather than a bare context deadline. A genuine hang is caught by
+// the -timeout the Makefile passes to go test.
+const testTimeout = 30 * time.Second
 
 func filterMetrics(metrics []*helpers.Metric, filters []string) []*helpers.Metric {
 	res := make([]*helpers.Metric, 0, len(metrics))

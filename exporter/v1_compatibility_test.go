@@ -23,7 +23,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -223,7 +222,7 @@ func TestMongosMetrics(t *testing.T) {
 		}
 
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 		defer cancel()
 
 		port, err := tu.PortForContainer("mongos")
@@ -281,7 +280,7 @@ func TestMyState(t *testing.T) {
 		testCase := tt
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
 			port, err := tu.PortForContainer(testCase.containerName)
@@ -318,7 +317,7 @@ func TestArbiterMetrics(t *testing.T) {
 			Level: logLevel,
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 		defer cancel()
 
 		port, err := tu.PortForContainer(containerName)

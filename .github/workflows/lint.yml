@@ -47,7 +47,7 @@ jobs:
           filter_mode: added
           cache: false
           golangci_lint_flags: "--config=.golangci.yml"
-          golangci_lint_version: v2.12.2
+          golangci_lint_version: v2.13.1
 
       - name: Run license check
         run: |
