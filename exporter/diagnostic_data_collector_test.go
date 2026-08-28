@@ -39,7 +39,7 @@ import (
 )
 
 func TestDiagnosticDataCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -184,7 +184,7 @@ func TestCollectorWithCompatibleMode(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
 			port, err := tu.PortForContainer(tt.containerName)
@@ -205,7 +205,7 @@ func TestCollectorWithCompatibleMode(t *testing.T) {
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -324,7 +324,7 @@ func TestDiagnosticDataErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
 			port, err := tu.PortForContainer(tc.containerName)

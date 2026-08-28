@@ -37,7 +37,7 @@ import (
 )
 
 func TestIndexStatsCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -127,7 +127,7 @@ func TestIndexStatsCollectorSharded(t *testing.T) {
 }
 
 func TestDescendingIndexOverride(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
