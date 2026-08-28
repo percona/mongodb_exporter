@@ -111,6 +111,40 @@ export MONGODB_PASSWORD=YYY
 mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 
+#### Dynamic target support
+
+Dynamic target mode accepts the MongoDB address at scrape time, so the exporter does not need a predefined `MONGODB_URI`. Credentials and connection options stay in a local YAML file:
+
+```yaml
+auth_modules:
+  cloud_mongo:
+    type: userpass
+    userpass:
+      username: metrics_exporter
+      password: CHANGE_ME
+    options:
+      auth_source: admin
+      tls: false
+      tls_insecure_skip_verify: false
+```
+
+Start the exporter without `--mongodb.uri`:
+
+```sh
+mongodb_exporter --config.file=/etc/mongodb-exporter/mongodb_exporter.yml \
+  --collector.diagnosticdata \
+  --collector.dbstats \
+  --collector.shards
+```
+
+Pass a discovered target and authentication module to `/probe`:
+
+```sh
+curl 'http://127.0.0.1:9216/probe?target=mongo.example.com:3717&auth_module=cloud_mongo'
+```
+
+The target may contain only one hostname and an optional port. Credentials, paths, and query parameters are rejected; these values must come from the selected authentication module. If the config contains exactly one authentication module, `auth_module` may be omitted.
+
 #### Multi-target support
 You can run the exporter specifying multiple URIs, devided by a comma in --mongodb.uri option or MONGODB_URI environment variable in order to monitor multiple mongodb instances with the a single mongodb_exporter instance.
 ```sh
