@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
@@ -37,7 +36,7 @@ func TestGetEncryptionInfo(t *testing.T) {
 		t.Skip("Test is only for Percona MongoDB as upstream MongoDB does not support encryption")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.TestClient(ctx, tu.MongoDBStandAloneEncryptedPort, t)

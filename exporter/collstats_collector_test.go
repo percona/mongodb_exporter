@@ -34,7 +34,7 @@ import (
 )
 
 func TestCollStatsCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -132,7 +132,7 @@ func TestCollStatsCollectorSharded(t *testing.T) {
 
 func TestCollStatsForFakeCountType(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
