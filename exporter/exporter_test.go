@@ -210,7 +210,7 @@ func TestConnect(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				res, err := http.Get(ts.URL) //nolint:noctx
-				assert.Nil(t, e.client)
+				assert.Nil(t, e.cachedClient())
 				assert.NoError(t, err)
 				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
@@ -244,7 +244,7 @@ func TestConnect(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				res, err := http.Get(ts.URL) //nolint:noctx
-				assert.NotNil(t, e.client)
+				assert.NotNil(t, e.cachedClient())
 				assert.NoError(t, err)
 				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
@@ -329,7 +329,7 @@ func TestGlobalConnPoolReplacesDisconnectedClient(t *testing.T) {
 	// cached, or every later scrape would fail with it too.
 	_, err = e.getClient(ctx)
 	require.Error(t, err)
-	require.Nil(t, e.client, "disconnected client stayed cached")
+	require.Nil(t, e.cachedClient(), "disconnected client stayed cached")
 
 	second, err := e.getClient(ctx)
 	require.NoError(t, err)
@@ -385,10 +385,7 @@ func TestGlobalConnPoolCacheWarmsAfterScrapeGivesUp(t *testing.T) {
 	require.Error(t, err)
 
 	require.Eventually(t, func() bool {
-		e.clientMu.RLock()
-		defer e.clientMu.RUnlock()
-
-		return e.client != nil
+		return e.cachedClient() != nil
 	}, 15*time.Second, 50*time.Millisecond,
 		"the connect was cancelled along with the scrape, leaving the pool empty")
 }
@@ -453,7 +450,7 @@ func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {
 
 	_, err = e.getClient(expired)
 	require.Error(t, err)
-	assert.Same(t, first, e.client, "healthy client was dropped after a transient error")
+	assert.Same(t, first, e.cachedClient(), "healthy client was dropped after a transient error")
 }
 
 // How this test works?

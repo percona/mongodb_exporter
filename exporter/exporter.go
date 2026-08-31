@@ -303,9 +303,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 		return connect(ctx, e.opts)
 	}
 
-	e.clientMu.RLock()
-	client := e.client
-	e.clientMu.RUnlock()
+	client := e.cachedClient()
 
 	// Health-check outside the lock. Holding it across the Ping would make concurrent
 	// scrapes of this target queue behind each other, letting one slow scrape push the
@@ -448,6 +446,17 @@ func (e *Exporter) Handler() http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+// cachedClient returns the pooled client, or nil if none has been built yet. The connect
+// that fills the cache runs detached from the scrape that started it, so a caller that
+// gave up on its deadline has no ordering against that write. This is the only safe way
+// to read the pointer.
+func (e *Exporter) cachedClient() *mongo.Client {
+	e.clientMu.RLock()
+	defer e.clientMu.RUnlock()
+
+	return e.client
 }
 
 // GetRequestOpts makes exporter.Opts structure from request filters and default options.
