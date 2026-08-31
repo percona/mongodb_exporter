@@ -648,3 +648,64 @@ func TestMongoUpMetric(t *testing.T) {
 		})
 	}
 }
+
+// The connect budget has to be one number, used both for the driver's own timeouts and for
+// the deadline a caller wraps around the attempt. When they disagreed, the outer deadline
+// silently won: a URI asking for more than --mongodb.connect-timeout-ms had its handshake
+// aborted on every scrape, so mongodb_up stayed 0 permanently rather than transiently.
+func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
+	t.Parallel()
+
+	const uri = "mongodb://127.0.0.1:27017/admin"
+
+	tests := map[string]struct {
+		uri              string
+		connectTimeoutMS int
+		wantBudget       time.Duration
+		wantSelection    time.Duration
+	}{
+		"uri outranks the flag": {
+			uri:              uri + "?connectTimeoutMS=8000",
+			connectTimeoutMS: 5000,
+			wantBudget:       8 * time.Second,
+			wantSelection:    8 * time.Second,
+		},
+		"flag applies when the uri is silent": {
+			uri:              uri,
+			connectTimeoutMS: 5000,
+			wantBudget:       5 * time.Second,
+			wantSelection:    5 * time.Second,
+		},
+		"explicit selection timeout in the uri is left alone": {
+			uri:              uri + "?connectTimeoutMS=8000&serverSelectionTimeoutMS=2000",
+			connectTimeoutMS: 5000,
+			wantBudget:       8 * time.Second,
+			wantSelection:    2 * time.Second,
+		},
+		"neither set falls back rather than asking for no timeout": {
+			uri:              uri,
+			connectTimeoutMS: 0,
+			wantBudget:       defaultConnectTimeout,
+			wantSelection:    defaultConnectTimeout,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			clientOpts, budget, err := clientOptionsFor(&Opts{URI: test.uri, ConnectTimeoutMS: test.connectTimeoutMS})
+			require.NoError(t, err)
+
+			assert.Equal(t, test.wantBudget, budget, "budget a caller would bound the attempt with")
+
+			require.NotNil(t, clientOpts.ServerSelectionTimeout,
+				"unset means the driver's own 30s default, which the budget then truncates")
+			assert.Equal(t, test.wantSelection, *clientOpts.ServerSelectionTimeout)
+
+			require.NotNil(t, clientOpts.ConnectTimeout)
+			assert.LessOrEqual(t, *clientOpts.ConnectTimeout, budget,
+				"the driver must not be given longer than the caller will wait")
+		})
+	}
+}

@@ -31,6 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promslog"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
@@ -101,10 +102,10 @@ var (
 const (
 	defaultCacheSize = 1000
 
-	// defaultConnectTimeout bounds building the pooled client when Opts.ConnectTimeoutMS is
-	// unset. connect would otherwise hand the driver a server-selection timeout of 0, which
-	// it reads as no timeout at all, and an unanswering server would block a connect for the
-	// lifetime of the process.
+	// defaultConnectTimeout bounds a connect when neither the URI nor Opts.ConnectTimeoutMS
+	// gives it a budget. The driver would otherwise be handed a server-selection timeout of
+	// 0, which it reads as no timeout at all, and an unanswering server would block a
+	// connect for the lifetime of the process.
 	defaultConnectTimeout = 30 * time.Second
 )
 
@@ -337,9 +338,13 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	// scrape would keep paying for a connect that can never finish. Concurrent scrapes
 	// collapse onto that one connect, and each gives up on its own deadline while it
 	// carries on in the background.
-	connectTimeout := time.Duration(e.opts.ConnectTimeoutMS) * time.Millisecond
-	if connectTimeout <= 0 {
-		connectTimeout = defaultConnectTimeout
+	//
+	// The budget comes from clientOptionsFor rather than the flag alone, so it matches what
+	// the driver itself was given. A deadline shorter than that would abort a handshake
+	// still within its own limit, on every scrape, leaving mongodb_up at 0 for good.
+	_, connectTimeout, err := clientOptionsFor(e.opts)
+	if err != nil {
+		return nil, err
 	}
 
 	built := e.clientGroup.DoChan("", func() (any, error) { //nolint:contextcheck
@@ -499,19 +504,50 @@ func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 	return requestOpts
 }
 
-func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
+// clientOptionsFor builds the driver options for opts and returns, alongside them, the
+// budget one connect attempt gets. It is the single authority for that budget, so a caller
+// that bounds the attempt with a context uses the same value the driver was given and can
+// never cut a handshake short of what was asked for.
+//
+// A connectTimeoutMS in the URI wins over --mongodb.connect-timeout-ms, being the more
+// specific instruction; with neither usable the budget falls back to defaultConnectTimeout,
+// since the driver reads 0 as no timeout at all.
+func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error) {
 	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
-		return nil, fmt.Errorf("invalid dsn: %w", err)
+		return nil, 0, fmt.Errorf("invalid dsn: %w", err)
 	}
 
 	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
+	budget := defaultConnectTimeout
+
+	switch {
+	case clientOpts.ConnectTimeout != nil && *clientOpts.ConnectTimeout > 0:
+		budget = *clientOpts.ConnectTimeout
+	case opts.ConnectTimeoutMS > 0:
+		budget = time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
+	}
+
 	if clientOpts.ConnectTimeout == nil {
-		connectTimeout := time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
-		clientOpts.SetConnectTimeout(connectTimeout)
-		clientOpts.SetServerSelectionTimeout(connectTimeout)
+		clientOpts.SetConnectTimeout(budget)
+	}
+
+	// Set only when the URI is silent: an explicit serverSelectionTimeoutMS is the
+	// operator's instruction and outranks the budget. Left unset the driver falls back to
+	// 30s, which nobody asked for and which the caller's deadline then truncates.
+	if clientOpts.ServerSelectionTimeout == nil {
+		clientOpts.SetServerSelectionTimeout(budget)
+	}
+
+	return clientOpts, budget, nil
+}
+
+func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
+	clientOpts, _, err := clientOptionsFor(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := mongo.Connect(ctx, clientOpts)
