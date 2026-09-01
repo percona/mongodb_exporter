@@ -338,30 +338,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	// scrape would keep paying for a connect that can never finish. Concurrent scrapes
 	// collapse onto that one connect, and each gives up on its own deadline while it
 	// carries on in the background.
-	//
-	// The budget comes from clientOptionsFor rather than the flag alone, so it matches what
-	// the driver itself was given. A deadline shorter than that would abort a handshake
-	// still within its own limit, on every scrape, leaving mongodb_up at 0 for good.
-	_, connectTimeout, err := clientOptionsFor(e.opts)
-	if err != nil {
-		return nil, err
-	}
-
-	built := e.clientGroup.DoChan("", func() (any, error) { //nolint:contextcheck
-		connectCtx, cancel := context.WithTimeout(context.Background(), connectTimeout)
-		defer cancel()
-
-		newClient, err := connect(connectCtx, e.opts)
-		if err != nil {
-			return nil, err
-		}
-
-		e.clientMu.Lock()
-		e.client = newClient
-		e.clientMu.Unlock()
-
-		return newClient, nil
-	})
+	built := e.clientGroup.DoChan("", e.buildClient)
 
 	select {
 	case res := <-built:
@@ -504,6 +481,46 @@ func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 	return requestOpts
 }
 
+// buildClient fills the client cache and returns what is in it. It runs as a singleflight
+// flight, so at most one of these is in progress at a time.
+func (e *Exporter) buildClient() (any, error) {
+	// singleflight retires its key once a flight returns, so a scrape that read an empty
+	// cache and arrives after an earlier flight finished starts a new flight rather than
+	// joining the old one. Connecting again would displace a live client that nothing ever
+	// disconnects, leaving its topology, monitors and heartbeat connections running for the
+	// life of the process.
+	if cached := e.cachedClient(); cached != nil {
+		return cached, nil
+	}
+
+	// Resolved here rather than on the caller's goroutine: for mongodb+srv:// this performs
+	// SRV and TXT lookups through net.LookupSRV, which takes no context, so on the caller's
+	// goroutine a slow resolver would block the scrape past the very budget getClient's
+	// select exists to keep. It cannot be cancelled either way, but off the scrape's
+	// goroutine it can only delay the pool, not the response.
+	//
+	// The budget it returns is what the driver itself was given, so the deadline below can
+	// never abort a handshake that was still within its own limit.
+	clientOpts, connectTimeout, err := clientOptionsFor(e.opts)
+	if err != nil {
+		return nil, err
+	}
+
+	connectCtx, cancel := context.WithTimeout(context.Background(), connectTimeout)
+	defer cancel()
+
+	newClient, err := connectWith(connectCtx, clientOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	e.clientMu.Lock()
+	e.client = newClient
+	e.clientMu.Unlock()
+
+	return newClient, nil
+}
+
 // clientOptionsFor builds the driver options for opts and returns, alongside them, the
 // budget one connect attempt gets. It is the single authority for that budget, so a caller
 // that bounds the attempt with a context uses the same value the driver was given and can
@@ -550,6 +567,12 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 		return nil, err
 	}
 
+	return connectWith(ctx, clientOpts)
+}
+
+// connectWith is connect for a caller that already holds resolved options, so the pooled
+// path does not resolve the URI -- an SRV lookup among other things -- a second time.
+func connectWith(ctx context.Context, clientOpts *options.ClientOptions) (*mongo.Client, error) {
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
 		return nil, fmt.Errorf("invalid MongoDB options: %w", err)

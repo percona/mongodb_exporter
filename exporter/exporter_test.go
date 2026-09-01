@@ -709,3 +709,26 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 		})
 	}
 }
+
+// A flight must never displace a client already in the cache. singleflight retires its key
+// when a flight returns, so a scrape that read an empty cache and arrives after an earlier
+// flight finished starts a second flight rather than joining the first. Connecting again
+// would strand the cached client: nothing in the pooled path ever disconnects one, so its
+// topology, monitor goroutines and heartbeat connections would outlive it -- background
+// load on the very MongoDB this pool exists to take load off.
+func TestGlobalConnPoolBuildDoesNotOrphanCachedClient(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+
+	first, err := e.getClient(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+
+	// Exactly what that second flight runs.
+	got, err := e.buildClient()
+	require.NoError(t, err)
+
+	assert.Same(t, first, got, "the flight connected again instead of taking the cached client")
+	assert.Same(t, first, e.cachedClient(), "the cached client was displaced, and nothing disconnects it")
+}
