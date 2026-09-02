@@ -653,6 +653,8 @@ func TestMongoUpMetric(t *testing.T) {
 // the deadline a caller wraps around the attempt. When they disagreed, the outer deadline
 // silently won: a URI asking for more than --mongodb.connect-timeout-ms had its handshake
 // aborted on every scrape, so mongodb_up stayed 0 permanently rather than transiently.
+//
+//nolint:funlen
 func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 	t.Parallel()
 
@@ -681,6 +683,22 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 			connectTimeoutMS: 5000,
 			wantBudget:       8 * time.Second,
 			wantSelection:    2 * time.Second,
+		},
+		// The reverse ordering is the one that used to break: taking the budget from the
+		// connect side alone expired the caller's deadline at 2s while the operator's 8s
+		// selection window was still running, so the scrape reported its own deadline
+		// rather than the setting.
+		"selection timeout longer than connect widens the budget": {
+			uri:              uri + "?connectTimeoutMS=2000&serverSelectionTimeoutMS=8000",
+			connectTimeoutMS: 5000,
+			wantBudget:       8 * time.Second,
+			wantSelection:    8 * time.Second,
+		},
+		"selection timeout alone widens the budget past the flag": {
+			uri:              uri + "?serverSelectionTimeoutMS=8000",
+			connectTimeoutMS: 5000,
+			wantBudget:       8 * time.Second,
+			wantSelection:    8 * time.Second,
 		},
 		"neither set falls back rather than asking for no timeout": {
 			uri:              uri,

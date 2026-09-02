@@ -499,8 +499,8 @@ func (e *Exporter) buildClient() (any, error) {
 	// select exists to keep. It cannot be cancelled either way, but off the scrape's
 	// goroutine it can only delay the pool, not the response.
 	//
-	// The budget it returns is what the driver itself was given, so the deadline below can
-	// never abort a handshake that was still within its own limit.
+	// The budget it returns covers whichever driver timeout runs longest, so the deadline
+	// below cannot abort an attempt that was still within a limit the operator set.
 	clientOpts, connectTimeout, err := clientOptionsFor(e.opts)
 	if err != nil {
 		return nil, err
@@ -538,25 +538,29 @@ func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error)
 	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
-	budget := defaultConnectTimeout
+	// Fill in whatever the URI left unset. Neither may be left at zero, which the driver
+	// reads as no timeout at all.
+	if clientOpts.ConnectTimeout == nil || *clientOpts.ConnectTimeout <= 0 {
+		fromFlag := defaultConnectTimeout
+		if opts.ConnectTimeoutMS > 0 {
+			fromFlag = time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
+		}
 
-	switch {
-	case clientOpts.ConnectTimeout != nil && *clientOpts.ConnectTimeout > 0:
-		budget = *clientOpts.ConnectTimeout
-	case opts.ConnectTimeoutMS > 0:
-		budget = time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
+		clientOpts.SetConnectTimeout(fromFlag)
 	}
 
-	if clientOpts.ConnectTimeout == nil {
-		clientOpts.SetConnectTimeout(budget)
+	// An explicit serverSelectionTimeoutMS is the operator's instruction and is kept as
+	// given; only when the URI is silent does it mirror the connect timeout.
+	if clientOpts.ServerSelectionTimeout == nil || *clientOpts.ServerSelectionTimeout <= 0 {
+		clientOpts.SetServerSelectionTimeout(*clientOpts.ConnectTimeout)
 	}
 
-	// Set only when the URI is silent: an explicit serverSelectionTimeoutMS is the
-	// operator's instruction and outranks the budget. Left unset the driver falls back to
-	// 30s, which nobody asked for and which the caller's deadline then truncates.
-	if clientOpts.ServerSelectionTimeout == nil {
-		clientOpts.SetServerSelectionTimeout(budget)
-	}
+	// The budget has to cover whichever of the two runs longest. They bound different
+	// things -- connectTimeoutMS one socket connect, serverSelectionTimeoutMS the selection
+	// loop around it -- so taking only the connect side would let a caller's deadline
+	// expire while an explicitly longer selection window was still running, reporting the
+	// caller's own deadline instead of the setting the operator asked for.
+	budget := max(*clientOpts.ConnectTimeout, *clientOpts.ServerSelectionTimeout)
 
 	return clientOpts, budget, nil
 }
