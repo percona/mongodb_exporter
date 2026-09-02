@@ -31,8 +31,16 @@ import (
 )
 
 const (
-	exporterPrefix = "mongodb_"
+	exporterPrefix         = "mongodb_"
+	histogramLowerBoundKey = "lowerBound"
+	histogramMicrosKey     = "micros"
+	histogramBoundLabel    = "lower_bound"
 )
+
+// Fields holding a histogram bucket boundary, sorted by precedence. See histogramBoundKey.
+//
+//nolint:gochecknoglobals
+var histogramBoundKeys = []string{histogramLowerBoundKey, histogramMicrosKey}
 
 type rawMetric struct {
 	// Full Qualified Name
@@ -320,7 +328,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 
 	for k, val := range m {
 		nextPrefix := prefix + k
-		if !includeHistograms && isHistogramPath(nextPrefix) {
+		if !includeHistograms && isHistogramBucketValue(nextPrefix, val) {
 			continue
 		}
 
@@ -433,16 +441,52 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 			continue
 		}
 
+		boundKey, ok := histogramBoundKey(bucket)
+		if !ok {
+			continue
+		}
+
 		labels := make(map[string]string, len(commonLabels)+1)
 		for name, value := range commonLabels {
 			labels[name] = value
 		}
 
-		labels["lower_bound"] = fmt.Sprint(bucket["lowerBound"])
+		labels[histogramBoundLabel] = fmt.Sprint(bucket[boundKey])
 		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
 	}
 
 	return metrics
+}
+
+// histogramBoundKey returns the field holding the bucket boundary. getDiagnosticData names it
+// two ways, both documented as the lower bound of the bucket: "lowerBound" under "histograms"
+// nodes and "micros" under the "histogram" arrays of serverStatus.opLatencies. Both are exposed
+// under histogramBoundLabel so that a query does not have to know which shape it came from.
+// The order decides which one wins should a bucket ever carry both.
+func histogramBoundKey(bucket map[string]any) (string, bool) {
+	for _, key := range histogramBoundKeys {
+		if _, ok := bucket[key]; ok {
+			return key, true
+		}
+	}
+
+	return "", false
+}
+
+// isHistogramBucketValue reports whether the value holds histogram buckets, so that
+// includeHistograms gates the buckets themselves rather than every node that happens to be
+// named "histogram" or "histograms". Only the diagnostic data collector can enable them,
+// every other collector passes includeHistograms=false; see the "latencyStats" request of
+// the collstats collector and PMM-9568.
+func isHistogramBucketValue(prefix string, val any) bool {
+	switch v := val.(type) {
+	case primitive.A:
+		return isHistogramBucketSlice(prefix, v)
+	case []any:
+		return isHistogramBucketSlice(prefix, v)
+	default:
+		return false
+	}
 }
 
 func isHistogramBucketSlice(prefix string, v []any) bool {
@@ -458,7 +502,7 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 		if !ok {
 			return false
 		}
-		if _, ok := bucket["lowerBound"]; !ok {
+		if _, ok := histogramBoundKey(bucket); !ok {
 			return false
 		}
 		if _, ok := bucket["count"]; !ok {
@@ -470,7 +514,11 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 }
 
 func isHistogramPath(prefix string) bool {
-	return prefix == "histograms" || strings.Contains(prefix, ".histograms.") || strings.HasSuffix(prefix, ".histograms") //nolint:goconst
+	return isPathNode(prefix, "histograms") || isPathNode(prefix, "histogram")
+}
+
+func isPathNode(prefix, node string) bool {
+	return prefix == node || strings.Contains(prefix, "."+node+".") || strings.HasSuffix(prefix, "."+node)
 }
 
 func asMetricMap(item any) (map[string]any, bool) {
