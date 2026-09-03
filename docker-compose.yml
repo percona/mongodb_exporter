@@ -34,7 +34,7 @@ services:
         container_name: "mongo-1-arbiter"
         image: ${TEST_MONGODB_IMAGE:-mongo:6.0}
         ports:
-            - "${TEST_MONGODB_S1_ARBITER:-17011}:27017"
+            - "${TEST_MONGODB_S1_ARBITER_PORT:-17011}:27017"
         command: mongod --replSet rs1 --shardsvr --port 27017  --oplogSize 16
         networks:
             - rs1
@@ -98,7 +98,7 @@ services:
         build:
             dockerfile: test-setup/mongodb-auth.dockerfile
         ports:
-            - "${TEST_MONGODB_S2_ARBITER:-17012}:27017"
+            - "${TEST_MONGODB_S2_ARBITER_PORT:-17012}:27017"
         command: mongod --replSet rs2 --port 27017  --oplogSize 16 --auth --keyFile=/opt/keyfile
         networks:
             - rs2
