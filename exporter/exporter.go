@@ -25,6 +25,7 @@ import (
 	_ "net/http/pprof"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,16 +40,22 @@ import (
 
 // Exporter holds Exporter methods and attributes.
 type Exporter struct {
-	client *mongo.Client
-	// clientMu guards the client pointer only. It is never held across a command, so
-	// concurrent scrapes of this target do not wait for each other.
-	clientMu sync.RWMutex
+	// client is the pooled client, nil until a connect has succeeded.
+	client atomic.Pointer[pooledClient]
 	// clientGroup collapses concurrent attempts to build client into one connect.
 	clientGroup           singleflight.Group
 	logger                *slog.Logger
 	opts                  *Opts
 	lock                  *sync.Mutex
 	totalCollectionsCount int
+}
+
+// pooledClient is the cached client together with how many scrapes in a row have failed its
+// health check.
+type pooledClient struct {
+	*mongo.Client
+
+	pingFailures atomic.Int32
 }
 
 // Opts holds new exporter options.
@@ -97,22 +104,24 @@ type Opts struct {
 var (
 	errCannotHandleType   = fmt.Errorf("don't know how to handle data type")
 	errUnexpectedDataType = fmt.Errorf("unexpected data type")
+	errConnectPanicked    = errors.New("cannot connect to MongoDB: connect panicked")
 )
 
 const (
 	defaultCacheSize = 1000
 
-	// defaultConnectTimeout bounds a connect when neither the URI nor Opts.ConnectTimeoutMS
-	// gives it a budget. The driver would otherwise be handed a server-selection timeout of
-	// 0, which it reads as no timeout at all, and an unanswering server would block a
-	// connect for the lifetime of the process.
+	// defaultConnectTimeout stands in for a connect or server-selection timeout of zero, which
+	// the driver reads as no timeout at all. It equals the driver's own server-selection default.
 	defaultConnectTimeout = 30 * time.Second
 
-	// driverServerSelectionTimeout is what the driver applies when ServerSelectionTimeout is
-	// left unset -- defaultServerSelectionTimeout in x/mongo/driver/topology. Mirrored here
-	// so the connect budget can cover a selection window the exporter deliberately leaves
-	// the driver to choose.
-	driverServerSelectionTimeout = 30 * time.Second
+	// defaultMaxConnIdleTime closes pooled connections that sat idle this long. The driver never
+	// prunes idle connections on its own and reuses them unchecked, so a socket a middlebox
+	// dropped during a gap between scrapes would otherwise fail the next scrape.
+	defaultMaxConnIdleTime = 5 * time.Minute
+
+	// maxConsecutivePingFailures is how many scrapes in a row may fail the pooled client's
+	// health check before it is dropped and built anew.
+	maxConsecutivePingFailures = 3
 )
 
 // New connects to the database and returns a new Exporter instance.
@@ -132,30 +141,13 @@ func New(opts *Opts) *Exporter {
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
 	}
-	// Try initial connect. Connection will be retried with every scrape.
-	// getClient bounds the connect itself, so no deadline is imposed here.
-	go func() {
-		ctx := context.Background()
-
-		client, err := exp.getClient(ctx)
-		if err != nil {
-			exp.logger.Error("Cannot connect to MongoDB", "error", err)
-
-			return
-		}
-
-		// With the global pool this client is the one every later scrape reuses. Otherwise
-		// nothing owns it, since each scrape builds its own, so leaving it connected would
-		// leak a topology, its monitoring goroutines and a connection.
-		if exp.opts.GlobalConnPool {
-			return
-		}
-
-		err = client.Disconnect(ctx)
-		if err != nil {
-			exp.logger.Error("Cannot disconnect client", "error", err)
-		}
-	}()
+	// Warm the pool so the first scrape does not pay for the connect. getClient bounds the
+	// attempt and buildClient logs a failure, which every scrape retries anyway.
+	if opts.GlobalConnPool {
+		go func() {
+			_, _ = exp.getClient(context.Background())
+		}()
+	}
 
 	return exp
 }
@@ -310,28 +302,21 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 		return connect(ctx, e.opts)
 	}
 
-	client := e.cachedClient()
-
-	// Health-check outside the lock. Holding it across the Ping would make concurrent
-	// scrapes of this target queue behind each other, letting one slow scrape push the
-	// next past its budget.
-	if client != nil {
-		err := client.Ping(ctx, nil)
+	if pooled := e.client.Load(); pooled != nil {
+		err := pooled.Ping(ctx, nil)
 		if err == nil {
-			return client, nil
+			pooled.pingFailures.Store(0)
+
+			return pooled.Client, nil
 		}
 
-		// A disconnected client never recovers, so forget it and let the next scrape build a
-		// new one. Every other error is transient -- an unreachable server, a scrape that ran
-		// out of time -- and the driver reconnects the pool on its own; tearing it down would
-		// only add churn while MongoDB is already struggling.
-		if errors.Is(err, mongo.ErrClientDisconnected) {
-			e.logger.Warn("Dropping disconnected MongoDB client, reconnecting on next scrape")
-			e.clientMu.Lock()
-			if e.client == client {
-				e.client = nil
-			}
-			e.clientMu.Unlock()
+		// One failed health check is transient -- an unreachable server, a scrape out of time --
+		// and the driver reconnects its pool on its own. A client that keeps failing is dropped
+		// so the next scrape builds one from scratch: that is the only way to pick up what the
+		// driver reads once, such as rotated TLS material.
+		if pooled.pingFailures.Add(1) >= maxConsecutivePingFailures && e.client.CompareAndSwap(pooled, nil) {
+			e.logger.Warn("Dropping MongoDB client after repeated failed health checks, reconnecting on next scrape", "error", err)
+			_ = pooled.Disconnect(ctx)
 		}
 
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
@@ -436,17 +421,6 @@ func (e *Exporter) Handler() http.Handler {
 	})
 }
 
-// cachedClient returns the pooled client, or nil if none has been built yet. The connect
-// that fills the cache runs detached from the scrape that started it, so a caller that
-// gave up on its deadline has no ordering against that write. This is the only safe way
-// to read the pointer.
-func (e *Exporter) cachedClient() *mongo.Client {
-	e.clientMu.RLock()
-	defer e.clientMu.RUnlock()
-
-	return e.client
-}
-
 // GetRequestOpts makes exporter.Opts structure from request filters and default options.
 func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 	requestOpts := Opts{}
@@ -489,24 +463,25 @@ func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 
 // buildClient fills the client cache and returns what is in it. It runs as a singleflight
 // flight, so at most one of these is in progress at a time.
-func (e *Exporter) buildClient() (any, error) {
+func (e *Exporter) buildClient() (_ any, err error) {
+	// singleflight re-raises a flight's panic on a goroutine of its own, where nothing recovers
+	// it, so a connect that panicked would take the process down rather than fail one scrape.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: %v", errConnectPanicked, r)
+		}
+	}()
+
 	// singleflight retires its key once a flight returns, so a scrape that read an empty
 	// cache and arrives after an earlier flight finished starts a new flight rather than
-	// joining the old one. Connecting again would displace a live client that nothing ever
-	// disconnects, leaving its topology, monitors and heartbeat connections running for the
-	// life of the process.
-	if cached := e.cachedClient(); cached != nil {
-		return cached, nil
+	// joining the old one. It must not displace a live client, which nothing ever disconnects.
+	if pooled := e.client.Load(); pooled != nil {
+		return pooled.Client, nil
 	}
 
 	// Resolved here rather than on the caller's goroutine: for mongodb+srv:// this performs
-	// SRV and TXT lookups through net.LookupSRV, which takes no context, so on the caller's
-	// goroutine a slow resolver would block the scrape past the very budget getClient's
-	// select exists to keep. It cannot be cancelled either way, but off the scrape's
-	// goroutine it can only delay the pool, not the response.
-	//
-	// The budget it returns covers whichever driver timeout runs longest, so the deadline
-	// below cannot abort an attempt that was still within a limit the operator set.
+	// SRV and TXT lookups through net.LookupSRV, which takes no context, so a slow resolver
+	// can only delay the pool, not a scrape's response.
 	clientOpts, connectTimeout, err := clientOptionsFor(e.opts)
 	if err != nil {
 		return nil, err
@@ -517,26 +492,28 @@ func (e *Exporter) buildClient() (any, error) {
 
 	newClient, err := connectWith(connectCtx, clientOpts)
 	if err != nil {
+		// Every scrape waiting on this flight may have given up on its own deadline already, in
+		// which case nobody else sees the cause.
+		e.logger.Error("MongoDB connect attempt failed", "error", err)
+
 		return nil, err
 	}
 
-	e.clientMu.Lock()
-	e.client = newClient
-	e.clientMu.Unlock()
+	e.client.Store(&pooledClient{Client: newClient})
 
 	return newClient, nil
 }
 
 // clientOptionsFor builds the driver options for opts and returns, alongside them, the
-// budget one connect attempt gets. It is the single authority for that budget, so a caller
-// that bounds the attempt with a context uses the same value the driver was given and can
-// never cut a handshake short of what was asked for.
+// budget one connect attempt gets. The driver spends its connect and server-selection
+// timeouts in sequence, so the budget is their sum, and a caller that bounds the attempt
+// with it never cuts short a wait the operator configured.
 //
-// A connectTimeoutMS in the URI wins over --mongodb.connect-timeout-ms, being the more
-// specific instruction; with neither usable the budget falls back to defaultConnectTimeout,
-// since the driver reads 0 as no timeout at all. serverSelectionTimeoutMS is left to the
-// driver unless the URI or the flag gave a connect timeout to derive it from, so the budget
-// accounts for the driver's default as well as the values actually set.
+// connectTimeoutMS in the URI wins over --mongodb.connect-timeout-ms; a zero there is the
+// driver's "no dial timeout" and is passed through. Server selection is taken from the URI,
+// else derived from the flag's connect timeout, else the driver's default. A zero selection
+// timeout, or a zero flag, would mean no timeout at all and is replaced by
+// defaultConnectTimeout: a connect has to finish for the pool to ever fill.
 func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error) {
 	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
@@ -546,41 +523,32 @@ func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error)
 	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
-	// The connect timeout comes from the URI, else the flag, else the default. It may not be
-	// left at zero, which the driver reads as no timeout at all.
+	if clientOpts.MaxConnIdleTime == nil {
+		clientOpts.SetMaxConnIdleTime(defaultMaxConnIdleTime)
+	}
+
 	connectTimeout := defaultConnectTimeout
 	if opts.ConnectTimeoutMS > 0 {
 		connectTimeout = time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
 	}
 
-	connectFromURI := clientOpts.ConnectTimeout != nil && *clientOpts.ConnectTimeout > 0
+	connectFromURI := clientOpts.ConnectTimeout != nil
 	if connectFromURI {
 		connectTimeout = *clientOpts.ConnectTimeout
 	} else {
 		clientOpts.SetConnectTimeout(connectTimeout)
 	}
 
-	// Server selection is a separate limit: connectTimeoutMS bounds one socket connect,
-	// serverSelectionTimeoutMS bounds the selection loop around it, and that loop is what
-	// lets a scrape ride out an election instead of reporting mongodb_up 0. So it is
-	// derived from the connect timeout only when the URI said nothing about connecting
-	// either -- a URI carrying connectTimeoutMS alone keeps the driver's own default, as it
-	// did before this path was rewritten.
-	selectionTimeout := driverServerSelectionTimeout
+	selectionTimeout := defaultConnectTimeout
 	switch {
 	case clientOpts.ServerSelectionTimeout != nil && *clientOpts.ServerSelectionTimeout > 0:
 		selectionTimeout = *clientOpts.ServerSelectionTimeout
 	case !connectFromURI:
 		selectionTimeout = connectTimeout
-		clientOpts.SetServerSelectionTimeout(selectionTimeout)
 	}
+	clientOpts.SetServerSelectionTimeout(selectionTimeout)
 
-	// The budget has to cover whichever of the two runs longest, including a selection
-	// window left for the driver to default: bounding the attempt by the connect side alone
-	// would expire the caller's deadline while selection was still legitimately running.
-	budget := max(connectTimeout, selectionTimeout)
-
-	return clientOpts, budget, nil
+	return clientOpts, connectTimeout + selectionTimeout, nil
 }
 
 func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
@@ -592,8 +560,7 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 	return connectWith(ctx, clientOpts)
 }
 
-// connectWith is connect for a caller that already holds resolved options, so the pooled
-// path does not resolve the URI -- an SRV lookup among other things -- a second time.
+// connectWith is connect for a caller that already holds resolved options.
 func connectWith(ctx context.Context, clientOpts *options.ClientOptions) (*mongo.Client, error) {
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {

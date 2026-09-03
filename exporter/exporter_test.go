@@ -16,9 +16,11 @@
 package exporter
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -210,7 +213,7 @@ func TestConnect(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				res, err := http.Get(ts.URL) //nolint:noctx
-				assert.Nil(t, e.cachedClient())
+				assert.Nil(t, cachedClient(e))
 				assert.NoError(t, err)
 				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
@@ -244,7 +247,7 @@ func TestConnect(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				res, err := http.Get(ts.URL) //nolint:noctx
-				assert.NotNil(t, e.cachedClient())
+				assert.NotNil(t, cachedClient(e))
 				assert.NoError(t, err)
 				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
@@ -279,11 +282,21 @@ func newPooledExporter(t *testing.T) *Exporter {
 	}
 }
 
+// cachedClient returns the pooled client, or nil if none has been built yet.
+func cachedClient(e *Exporter) *mongo.Client {
+	if pooled := e.client.Load(); pooled != nil {
+		return pooled.Client
+	}
+
+	return nil
+}
+
 // blackHoleMongo returns the address of a listener that accepts connections and never
 // answers, so a driver handshake against it blocks until its own timeout rather than
 // failing fast the way a closed port would. The returned channel is closed once the first
-// connection has been accepted, which is when a connect is provably in flight.
-func blackHoleMongo(t *testing.T) (string, <-chan struct{}) {
+// connection has been accepted, which is when a connect is provably in flight, and the
+// counter says how many were accepted in all, which tells a hung handshake from a redial loop.
+func blackHoleMongo(t *testing.T) (string, <-chan struct{}, *atomic.Int32) {
 	t.Helper()
 
 	var listenCfg net.ListenConfig
@@ -292,26 +305,61 @@ func blackHoleMongo(t *testing.T) (string, <-chan struct{}) {
 	t.Cleanup(func() { _ = listener.Close() })
 
 	dialed := make(chan struct{})
+	var accepts atomic.Int32
 	go func() {
-		first := true
+		// Every accepted connection is kept until the listener closes. Dropping the reference
+		// would let the net package's finalizer close it at the next GC, and the driver would
+		// see a reset instead of a hung handshake.
+		var conns []net.Conn
+		defer func() {
+			for _, conn := range conns {
+				_ = conn.Close()
+			}
+		}()
+
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
 				return
 			}
-			if first {
+			conns = append(conns, conn)
+			if accepts.Add(1) == 1 {
 				close(dialed)
-				first = false
 			}
-			// Hold the connection open and stay silent. The process end closes it.
-			_ = conn
 		}
 	}()
 
-	return listener.Addr().String(), dialed
+	return listener.Addr().String(), dialed, &accepts
 }
 
-func TestGlobalConnPoolReplacesDisconnectedClient(t *testing.T) {
+// syncBuffer collects log output written from a flight's goroutine while the test reads it.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// bytes.Buffer.Write documents that its error is always nil.
+	n, _ := b.buf.Write(p)
+
+	return n, nil
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+// A client whose health check keeps failing is dropped, so the next scrape builds a new one.
+// Nothing else ever replaces the pooled client, so this is what picks up changes the driver
+// reads once, such as rotated TLS material. One failure is not enough: a scrape out of time
+// or a server mid-election is transient, and rebuilding would only add churn.
+func TestGlobalConnPoolDropsClientAfterRepeatedPingFailures(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -319,17 +367,19 @@ func TestGlobalConnPoolReplacesDisconnectedClient(t *testing.T) {
 
 	first, err := e.getClient(ctx)
 	require.NoError(t, err)
-	require.NotNil(t, first)
 
-	// Make the cached client permanently unusable. Every later Ping on it fails with
-	// ErrClientDisconnected, no matter how healthy the server is.
+	// Make every later Ping on the cached client fail, however healthy the server is.
 	require.NoError(t, first.Disconnect(ctx))
 
-	// The scrape that discovers it still fails, but it must not leave the dead client
-	// cached, or every later scrape would fail with it too.
+	for range maxConsecutivePingFailures - 1 {
+		_, err = e.getClient(ctx)
+		require.Error(t, err)
+		require.Same(t, first, cachedClient(e), "client was dropped before the failures added up")
+	}
+
 	_, err = e.getClient(ctx)
 	require.Error(t, err)
-	require.Nil(t, e.cachedClient(), "disconnected client stayed cached")
+	require.Nil(t, cachedClient(e), "failing client stayed cached")
 
 	second, err := e.getClient(ctx)
 	require.NoError(t, err)
@@ -368,12 +418,12 @@ func TestGlobalConnPoolCacheWarmsAfterScrapeGivesUp(t *testing.T) {
 	t.Parallel()
 
 	e := newPooledExporter(t)
+	// Keep the flight's budget under the wait below, so a flight still running when the test
+	// ends cannot land a client nobody disconnects.
+	e.opts.ConnectTimeoutMS = 5000
 	t.Cleanup(func() {
-		e.clientMu.RLock()
-		defer e.clientMu.RUnlock()
-
-		if e.client != nil {
-			_ = e.client.Disconnect(context.Background())
+		if client := cachedClient(e); client != nil {
+			_ = client.Disconnect(context.Background())
 		}
 	})
 
@@ -385,7 +435,7 @@ func TestGlobalConnPoolCacheWarmsAfterScrapeGivesUp(t *testing.T) {
 	require.Error(t, err)
 
 	require.Eventually(t, func() bool {
-		return e.cachedClient() != nil
+		return cachedClient(e) != nil
 	}, 15*time.Second, 50*time.Millisecond,
 		"the connect was cancelled along with the scrape, leaving the pool empty")
 }
@@ -397,7 +447,7 @@ func TestGlobalConnPoolScrapeGivesUpOnConnectInFlight(t *testing.T) {
 	t.Parallel()
 
 	e := newPooledExporter(t)
-	addr, dialed := blackHoleMongo(t)
+	addr, dialed, accepts := blackHoleMongo(t)
 	e.opts.URI = "mongodb://" + addr + "/admin"
 	e.opts.ConnectTimeoutMS = 3000
 
@@ -427,10 +477,80 @@ func TestGlobalConnPoolScrapeGivesUpOnConnectInFlight(t *testing.T) {
 	assert.Less(t, elapsed, 4*budget,
 		"scrape waited for the in-flight connect instead of giving up on its budget")
 
+	// Well past the flight's budget of connect plus selection timeout.
 	select {
 	case <-inFlight:
-	case <-time.After(time.Duration(e.opts.ConnectTimeoutMS) * time.Millisecond * 2):
+	case <-time.After(10 * time.Second):
 		t.Fatal("the background connect never returned")
+	}
+
+	// A handshake the listener holds open is dialled once, or twice if the heartbeat times out
+	// and redials before selection gives up. A fixture that let the socket go would have handed
+	// the driver a reset every half second instead.
+	assert.LessOrEqual(t, accepts.Load(), int32(2), "the black hole did not hold the connection open")
+}
+
+// A flight nobody waits on any more still has to say why it failed: the scrapes that started
+// it logged only their own deadline, and nothing else sees the cause.
+func TestGlobalConnPoolLogsConnectFailureAfterScrapesGaveUp(t *testing.T) {
+	t.Parallel()
+
+	var logs syncBuffer
+	e := newPooledExporter(t)
+	e.logger = slog.New(slog.NewTextHandler(&logs, nil))
+	addr, _, _ := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	e.opts.ConnectTimeoutMS = 1000
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := e.getClient(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+
+	require.Eventually(t, func() bool {
+		return strings.Contains(logs.String(), "MongoDB connect attempt failed")
+	}, 5*time.Second, 50*time.Millisecond, "the flight's failure was never logged")
+	assert.Contains(t, logs.String(), "server selection error", "the log carries the cause, not just a deadline")
+}
+
+// singleflight re-raises a panic from a flight on a goroutine of its own, where nothing can
+// recover it, so a connect that panics has to come back as an error from inside the flight.
+func TestGlobalConnPoolBuildTurnsPanicIntoError(t *testing.T) {
+	t.Parallel()
+
+	// Nil options are the cheapest panic to hand the flight.
+	e := &Exporter{logger: promslog.New(&promslog.Config{})}
+
+	res := <-e.clientGroup.DoChan("", e.buildClient)
+	require.ErrorIs(t, res.Err, errConnectPanicked)
+}
+
+// New warms the pool in the background only when there is a pool to warm. Without one a
+// connect at startup serves nobody, since every scrape builds its own client.
+func TestNewConnectsAtStartupOnlyForPool(t *testing.T) {
+	t.Parallel()
+
+	for name, pool := range map[string]bool{"pool on": true, "pool off": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			addr, dialed, _ := blackHoleMongo(t)
+			New(&Opts{
+				Logger:           promslog.New(&promslog.Config{}),
+				URI:              "mongodb://" + addr + "/admin",
+				GlobalConnPool:   pool,
+				DirectConnect:    true,
+				ConnectTimeoutMS: 1000,
+			})
+
+			select {
+			case <-dialed:
+				assert.True(t, pool, "startup connected although every scrape builds its own client")
+			case <-time.After(2 * time.Second):
+				assert.False(t, pool, "the pool was not warmed at startup")
+			}
+		})
 	}
 }
 
@@ -450,7 +570,7 @@ func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {
 
 	_, err = e.getClient(expired)
 	require.Error(t, err)
-	assert.Same(t, first, e.cachedClient(), "healthy client was dropped after a transient error")
+	assert.Same(t, first, cachedClient(e), "healthy client was dropped after a transient error")
 }
 
 // How this test works?
@@ -663,38 +783,42 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 	tests := map[string]struct {
 		uri              string
 		connectTimeoutMS int
-		wantBudget       time.Duration
+		wantConnect      time.Duration
 		wantSelection    time.Duration
-		// wantDriverSelection expects serverSelectionTimeoutMS to be left unset, so the
-		// driver applies its own default rather than the exporter narrowing the window.
-		wantDriverSelection bool
+		wantBudget       time.Duration
 	}{
-		// connectTimeoutMS says nothing about how long selection may take, so selection is
-		// left to the driver. Deriving it from the connect timeout would shrink the window a
+		// connectTimeoutMS says nothing about how long selection may take, so selection keeps
+		// the driver's default. Deriving it from the connect timeout would shrink the window a
 		// scrape needs to ride out an election.
-		"connect timeout in the uri leaves selection to the driver": {
-			uri:                 uri + "?connectTimeoutMS=8000",
-			connectTimeoutMS:    5000,
-			wantBudget:          driverServerSelectionTimeout,
-			wantDriverSelection: true,
+		"connect timeout in the uri keeps the default selection window": {
+			uri:              uri + "?connectTimeoutMS=8000",
+			connectTimeoutMS: 5000,
+			wantConnect:      8 * time.Second,
+			wantSelection:    defaultConnectTimeout,
+			wantBudget:       8*time.Second + defaultConnectTimeout,
 		},
-		"short connect timeout in the uri still leaves selection to the driver": {
-			uri:                 uri + "?connectTimeoutMS=1000",
-			connectTimeoutMS:    5000,
-			wantBudget:          driverServerSelectionTimeout,
-			wantDriverSelection: true,
+		// A zero connect timeout is the driver's "no dial timeout", not an unset one: the flag
+		// must not replace it, nor selection be narrowed as if the URI had said nothing.
+		"zero connect timeout in the uri is passed through": {
+			uri:              uri + "?connectTimeoutMS=0",
+			connectTimeoutMS: 5000,
+			wantConnect:      0,
+			wantSelection:    defaultConnectTimeout,
+			wantBudget:       defaultConnectTimeout,
 		},
 		"flag applies when the uri is silent": {
 			uri:              uri,
 			connectTimeoutMS: 5000,
-			wantBudget:       5 * time.Second,
+			wantConnect:      5 * time.Second,
 			wantSelection:    5 * time.Second,
+			wantBudget:       10 * time.Second,
 		},
 		"explicit selection timeout in the uri is left alone": {
 			uri:              uri + "?connectTimeoutMS=8000&serverSelectionTimeoutMS=2000",
 			connectTimeoutMS: 5000,
-			wantBudget:       8 * time.Second,
+			wantConnect:      8 * time.Second,
 			wantSelection:    2 * time.Second,
+			wantBudget:       10 * time.Second,
 		},
 		// The reverse ordering is the one that used to break: taking the budget from the
 		// connect side alone expired the caller's deadline at 2s while the operator's 8s
@@ -703,20 +827,32 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 		"selection timeout longer than connect widens the budget": {
 			uri:              uri + "?connectTimeoutMS=2000&serverSelectionTimeoutMS=8000",
 			connectTimeoutMS: 5000,
-			wantBudget:       8 * time.Second,
+			wantConnect:      2 * time.Second,
 			wantSelection:    8 * time.Second,
+			wantBudget:       10 * time.Second,
 		},
 		"selection timeout alone widens the budget past the flag": {
 			uri:              uri + "?serverSelectionTimeoutMS=8000",
 			connectTimeoutMS: 5000,
-			wantBudget:       8 * time.Second,
+			wantConnect:      5 * time.Second,
 			wantSelection:    8 * time.Second,
+			wantBudget:       13 * time.Second,
+		},
+		// The driver would select forever, and the connect with it, leaving the pool empty for
+		// good. The driver is told the fallback too, so the caller's deadline agrees with it.
+		"zero selection timeout in the uri falls back rather than asking for no timeout": {
+			uri:              uri + "?connectTimeoutMS=5000&serverSelectionTimeoutMS=0",
+			connectTimeoutMS: 5000,
+			wantConnect:      5 * time.Second,
+			wantSelection:    defaultConnectTimeout,
+			wantBudget:       5*time.Second + defaultConnectTimeout,
 		},
 		"neither set falls back rather than asking for no timeout": {
 			uri:              uri,
 			connectTimeoutMS: 0,
-			wantBudget:       defaultConnectTimeout,
+			wantConnect:      defaultConnectTimeout,
 			wantSelection:    defaultConnectTimeout,
+			wantBudget:       2 * defaultConnectTimeout,
 		},
 	}
 
@@ -727,22 +863,32 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 			clientOpts, budget, err := clientOptionsFor(&Opts{URI: test.uri, ConnectTimeoutMS: test.connectTimeoutMS})
 			require.NoError(t, err)
 
-			assert.Equal(t, test.wantBudget, budget, "budget a caller would bound the attempt with")
-
-			if test.wantDriverSelection {
-				assert.Nil(t, clientOpts.ServerSelectionTimeout,
-					"selection was narrowed instead of being left to the driver")
-			} else {
-				require.NotNil(t, clientOpts.ServerSelectionTimeout,
-					"unset would leave the driver's own default, which this case does not intend")
-				assert.Equal(t, test.wantSelection, *clientOpts.ServerSelectionTimeout)
-			}
-
 			require.NotNil(t, clientOpts.ConnectTimeout)
-			assert.LessOrEqual(t, *clientOpts.ConnectTimeout, budget,
-				"the driver must not be given longer than the caller will wait")
+			assert.Equal(t, test.wantConnect, *clientOpts.ConnectTimeout)
+			require.NotNil(t, clientOpts.ServerSelectionTimeout,
+				"unset would leave the driver to decide, and the budget could not follow it")
+			assert.Equal(t, test.wantSelection, *clientOpts.ServerSelectionTimeout)
+			assert.Equal(t, test.wantBudget, budget, "budget a caller would bound the attempt with")
 		})
 	}
+}
+
+// The driver never prunes idle connections by default and reuses them without checking they
+// are still open, so a socket a middlebox dropped between scrapes would fail the next one.
+func TestClientOptionsForPrunesIdleConnections(t *testing.T) {
+	t.Parallel()
+
+	const uri = "mongodb://127.0.0.1:27017/admin"
+
+	clientOpts, _, err := clientOptionsFor(&Opts{URI: uri})
+	require.NoError(t, err)
+	require.NotNil(t, clientOpts.MaxConnIdleTime, "idle connections would never be pruned")
+	assert.Equal(t, defaultMaxConnIdleTime, *clientOpts.MaxConnIdleTime)
+
+	clientOpts, _, err = clientOptionsFor(&Opts{URI: uri + "?maxIdleTimeMS=1000"})
+	require.NoError(t, err)
+	require.NotNil(t, clientOpts.MaxConnIdleTime)
+	assert.Equal(t, time.Second, *clientOpts.MaxConnIdleTime, "the uri's own setting was overridden")
 }
 
 // A flight must never displace a client already in the cache. singleflight retires its key
@@ -765,5 +911,5 @@ func TestGlobalConnPoolBuildDoesNotOrphanCachedClient(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Same(t, first, got, "the flight connected again instead of taking the cached client")
-	assert.Same(t, first, e.cachedClient(), "the cached client was displaced, and nothing disconnects it")
+	assert.Same(t, first, cachedClient(e), "the cached client was displaced, and nothing disconnects it")
 }

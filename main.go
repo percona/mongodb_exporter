@@ -52,7 +52,7 @@ type GlobalFlags struct {
 	TLSConfigPath         string   `help:"Path to the file having Prometheus TLS config for basic auth"     name:"web.config"`
 	TimeoutOffset         int      `default:"1"                                                             help:"Offset to subtract from the request timeout in seconds"                                                                                  name:"web.timeout-offset"`
 	LogLevel              string   `default:"error"                                                         enum:"debug,info,warn,error,fatal"                                                                                                             help:"Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]" name:"log.level"`
-	ConnectTimeoutMS      int      `default:"5000"                                                          help:"Connection timeout in milliseconds"                                                                                                      name:"mongodb.connect-timeout-ms"`
+	ConnectTimeoutMS      int      `default:"5000"                                                          help:"Connection timeout in milliseconds, unless the URI sets connectTimeoutMS. 0 falls back to 30s rather than no timeout"                    name:"mongodb.connect-timeout-ms"`
 
 	EnableExporterMetrics          bool `default:"True"                                                            help:"Enable collecting metrics about the exporter itself (process_*, go_*)" name:"collector.exporter-metrics" negatable:""`
 	EnableDiagnosticData           bool `help:"Enable collecting metrics from getDiagnosticData"                   name:"collector.diagnosticdata"`
