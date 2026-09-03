@@ -665,12 +665,24 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 		connectTimeoutMS int
 		wantBudget       time.Duration
 		wantSelection    time.Duration
+		// wantDriverSelection expects serverSelectionTimeoutMS to be left unset, so the
+		// driver applies its own default rather than the exporter narrowing the window.
+		wantDriverSelection bool
 	}{
-		"uri outranks the flag": {
-			uri:              uri + "?connectTimeoutMS=8000",
-			connectTimeoutMS: 5000,
-			wantBudget:       8 * time.Second,
-			wantSelection:    8 * time.Second,
+		// connectTimeoutMS says nothing about how long selection may take, so selection is
+		// left to the driver. Deriving it from the connect timeout would shrink the window a
+		// scrape needs to ride out an election.
+		"connect timeout in the uri leaves selection to the driver": {
+			uri:                 uri + "?connectTimeoutMS=8000",
+			connectTimeoutMS:    5000,
+			wantBudget:          driverServerSelectionTimeout,
+			wantDriverSelection: true,
+		},
+		"short connect timeout in the uri still leaves selection to the driver": {
+			uri:                 uri + "?connectTimeoutMS=1000",
+			connectTimeoutMS:    5000,
+			wantBudget:          driverServerSelectionTimeout,
+			wantDriverSelection: true,
 		},
 		"flag applies when the uri is silent": {
 			uri:              uri,
@@ -717,9 +729,14 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 
 			assert.Equal(t, test.wantBudget, budget, "budget a caller would bound the attempt with")
 
-			require.NotNil(t, clientOpts.ServerSelectionTimeout,
-				"unset means the driver's own 30s default, which the budget then truncates")
-			assert.Equal(t, test.wantSelection, *clientOpts.ServerSelectionTimeout)
+			if test.wantDriverSelection {
+				assert.Nil(t, clientOpts.ServerSelectionTimeout,
+					"selection was narrowed instead of being left to the driver")
+			} else {
+				require.NotNil(t, clientOpts.ServerSelectionTimeout,
+					"unset would leave the driver's own default, which this case does not intend")
+				assert.Equal(t, test.wantSelection, *clientOpts.ServerSelectionTimeout)
+			}
 
 			require.NotNil(t, clientOpts.ConnectTimeout)
 			assert.LessOrEqual(t, *clientOpts.ConnectTimeout, budget,

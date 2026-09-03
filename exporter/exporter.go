@@ -107,6 +107,12 @@ const (
 	// 0, which it reads as no timeout at all, and an unanswering server would block a
 	// connect for the lifetime of the process.
 	defaultConnectTimeout = 30 * time.Second
+
+	// driverServerSelectionTimeout is what the driver applies when ServerSelectionTimeout is
+	// left unset -- defaultServerSelectionTimeout in x/mongo/driver/topology. Mirrored here
+	// so the connect budget can cover a selection window the exporter deliberately leaves
+	// the driver to choose.
+	driverServerSelectionTimeout = 30 * time.Second
 )
 
 // New connects to the database and returns a new Exporter instance.
@@ -528,7 +534,9 @@ func (e *Exporter) buildClient() (any, error) {
 //
 // A connectTimeoutMS in the URI wins over --mongodb.connect-timeout-ms, being the more
 // specific instruction; with neither usable the budget falls back to defaultConnectTimeout,
-// since the driver reads 0 as no timeout at all.
+// since the driver reads 0 as no timeout at all. serverSelectionTimeoutMS is left to the
+// driver unless the URI or the flag gave a connect timeout to derive it from, so the budget
+// accounts for the driver's default as well as the values actually set.
 func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error) {
 	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
@@ -538,29 +546,39 @@ func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error)
 	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
-	// Fill in whatever the URI left unset. Neither may be left at zero, which the driver
-	// reads as no timeout at all.
-	if clientOpts.ConnectTimeout == nil || *clientOpts.ConnectTimeout <= 0 {
-		fromFlag := defaultConnectTimeout
-		if opts.ConnectTimeoutMS > 0 {
-			fromFlag = time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
-		}
-
-		clientOpts.SetConnectTimeout(fromFlag)
+	// The connect timeout comes from the URI, else the flag, else the default. It may not be
+	// left at zero, which the driver reads as no timeout at all.
+	connectTimeout := defaultConnectTimeout
+	if opts.ConnectTimeoutMS > 0 {
+		connectTimeout = time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
 	}
 
-	// An explicit serverSelectionTimeoutMS is the operator's instruction and is kept as
-	// given; only when the URI is silent does it mirror the connect timeout.
-	if clientOpts.ServerSelectionTimeout == nil || *clientOpts.ServerSelectionTimeout <= 0 {
-		clientOpts.SetServerSelectionTimeout(*clientOpts.ConnectTimeout)
+	connectFromURI := clientOpts.ConnectTimeout != nil && *clientOpts.ConnectTimeout > 0
+	if connectFromURI {
+		connectTimeout = *clientOpts.ConnectTimeout
+	} else {
+		clientOpts.SetConnectTimeout(connectTimeout)
 	}
 
-	// The budget has to cover whichever of the two runs longest. They bound different
-	// things -- connectTimeoutMS one socket connect, serverSelectionTimeoutMS the selection
-	// loop around it -- so taking only the connect side would let a caller's deadline
-	// expire while an explicitly longer selection window was still running, reporting the
-	// caller's own deadline instead of the setting the operator asked for.
-	budget := max(*clientOpts.ConnectTimeout, *clientOpts.ServerSelectionTimeout)
+	// Server selection is a separate limit: connectTimeoutMS bounds one socket connect,
+	// serverSelectionTimeoutMS bounds the selection loop around it, and that loop is what
+	// lets a scrape ride out an election instead of reporting mongodb_up 0. So it is
+	// derived from the connect timeout only when the URI said nothing about connecting
+	// either -- a URI carrying connectTimeoutMS alone keeps the driver's own default, as it
+	// did before this path was rewritten.
+	selectionTimeout := driverServerSelectionTimeout
+	switch {
+	case clientOpts.ServerSelectionTimeout != nil && *clientOpts.ServerSelectionTimeout > 0:
+		selectionTimeout = *clientOpts.ServerSelectionTimeout
+	case !connectFromURI:
+		selectionTimeout = connectTimeout
+		clientOpts.SetServerSelectionTimeout(selectionTimeout)
+	}
+
+	// The budget has to cover whichever of the two runs longest, including a selection
+	// window left for the driver to default: bounding the attempt by the connect side alone
+	// would expire the caller's deadline while selection was still legitimately running.
+	budget := max(connectTimeout, selectionTimeout)
 
 	return clientOpts, budget, nil
 }
