@@ -371,7 +371,7 @@ func TestGlobalConnPoolDropsClientAfterRepeatedPingFailures(t *testing.T) {
 	// A client that cannot reach its server fails every health check with a selection error.
 	// That is the transient-looking failure the counter exists for, as opposed to the
 	// disconnected sentinel, which is dropped on sight and so would not exercise it.
-	clientOpts, _, err := clientOptionsFor(e.opts)
+	clientOpts, err := clientOptionsFor(e.opts)
 	require.NoError(t, err)
 	unreachable, err := mongo.Connect(ctx, clientOpts)
 	require.NoError(t, err)
@@ -812,76 +812,100 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 	tests := map[string]struct {
 		uri              string
 		connectTimeoutMS int
-		wantConnect      time.Duration
-		wantSelection    time.Duration
-		wantBudget       time.Duration
+		// wantConnect and wantSelection are what a per-scrape client is given, where the
+		// scrape's own context is the bound and a zero is honoured as "no timeout".
+		wantConnect   time.Duration
+		wantSelection time.Duration
+		// wantBoundedConnect, wantBoundedSelection and wantBudget are what the detached pooled
+		// connect is given, where a zero would mean the pool could never fill.
+		wantBoundedConnect   time.Duration
+		wantBoundedSelection time.Duration
+		wantBudget           time.Duration
 	}{
 		// connectTimeoutMS says nothing about how long selection may take, so selection keeps
 		// the driver's default. Deriving it from the connect timeout would shrink the window a
 		// scrape needs to ride out an election.
 		"connect timeout in the uri keeps the default selection window": {
-			uri:              uri + "?connectTimeoutMS=8000",
-			connectTimeoutMS: 5000,
-			wantConnect:      8 * time.Second,
-			wantSelection:    defaultConnectTimeout,
-			wantBudget:       8*time.Second + defaultConnectTimeout,
+			uri:                  uri + "?connectTimeoutMS=8000",
+			connectTimeoutMS:     5000,
+			wantConnect:          8 * time.Second,
+			wantSelection:        defaultConnectTimeout,
+			wantBoundedConnect:   8 * time.Second,
+			wantBoundedSelection: defaultConnectTimeout,
+			wantBudget:           8*time.Second + defaultConnectTimeout,
 		},
 		// A zero connect timeout is the driver's "no dial timeout", not an unset one: the flag
-		// must not replace it, nor selection be narrowed as if the URI had said nothing.
-		"zero connect timeout in the uri is passed through": {
-			uri:              uri + "?connectTimeoutMS=0",
-			connectTimeoutMS: 5000,
-			wantConnect:      0,
-			wantSelection:    defaultConnectTimeout,
-			wantBudget:       defaultConnectTimeout,
+		// must not replace it, nor selection be narrowed as if the URI had said nothing. Only
+		// the detached pooled connect, which has no caller's context to stop it, replaces it.
+		"zero connect timeout in the uri is kept per scrape and bounded for the pool": {
+			uri:                  uri + "?connectTimeoutMS=0",
+			connectTimeoutMS:     5000,
+			wantConnect:          0,
+			wantSelection:        defaultConnectTimeout,
+			wantBoundedConnect:   defaultConnectTimeout,
+			wantBoundedSelection: defaultConnectTimeout,
+			wantBudget:           2 * defaultConnectTimeout,
 		},
 		"flag applies when the uri is silent": {
-			uri:              uri,
-			connectTimeoutMS: 5000,
-			wantConnect:      5 * time.Second,
-			wantSelection:    5 * time.Second,
-			wantBudget:       10 * time.Second,
+			uri:                  uri,
+			connectTimeoutMS:     5000,
+			wantConnect:          5 * time.Second,
+			wantSelection:        5 * time.Second,
+			wantBoundedConnect:   5 * time.Second,
+			wantBoundedSelection: 5 * time.Second,
+			wantBudget:           10 * time.Second,
 		},
 		"explicit selection timeout in the uri is left alone": {
-			uri:              uri + "?connectTimeoutMS=8000&serverSelectionTimeoutMS=2000",
-			connectTimeoutMS: 5000,
-			wantConnect:      8 * time.Second,
-			wantSelection:    2 * time.Second,
-			wantBudget:       10 * time.Second,
+			uri:                  uri + "?connectTimeoutMS=8000&serverSelectionTimeoutMS=2000",
+			connectTimeoutMS:     5000,
+			wantConnect:          8 * time.Second,
+			wantSelection:        2 * time.Second,
+			wantBoundedConnect:   8 * time.Second,
+			wantBoundedSelection: 2 * time.Second,
+			wantBudget:           10 * time.Second,
 		},
 		// The reverse ordering is the one that used to break: taking the budget from the
 		// connect side alone expired the caller's deadline at 2s while the operator's 8s
 		// selection window was still running, so the scrape reported its own deadline
 		// rather than the setting.
 		"selection timeout longer than connect widens the budget": {
-			uri:              uri + "?connectTimeoutMS=2000&serverSelectionTimeoutMS=8000",
-			connectTimeoutMS: 5000,
-			wantConnect:      2 * time.Second,
-			wantSelection:    8 * time.Second,
-			wantBudget:       10 * time.Second,
+			uri:                  uri + "?connectTimeoutMS=2000&serverSelectionTimeoutMS=8000",
+			connectTimeoutMS:     5000,
+			wantConnect:          2 * time.Second,
+			wantSelection:        8 * time.Second,
+			wantBoundedConnect:   2 * time.Second,
+			wantBoundedSelection: 8 * time.Second,
+			wantBudget:           10 * time.Second,
 		},
 		"selection timeout alone widens the budget past the flag": {
-			uri:              uri + "?serverSelectionTimeoutMS=8000",
-			connectTimeoutMS: 5000,
-			wantConnect:      5 * time.Second,
-			wantSelection:    8 * time.Second,
-			wantBudget:       13 * time.Second,
+			uri:                  uri + "?serverSelectionTimeoutMS=8000",
+			connectTimeoutMS:     5000,
+			wantConnect:          5 * time.Second,
+			wantSelection:        8 * time.Second,
+			wantBoundedConnect:   5 * time.Second,
+			wantBoundedSelection: 8 * time.Second,
+			wantBudget:           13 * time.Second,
 		},
-		// The driver would select forever, and the connect with it, leaving the pool empty for
-		// good. The driver is told the fallback too, so the caller's deadline agrees with it.
-		"zero selection timeout in the uri falls back rather than asking for no timeout": {
-			uri:              uri + "?connectTimeoutMS=5000&serverSelectionTimeoutMS=0",
-			connectTimeoutMS: 5000,
-			wantConnect:      5 * time.Second,
-			wantSelection:    defaultConnectTimeout,
-			wantBudget:       5*time.Second + defaultConnectTimeout,
+		// A per-scrape client keeps the zero: the scrape's context is the bound the operator
+		// asked for. The pooled connect has no such bound, and would select forever, leaving
+		// the pool empty for good, so there the zero becomes the fallback.
+		"zero selection timeout in the uri is kept per scrape and bounded for the pool": {
+			uri:                  uri + "?connectTimeoutMS=5000&serverSelectionTimeoutMS=0",
+			connectTimeoutMS:     5000,
+			wantConnect:          5 * time.Second,
+			wantSelection:        0,
+			wantBoundedConnect:   5 * time.Second,
+			wantBoundedSelection: defaultConnectTimeout,
+			wantBudget:           5*time.Second + defaultConnectTimeout,
 		},
-		"neither set falls back rather than asking for no timeout": {
-			uri:              uri,
-			connectTimeoutMS: 0,
-			wantConnect:      defaultConnectTimeout,
-			wantSelection:    defaultConnectTimeout,
-			wantBudget:       2 * defaultConnectTimeout,
+		"nothing set leaves the scrape in charge and falls back for the pool": {
+			uri:                  uri,
+			connectTimeoutMS:     0,
+			wantConnect:          0,
+			wantSelection:        0,
+			wantBoundedConnect:   defaultConnectTimeout,
+			wantBoundedSelection: defaultConnectTimeout,
+			wantBudget:           2 * defaultConnectTimeout,
 		},
 	}
 
@@ -889,14 +913,22 @@ func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			clientOpts, budget, err := clientOptionsFor(&Opts{URI: test.uri, ConnectTimeoutMS: test.connectTimeoutMS})
+			clientOpts, err := clientOptionsFor(&Opts{URI: test.uri, ConnectTimeoutMS: test.connectTimeoutMS})
 			require.NoError(t, err)
 
 			require.NotNil(t, clientOpts.ConnectTimeout)
-			assert.Equal(t, test.wantConnect, *clientOpts.ConnectTimeout)
+			assert.Equal(t, test.wantConnect, *clientOpts.ConnectTimeout,
+				"connect timeout a per-scrape client is given")
 			require.NotNil(t, clientOpts.ServerSelectionTimeout,
 				"unset would leave the driver to decide, and the budget could not follow it")
-			assert.Equal(t, test.wantSelection, *clientOpts.ServerSelectionTimeout)
+			assert.Equal(t, test.wantSelection, *clientOpts.ServerSelectionTimeout,
+				"selection timeout a per-scrape client is given")
+
+			budget := boundConnect(clientOpts)
+			assert.Equal(t, test.wantBoundedConnect, *clientOpts.ConnectTimeout,
+				"connect timeout the detached pooled connect is given")
+			assert.Equal(t, test.wantBoundedSelection, *clientOpts.ServerSelectionTimeout,
+				"selection timeout the detached pooled connect is given")
 			assert.Equal(t, test.wantBudget, budget, "budget a caller would bound the attempt with")
 		})
 	}
@@ -909,12 +941,12 @@ func TestClientOptionsForPrunesIdleConnections(t *testing.T) {
 
 	const uri = "mongodb://127.0.0.1:27017/admin"
 
-	clientOpts, _, err := clientOptionsFor(&Opts{URI: uri})
+	clientOpts, err := clientOptionsFor(&Opts{URI: uri})
 	require.NoError(t, err)
 	require.NotNil(t, clientOpts.MaxConnIdleTime, "idle connections would never be pruned")
 	assert.Equal(t, defaultMaxConnIdleTime, *clientOpts.MaxConnIdleTime)
 
-	clientOpts, _, err = clientOptionsFor(&Opts{URI: uri + "?maxIdleTimeMS=1000"})
+	clientOpts, err = clientOptionsFor(&Opts{URI: uri + "?maxIdleTimeMS=1000"})
 	require.NoError(t, err)
 	require.NotNil(t, clientOpts.MaxConnIdleTime)
 	assert.Equal(t, time.Second, *clientOpts.MaxConnIdleTime, "the uri's own setting was overridden")

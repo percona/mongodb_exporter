@@ -494,12 +494,12 @@ func (e *Exporter) buildClient() (_ any, err error) {
 	// Resolved here rather than on the caller's goroutine: for mongodb+srv:// this performs
 	// SRV and TXT lookups through net.LookupSRV, which takes no context, so a slow resolver
 	// can only delay the pool, not a scrape's response.
-	clientOpts, connectTimeout, err := clientOptionsFor(e.opts)
+	clientOpts, err := clientOptionsFor(e.opts)
 	if err != nil {
 		return nil, err
 	}
 
-	connectCtx, cancel := context.WithTimeout(context.Background(), connectTimeout)
+	connectCtx, cancel := context.WithTimeout(context.Background(), boundConnect(clientOpts))
 	defer cancel()
 
 	newClient, err := connectWith(connectCtx, clientOpts)
@@ -516,20 +516,21 @@ func (e *Exporter) buildClient() (_ any, err error) {
 	return newClient, nil
 }
 
-// clientOptionsFor builds the driver options for opts and returns, alongside them, the
-// budget one connect attempt gets. The driver spends its connect and server-selection
-// timeouts in sequence, so the budget is their sum, and a caller that bounds the attempt
-// with it never cuts short a wait the operator configured.
+// clientOptionsFor builds the driver options for opts, as the URI and the flag ask for them.
 //
-// connectTimeoutMS in the URI wins over --mongodb.connect-timeout-ms; a zero there is the
-// driver's "no dial timeout" and is passed through. Server selection is taken from the URI,
-// else derived from the flag's connect timeout, else the driver's default. A zero selection
-// timeout, or a zero flag, would mean no timeout at all and is replaced by
-// defaultConnectTimeout: a connect has to finish for the pool to ever fill.
-func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error) {
+// connectTimeoutMS in the URI wins over --mongodb.connect-timeout-ms. Server selection is
+// taken from the URI, else it follows the flag's connect timeout so that one flag bounds the
+// whole attempt -- but not when the URI set only connectTimeoutMS, since narrowing selection
+// to a dial timeout the operator chose for a different purpose would cost a scrape the window
+// it needs to ride out an election.
+//
+// A zero from either source is the driver's "no timeout at all", and is passed through: the
+// caller's context is then the only bound, which is what an operator who writes a zero is
+// asking for. A connect with no such caller has to call boundConnect first.
+func clientOptionsFor(opts *Opts) (*options.ClientOptions, error) {
 	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
-		return nil, 0, fmt.Errorf("invalid dsn: %w", err)
+		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
 
 	clientOpts.SetDirect(opts.DirectConnect)
@@ -539,7 +540,7 @@ func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error)
 		clientOpts.SetMaxConnIdleTime(defaultMaxConnIdleTime)
 	}
 
-	connectTimeout := defaultConnectTimeout
+	var connectTimeout time.Duration
 	if opts.ConnectTimeoutMS > 0 {
 		connectTimeout = time.Duration(opts.ConnectTimeoutMS) * time.Millisecond
 	}
@@ -547,24 +548,48 @@ func clientOptionsFor(opts *Opts) (*options.ClientOptions, time.Duration, error)
 	connectFromURI := clientOpts.ConnectTimeout != nil
 	if connectFromURI {
 		connectTimeout = *clientOpts.ConnectTimeout
-	} else {
-		clientOpts.SetConnectTimeout(connectTimeout)
+	}
+
+	selectionTimeout := connectTimeout
+	switch {
+	case clientOpts.ServerSelectionTimeout != nil:
+		selectionTimeout = *clientOpts.ServerSelectionTimeout
+	case connectFromURI:
+		selectionTimeout = defaultConnectTimeout
+	}
+
+	clientOpts.SetConnectTimeout(connectTimeout)
+	clientOpts.SetServerSelectionTimeout(selectionTimeout)
+
+	return clientOpts, nil
+}
+
+// boundConnect makes clientOpts safe for a connect that no caller's context bounds -- the
+// pooled one, which runs detached so that a scrape shorter than a connect cannot leave the
+// pool permanently empty. A timeout of zero means no timeout at all to the driver, so one
+// unanswered connect would hold the pool empty for the life of the process. It returns the
+// budget that connect must be given: the driver spends its two timeouts in sequence, so the
+// budget is their sum, and a caller bounding the attempt with it never cuts short a wait the
+// operator configured.
+func boundConnect(clientOpts *options.ClientOptions) time.Duration {
+	connectTimeout := defaultConnectTimeout
+	if clientOpts.ConnectTimeout != nil && *clientOpts.ConnectTimeout > 0 {
+		connectTimeout = *clientOpts.ConnectTimeout
 	}
 
 	selectionTimeout := defaultConnectTimeout
-	switch {
-	case clientOpts.ServerSelectionTimeout != nil && *clientOpts.ServerSelectionTimeout > 0:
+	if clientOpts.ServerSelectionTimeout != nil && *clientOpts.ServerSelectionTimeout > 0 {
 		selectionTimeout = *clientOpts.ServerSelectionTimeout
-	case !connectFromURI:
-		selectionTimeout = connectTimeout
 	}
+
+	clientOpts.SetConnectTimeout(connectTimeout)
 	clientOpts.SetServerSelectionTimeout(selectionTimeout)
 
-	return clientOpts, connectTimeout + selectionTimeout, nil
+	return connectTimeout + selectionTimeout
 }
 
 func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
-	clientOpts, _, err := clientOptionsFor(opts)
+	clientOpts, err := clientOptionsFor(opts)
 	if err != nil {
 		return nil, err
 	}
