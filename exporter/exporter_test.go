@@ -357,9 +357,40 @@ func (b *syncBuffer) String() string {
 
 // A client whose health check keeps failing is dropped, so the next scrape builds a new one.
 // Nothing else ever replaces the pooled client, so this is what picks up changes the driver
-// reads once, such as rotated TLS material. One failure is not enough: a scrape out of time
-// or a server mid-election is transient, and rebuilding would only add churn.
+// reads once, such as rotated TLS material. One failure is not enough: a server mid-election
+// recovers on its own, and rebuilding would only add churn.
 func TestGlobalConnPoolDropsClientAfterRepeatedPingFailures(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	e := newPooledExporter(t)
+	addr, _, _ := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	e.opts.ConnectTimeoutMS = 200
+
+	// A client that cannot reach its server fails every health check with a selection error.
+	// That is the transient-looking failure the counter exists for, as opposed to the
+	// disconnected sentinel, which is dropped on sight and so would not exercise it.
+	clientOpts, _, err := clientOptionsFor(e.opts)
+	require.NoError(t, err)
+	unreachable, err := mongo.Connect(ctx, clientOpts)
+	require.NoError(t, err)
+	e.client.Store(&pooledClient{Client: unreachable})
+
+	for range maxConsecutivePingFailures - 1 {
+		_, err = e.getClient(ctx)
+		require.Error(t, err)
+		require.Same(t, unreachable, cachedClient(e), "client was dropped before the failures added up")
+	}
+
+	_, err = e.getClient(ctx)
+	require.Error(t, err)
+	require.Nil(t, cachedClient(e), "failing client stayed cached")
+}
+
+// A disconnected client never recovers, so waiting for it to fail the count out would report
+// mongodb_up 0 for scrapes that could have been served by a new client.
+func TestGlobalConnPoolDropsDisconnectedClientAtOnce(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -367,19 +398,11 @@ func TestGlobalConnPoolDropsClientAfterRepeatedPingFailures(t *testing.T) {
 
 	first, err := e.getClient(ctx)
 	require.NoError(t, err)
-
-	// Make every later Ping on the cached client fail, however healthy the server is.
 	require.NoError(t, first.Disconnect(ctx))
-
-	for range maxConsecutivePingFailures - 1 {
-		_, err = e.getClient(ctx)
-		require.Error(t, err)
-		require.Same(t, first, cachedClient(e), "client was dropped before the failures added up")
-	}
 
 	_, err = e.getClient(ctx)
 	require.Error(t, err)
-	require.Nil(t, cachedClient(e), "failing client stayed cached")
+	require.Nil(t, cachedClient(e), "disconnected client stayed cached")
 
 	second, err := e.getClient(ctx)
 	require.NoError(t, err)
@@ -554,6 +577,10 @@ func TestNewConnectsAtStartupOnlyForPool(t *testing.T) {
 	}
 }
 
+// A scrape that runs out of time must not cost us the pool: the client is healthy, only that
+// request is over. This has to hold however many of them expire, because concurrent scrapes
+// of one target run out independently -- counting them would let three that expire together
+// evict a client with nothing wrong with it.
 func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {
 	t.Parallel()
 
@@ -563,14 +590,16 @@ func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
 
-	// A scrape that runs out of time must not cost us the pool: the client is healthy,
-	// only this request is over.
-	expired, cancel := context.WithCancel(t.Context())
-	cancel()
+	for range maxConsecutivePingFailures + 1 {
+		expired, cancel := context.WithCancel(t.Context())
+		cancel()
 
-	_, err = e.getClient(expired)
-	require.Error(t, err)
-	assert.Same(t, first, cachedClient(e), "healthy client was dropped after a transient error")
+		_, err = e.getClient(expired)
+		require.Error(t, err)
+		require.Same(t, first, cachedClient(e), "healthy client was dropped after a scrape ran out of time")
+	}
+
+	assert.NoError(t, first.Ping(t.Context(), nil), "the client the scrapes gave up on is still usable")
 }
 
 // How this test works?

@@ -310,13 +310,25 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 			return pooled.Client, nil
 		}
 
-		// One failed health check is transient -- an unreachable server, a scrape out of time --
-		// and the driver reconnects its pool on its own. A client that keeps failing is dropped
-		// so the next scrape builds one from scratch: that is the only way to pick up what the
-		// driver reads once, such as rotated TLS material.
-		if pooled.pingFailures.Add(1) >= maxConsecutivePingFailures && e.client.CompareAndSwap(pooled, nil) {
-			e.logger.Warn("Dropping MongoDB client after repeated failed health checks, reconnecting on next scrape", "error", err)
-			_ = pooled.Disconnect(ctx)
+		// A scrape that ran out of its own budget says nothing about the client's health, so it
+		// must not count: concurrent scrapes of one target expire independently, and counting
+		// them would let three of them evict a perfectly healthy client. A disconnected client
+		// is the opposite case and never recovers, so it need not fail twice more first.
+		// Everything else is transient until it repeats -- the driver reconnects its own pool,
+		// a server mid-election recovers on its own -- and a client that keeps failing is
+		// dropped so the next scrape builds one from scratch. That rebuild is the only thing
+		// that picks up what the driver reads once, such as rotated TLS material.
+		drop := errors.Is(err, mongo.ErrClientDisconnected) ||
+			(ctx.Err() == nil && pooled.pingFailures.Add(1) >= maxConsecutivePingFailures)
+
+		// Disconnecting closes connections a concurrent scrape may still be collecting on, and
+		// that scrape fails. It has already failed every health check for three scrapes by now,
+		// so it was collecting against a broken client anyway, and the alternative is stranding
+		// its topology and monitor goroutines for the life of the process. The disconnect is
+		// detached from this scrape's deadline so ending the request cannot cut it short.
+		if drop && e.client.CompareAndSwap(pooled, nil) {
+			e.logger.Warn("Dropping unusable MongoDB client, reconnecting on next scrape", "error", err)
+			_ = pooled.Disconnect(context.WithoutCancel(ctx))
 		}
 
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
