@@ -374,6 +374,15 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 			return nil, res.Err
 		}
 
+		// A flight that finished before this select leaves its result waiting in the channel,
+		// so both cases can be ready and select picks between them at random. A scrape with
+		// nothing left of its budget gets the same answer here as it does from a cached
+		// client: every command on that context would fail on the deadline anyway. The client
+		// itself is cached by now, so the next scrape has it.
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("cannot connect to MongoDB: %w", ctx.Err())
+		}
+
 		return res.Val.(*mongo.Client), nil //nolint:forcetypeassert
 	case <-ctx.Done():
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", ctx.Err())
