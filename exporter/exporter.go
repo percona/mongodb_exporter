@@ -717,8 +717,11 @@ func connectWith(ctx context.Context, clientOpts *options.ClientOptions) (*mongo
 	// is reachable, and a connect that fails on it leaves the caller with no client at all.
 	err = client.Ping(ctx, readpref.PrimaryPreferred())
 	if err != nil {
-		// Ping failed. Close background connections. Error is ignored since the ping error is more relevant.
-		_ = client.Disconnect(ctx)
+		// Ping failed. Close background connections. Error is ignored since the ping error is more
+		// relevant. Stripping the deadline is what dropClient does and for the same reason: the
+		// driver reads one as a request to wait for checked-out connections, and implements that
+		// wait as a loop with a default branch, which spins on a core until the deadline passes.
+		_ = client.Disconnect(context.WithoutCancel(ctx))
 
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
 	}
