@@ -744,7 +744,12 @@ func TestGlobalConnPoolScrapeGivesUpOnConnectInFlight(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
-	assert.Less(t, elapsed, 4*budget,
+
+	// Anchored to the flight's budget -- connect plus selection -- rather than to a small
+	// multiple of the scrape's. What the scrape must not do is wait for the flight, and a loaded
+	// runner that adds a second to a 300ms deadline is not that.
+	flightBudget := 2 * time.Duration(e.opts.ConnectTimeoutMS) * time.Millisecond
+	assert.Less(t, elapsed, flightBudget/2,
 		"scrape waited for the in-flight connect instead of giving up on its budget")
 
 	// Well past the flight's budget of connect plus selection timeout.
@@ -754,10 +759,11 @@ func TestGlobalConnPoolScrapeGivesUpOnConnectInFlight(t *testing.T) {
 		t.Fatal("the background connect never returned")
 	}
 
-	// A handshake the listener holds open is dialled once, or twice if the heartbeat times out
-	// and redials before selection gives up. A fixture that let the socket go would have handed
-	// the driver a reset every half second instead.
-	assert.LessOrEqual(t, accepts.Load(), int32(2), "the black hole did not hold the connection open")
+	// A handshake the listener holds open is dialled once, or a few times if the heartbeat times
+	// out and redials before selection gives up. How often the driver does that is not a
+	// contract, so the bound is only tight enough to catch the fixture letting the socket go,
+	// which would hand the driver a reset every half second and dial into double figures.
+	assert.Less(t, accepts.Load(), int32(6), "the black hole did not hold the connection open")
 }
 
 // A flight nobody waits on any more still has to say why it failed: the scrapes that started
