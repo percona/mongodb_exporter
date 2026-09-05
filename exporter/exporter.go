@@ -67,19 +67,29 @@ func (p *pooledClient) generation() uint64 {
 	return p.health.Load() >> healthGenerationShift
 }
 
-// pass records a passing health check, retiring every check still in flight.
-func (p *pooledClient) pass() {
+// pass records a passing health check, retiring every check still in flight, and reports
+// whether the client may still be handed out. It may not once a failing check has taken the
+// count to the threshold: that check has claimed the eviction but has yet to swap the client
+// out of the cache, and the disconnect behind that swap would break whatever this scrape went
+// on to collect.
+func (p *pooledClient) pass() bool {
 	for {
 		current := p.health.Load()
+		if current&healthFailureMask >= maxConsecutivePingFailures {
+			return false
+		}
+
 		next := (current>>healthGenerationShift + 1) << healthGenerationShift
 		if p.health.CompareAndSwap(current, next) {
-			return
+			return true
 		}
 	}
 }
 
 // fail records a health check that began in generation gen and failed, and reports whether
 // the client has now failed maxConsecutivePingFailures checks without one passing in between.
+// Reaching the threshold is terminal: the count never comes back below it, which is what makes
+// the eviction a claim rather than an intention a later pass could overturn.
 func (p *pooledClient) fail(gen uint64) bool {
 	for {
 		current := p.health.Load()
@@ -141,6 +151,7 @@ var (
 	errCannotHandleType   = fmt.Errorf("don't know how to handle data type")
 	errUnexpectedDataType = fmt.Errorf("unexpected data type")
 	errConnectPanicked    = errors.New("cannot connect to MongoDB: connect panicked")
+	errClientEvicted      = errors.New("cannot connect to MongoDB: pooled client is being replaced")
 )
 
 const (
@@ -345,35 +356,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	}
 
 	if pooled := e.client.Load(); pooled != nil {
-		// A scrape with nothing left of its budget cannot learn anything, and a check it never
-		// ran must not count towards eviction: concurrent scrapes of one target run out
-		// independently, and three of them arriving spent would evict a healthy client. A check
-		// that does run and then fails on the deadline is the opposite -- a healthy client
-		// answers a ping in microseconds, so outliving the budget is evidence against this one.
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("cannot connect to MongoDB: %w", ctx.Err())
-		}
-
-		gen := pooled.generation()
-
-		err := pooled.Ping(ctx, nil)
-		if err == nil {
-			pooled.pass()
-
-			return pooled.Client, nil
-		}
-
-		// A disconnected client never recovers, so it need not fail twice more first. Everything
-		// else is transient until it repeats -- the driver reconnects its own pool, a server
-		// mid-election recovers on its own -- and a client that keeps failing is dropped so the
-		// next scrape builds one from scratch. That rebuild is the only thing that picks up what
-		// the driver reads once, such as rotated TLS material. A check that a passing one
-		// overtook while it was in flight is stale, which is what gen settles.
-		if errors.Is(err, mongo.ErrClientDisconnected) || pooled.fail(gen) {
-			e.dropClient(ctx, pooled, err)
-		}
-
-		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
+		return e.checkClient(ctx, pooled)
 	}
 
 	// Build the client. Initialization is retried with every scrape until it succeeds once.
@@ -473,6 +456,45 @@ func (e *Exporter) Handler() http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+// checkClient health-checks the cached client and returns it if the check passes, dropping it
+// once its checks have failed maxConsecutivePingFailures times in a row.
+func (e *Exporter) checkClient(ctx context.Context, pooled *pooledClient) (*mongo.Client, error) {
+	// A scrape with nothing left of its budget cannot learn anything, and a check it never ran
+	// must not count towards eviction: concurrent scrapes of one target run out independently,
+	// and three of them arriving spent would evict a healthy client. A check that does run and
+	// then fails on the deadline is the opposite -- a healthy client answers a ping in
+	// microseconds, so outliving the budget is evidence against this one.
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("cannot connect to MongoDB: %w", ctx.Err())
+	}
+
+	gen := pooled.generation()
+
+	err := pooled.Ping(ctx, nil)
+	if err == nil {
+		if !pooled.pass() {
+			// A failing check has already claimed this client, and the disconnect it is about to
+			// run would break this scrape in the middle of collecting. Report the scrape as down
+			// instead; the next one builds a client from scratch.
+			return nil, errClientEvicted
+		}
+
+		return pooled.Client, nil
+	}
+
+	// A disconnected client never recovers, so it need not fail twice more first. Everything
+	// else is transient until it repeats -- the driver reconnects its own pool, a server
+	// mid-election recovers on its own -- and a client that keeps failing is dropped so the
+	// next scrape builds one from scratch. That rebuild is the only thing that picks up what
+	// the driver reads once, such as rotated TLS material. A check that a passing one overtook
+	// while it was in flight is stale, which is what gen settles.
+	if errors.Is(err, mongo.ErrClientDisconnected) || pooled.fail(gen) {
+		e.dropClient(ctx, pooled, err)
+	}
+
+	return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
 }
 
 // dropClient takes pooled out of the cache, so the next scrape builds a client from scratch,

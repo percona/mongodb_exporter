@@ -420,11 +420,15 @@ func TestPooledClientIgnoresHealthChecksOvertakenByAPass(t *testing.T) {
 		assert.Equal(t, last, pooled.fail(gen), "failure %d of %d", i+1, maxConsecutivePingFailures)
 	}
 
+	// Reaching the threshold claims the eviction, and no check that passes afterwards can give
+	// the client back: the claiming check has yet to disconnect it.
+	require.False(t, pooled.pass(), "a pass resurrected a client already claimed for eviction")
+
 	// And a pass in the middle of a run starts the count over.
-	pooled.pass()
+	pooled = new(pooledClient)
 	gen = pooled.generation()
 	require.False(t, pooled.fail(gen), "one failure is not enough to evict")
-	pooled.pass()
+	require.True(t, pooled.pass())
 
 	gen = pooled.generation()
 	for i := range maxConsecutivePingFailures {
@@ -494,6 +498,36 @@ func TestGlobalConnPoolPassRetiresEarlierFailures(t *testing.T) {
 		require.False(t, pooled.fail(pooled.generation()))
 	}
 	require.NotNil(t, cachedClient(e), "failures a pass should have retired evicted the client")
+}
+
+// The threshold and the eviction are two steps, and the client stays in the cache between
+// them. A scrape whose own health check passes in that window must not collect on a client the
+// claiming check is about to disconnect underneath it.
+func TestGlobalConnPoolPassDoesNotHandOutAClaimedClient(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	e := newPooledExporter(t)
+
+	client, err := e.getClient(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+	pooled := e.client.Load()
+	require.NotNil(t, pooled)
+
+	// A concurrent check fails the last time it can, claiming the eviction, and is descheduled
+	// before it swaps the client out of the cache.
+	gen := pooled.generation()
+	for i := range maxConsecutivePingFailures {
+		last := i == maxConsecutivePingFailures-1
+		require.Equal(t, last, pooled.fail(gen), "failure %d of %d", i+1, maxConsecutivePingFailures)
+	}
+
+	// This scrape's health check passes -- the server is reachable -- and is refused anyway.
+	_, err = e.getClient(ctx)
+	require.ErrorIs(t, err, errClientEvicted)
+	require.Same(t, client, cachedClient(e), "the passing check evicted the client itself")
 }
 
 // A concurrency guard for the packed health word: many checks in one generation, released
