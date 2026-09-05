@@ -468,6 +468,37 @@ func TestGlobalConnPoolDropsClientWhenScrapesOutrunTheDriverTimeout(t *testing.T
 	require.Nil(t, cachedClient(e), "a client that never answers inside the scrape budget stayed cached")
 }
 
+// The other half of that: a scrape Prometheus hung up on has its context cancelled mid-ping,
+// and what comes back is evidence about the cancellation, not about the client. Three of those
+// in a row must not evict a client with nothing wrong with it.
+func TestGlobalConnPoolIgnoresCancelledHealthChecks(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+	addr, _, _ := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	// Long enough that nothing but the cancellation can end a ping.
+	e.opts.ConnectTimeoutMS = 30000
+
+	clientOpts, err := clientOptionsFor(e.opts)
+	require.NoError(t, err)
+	unreachable, err := mongo.Connect(t.Context(), clientOpts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = unreachable.Disconnect(context.Background()) })
+	e.client.Store(&pooledClient{Client: unreachable})
+
+	for range maxConsecutivePingFailures {
+		ctx, cancel := context.WithCancel(t.Context())
+		time.AfterFunc(50*time.Millisecond, cancel)
+
+		_, err = e.getClient(ctx)
+		cancel()
+		require.Error(t, err)
+	}
+
+	require.Same(t, unreachable, cachedClient(e), "scrapes their caller hung up on evicted the client")
+}
+
 // A passing health check retires the failures before it, which is what makes the count
 // consecutive. Without that, any three failures across a client's whole life would evict it.
 func TestGlobalConnPoolPassRetiresEarlierFailures(t *testing.T) {

@@ -506,7 +506,13 @@ func (e *Exporter) checkClient(ctx context.Context, pooled *pooledClient) (*mong
 	// next scrape builds one from scratch. That rebuild is the only thing that picks up what
 	// the driver reads once, such as rotated TLS material. A check that a passing one overtook
 	// while it was in flight is stale, which is what gen settles.
-	if errors.Is(err, mongo.ErrClientDisconnected) || pooled.fail(gen) {
+	// A scrape Prometheus hung up on has its context cancelled mid-ping, and the failure that
+	// comes back is about the cancellation rather than the client -- unlike a deadline, which a
+	// healthy client answers well inside. So it does not count. A disconnected client is
+	// disconnected whatever cut the ping short, and still goes.
+	cancelled := errors.Is(ctx.Err(), context.Canceled)
+
+	if errors.Is(err, mongo.ErrClientDisconnected) || (!cancelled && pooled.fail(gen)) {
 		e.dropClient(ctx, pooled, err)
 	}
 
