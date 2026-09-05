@@ -35,30 +35,52 @@ the current version.
 The build process uses the dockerized version of goreleaser so you don't need to install Go.
 Just run `make release` and the new binaries will be generated under the build directory.
 ```
-├── build
-│ ├── config.yaml
-│ ├── mongodb_exporter_7c73946_checksums.txt
-│ ├── mongodb_exporter-7c73946.darwin-amd64.tar.gz
-│ ├── mongodb_exporter-7c73946.linux-amd64.tar.gz
-│ ├── mongodb_exporter_darwin_amd64
-│ │ └── mongodb_exporter <--- MacOS binary
-│ └── mongodb_exporter_linux_amd64
-│ └── mongodb_exporter <--- Linux binary
+build
+├── config.yaml
+├── mongodb_exporter_7c73946_checksums.txt
+├── mongodb_exporter-7c73946.darwin-amd64.tar.gz
+├── mongodb_exporter-7c73946.darwin-arm64.tar.gz
+├── mongodb_exporter-7c73946.linux-amd64.tar.gz
+├── mongodb_exporter-7c73946.linux-arm64.tar.gz
+├── mongodb_exporter-7c73946.linux-arm.tar.gz
+├── mongodb_exporter-7c73946.linux-64-bit.deb
+├── mongodb_exporter-7c73946.linux-64-bit.rpm
+├── mongodb_exporter-7c73946.linux-arm64.deb
+├── mongodb_exporter-7c73946.linux-arm64.rpm
+├── mongodb_exporter-7c73946.linux-arm.deb
+├── mongodb_exporter-7c73946.linux-arm.rpm
+├── mongodb_exporter_darwin_amd64_v1
+│   └── mongodb_exporter    <--- macOS Intel binary
+├── mongodb_exporter_darwin_arm64_v8.0
+│   └── mongodb_exporter    <--- macOS Apple silicon binary
+├── mongodb_exporter_linux_amd64_v1
+│   └── mongodb_exporter    <--- Linux x86_64 binary
+├── mongodb_exporter_linux_arm64_v8.0
+│   └── mongodb_exporter    <--- Linux arm64 binary
+└── mongodb_exporter_linux_arm_7
+    └── mongodb_exporter    <--- Linux armv7 binary
 ```
+`7c73946` is the short commit hash — snapshot builds are versioned by commit.
+
 ### Running the exporter
-If you built the exporter using the method mentioned in the previous section, the generated binaries are in `mongodb_exporter_linux_amd64/mongodb_exporter` or `mongodb_exporter_darwin_amd64/mongodb_exporter`
+If you built the exporter using the method mentioned in the previous section, the generated binaries are in `build/mongodb_exporter_linux_amd64_v1/mongodb_exporter` or `build/mongodb_exporter_darwin_arm64_v8.0/mongodb_exporter`
 
 #### Docker
-A docker image is available on the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter).
+Images are published to the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter) on Docker Hub
+and to [GHCR](https://github.com/percona/mongodb_exporter/pkgs/container/mongodb_exporter). Both carry the same tags and are
+multi-architecture, covering `linux/amd64` and `linux/arm64`, so a single tag works on either platform.
 
 ##### Examples
 
 ```sh
 # with podman
-podman run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
+podman run -d -p 9216:9216 percona/mongodb_exporter:0.53 --mongodb.uri=mongodb://127.0.0.1:17001
 
 # with docker
-docker run -d -p 9216:9216 percona/mongodb_exporter:0.40 --mongodb.uri=mongodb://127.0.0.1:17001
+docker run -d -p 9216:9216 percona/mongodb_exporter:0.53 --mongodb.uri=mongodb://127.0.0.1:17001
+
+# from GHCR instead of Docker Hub
+docker run -d -p 9216:9216 ghcr.io/percona/mongodb_exporter:0.53 --mongodb.uri=mongodb://127.0.0.1:17001
 ```
 
 ### Permissions
@@ -97,18 +119,18 @@ More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual
 
 #### Example
 ```sh
-mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001
+build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001
 ```
 
 #### MongoDB Authentication
 You can supply the mongodb user/password direct in the `--mongodb.uri=` like `--mongodb.uri=mongodb://user:pass@127.0.0.1:17001`, you can also supply the mongodb user/password with `--mongodb.user=`, `--mongodb.password=`
 but the user and password info will be leaked via `ps` or `top` command, for security issue, you can use `MONGODB_USER` and `MONGODB_PASSWORD` env variable to set user/password for given uri
 ```sh
-MONGODB_USER=XXX MONGODB_PASSWORD=YYY mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+MONGODB_USER=XXX MONGODB_PASSWORD=YYY build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 # or
 export MONGODB_USER=XXX
 export MONGODB_PASSWORD=YYY
-mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 
 #### Multi-target support
@@ -143,7 +165,7 @@ mongodb_up{instance="host2:27016"} 1
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.
 Usage example: `--mongodb.collstats-colls=database1.collection1,database2.collection2`
 ```sh
-mongodb_exporter_linux_amd64/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 #### Enabling compatibility mode.
 When compatibility mode is enabled by the `--compatible-mode`, the exporter will expose all new metrics with the new naming and labeling schema and at the same time will expose metrics in the version 1 compatible way.
