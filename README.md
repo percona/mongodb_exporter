@@ -66,8 +66,9 @@ build
 If you built the exporter using the method mentioned in the previous section, the generated binaries are in `build/mongodb_exporter_linux_amd64_v1/mongodb_exporter` or `build/mongodb_exporter_darwin_arm64_v8.0/mongodb_exporter`
 
 #### Docker
-A docker image is available on the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter).
-It is a multi-architecture image covering `linux/amd64` and `linux/arm64`, so the same tag works on both.
+Images are published to the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter) on Docker Hub
+and to [GHCR](https://github.com/percona/mongodb_exporter/pkgs/container/mongodb_exporter). Both carry the same tags and are
+multi-architecture, covering `linux/amd64` and `linux/arm64`, so a single tag works on either platform.
 
 ##### Examples
 
@@ -77,6 +78,9 @@ podman run -d -p 9216:9216 percona/mongodb_exporter:0.53 --mongodb.uri=mongodb:/
 
 # with docker
 docker run -d -p 9216:9216 percona/mongodb_exporter:0.53 --mongodb.uri=mongodb://127.0.0.1:17001
+
+# from GHCR instead of Docker Hub
+docker run -d -p 9216:9216 ghcr.io/percona/mongodb_exporter:0.53 --mongodb.uri=mongodb://127.0.0.1:17001
 ```
 
 ### Permissions
