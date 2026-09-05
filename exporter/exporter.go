@@ -33,6 +33,7 @@ import (
 	"github.com/prometheus/common/promslog"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
@@ -481,7 +482,13 @@ func (e *Exporter) checkClient(ctx context.Context, pooled *pooledClient) (*mong
 
 	gen := pooled.generation()
 
-	err := pooled.Ping(ctx, nil)
+	// The same read preference mongodb_up is defined by. A nil one means the client's own, which
+	// the driver defaults to primary, and on a replica set without a primary that selects nothing
+	// -- so an election lasting three scrapes would evict a client with nothing wrong with it,
+	// which is the churn the threshold exists to prevent. Only a multi-host URI without
+	// --mongodb.direct-connect reaches that case; a single host is a Single topology, where the
+	// driver ignores read preference entirely.
+	err := pooled.Ping(ctx, readpref.PrimaryPreferred())
 	if err == nil {
 		if !pooled.pass() {
 			// A failing check has already claimed this client, and the disconnect it is about to
@@ -706,7 +713,10 @@ func connectWith(ctx context.Context, clientOpts *options.ClientOptions) (*mongo
 		return nil, fmt.Errorf("invalid MongoDB options: %w", err)
 	}
 
-	if err = client.Ping(ctx, nil); err != nil {
+	// PrimaryPreferred for the same reason the health check uses it: a replica set mid-election
+	// is reachable, and a connect that fails on it leaves the caller with no client at all.
+	err = client.Ping(ctx, readpref.PrimaryPreferred())
+	if err != nil {
 		// Ping failed. Close background connections. Error is ignored since the ping error is more relevant.
 		_ = client.Disconnect(ctx)
 
