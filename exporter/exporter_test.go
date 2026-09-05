@@ -18,6 +18,7 @@ package exporter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -386,6 +387,13 @@ func TestGlobalConnPoolDropsClientAfterRepeatedPingFailures(t *testing.T) {
 	_, err = e.getClient(ctx)
 	require.Error(t, err)
 	require.Nil(t, cachedClient(e), "failing client stayed cached")
+
+	// The disconnect runs off the scrape's goroutine, so that the scrape does not wait for
+	// in-flight collections to hand their connections back. It still has to happen: a client
+	// left connected keeps its topology and monitor goroutines for the life of the process.
+	require.Eventually(t, func() bool {
+		return errors.Is(unreachable.Ping(ctx, nil), mongo.ErrClientDisconnected)
+	}, clientDisconnectGrace, 20*time.Millisecond, "the dropped client was never disconnected")
 }
 
 // A disconnected client never recovers, so waiting for it to fail the count out would report

@@ -122,6 +122,10 @@ const (
 	// maxConsecutivePingFailures is how many scrapes in a row may fail the pooled client's
 	// health check before it is dropped and built anew.
 	maxConsecutivePingFailures = 3
+
+	// clientDisconnectGrace is how long a dropped client's in-flight collections have to hand
+	// their connections back before the driver closes them underneath them.
+	clientDisconnectGrace = 10 * time.Second
 )
 
 // New connects to the database and returns a new Exporter instance.
@@ -321,14 +325,26 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 		drop := errors.Is(err, mongo.ErrClientDisconnected) ||
 			(ctx.Err() == nil && pooled.pingFailures.Add(1) >= maxConsecutivePingFailures)
 
-		// Disconnecting closes connections a concurrent scrape may still be collecting on, and
-		// that scrape fails. It has already failed every health check for three scrapes by now,
-		// so it was collecting against a broken client anyway, and the alternative is stranding
-		// its topology and monitor goroutines for the life of the process. The disconnect is
-		// detached from this scrape's deadline so ending the request cannot cut it short.
+		// Disconnect waits for every checked-out connection to come back before it returns, so
+		// it runs on a goroutine of its own: this scrape has its answer and must not wait on a
+		// collection someone else is still running. The grace period lets those collections
+		// finish; whatever still holds a connection then has it closed underneath it, which is
+		// the price of not stranding the topology and its monitors for the life of the process.
 		if drop && e.client.CompareAndSwap(pooled, nil) {
 			e.logger.Warn("Dropping unusable MongoDB client, reconnecting on next scrape", "error", err)
-			_ = pooled.Disconnect(context.WithoutCancel(ctx))
+
+			// Detached from this scrape's cancellation, so ending the request cannot cut the
+			// cleanup short, but bounded so it cannot outlive the grace period either.
+			disconnectCtx, cancelDisconnect := context.WithTimeout(context.WithoutCancel(ctx), clientDisconnectGrace)
+
+			go func() {
+				defer cancelDisconnect()
+
+				disconnectErr := pooled.Disconnect(disconnectCtx)
+				if disconnectErr != nil {
+					e.logger.Debug("Dropped MongoDB client did not disconnect cleanly", "error", disconnectErr)
+				}
+			}()
 		}
 
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
