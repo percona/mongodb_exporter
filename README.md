@@ -133,6 +133,22 @@ export MONGODB_PASSWORD=YYY
 build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 
+The `MONGODB_USER_FILE` and `MONGODB_PASSWORD_FILE` environment variables can
+instead point to files containing the username and password. File values take
+precedence over credentials supplied directly. This supports Docker secrets,
+for example:
+```yml
+command:
+  - --mongodb.uri=mongodb://${MONGO_IP}:${MONGO_PORT}/?authSource=admin
+  - --collect-all
+environment:
+  MONGODB_USER_FILE: /run/secrets/mongo_usr
+  MONGODB_PASSWORD_FILE: /run/secrets/mongo_pwd
+secrets:
+  - mongo_usr
+  - mongo_pwd
+```
+
 #### Multi-target support
 You can run the exporter specifying multiple URIs, devided by a comma in --mongodb.uri option or MONGODB_URI environment variable in order to monitor multiple mongodb instances with the a single mongodb_exporter instance.
 ```sh
