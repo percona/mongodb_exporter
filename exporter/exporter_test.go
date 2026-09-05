@@ -396,6 +396,43 @@ func TestGlobalConnPoolDropsClientAfterRepeatedPingFailures(t *testing.T) {
 	}, clientDisconnectGrace, 20*time.Millisecond, "the dropped client was never disconnected")
 }
 
+// Health checks run concurrently, and one against an unreachable server outlives the recovery
+// it is reporting on: three can be in flight, a later one can pass once the server is back,
+// and the three can then fail. Counting those would evict the client the later check just
+// proved healthy, and disconnect it under the scrape that is collecting on it.
+func TestPooledClientIgnoresHealthChecksOvertakenByAPass(t *testing.T) {
+	t.Parallel()
+
+	pooled := new(pooledClient)
+
+	// Three checks start, then one that started later passes before any of them return.
+	gen := pooled.generation()
+	pooled.pass()
+
+	for range maxConsecutivePingFailures {
+		require.False(t, pooled.fail(gen), "a check the pass overtook counted towards eviction")
+	}
+
+	// Checks that begin after the pass still evict on their own account.
+	gen = pooled.generation()
+	for i := range maxConsecutivePingFailures {
+		last := i == maxConsecutivePingFailures-1
+		assert.Equal(t, last, pooled.fail(gen), "failure %d of %d", i+1, maxConsecutivePingFailures)
+	}
+
+	// And a pass in the middle of a run starts the count over.
+	pooled.pass()
+	gen = pooled.generation()
+	require.False(t, pooled.fail(gen), "one failure is not enough to evict")
+	pooled.pass()
+
+	gen = pooled.generation()
+	for i := range maxConsecutivePingFailures {
+		last := i == maxConsecutivePingFailures-1
+		assert.Equal(t, last, pooled.fail(gen), "the count did not start over after a pass")
+	}
+}
+
 // A disconnected client never recovers, so waiting for it to fail the count out would report
 // mongodb_up 0 for scrapes that could have been served by a new client.
 func TestGlobalConnPoolDropsDisconnectedClientAtOnce(t *testing.T) {

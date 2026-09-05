@@ -50,12 +50,48 @@ type Exporter struct {
 	totalCollectionsCount int
 }
 
-// pooledClient is the cached client together with how many scrapes in a row have failed its
-// health check.
+// pooledClient is the cached client together with the state of its health checks: a
+// generation, which every passing check bumps, packed with the number of checks that have
+// failed since. One word rather than two, so that a check which began before a pass cannot
+// count its failure against the state that pass created -- health checks run concurrently
+// and a slow one against an unreachable server outlives the recovery it is reporting on.
 type pooledClient struct {
 	*mongo.Client
 
-	pingFailures atomic.Int32
+	health atomic.Uint64
+}
+
+// generation returns the health-check generation a check is about to run in. A failure
+// reported against an older one is stale and does not count.
+func (p *pooledClient) generation() uint64 {
+	return p.health.Load() >> healthGenerationShift
+}
+
+// pass records a passing health check, retiring every check still in flight.
+func (p *pooledClient) pass() {
+	for {
+		current := p.health.Load()
+		next := (current>>healthGenerationShift + 1) << healthGenerationShift
+		if p.health.CompareAndSwap(current, next) {
+			return
+		}
+	}
+}
+
+// fail records a health check that began in generation gen and failed, and reports whether
+// the client has now failed maxConsecutivePingFailures checks without one passing in between.
+func (p *pooledClient) fail(gen uint64) bool {
+	for {
+		current := p.health.Load()
+		if current>>healthGenerationShift != gen {
+			return false
+		}
+
+		failures := current&healthFailureMask + 1
+		if p.health.CompareAndSwap(current, gen<<healthGenerationShift|failures) {
+			return failures >= maxConsecutivePingFailures
+		}
+	}
 }
 
 // Opts holds new exporter options.
@@ -122,6 +158,12 @@ const (
 	// maxConsecutivePingFailures is how many scrapes in a row may fail the pooled client's
 	// health check before it is dropped and built anew.
 	maxConsecutivePingFailures = 3
+
+	// healthGenerationShift splits pooledClient.health into the generation above and the
+	// failure count below. A generation per passing health check wraps no sooner than the
+	// heat death of a scrape interval; a failure count only ever reaches three.
+	healthGenerationShift = 32
+	healthFailureMask     = 1<<healthGenerationShift - 1
 
 	// clientDisconnectGrace is how long a dropped client's in-flight collections have to hand
 	// their connections back before the driver closes them underneath them.
@@ -307,23 +349,27 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	}
 
 	if pooled := e.client.Load(); pooled != nil {
+		gen := pooled.generation()
+
 		err := pooled.Ping(ctx, nil)
 		if err == nil {
-			pooled.pingFailures.Store(0)
+			pooled.pass()
 
 			return pooled.Client, nil
 		}
 
 		// A scrape that ran out of its own budget says nothing about the client's health, so it
 		// must not count: concurrent scrapes of one target expire independently, and counting
-		// them would let three of them evict a perfectly healthy client. A disconnected client
-		// is the opposite case and never recovers, so it need not fail twice more first.
-		// Everything else is transient until it repeats -- the driver reconnects its own pool,
-		// a server mid-election recovers on its own -- and a client that keeps failing is
-		// dropped so the next scrape builds one from scratch. That rebuild is the only thing
-		// that picks up what the driver reads once, such as rotated TLS material.
+		// them would let three of them evict a perfectly healthy client. Nor does a check that
+		// a passing one overtook while it was in flight, which is what gen settles. A
+		// disconnected client is the opposite case and never recovers, so it need not fail
+		// twice more first. Everything else is transient until it repeats -- the driver
+		// reconnects its own pool, a server mid-election recovers on its own -- and a client
+		// that keeps failing is dropped so the next scrape builds one from scratch. That
+		// rebuild is the only thing that picks up what the driver reads once, such as rotated
+		// TLS material.
 		drop := errors.Is(err, mongo.ErrClientDisconnected) ||
-			(ctx.Err() == nil && pooled.pingFailures.Add(1) >= maxConsecutivePingFailures)
+			(ctx.Err() == nil && pooled.fail(gen))
 
 		// Disconnect waits for every checked-out connection to come back before it returns, so
 		// it runs on a goroutine of its own: this scrape has its answer and must not wait on a
