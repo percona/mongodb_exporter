@@ -87,10 +87,12 @@ func (p *pooledClient) pass() bool {
 	}
 }
 
-// fail records a health check that began in generation gen and failed, and reports whether
-// the client has now failed maxConsecutivePingFailures checks without one passing in between.
-// Reaching the threshold is terminal: the count never comes back below it, which is what makes
-// the eviction a claim rather than an intention a later pass could overturn.
+// fail records a health check that began in generation gen and failed, and reports whether this
+// check is the one that took the client to maxConsecutivePingFailures failures with none passing
+// in between. Exactly one check per generation is told that, however they interleave, since every
+// successful swap stores a count of its own. The count carries on past the threshold and never
+// comes back below it, which is what makes the eviction a claim rather than an intention a later
+// pass could overturn.
 func (p *pooledClient) fail(gen uint64) bool {
 	for {
 		current := p.health.Load()
@@ -100,7 +102,7 @@ func (p *pooledClient) fail(gen uint64) bool {
 
 		failures := current&healthFailureMask + 1
 		if p.health.CompareAndSwap(current, gen<<healthGenerationShift|failures) {
-			return failures >= maxConsecutivePingFailures
+			return failures == maxConsecutivePingFailures
 		}
 	}
 }

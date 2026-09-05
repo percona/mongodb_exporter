@@ -591,9 +591,12 @@ func TestPooledClientHealthStateUnderConcurrency(t *testing.T) {
 	close(start)
 	wg.Wait()
 
-	// Every check increments exactly once, so however they interleave, the ones from the
-	// threshold onwards report a drop. A lost update would show up as fewer.
-	assert.Equal(t, int32(checks-maxConsecutivePingFailures+1), drops.Load(),
+	// However they interleave, exactly one check stores the count that crosses the threshold, so
+	// exactly one is told it has the eviction.
+	assert.Equal(t, int32(1), drops.Load(), "the eviction was claimed more than once")
+
+	// And every check counted: a lost update would leave the total short.
+	assert.Equal(t, uint64(checks), pooled.health.Load()&healthFailureMask,
 		"concurrent health checks lost each other's updates")
 }
 
