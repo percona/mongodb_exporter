@@ -164,10 +164,6 @@ const (
 	// heat death of a scrape interval; a failure count only ever reaches three.
 	healthGenerationShift = 32
 	healthFailureMask     = 1<<healthGenerationShift - 1
-
-	// clientDisconnectGrace is how long a dropped client's in-flight collections have to hand
-	// their connections back before the driver closes them underneath them.
-	clientDisconnectGrace = 10 * time.Second
 )
 
 // New connects to the database and returns a new Exporter instance.
@@ -349,6 +345,15 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	}
 
 	if pooled := e.client.Load(); pooled != nil {
+		// A scrape with nothing left of its budget cannot learn anything, and a check it never
+		// ran must not count towards eviction: concurrent scrapes of one target run out
+		// independently, and three of them arriving spent would evict a healthy client. A check
+		// that does run and then fails on the deadline is the opposite -- a healthy client
+		// answers a ping in microseconds, so outliving the budget is evidence against this one.
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("cannot connect to MongoDB: %w", ctx.Err())
+		}
+
 		gen := pooled.generation()
 
 		err := pooled.Ping(ctx, nil)
@@ -358,39 +363,14 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 			return pooled.Client, nil
 		}
 
-		// A scrape that ran out of its own budget says nothing about the client's health, so it
-		// must not count: concurrent scrapes of one target expire independently, and counting
-		// them would let three of them evict a perfectly healthy client. Nor does a check that
-		// a passing one overtook while it was in flight, which is what gen settles. A
-		// disconnected client is the opposite case and never recovers, so it need not fail
-		// twice more first. Everything else is transient until it repeats -- the driver
-		// reconnects its own pool, a server mid-election recovers on its own -- and a client
-		// that keeps failing is dropped so the next scrape builds one from scratch. That
-		// rebuild is the only thing that picks up what the driver reads once, such as rotated
-		// TLS material.
-		drop := errors.Is(err, mongo.ErrClientDisconnected) ||
-			(ctx.Err() == nil && pooled.fail(gen))
-
-		// Disconnect waits for every checked-out connection to come back before it returns, so
-		// it runs on a goroutine of its own: this scrape has its answer and must not wait on a
-		// collection someone else is still running. The grace period lets those collections
-		// finish; whatever still holds a connection then has it closed underneath it, which is
-		// the price of not stranding the topology and its monitors for the life of the process.
-		if drop && e.client.CompareAndSwap(pooled, nil) {
-			e.logger.Warn("Dropping unusable MongoDB client, reconnecting on next scrape", "error", err)
-
-			// Detached from this scrape's cancellation, so ending the request cannot cut the
-			// cleanup short, but bounded so it cannot outlive the grace period either.
-			disconnectCtx, cancelDisconnect := context.WithTimeout(context.WithoutCancel(ctx), clientDisconnectGrace)
-
-			go func() {
-				defer cancelDisconnect()
-
-				disconnectErr := pooled.Disconnect(disconnectCtx)
-				if disconnectErr != nil {
-					e.logger.Debug("Dropped MongoDB client did not disconnect cleanly", "error", disconnectErr)
-				}
-			}()
+		// A disconnected client never recovers, so it need not fail twice more first. Everything
+		// else is transient until it repeats -- the driver reconnects its own pool, a server
+		// mid-election recovers on its own -- and a client that keeps failing is dropped so the
+		// next scrape builds one from scratch. That rebuild is the only thing that picks up what
+		// the driver reads once, such as rotated TLS material. A check that a passing one
+		// overtook while it was in flight is stale, which is what gen settles.
+		if errors.Is(err, mongo.ErrClientDisconnected) || pooled.fail(gen) {
+			e.dropClient(ctx, pooled, err)
 		}
 
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
@@ -493,6 +473,35 @@ func (e *Exporter) Handler() http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+// dropClient takes pooled out of the cache, so the next scrape builds a client from scratch,
+// and disconnects it. Only the scrape that wins the swap disconnects; a later one finds either
+// nil or the replacement.
+//
+// Disconnecting makes the client unusable at once: Topology.Disconnect takes the topology out
+// of its connected state before closing anything, so a scrape still collecting on this client
+// starts failing here. There is no avoiding that short of stranding the topology and its
+// monitors for the life of the process, and by now the client has failed every health check
+// for three scrapes, so that scrape was working against a broken client anyway.
+//
+// It runs on its own goroutine, since this scrape has its answer already, and on a context
+// with no deadline deliberately: the driver reads a deadline as a request to wait for
+// checked-out connections to come back, and implements that wait as a loop with a default
+// branch, which spins on a core until they return or the deadline passes.
+func (e *Exporter) dropClient(ctx context.Context, pooled *pooledClient, cause error) {
+	if !e.client.CompareAndSwap(pooled, nil) {
+		return
+	}
+
+	e.logger.Warn("Dropping unusable MongoDB client, reconnecting on next scrape", "error", cause)
+
+	go func() {
+		err := pooled.Disconnect(context.WithoutCancel(ctx))
+		if err != nil {
+			e.logger.Debug("Dropped MongoDB client did not disconnect cleanly", "error", err)
+		}
+	}()
 }
 
 // GetRequestOpts makes exporter.Opts structure from request filters and default options.

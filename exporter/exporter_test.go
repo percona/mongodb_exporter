@@ -393,7 +393,7 @@ func TestGlobalConnPoolDropsClientAfterRepeatedPingFailures(t *testing.T) {
 	// left connected keeps its topology and monitor goroutines for the life of the process.
 	require.Eventually(t, func() bool {
 		return errors.Is(unreachable.Ping(ctx, nil), mongo.ErrClientDisconnected)
-	}, clientDisconnectGrace, 20*time.Millisecond, "the dropped client was never disconnected")
+	}, 5*time.Second, 20*time.Millisecond, "the dropped client was never disconnected")
 }
 
 // Health checks run concurrently, and one against an unreachable server outlives the recovery
@@ -431,6 +431,140 @@ func TestPooledClientIgnoresHealthChecksOvertakenByAPass(t *testing.T) {
 		last := i == maxConsecutivePingFailures-1
 		assert.Equal(t, last, pooled.fail(gen), "the count did not start over after a pass")
 	}
+}
+
+// A check that runs out of the scrape's budget still tells us the client did not answer, and
+// has to count. While it did not, a wedged client stayed cached for the life of the process
+// whenever the scrape budget was shorter than the driver's server-selection timeout -- which
+// the driver's own 30s default makes the common case, not the exotic one.
+func TestGlobalConnPoolDropsClientWhenScrapesOutrunTheDriverTimeout(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+	addr, _, _ := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	// Server selection outlasts every scrape below, so no check can fail on anything but the
+	// scrape's own deadline.
+	e.opts.ConnectTimeoutMS = 30000
+
+	clientOpts, err := clientOptionsFor(e.opts)
+	require.NoError(t, err)
+	unreachable, err := mongo.Connect(t.Context(), clientOpts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = unreachable.Disconnect(context.Background()) })
+	e.client.Store(&pooledClient{Client: unreachable})
+
+	for range maxConsecutivePingFailures {
+		scrape, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		_, err = e.getClient(scrape)
+		cancel()
+		require.Error(t, err)
+	}
+
+	require.Nil(t, cachedClient(e), "a client that never answers inside the scrape budget stayed cached")
+}
+
+// A passing health check retires the failures before it, which is what makes the count
+// consecutive. Without that, any three failures across a client's whole life would evict it.
+func TestGlobalConnPoolPassRetiresEarlierFailures(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	e := newPooledExporter(t)
+
+	first, err := e.getClient(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+
+	pooled := e.client.Load()
+	require.NotNil(t, pooled)
+
+	// One short of the threshold, then a real health check passes through getClient.
+	for range maxConsecutivePingFailures - 1 {
+		require.False(t, pooled.fail(pooled.generation()))
+	}
+	before := pooled.generation()
+
+	_, err = e.getClient(ctx)
+	require.NoError(t, err)
+	require.Greater(t, pooled.generation(), before, "a passing health check did not start a new generation")
+
+	// So the count starts over, and the same number of failures no longer evicts.
+	for range maxConsecutivePingFailures - 1 {
+		require.False(t, pooled.fail(pooled.generation()))
+	}
+	require.NotNil(t, cachedClient(e), "failures a pass should have retired evicted the client")
+}
+
+// A concurrency guard for the packed health word: many checks in one generation, released
+// together. -race catches the word losing its atomicity, and the count catches the arithmetic
+// going wrong under contention. It does not prove the compare-and-swap is needed rather than a
+// plain store -- a lost update collides too rarely here to fail a test -- so that rests on
+// reading the code.
+func TestPooledClientHealthStateUnderConcurrency(t *testing.T) {
+	t.Parallel()
+
+	// Enough checks, released together, that a read-modify-write would lose some of them.
+	const checks = 500
+
+	pooled := new(pooledClient)
+	gen := pooled.generation()
+
+	var drops atomic.Int32
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+
+	for range checks {
+		wg.Go(func() {
+			<-start
+
+			if pooled.fail(gen) {
+				drops.Add(1)
+			}
+		})
+	}
+	close(start)
+	wg.Wait()
+
+	// Every check increments exactly once, so however they interleave, the ones from the
+	// threshold onwards report a drop. A lost update would show up as fewer.
+	assert.Equal(t, int32(checks-maxConsecutivePingFailures+1), drops.Load(),
+		"concurrent health checks lost each other's updates")
+}
+
+// The whole point of the pool: the client outlives the request that built it, and the next
+// scrape reuses that same live client rather than building its own.
+func TestGlobalConnPoolHandlerReusesOneLiveClient(t *testing.T) {
+	t.Parallel()
+
+	e := New(&Opts{
+		Logger:         promslog.New(&promslog.Config{}),
+		URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
+		GlobalConnPool: true,
+		DirectConnect:  true,
+	})
+
+	ts := httptest.NewServer(e.Handler())
+	t.Cleanup(ts.Close)
+
+	scrape := func() {
+		res, err := http.Get(ts.URL) //nolint:noctx
+		require.NoError(t, err)
+		body, err := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		require.NoError(t, err)
+		require.Contains(t, string(body), `mongodb_up{cluster_role="mongod"} 1`)
+	}
+
+	scrape()
+	first := cachedClient(e)
+	require.NotNil(t, first, "the scrape did not leave a client in the pool")
+
+	scrape()
+	require.Same(t, first, cachedClient(e), "the second scrape replaced the pooled client")
+	require.NoError(t, first.Ping(t.Context(), nil), "the pooled client was disconnected after the scrape")
+
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
 }
 
 // A disconnected client never recovers, so waiting for it to fail the count out would report
@@ -849,7 +983,7 @@ func TestMongoUpMetric(t *testing.T) {
 // aborted on every scrape, so mongodb_up stayed 0 permanently rather than transiently.
 //
 //nolint:funlen
-func TestClientOptionsForResolvesOneConnectBudget(t *testing.T) {
+func TestClientOptionsForResolvesTimeoutsForBothPaths(t *testing.T) {
 	t.Parallel()
 
 	const uri = "mongodb://127.0.0.1:27017/admin"
@@ -989,7 +1123,7 @@ func TestClientOptionsForPrunesIdleConnections(t *testing.T) {
 	clientOpts, err := clientOptionsFor(&Opts{URI: uri})
 	require.NoError(t, err)
 	require.NotNil(t, clientOpts.MaxConnIdleTime, "idle connections would never be pruned")
-	assert.Equal(t, defaultMaxConnIdleTime, *clientOpts.MaxConnIdleTime)
+	assert.Equal(t, 5*time.Minute, *clientOpts.MaxConnIdleTime)
 
 	clientOpts, err = clientOptionsFor(&Opts{URI: uri + "?maxIdleTimeMS=1000"})
 	require.NoError(t, err)
