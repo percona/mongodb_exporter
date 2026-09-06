@@ -562,10 +562,9 @@ func TestGlobalConnPoolPassDoesNotHandOutAClaimedClient(t *testing.T) {
 }
 
 // A concurrency guard for the packed health word: many checks in one generation, released
-// together. -race catches the word losing its atomicity, and the count catches the arithmetic
-// going wrong under contention. It does not prove the compare-and-swap is needed rather than a
-// plain store -- a lost update collides too rarely here to fail a test -- so that rests on
-// reading the code.
+// together. -race catches the word losing its atomicity, and the totals catch the arithmetic
+// going wrong under contention -- including the compare-and-swap giving way to a plain store,
+// which at this many checks loses enough of them to fail outright rather than intermittently.
 func TestPooledClientHealthStateUnderConcurrency(t *testing.T) {
 	t.Parallel()
 
