@@ -428,11 +428,14 @@ func (e *Exporter) Handler() http.Handler {
 			}
 		}
 
-		// Close client after usage.
+		// Close client after usage. The deadline is stripped for the reason dropClient strips
+		// it: the driver reads one as a request to wait for checked-out connections to come
+		// back, and implements that wait as a loop with a default branch, which spins on a core
+		// until they return or the deadline passes.
 		if !e.opts.GlobalConnPool {
 			defer func() {
 				if client != nil {
-					err := client.Disconnect(ctx)
+					err := client.Disconnect(context.WithoutCancel(ctx))
 					if err != nil {
 						e.logger.Error("Cannot disconnect client", "error", err)
 					}
