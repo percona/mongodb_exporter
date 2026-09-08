@@ -284,7 +284,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 			return e.client, nil
 		}
 
-		client, err := connect(context.Background(), e.opts)
+		client, err := connect(ctx, e.opts)
 		if err != nil {
 			return nil, err
 		}
@@ -425,7 +425,8 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
-	if err := configureAWSCredentialsProvider(ctx, clientOpts); err != nil {
+	err = configureAWSCredentialsProvider(ctx, clientOpts)
+	if err != nil {
 		return nil, err
 	}
 

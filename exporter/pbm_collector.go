@@ -198,11 +198,11 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, pbmClient *sdk.Cli
 			labels := map[string]string{
 				"opid":        backup.OPID,
 				"status":      string(backup.Status),
-				"name":        backup.Name,
+				nameKey:       backup.Name,
 				"host":        replset.Node,
 				"replica_set": replset.Name,
 				"self":        self,
-				"type":        string(backup.Type),
+				typeKey:       string(backup.Type),
 			}
 
 			metrics = append(metrics, createPBMMetric("backup_size_bytes",

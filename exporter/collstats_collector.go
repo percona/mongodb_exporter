@@ -140,7 +140,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		}
 
 		logger.Debug("$collStats metrics", "database", database, "collection", collection)
-		debugResult(logger, stats)
+		debugResult(d.ctx, logger, stats)
 
 		prefix := "collstats"
 

@@ -16,6 +16,7 @@
 package exporter
 
 import (
+	"context"
 	"io"
 	"os"
 	"testing"
@@ -60,7 +61,7 @@ func TestDebug(t *testing.T) {
   }
 }` + "\n"
 
-	debugResult(log.With("component", "test"), m)
+	debugResult(context.Background(), log.With("component", "test"), m)
 	assert.NoError(t, w.Close())
 	out, _ := io.ReadAll(r)
 

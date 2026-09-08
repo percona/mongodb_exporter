@@ -70,7 +70,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	logger.Debug("top result:")
-	debugResult(logger, m)
+	debugResult(d.ctx, logger, m)
 
 	totals, ok := m["totals"].(bson.M)
 	if !ok {

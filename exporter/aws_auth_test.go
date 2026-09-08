@@ -43,6 +43,8 @@ func TestConfigureAWSCredentialsProvider(t *testing.T) {
 }
 
 func TestConfigureAWSCredentialsProviderSkipsOtherMechanisms(t *testing.T) {
+	t.Parallel()
+
 	clientOpts := options.Client().SetAuth(options.Credential{AuthMechanism: "SCRAM-SHA-256"})
 
 	require.NoError(t, configureAWSCredentialsProvider(context.Background(), clientOpts))

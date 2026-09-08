@@ -17,12 +17,12 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -84,9 +84,9 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 		// Get all requests that are being processed except system requests (admin and local).
 		cmd = append(cmd,
 			bson.E{Key: "active", Value: true},
-			bson.E{Key: "op", Value: bson.D{{Key: "$ne", Value: ""}}},
+			bson.E{Key: "op", Value: bson.D{{Key: notEqualOperator, Value: ""}}},
 			bson.E{Key: "ns", Value: bson.D{
-				{Key: "$ne", Value: ""},
+				{Key: notEqualOperator, Value: ""},
 				{Key: "$not", Value: bson.D{{Key: "$regex", Value: "^admin.*|^local.*"}}},
 			}},
 			bson.E{Key: "microsecs_running", Value: bson.D{
@@ -106,7 +106,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	logger.Debug("currentop response from MongoDB:")
-	debugResult(logger, r)
+	debugResult(d.ctx, logger, r)
 
 	if slowQueriesEnabled {
 		inprog, ok := r["inprog"].(bson.A)

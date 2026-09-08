@@ -142,7 +142,8 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 		return "", errors.New("cannot get mongo node type from an empty client")
 	}
 	md := proto.MasterDoc{}
-	if err := client.Database("admin").RunCommand(ctx, bson.M{"isMaster": 1}).Decode(&md); err != nil {
+	err := client.Database("admin").RunCommand(ctx, bson.M{"isMaster": 1}).Decode(&md)
+	if err != nil {
 		return "", err
 	}
 
@@ -174,7 +175,7 @@ func getClusterRole(ctx context.Context, client *mongo.Client, logger *slog.Logg
 	}
 
 	logger.Debug("getCmdLineOpts response:")
-	debugResult(logger, cmdOpts)
+	debugResult(ctx, logger, cmdOpts)
 
 	if walkTo(cmdOpts, []string{"parsed", "sharding", "configDB"}) != nil {
 		return "mongos", nil

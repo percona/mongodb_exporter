@@ -394,7 +394,7 @@ func addTestData(ctx context.Context, client *mongo.Client, count int) error {
 		return errors.Wrap(err, "cannot start session to add test data")
 	}
 
-	if err = mongo.WithSession(ctx, session, func(sc context.Context) error {
+	err = mongo.WithSession(ctx, session, func(_ context.Context) error {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
@@ -412,7 +412,8 @@ func addTestData(ctx context.Context, client *mongo.Client, count int) error {
 		}
 
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return errors.Wrap(err, "cannot add data inside a session")
 	}
 
@@ -431,7 +432,7 @@ func cleanTestData(ctx context.Context, client *mongo.Client, count int) error {
 		return errors.Wrap(err, "cannot start session to add test data")
 	}
 
-	if err = mongo.WithSession(ctx, session, func(sc context.Context) error {
+	err = mongo.WithSession(ctx, session, func(sc context.Context) error {
 		for i := 0; i < count; i++ {
 			dbName := fmt.Sprintf("testdb_%06d", i)
 			client.Database(dbName).Drop(ctx) //nolint:errcheck
@@ -442,7 +443,8 @@ func cleanTestData(ctx context.Context, client *mongo.Client, count int) error {
 		}
 
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return errors.Wrap(err, "cannot add data inside a session")
 	}
 

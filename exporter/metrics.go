@@ -97,18 +97,18 @@ var (
 	//
 	nodeToPDMetrics = map[string]string{
 		"collStats.storageStats.indexDetails.":                   "index_name",
-		"globalLock.activeQueue.":                                "count_type",
+		"globalLock.activeQueue.":                                countTypeKey,
 		"globalLock.locks.":                                      "lock_type",
 		"serverStatus.asserts.":                                  "assert_type",
 		"serverStatus.connections.":                              "conn_type",
-		"serverStatus.globalLock.currentQueue.":                  "count_type",
+		"serverStatus.globalLock.currentQueue.":                  countTypeKey,
 		"serverStatus.metrics.commands.":                         "cmd_name",
 		"serverStatus.metrics.cursor.open.":                      "csr_type",
-		"serverStatus.metrics.document.":                         "doc_op_type",
-		"serverStatus.opLatencies.":                              "op_type",
+		"serverStatus.metrics.document.":                         docOpTypeKey,
+		"serverStatus.opLatencies.":                              opTypeKey,
 		"serverStatus.opReadConcernCounters.":                    "concern_type",
-		"serverStatus.opcounters.":                               "legacy_op_type",
-		"serverStatus.opcountersRepl.":                           "legacy_op_type",
+		"serverStatus.opcounters.":                               legacyOpTypeKey,
+		"serverStatus.opcountersRepl.":                           legacyOpTypeKey,
 		"serverStatus.transactions.commitTypes.":                 "commit_type",
 		"serverStatus.wiredTiger.concurrentTransactions.":        "txn_rw_type",
 		"serverStatus.queues.execution.":                         "txn_rw_type",
@@ -225,7 +225,7 @@ func makeRawMetric(prefix, name string, value any, labels map[string]string) (*r
 
 	// reservedPrefixes are used for metrics that might include the word ‘count’ in their name but are not actual counters.
 	reservedPrefixes := []string{"collstats.storageStats.indexSizes."}
-	if !slices.Contains(reservedPrefixes, prefix) && strings.HasSuffix(strings.ToLower(name), "count") {
+	if !slices.Contains(reservedPrefixes, prefix) && strings.HasSuffix(strings.ToLower(name), countKey) {
 		metricType = prometheus.CounterValue
 	}
 
@@ -365,7 +365,7 @@ func processSlice(prefix string, v []any, commonLabels map[string]string, compat
 		}
 
 		// use the replicaset or server name as a label
-		if name, ok := s["name"].(string); ok {
+		if name, ok := s[nameKey].(string); ok {
 			labels["member_idx"] = name
 		}
 		if state, ok := s["stateStr"].(string); ok {
@@ -463,7 +463,7 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 		// Without a label naming the bucket, every bucket of the histogram produces the
 		// same series and the registry rejects all but the first.
 		labels[boundLabel(boundKey)] = fmt.Sprint(bound)
-		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
+		metrics = appendMetricValue(metrics, prefix+".", countKey, bucket[countKey], labels, compatibleMode)
 	}
 
 	return metrics
@@ -494,7 +494,7 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 		if _, _, ok := histogramBound(bucket); !ok {
 			return false
 		}
-		if _, ok := bucket["count"]; !ok {
+		if _, ok := bucket[countKey]; !ok {
 			return false
 		}
 	}
@@ -568,7 +568,7 @@ var specialConversions = []conversion{ //nolint:gochecknoglobals
 	{
 		oldName:     "mongodb_ss_opLatencies_ops",
 		prefix:      "mongodb_ss_opLatencies",
-		suffixLabel: "op_type",
+		suffixLabel: opTypeKey,
 		suffixMapping: map[string]string{
 			"commands_ops":     "commands",
 			"reads_ops":        "reads",
@@ -579,7 +579,7 @@ var specialConversions = []conversion{ //nolint:gochecknoglobals
 	{
 		oldName:     "mongodb_ss_opLatencies_latency",
 		prefix:      "mongodb_ss_opLatencies",
-		suffixLabel: "op_type",
+		suffixLabel: opTypeKey,
 		suffixMapping: map[string]string{
 			"commands_latency":     "commands",
 			"reads_latency":        "reads",

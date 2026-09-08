@@ -90,7 +90,7 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 		}
 
 		logger.Debug("$dbStats metrics for", "database", db)
-		debugResult(logger, dbStats)
+		debugResult(d.ctx, logger, dbStats)
 
 		prefix := "dbstats"
 

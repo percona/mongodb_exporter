@@ -89,11 +89,11 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 			}
 
 			var ok bool
-			if _, ok = row["_id"]; !ok {
+			if _, ok = row[idKey]; !ok {
 				continue
 			}
 			var rowID string
-			if rowID, ok = row["_id"].(string); !ok {
+			if rowID, ok = row[idKey].(string); !ok {
 				continue
 			}
 
@@ -103,7 +103,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 				if !success {
 					continue
 				}
-				for _, metric := range makeMetrics(prefix, bson.M{"count": chunks}, labels, d.compatible) {
+				for _, metric := range makeMetrics(prefix, bson.M{countKey: chunks}, labels, d.compatible) {
 					ch <- metric
 				}
 			}
@@ -119,11 +119,11 @@ func (d *shardsCollector) getInfoForChunk(c bson.M, database, rowID string) (map
 		}
 	}
 
-	if _, ok = c["shard"]; !ok {
+	if _, ok = c[shardKey]; !ok {
 		return nil, 0, ok
 	}
 	var shard string
-	if shard, ok = c["shard"].(string); !ok {
+	if shard, ok = c[shardKey].(string); !ok {
 		return nil, 0, ok
 	}
 
@@ -138,11 +138,11 @@ func (d *shardsCollector) getInfoForChunk(c bson.M, database, rowID string) (map
 	labels := make(map[string]string)
 	labels["database"] = database
 	labels["collection"] = strings.Replace(rowID, fmt.Sprintf("%s.", database), "", 1)
-	labels["shard"] = shard
+	labels[shardKey] = shard
 
 	logger := d.base.logger
 	logger.Debug("$shards metrics for config.chunks")
-	debugResult(logger, bson.M{database: c})
+	debugResult(d.ctx, logger, bson.M{database: c})
 
 	return labels, chunks, true
 }
@@ -152,7 +152,7 @@ func (d *shardsCollector) getCollectionsForDBName(database string) []bson.M {
 	logger := d.base.logger
 
 	cursor := client.Database("config").Collection("collections")
-	rs, err := cursor.Find(d.ctx, bson.M{"_id": bson.M{"$regex": fmt.Sprintf("^%s.", database), "$options": "i"}})
+	rs, err := cursor.Find(d.ctx, bson.M{idKey: bson.M{"$regex": fmt.Sprintf("^%s.", database), "$options": "i"}})
 	if err != nil {
 		logger.Error("cannot find _id with database prefix", "database", database, "error", err)
 		return nil
@@ -175,16 +175,16 @@ func (d *shardsCollector) getChunksForCollection(row bson.M) []bson.M {
 			chunksMatchPredicate = bson.M{"uuid": uuid}
 		}
 	} else {
-		if id, ok := row["_id"]; ok {
-			chunksMatchPredicate = bson.M{"_id": id}
+		if id, ok := row[idKey]; ok {
+			chunksMatchPredicate = bson.M{idKey: id}
 		}
 	}
 
 	aggregation := bson.A{
 		bson.M{"$match": chunksMatchPredicate},
-		bson.M{"$group": bson.M{"_id": "$shard", "cnt": bson.M{"$sum": 1}}},
-		bson.M{"$project": bson.M{"_id": 0, "shard": "$_id", "nChunks": "$cnt"}},
-		bson.M{"$sort": bson.M{"shard": 1}},
+		bson.M{groupOperator: bson.M{idKey: "$shard", "cnt": bson.M{sumOperator: 1}}},
+		bson.M{"$project": bson.M{idKey: 0, shardKey: idReference, "nChunks": "$cnt"}},
+		bson.M{"$sort": bson.M{shardKey: 1}},
 	}
 
 	client := d.base.client
@@ -221,7 +221,7 @@ func chunksTotal(ctx context.Context, client *mongo.Client) (prometheus.Metric, 
 
 func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
 	aggregation := bson.D{
-		{Key: "$group", Value: bson.M{"_id": "$shard", "count": bson.M{"$sum": 1}}},
+		{Key: groupOperator, Value: bson.M{idKey: "$shard", countKey: bson.M{sumOperator: 1}}},
 	}
 
 	cursor, err := client.Database("config").Collection("chunks").Aggregate(ctx, mongo.Pipeline{aggregation})
@@ -238,14 +238,14 @@ func chunksTotalPerShard(ctx context.Context, client *mongo.Client) ([]prometheu
 
 	for _, shard := range shards {
 		help := "Total number of chunks per shard"
-		id, ok := shard["_id"].(string)
+		id, ok := shard[idKey].(string)
 		if !ok {
 			continue
 		}
-		labels := map[string]string{"shard": id}
+		labels := map[string]string{shardKey: id}
 
 		d := prometheus.NewDesc("mongodb_mongos_sharding_shard_chunks_total", help, nil, labels)
-		val, ok := shard["count"].(int32)
+		val, ok := shard[countKey].(int32)
 		if !ok {
 			continue
 		}
