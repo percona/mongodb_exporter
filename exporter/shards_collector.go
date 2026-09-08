@@ -23,9 +23,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type shardsCollector struct {
@@ -104,7 +103,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 				if !success {
 					continue
 				}
-				for _, metric := range makeMetrics(prefix, primitive.M{"count": chunks}, labels, d.compatible) {
+				for _, metric := range makeMetrics(prefix, bson.M{"count": chunks}, labels, d.compatible) {
 					ch <- metric
 				}
 			}
@@ -112,7 +111,7 @@ func (d *shardsCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (d *shardsCollector) getInfoForChunk(c primitive.M, database, rowID string) (map[string]string, int32, bool) {
+func (d *shardsCollector) getInfoForChunk(c bson.M, database, rowID string) (map[string]string, int32, bool) {
 	var ok bool
 	if _, ok = c["dropped"]; ok {
 		if dropped, ok := c["dropped"].(bool); ok && dropped {
@@ -143,12 +142,12 @@ func (d *shardsCollector) getInfoForChunk(c primitive.M, database, rowID string)
 
 	logger := d.base.logger
 	logger.Debug("$shards metrics for config.chunks")
-	debugResult(logger, primitive.M{database: c})
+	debugResult(logger, bson.M{database: c})
 
 	return labels, chunks, true
 }
 
-func (d *shardsCollector) getCollectionsForDBName(database string) []primitive.M {
+func (d *shardsCollector) getCollectionsForDBName(database string) []bson.M {
 	client := d.base.client
 	logger := d.base.logger
 
@@ -169,7 +168,7 @@ func (d *shardsCollector) getCollectionsForDBName(database string) []primitive.M
 	return decoded
 }
 
-func (d *shardsCollector) getChunksForCollection(row primitive.M) []bson.M {
+func (d *shardsCollector) getChunksForCollection(row bson.M) []bson.M {
 	var chunksMatchPredicate bson.M
 	if _, ok := row["timestamp"]; ok {
 		if uuid, ok := row["uuid"]; ok {

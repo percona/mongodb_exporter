@@ -22,8 +22,8 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/proto"
 	"github.com/percona/mongodb_exporter/internal/util"
@@ -142,7 +142,7 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 		return "", errors.New("cannot get mongo node type from an empty client")
 	}
 	md := proto.MasterDoc{}
-	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
+	if err := client.Database("admin").RunCommand(ctx, bson.M{"isMaster": 1}).Decode(&md); err != nil {
 		return "", err
 	}
 
@@ -158,10 +158,10 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 }
 
 func getClusterRole(ctx context.Context, client *mongo.Client, logger *slog.Logger) (string, error) {
-	cmdOpts := primitive.M{}
+	cmdOpts := bson.M{}
 	// Not always we can get this info. For example, we cannot get this for hidden hosts so
 	// if there is an error, just ignore it
-	res := client.Database("admin").RunCommand(ctx, primitive.D{
+	res := client.Database("admin").RunCommand(ctx, bson.D{
 		{Key: "getCmdLineOpts", Value: 1},
 	})
 

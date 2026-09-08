@@ -21,18 +21,16 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/AlekSi/pointer"
 	"github.com/pkg/errors"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
 
 func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string, skipViews bool) ([]string, error) {
-	opts := &options.ListCollectionsOptions{NameOnly: pointer.ToBool(true), AuthorizedCollections: pointer.ToBool(true)}
+	opts := options.ListCollections().SetNameOnly(true).SetAuthorizedCollections(true)
 	filter := bson.D{} // Default=empty -> list all collections
 
 	// if there is a filter with the list of collections we want, create a filter like
@@ -50,7 +48,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 				// The rest is the collection name and it can have dots. We need to rebuild it.
 				collection := strings.Join(parts[1:], ".")
 				matchExpressions = append(matchExpressions,
-					bson.D{{Key: "name", Value: primitive.Regex{Pattern: collection, Options: "i"}}})
+					bson.D{{Key: "name", Value: bson.Regex{Pattern: collection, Options: "i"}}})
 			}
 		}
 
@@ -60,7 +58,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 	}
 
 	if skipViews {
-		filter = append(filter, primitive.E{Key: "type", Value: bson.D{
+		filter = append(filter, bson.E{Key: "type", Value: bson.D{
 			{Key: "$in", Value: bson.A{"collection", "timeseries"}},
 		}})
 	}
@@ -81,10 +79,7 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 //
 // - exclude: List of databases to be excluded. Useful to ignore system databases.
 func databases(ctx context.Context, client *mongo.Client, filterInNamespaces []string, exclude []string) ([]string, error) {
-	opts := &options.ListDatabasesOptions{
-		NameOnly:            pointer.ToBool(true),
-		AuthorizedDatabases: pointer.ToBool(true),
-	}
+	opts := options.ListDatabases().SetNameOnly(true).SetAuthorizedDatabases(true)
 
 	filter := bson.D{}
 
@@ -104,7 +99,7 @@ func databases(ctx context.Context, client *mongo.Client, filterInNamespaces []s
 	return dbNames, nil
 }
 
-func makeExcludeFilter(exclude []string) *primitive.E {
+func makeExcludeFilter(exclude []string) *bson.E {
 	if len(exclude) == 0 {
 		return nil
 	}
@@ -116,10 +111,10 @@ func makeExcludeFilter(exclude []string) *primitive.E {
 		)
 	}
 
-	return &primitive.E{Key: "$and", Value: filterExpressions}
+	return &bson.E{Key: "$and", Value: filterExpressions}
 }
 
-func makeDBsFilter(filterInNamespaces []string) *primitive.E {
+func makeDBsFilter(filterInNamespaces []string) *bson.E {
 	nss := removeEmptyStrings(filterInNamespaces)
 	if len(nss) == 0 {
 		return nil
@@ -133,7 +128,7 @@ func makeDBsFilter(filterInNamespaces []string) *primitive.E {
 		)
 	}
 
-	return &primitive.E{Key: "$or", Value: filterExpressions}
+	return &bson.E{Key: "$or", Value: filterExpressions}
 }
 
 func removeEmptyStrings(items []string) []string {

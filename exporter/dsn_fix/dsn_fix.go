@@ -18,13 +18,16 @@ package dsn_fix
 import (
 	"net/url"
 
-	"github.com/AlekSi/pointer"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // ClientOptionsForDSN applies URI to Client.
 func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
-	clientOptions := options.Client().ApplyURI(dsn)
+	clientOptions := options.Client().ApplyURI(dsn).SetBSONOptions(&options.BSONOptions{
+		// Preserve the v1 driver's default for interface/map decoding. The v2
+		// driver defaults nested documents to bson.D instead of bson.M.
+		DefaultDocumentM: true,
+	})
 	if e := clientOptions.Validate(); e != nil {
 		return nil, e
 	}
@@ -41,8 +44,6 @@ func ClientOptionsForDSN(dsn string) (*options.ClientOptions, error) {
 	if username != "" || password != "" {
 		clientOptions.Auth.Username = username
 		clientOptions.Auth.Password = password
-		// set this flag to connect to arbiter when there authentication is enabled
-		clientOptions.AuthenticateToAnything = pointer.ToBool(true) //nolint:staticcheck
 	}
 
 	return clientOptions, nil

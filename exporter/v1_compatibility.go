@@ -25,10 +25,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/percona/mongodb_exporter/internal/proto"
 	"github.com/percona/mongodb_exporter/internal/util"
@@ -947,7 +946,7 @@ func arbiterMetrics(ctx context.Context, client *mongo.Client, l *slog.Logger) [
 func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
 	oplogRS := client.Database("local").Collection("oplog.rs")
 	type oplogRSResult struct {
-		Timestamp primitive.Timestamp `bson:"ts"`
+		Timestamp bson.Timestamp `bson:"ts"`
 	}
 	var head, tail oplogRSResult
 	headRes := oplogRS.FindOne(ctx, bson.M{}, options.FindOne().SetSort(bson.M{
@@ -1410,7 +1409,7 @@ func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *slog.Logger) [
 	return metrics
 }
 
-func walkTo(m primitive.M, path []string) interface{} {
+func walkTo(m bson.M, path []string) interface{} {
 	val, ok := m[path[0]]
 	if !ok {
 		return nil
@@ -1418,7 +1417,7 @@ func walkTo(m primitive.M, path []string) interface{} {
 
 	if len(path) > 1 {
 		switch v := val.(type) {
-		case primitive.M:
+		case bson.M:
 			val = walkTo(v, path[1:])
 		case map[string]interface{}:
 			val = walkTo(v, path[1:])

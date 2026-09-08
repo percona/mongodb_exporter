@@ -26,8 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const (
@@ -74,7 +73,7 @@ var (
 	// For example, the fields under the serverStatus.opcounters. structure have this
 	// signature:
 	//
-	//    "opcounters": primitive.M{
+	//    "opcounters": bson.M{
 	//        "insert":  int32(4),
 	//        "query":   int32(2118),
 	//        "update":  int32(14),
@@ -125,22 +124,22 @@ var (
 	// For example, the fields under the storageStats.indexDetails. structure have this
 	// signature:
 	//
-	//    "storageStats": primitive.M{
-	//        "indexDetails": primitive.M{
-	//            "_id_": primitive.M{
-	//                "LSM": primitive.M{
+	//    "storageStats": bson.M{
+	//        "indexDetails": bson.M{
+	//            "_id_": bson.M{
+	//                "LSM": bson.M{
 	//                    "bloom filter false positives": int32(0),
 	//                    "bloom filter hits":            int32(0),
 	//                    "bloom filter misses":          int32(0),
 	// ...
 	//                },
-	//				"block-manager": primitive.M{
+	//				"block-manager": bson.M{
 	//                    "allocations requiring file extension": int32(0),
 	// ...
 	//                },
 	// ...
 	//            },
-	//            "name_1": primitive.M{
+	//            "name_1": bson.M{
 	// ...
 	//            },
 	// ...
@@ -271,11 +270,11 @@ func asFloat64(value any) (*float64, error) {
 		f = float64(v)
 	case float64:
 		f = v
-	case primitive.DateTime:
+	case bson.DateTime:
 		f = float64(v)
-	case primitive.Timestamp:
+	case bson.Timestamp:
 		f = float64(v.T)
-	case primitive.A, primitive.ObjectID, primitive.Binary, string, []uint8, time.Time:
+	case bson.A, bson.ObjectID, bson.Binary, string, []uint8, time.Time:
 		return nil, nil
 	default:
 		return nil, errors.Wrapf(errCannotHandleType, "%T", v)
@@ -337,7 +336,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case map[string]any:
 			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
-		case primitive.A:
+		case bson.A:
 			res = append(res, processMetricSlice(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case []any:
 			if isHistogramBucketSlice(nextPrefix, v) {
@@ -520,7 +519,7 @@ func asMetricMap(item any) (map[string]any, bool) {
 	switch value := item.(type) {
 	case map[string]any:
 		return value, true
-	case primitive.M:
+	case bson.M:
 		return map[string]any(value), true
 	default:
 		return nil, false

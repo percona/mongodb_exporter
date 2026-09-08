@@ -32,9 +32,9 @@ import (
 	"github.com/foxcpp/go-mockdns"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const (
@@ -133,9 +133,10 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 		ConnectTimeout: &to,
 		Hosts:          []string{net.JoinHostPort(hostname, port)},
 		Direct:         &direct,
+		BSONOptions:    &options.BSONOptions{DefaultDocumentM: true},
 	}
 
-	client, err := mongo.Connect(ctx, co)
+	client, err := mongo.Connect(co)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
