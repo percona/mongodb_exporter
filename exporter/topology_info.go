@@ -120,9 +120,11 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 		return err
 	}
 
-	cid, err := util.ClusterID(ctx, t.client)
-	if err != nil {
-		if nodeType != typeArbiter { // arbiters don't have a cluster ID
+	cid := ""
+	if nodeType != typeArbiter { // arbiters don't have a cluster ID
+		var err error
+		cid, err = util.ClusterID(ctx, t.client)
+		if err != nil {
 			return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting cluster ID: %s", err)
 		}
 	}
