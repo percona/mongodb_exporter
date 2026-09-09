@@ -64,3 +64,16 @@ func TestConfigureAWSCredentialsProviderInvalidConfig(t *testing.T) {
 
 	require.Error(t, configureAWSCredentialsProvider(context.Background(), clientOpts))
 }
+
+func TestConnectInvalidAWSConfig(t *testing.T) {
+	configFile := filepath.Join(t.TempDir(), "config")
+	require.NoError(t, os.WriteFile(configFile, []byte("[default]\ndefaults_mode = invalid\n"), 0o600))
+	t.Setenv("AWS_CONFIG_FILE", configFile)
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", filepath.Join(t.TempDir(), "credentials"))
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+
+	client, err := connect(context.Background(), &Opts{URI: "mongodb://localhost/?authMechanism=MONGODB-AWS"})
+
+	require.Error(t, err)
+	require.Nil(t, client)
+}
