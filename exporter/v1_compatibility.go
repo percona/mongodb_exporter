@@ -1165,6 +1165,13 @@ func shardedCollectionsTotal(ctx context.Context, client *mongo.Client) (prometh
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(collCount))
 }
 
+func balancerRunningValue(inBalancerRound bool) float64 {
+	if inBalancerRound {
+		return 1
+	}
+	return 0
+}
+
 func chunksBalancerRunning(ctx context.Context, client *mongo.Client) (prometheus.Metric, error) {
 	var m struct {
 		InBalancerRound bool `bson:"inBalancerRound"`
@@ -1177,10 +1184,7 @@ func chunksBalancerRunning(ctx context.Context, client *mongo.Client) (prometheu
 		return nil, err
 	}
 
-	value := float64(0)
-	if !m.InBalancerRound {
-		value = 1
-	}
+	value := balancerRunningValue(m.InBalancerRound)
 
 	name := "mongodb_mongos_sharding_chunks_is_balancer_running"
 	help := "Shard balancer is in a balancing round"
