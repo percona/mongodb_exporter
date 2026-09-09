@@ -55,7 +55,7 @@ func TestConfigureAWSCredentialsProviderSkipsOtherMechanisms(t *testing.T) {
 
 func TestConfigureAWSCredentialsProviderInvalidConfig(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "config")
-	require.NoError(t, os.WriteFile(configFile, []byte("[default\n"), 0o600))
+	require.NoError(t, os.WriteFile(configFile, []byte("[default]\ndefaults_mode = invalid\n"), 0o600))
 	t.Setenv("AWS_CONFIG_FILE", configFile)
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", filepath.Join(t.TempDir(), "credentials"))
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
