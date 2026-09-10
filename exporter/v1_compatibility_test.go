@@ -250,6 +250,20 @@ func TestMongosMetrics(t *testing.T) {
 	})
 }
 
+func TestMongosMetricsCollection(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	port, err := tu.PortForContainer("mongos")
+	require.NoError(t, err)
+	client := tu.TestClient(ctx, port, t)
+
+	metrics := mongosMetrics(ctx, client, promslog.New(&promslog.Config{}))
+	assert.NotEmpty(t, metrics)
+}
+
 // myState should always return a metric. If there is no connection, the value
 // should be the MongoDB unknown state = 6
 func TestMyState(t *testing.T) {
