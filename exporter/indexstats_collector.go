@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type indexstatsCollector struct {
@@ -119,13 +119,13 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 		d.base.logger.Debug("indexStats", "database", database, "collection", collection)
 
-		debugResult(d.base.logger, stats)
+		debugResult(d.ctx, d.base.logger, stats)
 
 		for _, metric := range stats {
-			indexName := fmt.Sprintf("%s", metric["name"])
+			indexName := fmt.Sprintf("%s", metric[nameKey])
 			// Override the label name
 			if d.overrideDescendingIndex {
-				indexName = strings.ReplaceAll(fmt.Sprintf("%s", metric["name"]), "-1", "DESC")
+				indexName = strings.ReplaceAll(fmt.Sprintf("%s", metric[nameKey]), "-1", "DESC")
 			}
 
 			// prefix and labels are needed to avoid duplicated metric names since the metrics are the

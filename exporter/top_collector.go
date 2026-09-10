@@ -21,9 +21,8 @@ import (
 	"log/slog"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type topCollector struct {
@@ -64,16 +63,16 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 	cmd := bson.D{{Key: "top", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
-	var m primitive.M
+	var m bson.M
 	if err := res.Decode(&m); err != nil {
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
 		return
 	}
 
 	logger.Debug("top result:")
-	debugResult(logger, m)
+	debugResult(d.ctx, logger, m)
 
-	totals, ok := m["totals"].(primitive.M)
+	totals, ok := m["totals"].(bson.M)
 	if !ok {
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingTotalsEntry),
 			ErrInvalidOrMissingTotalsEntry)
@@ -145,7 +144,7 @@ func (d *topCollector) collect(ch chan<- prometheus.Metric) {
 		labels["database"] = db
 		labels["collection"] = coll
 
-		mm, ok := metrics.(primitive.M) // ingore entries like -> "note" : "all times in microseconds"
+		mm, ok := metrics.(bson.M) // ingore entries like -> "note" : "all times in microseconds"
 		if !ok {
 			continue
 		}

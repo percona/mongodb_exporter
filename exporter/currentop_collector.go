@@ -17,16 +17,15 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type currentopCollector struct {
@@ -85,9 +84,9 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 		// Get all requests that are being processed except system requests (admin and local).
 		cmd = append(cmd,
 			bson.E{Key: "active", Value: true},
-			bson.E{Key: "op", Value: bson.D{{Key: "$ne", Value: ""}}},
+			bson.E{Key: "op", Value: bson.D{{Key: notEqualOperator, Value: ""}}},
 			bson.E{Key: "ns", Value: bson.D{
-				{Key: "$ne", Value: ""},
+				{Key: notEqualOperator, Value: ""},
 				{Key: "$not", Value: bson.D{{Key: "$regex", Value: "^admin.*|^local.*"}}},
 			}},
 			bson.E{Key: "microsecs_running", Value: bson.D{
@@ -99,7 +98,7 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
 
-	var r primitive.M
+	var r bson.M
 	if err := res.Decode(&r); err != nil {
 		logger.Error("Failed to decode currentOp response", "error", err)
 		ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
@@ -107,13 +106,13 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	logger.Debug("currentop response from MongoDB:")
-	debugResult(logger, r)
+	debugResult(d.ctx, logger, r)
 
 	if slowQueriesEnabled {
-		inprog, ok := r["inprog"].(primitive.A)
+		inprog, ok := r["inprog"].(bson.A)
 
 		if !ok {
-			logger.Error(fmt.Sprintf("Invalid type primitive.A assertion for 'inprog': %T", r["inprog"]))
+			logger.Error(fmt.Sprintf("Invalid type bson.A assertion for 'inprog': %T", r["inprog"]))
 			ch <- prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(ErrInvalidOrMissingInprogEntry),
 				ErrInvalidOrMissingInprogEntry)
 		}
@@ -125,9 +124,9 @@ func (d *currentopCollector) collect(ch chan<- prometheus.Metric) {
 
 		for _, bsonMap := range inprog {
 
-			bsonMapElement, ok := bsonMap.(primitive.M)
+			bsonMapElement, ok := bsonMap.(bson.M)
 			if !ok {
-				logger.Error(fmt.Sprintf("Invalid type primitive.M assertion for bsonMap: %T", bsonMapElement))
+				logger.Error(fmt.Sprintf("Invalid type bson.M assertion for bsonMap: %T", bsonMapElement))
 				continue
 			}
 			opid, ok := bsonMapElement["opid"].(int32)

@@ -21,9 +21,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type profileCollector struct {
@@ -69,7 +68,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	}
 
 	// Now time + '--collector.profile-time-ts'
-	ts := primitive.NewDateTimeFromTime(time.Now().Add(-time.Duration(time.Second * time.Duration(timeScrape))))
+	ts := bson.NewDateTimeFromTime(time.Now().Add(-time.Second * time.Duration(timeScrape)))
 
 	labels := d.topologyInfo.baseLabels()
 
@@ -83,10 +82,10 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 		}
 		labels["database"] = db
 
-		m := primitive.M{"count": res}
+		m := bson.M{countKey: res}
 
 		logger.Debug("profile response from MongoDB:")
-		debugResult(logger, primitive.M{db: m})
+		debugResult(d.ctx, logger, bson.M{db: m})
 
 		for _, metric := range makeMetrics("profile_slow_query", m, labels, d.compatibleMode) {
 			ch <- metric

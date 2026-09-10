@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type collstatsCollector struct {
@@ -140,7 +140,7 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		}
 
 		logger.Debug("$collStats metrics", "database", database, "collection", collection)
-		debugResult(logger, stats)
+		debugResult(d.ctx, logger, stats)
 
 		prefix := "collstats"
 

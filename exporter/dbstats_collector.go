@@ -20,8 +20,8 @@ import (
 	"log/slog"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type dbstatsCollector struct {
@@ -90,7 +90,7 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 		}
 
 		logger.Debug("$dbStats metrics for", "database", db)
-		debugResult(logger, dbStats)
+		debugResult(d.ctx, logger, dbStats)
 
 		prefix := "dbstats"
 

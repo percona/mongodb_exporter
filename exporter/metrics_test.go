@@ -24,8 +24,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type staticCollector []prometheus.Metric
@@ -157,8 +156,8 @@ func TestMakeRawMetric(t *testing.T) {
 		{value: int64(2), wantVal: pointer.ToFloat64(2)},
 		{value: float32(1.23), wantVal: new(float64(float32(1.23)))},
 		{value: float64(1.23), wantVal: new(1.23)},
-		{value: primitive.A{}, wantVal: nil},
-		{value: primitive.Timestamp{T: 123, I: 456}, wantVal: pointer.ToFloat64(123)},
+		{value: bson.A{}, wantVal: nil},
+		{value: bson.Timestamp{T: 123, I: 456}, wantVal: pointer.ToFloat64(123)},
 		{value: "zapp", wantVal: nil},
 		{value: []byte{}, wantVal: nil},
 		{value: time.Date(2020, 6, 15, 0, 0, 0, 0, time.UTC), wantVal: nil},
@@ -238,7 +237,7 @@ func TestHistogramMetricsDoNotCollide(t *testing.T) {
 	t.Parallel()
 
 	metrics := makeMetricsWithHistograms("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
-		"sbeMicros": primitive.A{
+		"sbeMicros": bson.A{
 			bson.M{"lowerBound": int64(0), "count": int64(3)},
 			bson.M{"lowerBound": int64(1024), "count": int64(7)},
 		},
@@ -287,7 +286,7 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 
 	metrics := makeMetrics("serverStatus.metrics.query.multiPlanner", bson.M{
 		"histograms": bson.M{
-			"sbeMicros": primitive.A{
+			"sbeMicros": bson.A{
 				bson.M{"lowerBound": int64(0), "count": int64(3)},
 				bson.M{"lowerBound": int64(1024), "count": int64(7)},
 			},
@@ -297,7 +296,7 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	assert.Empty(t, metrics)
 
 	metrics = makeMetrics("serverStatus.metrics.query.multiPlanner.histograms", bson.M{
-		"sbeMicros": primitive.A{
+		"sbeMicros": bson.A{
 			bson.M{"lowerBound": int64(0), "count": int64(3)},
 			bson.M{"lowerBound": int64(1024), "count": int64(7)},
 		},
@@ -325,7 +324,7 @@ func TestOpLatenciesHistogramBucketsDoNotCollide(t *testing.T) {
 	t.Parallel()
 
 	metrics := makeMetricsWithHistograms("serverStatus.opLatencies.commands", bson.M{
-		"histogram": primitive.A{
+		"histogram": bson.A{
 			bson.M{"micros": int64(8), "count": int64(3)},
 			bson.M{"micros": int64(64), "count": int64(7)},
 			bson.M{"micros": int64(512), "count": int64(11)},
@@ -377,7 +376,7 @@ func TestOpLatenciesHistogramSkippedByDefault(t *testing.T) {
 	t.Parallel()
 
 	metrics := makeMetrics("serverStatus.opLatencies.commands", bson.M{
-		"histogram": primitive.A{
+		"histogram": bson.A{
 			bson.M{"micros": int64(8), "count": int64(3)},
 		},
 		"ops": int64(5),
