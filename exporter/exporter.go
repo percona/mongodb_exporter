@@ -29,7 +29,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promslog"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
 )
@@ -284,7 +284,7 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 			return e.client, nil
 		}
 
-		client, err := connect(context.Background(), e.opts)
+		client, err := connect(ctx, e.opts)
 		if err != nil {
 			return nil, err
 		}
@@ -425,6 +425,10 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
+	err = configureAWSCredentialsProvider(ctx, clientOpts)
+	if err != nil {
+		return nil, err
+	}
 
 	clientOpts.SetDirect(opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
@@ -435,7 +439,7 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 		clientOpts.SetServerSelectionTimeout(connectTimeout)
 	}
 
-	client, err := mongo.Connect(ctx, clientOpts)
+	client, err := mongo.Connect(clientOpts)
 	if err != nil {
 		return nil, fmt.Errorf("invalid MongoDB options: %w", err)
 	}

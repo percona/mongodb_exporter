@@ -22,8 +22,8 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/proto"
 	"github.com/percona/mongodb_exporter/internal/util"
@@ -120,9 +120,11 @@ func (t *topologyInfo) loadLabels(ctx context.Context) error {
 		return err
 	}
 
-	cid, err := util.ClusterID(ctx, t.client)
-	if err != nil {
-		if nodeType != typeArbiter { // arbiters don't have a cluster ID
+	cid := ""
+	if nodeType != typeArbiter { // arbiters don't have a cluster ID
+		var err error
+		cid, err = util.ClusterID(ctx, t.client)
+		if err != nil {
 			return errors.Wrapf(ErrCannotGetTopologyLabels, "error getting cluster ID: %s", err)
 		}
 	}
@@ -142,7 +144,8 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 		return "", errors.New("cannot get mongo node type from an empty client")
 	}
 	md := proto.MasterDoc{}
-	if err := client.Database("admin").RunCommand(ctx, primitive.M{"isMaster": 1}).Decode(&md); err != nil {
+	err := client.Database("admin").RunCommand(ctx, bson.M{"isMaster": 1}).Decode(&md)
+	if err != nil {
 		return "", err
 	}
 
@@ -158,10 +161,10 @@ func getNodeType(ctx context.Context, client *mongo.Client) (mongoDBNodeType, er
 }
 
 func getClusterRole(ctx context.Context, client *mongo.Client, logger *slog.Logger) (string, error) {
-	cmdOpts := primitive.M{}
+	cmdOpts := bson.M{}
 	// Not always we can get this info. For example, we cannot get this for hidden hosts so
 	// if there is an error, just ignore it
-	res := client.Database("admin").RunCommand(ctx, primitive.D{
+	res := client.Database("admin").RunCommand(ctx, bson.D{
 		{Key: "getCmdLineOpts", Value: 1},
 	})
 
@@ -174,7 +177,7 @@ func getClusterRole(ctx context.Context, client *mongo.Client, logger *slog.Logg
 	}
 
 	logger.Debug("getCmdLineOpts response:")
-	debugResult(logger, cmdOpts)
+	debugResult(ctx, logger, cmdOpts)
 
 	if walkTo(cmdOpts, []string{"parsed", "sharding", "configDB"}) != nil {
 		return "mongos", nil

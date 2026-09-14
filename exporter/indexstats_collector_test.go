@@ -23,15 +23,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AlekSi/pointer"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -57,9 +55,7 @@ func TestIndexStatsCollector(t *testing.T) {
 		mod := mongo.IndexModel{
 			Keys: bson.M{
 				"f1": 1,
-			}, Options: &options.IndexOptions{
-				Name: pointer.ToString("idx_01"),
-			},
+			}, Options: options.Index().SetName("idx_01"),
 		}
 		_, err := database.Collection(collection).Indexes().CreateOne(ctx, mod)
 		require.NoError(t, err)
@@ -200,8 +196,8 @@ func TestSanitize(t *testing.T) {
 			},
 			"building": 1,
 		}
-		want := primitive.M{
-			"accesses": primitive.M{
+		want := bson.M{
+			"accesses": bson.M{
 				"ops": float64(3),
 			},
 			"building": float64(1),
@@ -230,8 +226,8 @@ func TestSanitize(t *testing.T) {
 				"v":    2,
 			},
 		}
-		want := primitive.M{
-			"accesses": primitive.M{
+		want := bson.M{
+			"accesses": bson.M{
 				"ops": float64(3),
 			},
 		}

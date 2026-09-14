@@ -21,8 +21,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 const (
@@ -113,7 +113,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 		}
 
 		logger.Debug("getDiagnosticData result")
-		debugResult(logger, m)
+		debugResult(d.ctx, logger, m)
 
 		// MongoDB 8.0 splits the diagnostic data into multiple blocks, so we need to merge them
 		if _, ok := m["common"]; ok {
@@ -219,7 +219,7 @@ func (d *diagnosticDataCollector) retrieveSecurityEncryptionMetric(securityOptio
 		encryptionType = localKeyFileEncryption
 	}
 
-	labels := map[string]string{"type": encryptionType}
+	labels := map[string]string{typeKey: encryptionType}
 	desc := prometheus.NewDesc("mongodb_security_encryption_enabled", "Shows that encryption is enabled",
 		nil, labels)
 	metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, float64(1))

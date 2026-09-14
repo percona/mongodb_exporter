@@ -26,8 +26,7 @@ import (
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -64,7 +63,7 @@ type RSConfig struct {
 			W        int `bson:"w"`
 			Wtimeout int `bson:"wtimeout"`
 		} `bson:"getLastErrorDefaults"`
-		ReplicaSetID primitive.ObjectID `bson:"replicaSetId"`
+		ReplicaSetID bson.ObjectID `bson:"replicaSetId"`
 	} `bson:"settings"`
 }
 
@@ -80,7 +79,7 @@ func TestSecondaryLag(t *testing.T) {
 	var rsConf, rsConfOld ReplicasetConfig
 	var gg interface{}
 
-	res := client.Database("admin").RunCommand(ctx, primitive.M{"replSetGetConfig": 1})
+	res := client.Database("admin").RunCommand(ctx, bson.M{"replSetGetConfig": 1})
 	require.NoError(t, res.Err())
 
 	err := res.Decode(&gg) // To restore config after test
@@ -97,10 +96,10 @@ func TestSecondaryLag(t *testing.T) {
 	var replSetReconfig struct {
 		OK int `bson:"ok"`
 	}
-	err = client.Database("admin").RunCommand(ctx, primitive.M{"replSetReconfig": rsConf.Config}).Decode(&replSetReconfig)
+	err = client.Database("admin").RunCommand(ctx, bson.M{"replSetReconfig": rsConf.Config}).Decode(&replSetReconfig)
 	assert.NoError(t, err)
 
-	res = client.Database("admin").RunCommand(ctx, primitive.M{"replSetGetConfig": 1})
+	res = client.Database("admin").RunCommand(ctx, bson.M{"replSetGetConfig": 1})
 	require.NoError(t, res.Err())
 
 	// Generate documents so oplog is forced to have operations and the lag becomes real, otherwise
@@ -144,6 +143,6 @@ func TestSecondaryLag(t *testing.T) {
 	assert.True(t, *metric.Gauge.Value > 0)
 
 	rsConfOld.Config.Version = rsConf.Config.Version + 1
-	err = client.Database("admin").RunCommand(ctx, primitive.M{"replSetReconfig": rsConfOld.Config}).Decode(&replSetReconfig)
+	err = client.Database("admin").RunCommand(ctx, bson.M{"replSetReconfig": rsConfOld.Config}).Decode(&replSetReconfig)
 	assert.NoError(t, err)
 }

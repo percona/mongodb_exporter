@@ -21,8 +21,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type replSetGetConfigCollector struct {
@@ -84,7 +84,7 @@ func (d *replSetGetConfigCollector) collect(ch chan<- prometheus.Metric) {
 	m = config
 
 	logger.Debug("replSetGetConfig result:")
-	debugResult(logger, m)
+	debugResult(d.ctx, logger, m)
 
 	for _, metric := range makeMetrics("rs_cfg", m, d.topologyInfo.baseLabels(), d.compatibleMode) {
 		ch <- metric

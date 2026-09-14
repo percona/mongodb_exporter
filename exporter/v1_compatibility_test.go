@@ -29,7 +29,7 @@ import (
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -248,6 +248,20 @@ func TestMongosMetrics(t *testing.T) {
 		}
 		assert.Equal(t, float64(expected), m.GetGauge().GetValue()) //nolint
 	})
+}
+
+func TestMongosMetricsCollection(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	port, err := tu.PortForContainer("mongos")
+	require.NoError(t, err)
+	client := tu.TestClient(ctx, port, t)
+
+	metrics := mongosMetrics(ctx, client, promslog.New(&promslog.Config{}))
+	assert.NotEmpty(t, metrics)
 }
 
 // myState should always return a metric. If there is no connection, the value

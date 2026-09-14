@@ -26,8 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const (
@@ -74,7 +73,7 @@ var (
 	// For example, the fields under the serverStatus.opcounters. structure have this
 	// signature:
 	//
-	//    "opcounters": primitive.M{
+	//    "opcounters": bson.M{
 	//        "insert":  int32(4),
 	//        "query":   int32(2118),
 	//        "update":  int32(14),
@@ -98,18 +97,18 @@ var (
 	//
 	nodeToPDMetrics = map[string]string{
 		"collStats.storageStats.indexDetails.":                   "index_name",
-		"globalLock.activeQueue.":                                "count_type",
+		"globalLock.activeQueue.":                                countTypeKey,
 		"globalLock.locks.":                                      "lock_type",
 		"serverStatus.asserts.":                                  "assert_type",
 		"serverStatus.connections.":                              "conn_type",
-		"serverStatus.globalLock.currentQueue.":                  "count_type",
+		"serverStatus.globalLock.currentQueue.":                  countTypeKey,
 		"serverStatus.metrics.commands.":                         "cmd_name",
 		"serverStatus.metrics.cursor.open.":                      "csr_type",
-		"serverStatus.metrics.document.":                         "doc_op_type",
-		"serverStatus.opLatencies.":                              "op_type",
+		"serverStatus.metrics.document.":                         docOpTypeKey,
+		"serverStatus.opLatencies.":                              opTypeKey,
 		"serverStatus.opReadConcernCounters.":                    "concern_type",
-		"serverStatus.opcounters.":                               "legacy_op_type",
-		"serverStatus.opcountersRepl.":                           "legacy_op_type",
+		"serverStatus.opcounters.":                               legacyOpTypeKey,
+		"serverStatus.opcountersRepl.":                           legacyOpTypeKey,
 		"serverStatus.transactions.commitTypes.":                 "commit_type",
 		"serverStatus.wiredTiger.concurrentTransactions.":        "txn_rw_type",
 		"serverStatus.queues.execution.":                         "txn_rw_type",
@@ -125,22 +124,22 @@ var (
 	// For example, the fields under the storageStats.indexDetails. structure have this
 	// signature:
 	//
-	//    "storageStats": primitive.M{
-	//        "indexDetails": primitive.M{
-	//            "_id_": primitive.M{
-	//                "LSM": primitive.M{
+	//    "storageStats": bson.M{
+	//        "indexDetails": bson.M{
+	//            "_id_": bson.M{
+	//                "LSM": bson.M{
 	//                    "bloom filter false positives": int32(0),
 	//                    "bloom filter hits":            int32(0),
 	//                    "bloom filter misses":          int32(0),
 	// ...
 	//                },
-	//				"block-manager": primitive.M{
+	//				"block-manager": bson.M{
 	//                    "allocations requiring file extension": int32(0),
 	// ...
 	//                },
 	// ...
 	//            },
-	//            "name_1": primitive.M{
+	//            "name_1": bson.M{
 	// ...
 	//            },
 	// ...
@@ -226,7 +225,7 @@ func makeRawMetric(prefix, name string, value any, labels map[string]string) (*r
 
 	// reservedPrefixes are used for metrics that might include the word ‘count’ in their name but are not actual counters.
 	reservedPrefixes := []string{"collstats.storageStats.indexSizes."}
-	if !slices.Contains(reservedPrefixes, prefix) && strings.HasSuffix(strings.ToLower(name), "count") {
+	if !slices.Contains(reservedPrefixes, prefix) && strings.HasSuffix(strings.ToLower(name), countKey) {
 		metricType = prometheus.CounterValue
 	}
 
@@ -271,11 +270,11 @@ func asFloat64(value any) (*float64, error) {
 		f = float64(v)
 	case float64:
 		f = v
-	case primitive.DateTime:
+	case bson.DateTime:
 		f = float64(v)
-	case primitive.Timestamp:
+	case bson.Timestamp:
 		f = float64(v.T)
-	case primitive.A, primitive.ObjectID, primitive.Binary, string, []uint8, time.Time:
+	case bson.A, bson.ObjectID, bson.Binary, string, []uint8, time.Time:
 		return nil, nil
 	default:
 		return nil, errors.Wrapf(errCannotHandleType, "%T", v)
@@ -337,7 +336,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case map[string]any:
 			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
-		case primitive.A:
+		case bson.A:
 			res = append(res, processMetricSlice(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case []any:
 			if isHistogramBucketSlice(nextPrefix, v) {
@@ -366,7 +365,7 @@ func processSlice(prefix string, v []any, commonLabels map[string]string, compat
 		}
 
 		// use the replicaset or server name as a label
-		if name, ok := s["name"].(string); ok {
+		if name, ok := s[nameKey].(string); ok {
 			labels["member_idx"] = name
 		}
 		if state, ok := s["stateStr"].(string); ok {
@@ -464,7 +463,7 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 		// Without a label naming the bucket, every bucket of the histogram produces the
 		// same series and the registry rejects all but the first.
 		labels[boundLabel(boundKey)] = fmt.Sprint(bound)
-		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
+		metrics = appendMetricValue(metrics, prefix+".", countKey, bucket[countKey], labels, compatibleMode)
 	}
 
 	return metrics
@@ -495,7 +494,7 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 		if _, _, ok := histogramBound(bucket); !ok {
 			return false
 		}
-		if _, ok := bucket["count"]; !ok {
+		if _, ok := bucket[countKey]; !ok {
 			return false
 		}
 	}
@@ -520,7 +519,7 @@ func asMetricMap(item any) (map[string]any, bool) {
 	switch value := item.(type) {
 	case map[string]any:
 		return value, true
-	case primitive.M:
+	case bson.M:
 		return map[string]any(value), true
 	default:
 		return nil, false
@@ -569,7 +568,7 @@ var specialConversions = []conversion{ //nolint:gochecknoglobals
 	{
 		oldName:     "mongodb_ss_opLatencies_ops",
 		prefix:      "mongodb_ss_opLatencies",
-		suffixLabel: "op_type",
+		suffixLabel: opTypeKey,
 		suffixMapping: map[string]string{
 			"commands_ops":     "commands",
 			"reads_ops":        "reads",
@@ -580,7 +579,7 @@ var specialConversions = []conversion{ //nolint:gochecknoglobals
 	{
 		oldName:     "mongodb_ss_opLatencies_latency",
 		prefix:      "mongodb_ss_opLatencies",
-		suffixLabel: "op_type",
+		suffixLabel: opTypeKey,
 		suffixMapping: map[string]string{
 			"commands_latency":     "commands",
 			"reads_latency":        "reads",

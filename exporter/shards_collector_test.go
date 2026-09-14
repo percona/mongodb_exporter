@@ -23,17 +23,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 //nolint:paralleltest
 func TestShardsCollector(t *testing.T) {
-	t.Skip("This is failing in GitHub actions. Shards are not ready yet")
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
+	shardTestCollection(ctx, t, client, "test", "shard")
 	c := newShardsCollector(ctx, client, promslog.New(&promslog.Config{}), false)
 
 	reg := prometheus.NewPedanticRegistry()
@@ -65,4 +66,21 @@ func TestShardsCollector(t *testing.T) {
 	for _, v := range expected {
 		assert.Contains(t, res, v)
 	}
+}
+
+func TestShardsCollectorGetInfoForChunk(t *testing.T) {
+	t.Parallel()
+
+	c := &shardsCollector{base: newBaseCollector(nil, promslog.New(&promslog.Config{}))}
+	labels, chunks, ok := c.getInfoForChunk(bson.M{"shard": "rs1", "nChunks": int32(2)}, "test", "test.shard")
+
+	assert.True(t, ok)
+	assert.Equal(t, int32(2), chunks)
+	assert.Equal(t, map[string]string{"database": "test", "collection": "shard", "shard": "rs1"}, labels)
+
+	_, _, ok = c.getInfoForChunk(bson.M{"dropped": true}, "test", "test.shard")
+	assert.False(t, ok)
+
+	_, _, ok = c.getInfoForChunk(bson.M{"nChunks": int32(2)}, "test", "test.shard")
+	assert.False(t, ok)
 }

@@ -25,10 +25,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/percona/mongodb_exporter/internal/proto"
 	"github.com/percona/mongodb_exporter/internal/util"
@@ -234,7 +233,7 @@ var conversions = []conversion{
 	{
 		oldName:          "mongodb_asserts_total",
 		newName:          "mongodb_ss_asserts",
-		labelConversions: map[string]string{"assert_type": "type"},
+		labelConversions: map[string]string{"assert_type": typeKey},
 	},
 	{
 		oldName:          "mongodb_connections",
@@ -264,7 +263,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_global_lock_client",
 		prefix:      "mongodb_ss_globalLock_activeClients",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"readers": "reader",
 			"writers": "writer",
@@ -274,7 +273,7 @@ var conversions = []conversion{
 	{
 		oldName:          "mongodb_mongod_global_lock_current_queue",
 		newName:          "mongodb_ss_globalLock_currentQueue",
-		labelConversions: map[string]string{"count_type": "type"},
+		labelConversions: map[string]string{countTypeKey: typeKey},
 		labelValueConversions: map[string]string{
 			"readers": "reader",
 			"writers": "writer",
@@ -304,7 +303,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_memory",
 		prefix:      "mongodb_ss_mem",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"mapped":            "mapped",
 			"mappedWithJournal": "mapped_with_journal",
@@ -322,7 +321,7 @@ var conversions = []conversion{
 	{
 		oldName:          "mongodb_mongod_metrics_document_total",
 		newName:          "mongodb_ss_metric_document",
-		labelConversions: map[string]string{"doc_op_type": "type"},
+		labelConversions: map[string]string{docOpTypeKey: typeKey},
 	},
 	{
 		oldName: "mongodb_mongod_metrics_get_last_error_wtime_num_total",
@@ -377,7 +376,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_metrics_repl_executor_queue",
 		prefix:      "mongodb_ss_metrics_repl_executor_queues",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 	},
 	{
 		oldName: "mongodb_mongod_metrics_repl_executor_unsignaled_events",
@@ -423,17 +422,17 @@ var conversions = []conversion{
 	{
 		oldName:          "mongodb_mongod_op_counters_repl_total",
 		newName:          "mongodb_ss_opcountersRepl",
-		labelConversions: map[string]string{"legacy_op_type": "type"},
+		labelConversions: map[string]string{legacyOpTypeKey: typeKey},
 	},
 	{
 		oldName:          "mongodb_op_counters_total",
 		newName:          "mongodb_ss_opcounters",
-		labelConversions: map[string]string{"legacy_op_type": "type"},
+		labelConversions: map[string]string{legacyOpTypeKey: typeKey},
 	},
 	{
 		oldName:     "mongodb_mongod_wiredtiger_blockmanager_blocks_total",
 		prefix:      "mongodb_ss_wt_block_manager",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 	},
 	{
 		oldName: "mongodb_mongod_wiredtiger_cache_max_bytes",
@@ -490,7 +489,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_transactions_total",
 		prefix:      "mongodb_ss_wt_txn_transactions",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"begins":      "begins",
 			"checkpoints": "checkpoints",
@@ -501,7 +500,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_blockmanager_bytes_total",
 		prefix:      "mongodb_ss_wt_block_manager",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"bytes_read": "read", "mapped_bytes_read": "read_mapped",
 			"bytes_written": "written",
@@ -511,7 +510,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_cache_bytes",
 		prefix:      "mongodb_ss_wt_cache_bytes",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"currently_in_the_cache":                                 "total",
 			"tracked_dirty_bytes_in_the_cache":                       "dirty",
@@ -522,7 +521,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_cache_bytes_total",
 		prefix:      "mongodb_ss_wt_cache",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"bytes_read_into_cache":    "read",
 			"bytes_written_from_cache": "written",
@@ -531,7 +530,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_cache_pages",
 		prefix:      "mongodb_ss_wt_cache",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"pages_currently_held_in_the_cache": "total",
 			"tracked_dirty_pages_in_the_cache":  "dirty",
@@ -540,7 +539,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_cache_pages_total",
 		prefix:      "mongodb_ss_wt_cache",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"pages_read_into_cache":    "read",
 			"pages_written_from_cache": "written",
@@ -549,7 +548,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_log_records_total",
 		prefix:      "mongodb_ss_wt_log",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"log_records_compressed":     "compressed",
 			"log_records_not_compressed": "uncompressed",
@@ -558,7 +557,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_log_bytes_total",
 		prefix:      "mongodb_ss_wt_log",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"log_bytes_of_payload_data": "payload",
 			"log_bytes_written":         "unwritten",
@@ -567,7 +566,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_log_operations_total",
 		prefix:      "mongodb_ss_wt_log",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"log_read_operations":                  "read",
 			"log_write_operations":                 "write",
@@ -581,7 +580,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
 		prefix:      "mongodb_ss_wt_txn_transaction_checkpoint",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"min_time_msecs": "min",
 			"max_time_msecs": "max",
@@ -590,7 +589,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_mongod_wiredtiger_transactions_checkpoint_milliseconds",
 		prefix:      "mongodb_ss_wt_checkpoint",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"min_time_msecs": "min",
 			"max_time_msecs": "max",
@@ -599,12 +598,12 @@ var conversions = []conversion{
 	{
 		oldName:          "mongodb_mongod_global_lock_current_queue",
 		prefix:           "mongodb_mongod_global_lock_current_queue",
-		labelConversions: map[string]string{"op_type": "type"},
+		labelConversions: map[string]string{opTypeKey: typeKey},
 	},
 	{
 		oldName:          "mongodb_mongod_op_latencies_ops_total",
 		newName:          "mongodb_ss_opLatencies_ops",
-		labelConversions: map[string]string{"op_type": "type"},
+		labelConversions: map[string]string{opTypeKey: typeKey},
 		labelValueConversions: map[string]string{
 			"commands": "command",
 			"reads":    "read",
@@ -614,7 +613,7 @@ var conversions = []conversion{
 	{
 		oldName:          "mongodb_mongod_op_latencies_latency_total",
 		newName:          "mongodb_ss_opLatencies_latency",
-		labelConversions: map[string]string{"op_type": "type"},
+		labelConversions: map[string]string{opTypeKey: typeKey},
 		labelValueConversions: map[string]string{
 			"commands": "command",
 			"reads":    "read",
@@ -624,7 +623,7 @@ var conversions = []conversion{
 	{
 		oldName:          "mongodb_mongod_metrics_document_total",
 		newName:          "mongodb_ss_metrics_document",
-		labelConversions: map[string]string{"doc_op_type": "state"},
+		labelConversions: map[string]string{docOpTypeKey: "state"},
 	},
 	{
 		oldName:     "mongodb_mongod_metrics_query_executor_total",
@@ -638,7 +637,7 @@ var conversions = []conversion{
 	{
 		oldName:     "mongodb_memory",
 		prefix:      "mongodb_ss_mem",
-		suffixLabel: "type",
+		suffixLabel: typeKey,
 		suffixMapping: map[string]string{
 			"resident": "resident",
 			"virtual":  "virtual",
@@ -867,7 +866,7 @@ func retrieveMongoDBBuildInfo(ctx context.Context, client *mongo.Client, l *slog
 }
 
 func storageEngine(m bson.M) (prometheus.Metric, error) { //nolint:ireturn
-	v := walkTo(m, []string{"serverStatus", "storageEngine", "name"})
+	v := walkTo(m, []string{"serverStatus", "storageEngine", nameKey})
 	name := "mongodb_mongod_storage_engine"
 	help := "The storage engine used by the MongoDB instance"
 
@@ -947,7 +946,7 @@ func arbiterMetrics(ctx context.Context, client *mongo.Client, l *slog.Logger) [
 func oplogStatus(ctx context.Context, client *mongo.Client) ([]prometheus.Metric, error) {
 	oplogRS := client.Database("local").Collection("oplog.rs")
 	type oplogRSResult struct {
-		Timestamp primitive.Timestamp `bson:"ts"`
+		Timestamp bson.Timestamp `bson:"ts"`
 	}
 	var head, tail oplogRSResult
 	headRes := oplogRS.FindOne(ctx, bson.M{}, options.FindOne().SetSort(bson.M{
@@ -1022,7 +1021,7 @@ func replSetMetrics(d bson.M, l *slog.Logger) []prometheus.Metric { //nolint:cyc
 
 	for _, m := range repl.Members {
 		labels := map[string]string{
-			"name":  m.Name,
+			nameKey: m.Name,
 			"state": m.StateStr,
 			"set":   repl.Set,
 			"self":  "0",
@@ -1132,7 +1131,7 @@ func databasesTotalPartitioned(ctx context.Context, client *mongo.Client) (prome
 
 	name := "mongodb_mongos_sharding_databases_total"
 	help := "Total number of sharded databases"
-	labels := map[string]string{"type": "partitioned"}
+	labels := map[string]string{typeKey: "partitioned"}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
@@ -1146,7 +1145,7 @@ func databasesTotalUnpartitioned(ctx context.Context, client *mongo.Client) (pro
 
 	name := "mongodb_mongos_sharding_databases_total"
 	help := "Total number of sharded databases"
-	labels := map[string]string{"type": "unpartitioned"}
+	labels := map[string]string{typeKey: "unpartitioned"}
 
 	d := prometheus.NewDesc(name, help, nil, labels)
 	return prometheus.NewConstMetric(d, prometheus.GaugeValue, float64(n))
@@ -1260,9 +1259,9 @@ func changelog10m(ctx context.Context, client *mongo.Client, l *slog.Logger) ([]
 
 	coll := client.Database("config").Collection("changelog")
 	match := bson.M{"time": bson.M{"$gt": time.Now().Add(-10 * time.Minute)}}
-	group := bson.M{"_id": bson.M{"event": "$what", "note": "$details.note"}, "count": bson.M{"$sum": 1}}
+	group := bson.M{idKey: bson.M{"event": "$what", "note": "$details.note"}, countKey: bson.M{sumOperator: 1}}
 
-	c, err := coll.Aggregate(ctx, []bson.M{{"$match": match}, {"$group": group}})
+	c, err := coll.Aggregate(ctx, []bson.M{{"$match": match}, {groupOperator: group}})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to aggregate sharding changelog events")
 	}
@@ -1364,8 +1363,8 @@ func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *slog.Logger) [
 		if len(member.Shards) > 0 {
 			for shard, stats := range member.Shards {
 				labels := prometheus.Labels{
-					"db":    stats.Name,
-					"shard": strings.Split(shard, "/")[0],
+					"db":     stats.Name,
+					shardKey: strings.Split(shard, "/")[0],
 				}
 
 				name := "mongodb_mongos_db_data_size_bytes"
@@ -1410,7 +1409,7 @@ func dbstatsMetrics(ctx context.Context, client *mongo.Client, l *slog.Logger) [
 	return metrics
 }
 
-func walkTo(m primitive.M, path []string) interface{} {
+func walkTo(m bson.M, path []string) any {
 	val, ok := m[path[0]]
 	if !ok {
 		return nil
@@ -1418,7 +1417,7 @@ func walkTo(m primitive.M, path []string) interface{} {
 
 	if len(path) > 1 {
 		switch v := val.(type) {
-		case primitive.M:
+		case bson.M:
 			val = walkTo(v, path[1:])
 		case map[string]interface{}:
 			val = walkTo(v, path[1:])

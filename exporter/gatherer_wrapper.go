@@ -45,8 +45,6 @@ func (g *GathererWrapped) Gather() ([]*io_prometheus_client.MetricFamily, error)
 	for _, metric := range metrics {
 		for _, m := range metric.GetMetric() {
 			for k, v := range g.labels {
-				v := v
-				k := k
 				m.Label = append(m.Label, &io_prometheus_client.LabelPair{
 					Name:  &k,
 					Value: &v,

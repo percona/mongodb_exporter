@@ -23,8 +23,8 @@ import (
 	"os"
 )
 
-func debugResult(log *slog.Logger, m interface{}) {
-	if !log.Enabled(context.TODO(), slog.LevelDebug) {
+func debugResult(ctx context.Context, log *slog.Logger, m any) {
+	if !log.Enabled(ctx, slog.LevelDebug) {
 		return
 	}
 
