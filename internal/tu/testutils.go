@@ -19,6 +19,7 @@ package tu
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -30,7 +31,6 @@ import (
 	"time"
 
 	"github.com/foxcpp/go-mockdns"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -88,18 +88,18 @@ func DefaultTestClientMongoS(ctx context.Context, t *testing.T) *mongo.Client {
 func GetImageNameForContainer(containerName string) (string, string, error) {
 	di, err := InspectContainer(containerName)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
+		return "", "", fmt.Errorf("cannot inspect container %q: %w", containerName, err)
 	}
 
 	if len(di) == 0 {
-		return "", "", errors.Wrapf(err, "cannot get error for container %q (empty array)", "mongo-1-1")
+		return "", "", fmt.Errorf("%w: %q", errContainerMissing, containerName)
 	}
 
 	split := strings.Split(di[0].Config.Image, ":")
 
 	const numOfImageNameParts = 2
 	if len(split) != numOfImageNameParts {
-		return "", "", errors.New(fmt.Sprintf("image name is not correct: %s", di[0].Config.Image))
+		return "", "", fmt.Errorf("%w: %s", errMalformedImageName, di[0].Config.Image)
 	}
 
 	imageBaseName, version := split[0], split[1]
@@ -171,29 +171,58 @@ func InspectContainer(name string) (DockerInspectOutput, error) {
 
 	out, err := exec.Command("docker", "inspect", name).Output() //nolint:gosec
 	if err != nil {
-		return di, errors.Wrap(err, "cannot inspect docker container")
+		return di, fmt.Errorf("cannot inspect docker container: %w", err)
 	}
 
 	if err := json.Unmarshal(out, &di); err != nil {
-		return di, errors.Wrap(err, "cannot inspect docker container")
+		return di, fmt.Errorf("cannot inspect docker container: %w", err)
 	}
 
 	return di, nil
 }
 
-func PortForContainer(name string) (string, error) {
+var (
+	errContainerMissing   = errors.New("container does not exist, start the test cluster with `make test-cluster`")
+	errContainerStopped   = errors.New("container is not running")
+	errNoHostPort         = errors.New("container publishes no host port for 27017/tcp")
+	errNoContainerAddress = errors.New("container has no address on the exporter's docker network")
+	errMalformedImageName = errors.New("image name is not correct")
+)
+
+// runningContainer inspects name and fails unless the container is up.
+//
+// docker inspect succeeds for a container that exists but has stopped, and its address and port
+// fields are empty by then. Without this check a caller gets an empty string back and fails much
+// later on, against an address that was never there, rather than being told which container of
+// the test cluster is not running.
+func runningContainer(name string) (DockerInspectOutput, error) {
 	di, err := InspectContainer(name)
 	if err != nil {
-		return "", errors.Wrapf(err, "cannot get error for container %q", name)
+		return nil, fmt.Errorf("cannot inspect container %q: %w", name, err)
 	}
 
 	if len(di) == 0 {
-		return "", errors.Wrapf(err, "cannot get error for container %q (empty array)", name)
+		return nil, fmt.Errorf("%w: %q", errContainerMissing, name)
+	}
+
+	if !di[0].State.Running {
+		return nil, fmt.Errorf("%w: %q (state: %s, exit code: %d)",
+			errContainerStopped, name, di[0].State.Status, di[0].State.ExitCode)
+	}
+
+	return di, nil
+}
+
+// PortForContainer returns the host port a running container publishes for 27017/tcp.
+func PortForContainer(name string) (string, error) {
+	di, err := runningContainer(name)
+	if err != nil {
+		return "", err
 	}
 
 	ports := di[0].NetworkSettings.Ports["27017/tcp"]
 	if len(ports) == 0 {
-		return "", errors.Wrapf(err, "cannot get error for container %q (empty ports list)", name)
+		return "", fmt.Errorf("%w: %q", errNoHostPort, name)
 	}
 
 	return ports[0].HostPort, nil
@@ -201,16 +230,17 @@ func PortForContainer(name string) (string, error) {
 
 // IPForContainer returns the IP address of a running container.
 func IPForContainer(name string) (string, error) {
-	di, err := InspectContainer(name)
+	di, err := runningContainer(name)
 	if err != nil {
-		return "", errors.Wrapf(err, "cannot get error for container %q", name)
+		return "", err
 	}
 
-	if len(di) == 0 {
-		return "", errors.Wrapf(err, "cannot get error for container %q (empty array)", name)
+	address := di[0].NetworkSettings.Networks.MongodbExporterDefault.IPAddress
+	if address == "" {
+		return "", fmt.Errorf("%w: %q", errNoContainerAddress, name)
 	}
 
-	return di[0].NetworkSettings.Networks.MongodbExporterDefault.IPAddress, nil
+	return address, nil
 }
 
 // SetupFakeResolver sets up Fake DNS server to resolve SRV records.
