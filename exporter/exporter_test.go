@@ -333,6 +333,126 @@ func blackHoleMongo(t *testing.T) (string, <-chan struct{}, *atomic.Int32) {
 	return listener.Addr().String(), dialed, &accepts
 }
 
+// stallingMongo proxies TCP to a live mongod, so a client built through it is a real one, and
+// can then withhold the reply to an operation already sent, which keeps that operation's
+// connection checked out of the driver's pool for as long as the test needs it.
+type stallingMongo struct {
+	listener net.Listener
+	upstream string
+
+	mu      sync.Mutex
+	stalled bool
+	waiters []chan struct{}
+	conns   []net.Conn
+}
+
+func newStallingMongo(t *testing.T, upstream string) *stallingMongo {
+	t.Helper()
+
+	var listenCfg net.ListenConfig
+	listener, err := listenCfg.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	proxy := &stallingMongo{listener: listener, upstream: upstream}
+	go proxy.serve()
+
+	t.Cleanup(func() {
+		_ = listener.Close()
+		proxy.mu.Lock()
+		defer proxy.mu.Unlock()
+
+		for _, conn := range proxy.conns {
+			_ = conn.Close()
+		}
+	})
+
+	return proxy
+}
+
+func (p *stallingMongo) addr() string {
+	return p.listener.Addr().String()
+}
+
+// stall stops forwarding while holding sockets open. The returned channel closes once traffic
+// has actually been withheld, which is when an operation is provably in flight.
+func (p *stallingMongo) stall() <-chan struct{} {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.stalled = true
+	waiter := make(chan struct{})
+	p.waiters = append(p.waiters, waiter)
+
+	return waiter
+}
+
+func (p *stallingMongo) serve() {
+	for {
+		down, err := p.listener.Accept()
+		if err != nil {
+			return
+		}
+
+		p.mu.Lock()
+		p.conns = append(p.conns, down)
+		p.mu.Unlock()
+
+		var dialer net.Dialer
+		up, err := dialer.DialContext(context.Background(), "tcp", p.upstream)
+		if err != nil {
+			_ = down.Close()
+
+			continue
+		}
+
+		p.mu.Lock()
+		p.conns = append(p.conns, up)
+		p.mu.Unlock()
+
+		go p.pipe(up, down)
+		go p.pipe(down, up)
+	}
+}
+
+func (p *stallingMongo) pipe(dst, src net.Conn) {
+	buf := make([]byte, 32*1024)
+
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			p.gate()
+
+			if _, writeErr := dst.Write(buf[:n]); writeErr != nil {
+				return
+			}
+		}
+
+		if err != nil {
+			return
+		}
+	}
+}
+
+// gate blocks for as long as the proxy is stalled, waking whoever is waiting on the first
+// message it withholds.
+func (p *stallingMongo) gate() {
+	p.mu.Lock()
+	stalled := p.stalled
+	for _, waiter := range p.waiters {
+		close(waiter)
+	}
+	p.waiters = nil
+	p.mu.Unlock()
+
+	for stalled {
+		time.Sleep(10 * time.Millisecond)
+
+		p.mu.Lock()
+		stalled = p.stalled
+		p.mu.Unlock()
+	}
+}
+
 // syncBuffer collects log output written from a flight's goroutine while the test reads it.
 type syncBuffer struct {
 	mu  sync.Mutex
@@ -1225,4 +1345,93 @@ func TestGlobalConnPoolBuildDoesNotOrphanCachedClient(t *testing.T) {
 
 	assert.Same(t, first, got, "the flight connected again instead of taking the cached client")
 	assert.Same(t, first, cachedClient(e), "the cached client was displaced, and nothing disconnects it")
+}
+
+// The context a teardown disconnect runs on has two jobs, and they pull against each other.
+// Disconnect sends endSessions first, which selects a server: against one that went away, with
+// --mongodb.connect-timeout-ms=0 leaving no selection timeout, only the context can stop it
+// waiting. But bounding it with a deadline is what puts the driver into the graceful wait that
+// spins on a core, so the bound has to be cancellation.
+//
+// This is asserted on the context rather than on a disconnect against a server made to vanish:
+// the driver expires its own session pool somewhere in there, and when it wins that race
+// endSessions has nothing to send and comes back at once however it was bounded -- so the
+// end-to-end version reported success for the unfixed code about half the time.
+func TestDisconnectContextIsCancelledAndCarriesNoDeadline(t *testing.T) {
+	t.Parallel()
+
+	scrape, endScrape := context.WithCancel(t.Context())
+	ctx, cancel := disconnectContext(scrape)
+	defer cancel()
+
+	_, hasDeadline := ctx.Deadline()
+	require.False(t, hasDeadline, "a deadline is read by the driver as a request to wait, and that wait spins")
+
+	// The scrape ending is not the teardown ending.
+	endScrape()
+	select {
+	case <-ctx.Done():
+		t.Fatal("the scrape's cancellation cut the teardown short")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(disconnectTimeout + 10*time.Second):
+		t.Fatal("the teardown context is never cancelled, so a disconnect with nothing to answer it never returns")
+	}
+}
+
+// A deadline on Disconnect is read by the driver as a request to wait for checked-out
+// connections to come back, and that wait is a loop with a default branch which spins on a core
+// until the deadline passes. A context that can only be cancelled skips the wait altogether.
+//
+// The control arm is what makes the fast half mean anything: if no connection were checked out,
+// both halves would return at once and the assertion below would pass for the wrong reason.
+func TestDisconnectDoesNotWaitForCheckedOutConnections(t *testing.T) {
+	t.Parallel()
+
+	const graceful = time.Second
+
+	// A proxy each, so that the message one client has withheld cannot be mistaken for the
+	// other's, and so that both connect before either stalls.
+	withHeldConnection := func() *mongo.Client {
+		proxy := newStallingMongo(t, "127.0.0.1:"+tu.MongoDBS1PrimaryPort)
+
+		client, err := connect(t.Context(), &Opts{URI: "mongodb://" + proxy.addr(), DirectConnect: true})
+		require.NoError(t, err)
+
+		gated := proxy.stall()
+		go func() {
+			_, _ = client.Database("admin").Collection("disconnect_test").
+				CountDocuments(context.Background(), bson.M{})
+		}()
+		<-gated
+
+		// The withheld message may have been a heartbeat rather than the count; a moment here
+		// lets the count reach the proxy too. If it has not, the control arm below fails loudly
+		// rather than letting the subject pass for the wrong reason.
+		time.Sleep(200 * time.Millisecond)
+
+		return client
+	}
+
+	control := withHeldConnection()
+	subject := withHeldConnection()
+
+	deadlineCtx, cancel := context.WithTimeout(t.Context(), graceful)
+	defer cancel()
+
+	start := time.Now()
+	_ = control.Disconnect(deadlineCtx)
+	withDeadline := time.Since(start)
+
+	start = time.Now()
+	_ = disconnectClient(t.Context(), subject)
+	withCancel := time.Since(start)
+
+	require.GreaterOrEqual(t, withDeadline, graceful,
+		"a deadline did not hold Disconnect up, so no connection was checked out and this proves nothing")
+	require.Less(t, withCancel, graceful/2,
+		"Disconnect waited for checked-out connections, so it was handed a deadline")
 }

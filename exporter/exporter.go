@@ -173,6 +173,13 @@ const (
 	// health check before it is dropped and built anew.
 	maxConsecutivePingFailures = 3
 
+	// disconnectTimeout bounds a teardown disconnect. Disconnect sends endSessions first, which
+	// selects a server, so a client whose server vanished waits for one that never comes -- with
+	// --mongodb.connect-timeout-ms=0 there is no selection timeout to stop it either. The sessions
+	// it is trying to end expire server-side on their own, so cutting the attempt short costs
+	// nothing.
+	disconnectTimeout = 5 * time.Second
+
 	// healthGenerationShift splits pooledClient.health into the generation above and the
 	// failure count below. A generation per passing health check wraps no sooner than the
 	// heat death of a scrape interval; a failure count only ever reaches three.
@@ -428,17 +435,16 @@ func (e *Exporter) Handler() http.Handler {
 			}
 		}
 
-		// Close client after usage. The deadline is stripped for the reason dropClient strips
-		// it: the driver reads one as a request to wait for checked-out connections to come
-		// back, and implements that wait as a loop with a default branch, which spins on a core
-		// until they return or the deadline passes.
+		// Close client after usage. Off the serving goroutine: a client whose server vanished
+		// takes disconnectTimeout to give up, and this scrape has its answer already.
 		if !e.opts.GlobalConnPool {
 			defer func() {
 				if client != nil {
-					err := client.Disconnect(context.WithoutCancel(ctx))
-					if err != nil {
-						e.logger.Error("Cannot disconnect client", "error", err)
-					}
+					go func() {
+						if err := disconnectClient(ctx, client); err != nil {
+							e.logger.Error("Cannot disconnect client", "error", err)
+						}
+					}()
 				}
 			}()
 		}
@@ -534,10 +540,8 @@ func (e *Exporter) checkClient(ctx context.Context, pooled *pooledClient) (*mong
 // monitors for the life of the process, and by now the client has failed every health check
 // for three scrapes, so that scrape was working against a broken client anyway.
 //
-// It runs on its own goroutine, since this scrape has its answer already, and on a context
-// with no deadline deliberately: the driver reads a deadline as a request to wait for
-// checked-out connections to come back, and implements that wait as a loop with a default
-// branch, which spins on a core until they return or the deadline passes.
+// It runs on its own goroutine, since this scrape has its answer already, and disconnectClient
+// bounds the attempt without handing the driver a deadline.
 func (e *Exporter) dropClient(ctx context.Context, pooled *pooledClient, cause error) {
 	if !e.client.CompareAndSwap(pooled, nil) {
 		return
@@ -546,7 +550,7 @@ func (e *Exporter) dropClient(ctx context.Context, pooled *pooledClient, cause e
 	e.logger.Warn("Dropping unusable MongoDB client, reconnecting on next scrape", "error", cause)
 
 	go func() {
-		err := pooled.Disconnect(context.WithoutCancel(ctx))
+		err := disconnectClient(ctx, pooled.Client)
 		if err != nil {
 			e.logger.Debug("Dropped MongoDB client did not disconnect cleanly", "error", err)
 		}
@@ -708,6 +712,33 @@ func boundConnect(clientOpts *options.ClientOptions) time.Duration {
 	return connectTimeout + selectionTimeout
 }
 
+// disconnectClient closes client, bounding the attempt with cancellation rather than a deadline.
+// The distinction is the whole point: the driver reads a deadline as a request to wait for
+// checked-out connections to come back, and implements that wait as a loop with a default branch
+// (topology/pool.go), which spins on a core until they return or the deadline passes. A context
+// that can only be cancelled skips that wait entirely, while still cutting short the server
+// selection endSessions performs, which is otherwise unbounded once a server disappears.
+//
+// The caller's context is used for its values alone; a scrape ending must not cut teardown short.
+func disconnectClient(ctx context.Context, client *mongo.Client) error {
+	ctx, cancel := disconnectContext(ctx)
+	defer cancel()
+
+	return client.Disconnect(ctx) //nolint:wrapcheck
+}
+
+// disconnectContext returns the context a teardown disconnect runs on: cancelled once
+// disconnectTimeout is up, carrying no deadline, and detached from the caller's cancellation.
+func disconnectContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	timer := time.AfterFunc(disconnectTimeout, cancel)
+
+	return ctx, func() {
+		timer.Stop()
+		cancel()
+	}
+}
+
 func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 	clientOpts, err := clientOptionsFor(opts)
 	if err != nil {
@@ -728,11 +759,9 @@ func connectWith(ctx context.Context, clientOpts *options.ClientOptions) (*mongo
 	// is reachable, and a connect that fails on it leaves the caller with no client at all.
 	err = client.Ping(ctx, readpref.PrimaryPreferred())
 	if err != nil {
-		// Ping failed. Close background connections. Error is ignored since the ping error is more
-		// relevant. Stripping the deadline is what dropClient does and for the same reason: the
-		// driver reads one as a request to wait for checked-out connections, and implements that
-		// wait as a loop with a default branch, which spins on a core until the deadline passes.
-		_ = client.Disconnect(context.WithoutCancel(ctx))
+		// Ping failed. Close background connections off this goroutine, so a server that has
+		// gone away cannot hold up the caller; the ping error is the one worth reporting.
+		go func() { _ = disconnectClient(ctx, client) }()
 
 		return nil, fmt.Errorf("cannot connect to MongoDB: %w", err)
 	}

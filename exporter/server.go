@@ -132,17 +132,16 @@ func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.Hand
 				e.logger.Error("Cannot connect to MongoDB", "error", err)
 			}
 
-			// Close client after usage. The deadline is stripped for the reason dropClient strips
-			// it: the driver reads one as a request to wait for checked-out connections to come
-			// back, and implements that wait as a loop with a default branch, which spins on a
-			// core until they return or the deadline passes.
+			// Close client after usage. Off the serving goroutine: a client whose server vanished
+			// takes disconnectTimeout to give up, and this request has its answer already.
 			if !e.opts.GlobalConnPool {
 				defer func() {
 					if client != nil {
-						err := client.Disconnect(context.WithoutCancel(ctx))
-						if err != nil {
-							logger.Error("Cannot disconnect client", "error", err)
-						}
+						go func() {
+							if err := disconnectClient(ctx, client); err != nil {
+								logger.Error("Cannot disconnect client", "error", err)
+							}
+						}()
 					}
 				}()
 			}
