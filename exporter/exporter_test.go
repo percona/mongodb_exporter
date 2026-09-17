@@ -41,6 +41,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -1482,35 +1483,68 @@ func TestPooledClientCountsOneFailurePerRound(t *testing.T) {
 // reads as a stale series rather than as a target that is down, so nothing alerts. A scrape
 // that spent its whole budget in setup -- which is what a replica set with no primary does to
 // the commands makeRegistry runs, now that a secondary is enough to connect -- must still
-// report the zero.
+// report it.
+//
+// What it reports has to come from a ping that ran. On a spent context the driver fails one
+// instantly, and publishing that as a zero asserts the server is down on no evidence: a
+// deployment whose setup never fits in the budget would then report a healthy server down for
+// as long as it stays large.
 func TestGeneralCollectorReportsUpAfterScrapeBudgetIsSpent(t *testing.T) {
 	t.Parallel()
 
-	client, err := connect(t.Context(), &Opts{
-		URI:           "mongodb://127.0.0.1:" + tu.MongoDBS1PrimaryPort,
-		DirectConnect: true,
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+	upValue := func(t *testing.T, client *mongo.Client) float64 {
+		t.Helper()
 
-	// Spent by the time the collectors are described, exactly as it is when setup ran it out.
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
+		// Spent by the time the collectors are described, exactly as it is when setup ran it out.
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
 
-	registry := prometheus.NewRegistry()
-	registry.MustRegister(newGeneralCollector(ctx, client, typeMongod, promslog.NewNopLogger()))
+		registry := prometheus.NewRegistry()
+		registry.MustRegister(newGeneralCollector(ctx, client, typeMongod, promslog.NewNopLogger()))
 
-	families, err := registry.Gather()
-	require.NoError(t, err)
+		families, err := registry.Gather()
+		require.NoError(t, err)
 
-	var up *dto.MetricFamily
-	for _, family := range families {
-		if family.GetName() == "mongodb_up" {
-			up = family
+		var up *dto.MetricFamily
+		for _, family := range families {
+			if family.GetName() == "mongodb_up" {
+				up = family
+			}
 		}
+
+		require.NotNil(t, up, "the scrape carried no mongodb_up at all, so nothing reports on this target")
+		require.Len(t, up.GetMetric(), 1)
+
+		return up.GetMetric()[0].GetGauge().GetValue()
 	}
 
-	require.NotNil(t, up, "the scrape carried no mongodb_up at all, so nothing reports this target as down")
-	require.Len(t, up.GetMetric(), 1)
-	assert.Zero(t, up.GetMetric()[0].GetGauge().GetValue(), "a scrape that could not collect reported the target as up")
+	t.Run("server answers", func(t *testing.T) {
+		t.Parallel()
+
+		client, err := connect(t.Context(), &Opts{
+			URI:           "mongodb://127.0.0.1:" + tu.MongoDBS1PrimaryPort,
+			DirectConnect: true,
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+		assert.InDelta(t, 1, upValue(t, client), 0.001,
+			"a server that answers a probe was reported down because the scrape had run out of time")
+	})
+
+	t.Run("server does not answer", func(t *testing.T) {
+		t.Parallel()
+
+		// mongo.Connect does not reach the server, so this is a client to a port nothing
+		// listens on -- the shape of one whose server went away mid-scrape.
+		clientOpts := options.Client().ApplyURI("mongodb://127.0.0.1:1").
+			SetDirect(true).
+			SetServerSelectionTimeout(upProbeTimeout)
+
+		client, err := mongo.Connect(t.Context(), clientOpts)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+		assert.InDelta(t, 0, upValue(t, client), 0.001, "an unreachable server was reported up")
+	})
 }
