@@ -533,11 +533,11 @@ func TestPooledClientIgnoresHealthChecksOvertakenByAPass(t *testing.T) {
 		require.False(t, pooled.fail(gen), "a check the pass overtook counted towards eviction")
 	}
 
-	// Checks that begin after the pass still evict on their own account.
-	gen = pooled.generation()
+	// Checks that begin after the pass still evict on their own account. A round at a time,
+	// since only the first failure of a round counts.
 	for i := range maxConsecutivePingFailures {
 		last := i == maxConsecutivePingFailures-1
-		assert.Equal(t, last, pooled.fail(gen), "failure %d of %d", i+1, maxConsecutivePingFailures)
+		assert.Equal(t, last, pooled.fail(pooled.generation()), "failure %d of %d", i+1, maxConsecutivePingFailures)
 	}
 
 	// Reaching the threshold claims the eviction, and no check that passes afterwards can give
@@ -550,10 +550,9 @@ func TestPooledClientIgnoresHealthChecksOvertakenByAPass(t *testing.T) {
 	require.False(t, pooled.fail(gen), "one failure is not enough to evict")
 	require.True(t, pooled.pass())
 
-	gen = pooled.generation()
 	for i := range maxConsecutivePingFailures {
 		last := i == maxConsecutivePingFailures-1
-		assert.Equal(t, last, pooled.fail(gen), "the count did not start over after a pass")
+		assert.Equal(t, last, pooled.fail(pooled.generation()), "the count did not start over after a pass")
 	}
 }
 
@@ -669,10 +668,9 @@ func TestGlobalConnPoolPassDoesNotHandOutAClaimedClient(t *testing.T) {
 
 	// A concurrent check fails the last time it can, claiming the eviction, and is descheduled
 	// before it swaps the client out of the cache.
-	gen := pooled.generation()
 	for i := range maxConsecutivePingFailures {
 		last := i == maxConsecutivePingFailures-1
-		require.Equal(t, last, pooled.fail(gen), "failure %d of %d", i+1, maxConsecutivePingFailures)
+		require.Equal(t, last, pooled.fail(pooled.generation()), "failure %d of %d", i+1, maxConsecutivePingFailures)
 	}
 
 	// This scrape's health check passes -- the server is reachable -- and is refused anyway.
@@ -689,34 +687,41 @@ func TestPooledClientHealthStateUnderConcurrency(t *testing.T) {
 	t.Parallel()
 
 	// Enough checks, released together, that a read-modify-write would lose some of them.
-	const checks = 500
+	const checksPerRound = 500
 
 	pooled := new(pooledClient)
-	gen := pooled.generation()
 
 	var drops atomic.Int32
-	var wg sync.WaitGroup
-	start := make(chan struct{})
 
-	for range checks {
-		wg.Go(func() {
-			<-start
+	// A round's worth of checks all fail together, and the rounds are consecutive. However the
+	// checks within a round interleave, the round counts once.
+	for range maxConsecutivePingFailures {
+		gen := pooled.generation()
 
-			if pooled.fail(gen) {
-				drops.Add(1)
-			}
-		})
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+
+		for range checksPerRound {
+			wg.Go(func() {
+				<-start
+
+				if pooled.fail(gen) {
+					drops.Add(1)
+				}
+			})
+		}
+		close(start)
+		wg.Wait()
 	}
-	close(start)
-	wg.Wait()
 
-	// However they interleave, exactly one check stores the count that crosses the threshold, so
-	// exactly one is told it has the eviction.
+	// Exactly one check stores the count that crosses the threshold, so exactly one is told it
+	// has the eviction.
 	assert.Equal(t, int32(1), drops.Load(), "the eviction was claimed more than once")
 
-	// And every check counted: a lost update would leave the total short.
-	assert.Equal(t, uint64(checks), pooled.health.Load()&healthFailureMask,
-		"concurrent health checks lost each other's updates")
+	// One failure per round and no more: a lost update would leave the total short, and a round
+	// counting twice would overshoot.
+	assert.Equal(t, uint64(maxConsecutivePingFailures), pooled.health.Load()&healthFailureMask,
+		"a round did not count exactly one of its concurrent checks")
 }
 
 // The whole point of the pool: the client outlives the request that built it, and the next
@@ -1434,4 +1439,41 @@ func TestDisconnectDoesNotWaitForCheckedOutConnections(t *testing.T) {
 		"a deadline did not hold Disconnect up, so no connection was checked out and this proves nothing")
 	require.Less(t, withCancel, graceful/2,
 		"Disconnect waited for checked-out connections, so it was handed a deadline")
+}
+
+// PMM scrapes one exporter from several jobs at once, so the health checks of a round run
+// concurrently rather than one after another. Counting each of them separately takes a client
+// from healthy to evicted inside a single transient event, which is not the three rounds
+// maxConsecutivePingFailures is meant to buy.
+func TestPooledClientCountsOneFailurePerRound(t *testing.T) {
+	t.Parallel()
+
+	pooled := &pooledClient{}
+
+	gen := pooled.generation()
+	var evictions atomic.Int32
+	var wg sync.WaitGroup
+
+	for range maxConsecutivePingFailures {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			if pooled.fail(gen) {
+				evictions.Add(1)
+			}
+		}()
+	}
+
+	wg.Wait()
+	require.Zero(t, evictions.Load(), "one round of concurrent failures was enough to evict the client")
+
+	// Rounds that really are consecutive still count, and the last of them evicts.
+	var evicted bool
+	for range maxConsecutivePingFailures - 1 {
+		evicted = pooled.fail(pooled.generation())
+	}
+
+	require.True(t, evicted, "consecutive failing rounds never reached the threshold")
 }

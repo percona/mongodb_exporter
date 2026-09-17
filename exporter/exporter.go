@@ -93,6 +93,12 @@ func (p *pooledClient) pass() bool {
 // successful swap stores a count of its own. The count carries on past the threshold and never
 // comes back below it, which is what makes the eviction a claim rather than an intention a later
 // pass could overturn.
+//
+// Counting a failure moves the generation on, so only the first failure of a round is counted:
+// one target is scraped by several jobs at once, and their health checks fail together on one
+// transient event. Counting each of them would spend the whole threshold on that single event
+// rather than on the consecutive rounds it is meant to measure. The rest are stale by the same
+// rule that retires a check a pass overtook.
 func (p *pooledClient) fail(gen uint64) bool {
 	for {
 		current := p.health.Load()
@@ -101,7 +107,7 @@ func (p *pooledClient) fail(gen uint64) bool {
 		}
 
 		failures := current&healthFailureMask + 1
-		if p.health.CompareAndSwap(current, gen<<healthGenerationShift|failures) {
+		if p.health.CompareAndSwap(current, (gen+1)<<healthGenerationShift|failures) {
 			return failures == maxConsecutivePingFailures
 		}
 	}
