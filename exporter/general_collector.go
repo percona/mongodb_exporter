@@ -41,7 +41,12 @@ func newGeneralCollector(ctx context.Context, client *mongo.Client, nodeType mon
 }
 
 func (d *generalCollector) Describe(ch chan<- *prometheus.Desc) {
-	d.base.Describe(d.ctx, ch, d.collect)
+	// Deliberately not gated on the scrape's budget, unlike every other collector. A scrape
+	// that spent it all before reaching here -- a replica set with no primary keeps the setup
+	// commands waiting for one, and a secondary is enough to connect -- would otherwise carry
+	// no mongodb_up at all, which reads as a stale series rather than as a target that is down.
+	// The ping below fails on the spent context, so what gets reported is the zero.
+	d.base.describe(ch, d.collect)
 }
 
 func (d *generalCollector) Collect(ch chan<- prometheus.Metric) {

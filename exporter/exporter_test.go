@@ -1477,3 +1477,40 @@ func TestPooledClientCountsOneFailurePerRound(t *testing.T) {
 
 	require.True(t, evicted, "consecutive failing rounds never reached the threshold")
 }
+
+// mongodb_up is the one metric a scrape has to carry whatever else went wrong: its absence
+// reads as a stale series rather than as a target that is down, so nothing alerts. A scrape
+// that spent its whole budget in setup -- which is what a replica set with no primary does to
+// the commands makeRegistry runs, now that a secondary is enough to connect -- must still
+// report the zero.
+func TestGeneralCollectorReportsUpAfterScrapeBudgetIsSpent(t *testing.T) {
+	t.Parallel()
+
+	client, err := connect(t.Context(), &Opts{
+		URI:           "mongodb://127.0.0.1:" + tu.MongoDBS1PrimaryPort,
+		DirectConnect: true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+	// Spent by the time the collectors are described, exactly as it is when setup ran it out.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(newGeneralCollector(ctx, client, typeMongod, promslog.NewNopLogger()))
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	var up *dto.MetricFamily
+	for _, family := range families {
+		if family.GetName() == "mongodb_up" {
+			up = family
+		}
+	}
+
+	require.NotNil(t, up, "the scrape carried no mongodb_up at all, so nothing reports this target as down")
+	require.Len(t, up.GetMetric(), 1)
+	assert.Zero(t, up.GetMetric()[0].GetGauge().GetValue(), "a scrape that could not collect reported the target as up")
+}
