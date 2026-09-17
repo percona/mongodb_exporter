@@ -96,9 +96,15 @@ func (p *pooledClient) pass() bool {
 //
 // Counting a failure moves the generation on, so only the first failure of a round is counted:
 // one target is scraped by several jobs at once, and their health checks fail together on one
-// transient event. Counting each of them would spend the whole threshold on that single event
-// rather than on the consecutive rounds it is meant to measure. The rest are stale by the same
-// rule that retires a check a pass overtook.
+// transient event. Counting each of them would spend the whole threshold on that single event.
+// The rest are stale by the same rule that retires a check a pass overtook.
+//
+// A round here is the window between one counted failure and the next, not a length of time.
+// Checks that overlap share a round; checks that do not, do not. So the threshold measures
+// three failing checks rather than three scrape intervals, and jobs whose scrapes are staggered
+// rather than simultaneous reach it in proportionately less time -- three of them a few seconds
+// apart in seconds rather than the ~45 a single 15s scraper would take. Tying a round to a
+// clock instead is the fix for that, and is not attempted here.
 func (p *pooledClient) fail(gen uint64) bool {
 	for {
 		current := p.health.Load()
@@ -175,8 +181,8 @@ const (
 	// dropped during a gap between scrapes would otherwise fail the next scrape.
 	defaultMaxConnIdleTime = 5 * time.Minute
 
-	// maxConsecutivePingFailures is how many scrapes in a row may fail the pooled client's
-	// health check before it is dropped and built anew.
+	// maxConsecutivePingFailures is how many health checks in a row may fail before the pooled
+	// client is dropped and built anew. Checks that overlap count once between them; see fail.
 	maxConsecutivePingFailures = 3
 
 	// disconnectTimeout bounds a teardown disconnect. Disconnect sends endSessions first, which
@@ -211,10 +217,14 @@ func New(opts *Opts) *Exporter {
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
 	}
 	// Warm the pool so the first scrape does not pay for the connect. getClient bounds the
-	// attempt and buildClient logs a failure, which every scrape retries anyway.
+	// attempt, and every scrape retries anyway, so a failure here is not fatal -- but it is
+	// reported: buildClient logs the connect itself, and without this a URI the driver will not
+	// even parse stays quiet from startup until somebody scrapes.
 	if opts.GlobalConnPool {
 		go func() {
-			_, _ = exp.getClient(context.Background())
+			if _, err := exp.getClient(context.Background()); err != nil {
+				exp.logger.Error("Cannot connect to MongoDB", "error", err)
+			}
 		}()
 	}
 
