@@ -1548,3 +1548,53 @@ func TestGeneralCollectorReportsUpAfterScrapeBudgetIsSpent(t *testing.T) {
 		assert.InDelta(t, 0, upValue(t, client), 0.001, "an unreachable server was reported up")
 	})
 }
+
+// Every scrape of one target has to label mongodb_up the same way. The node type is read on
+// the scrape's own context, so a scrape that spent its budget in setup fails that lookup and
+// would fall back to the empty cluster_role -- publishing mongodb_up{cluster_role=""} beside
+// the mongodb_up{cluster_role="mongod"} every earlier scrape produced. The labelled series
+// then goes stale while an unrelated one carries on next to it, which is exactly the stale
+// series the ungated Describe exists to prevent.
+func TestRegistryKeepsClusterRoleWhenScrapeBudgetIsSpent(t *testing.T) {
+	t.Parallel()
+
+	e := New(&Opts{
+		URI:           "mongodb://127.0.0.1:" + tu.MongoDBS1PrimaryPort,
+		DirectConnect: true,
+		Logger:        promslog.NewNopLogger(),
+	})
+
+	client, err := connect(t.Context(), e.opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+	clusterRole := func(ctx context.Context) string {
+		registry := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+		families, err := registry.Gather()
+		require.NoError(t, err)
+
+		for _, family := range families {
+			if family.GetName() != "mongodb_up" {
+				continue
+			}
+
+			require.Len(t, family.GetMetric(), 1)
+
+			return metricLabels(family.GetMetric()[0])["cluster_role"]
+		}
+
+		t.Fatal("the scrape carried no mongodb_up at all")
+
+		return ""
+	}
+
+	require.Equal(t, string(typeMongod), clusterRole(t.Context()), "a scrape with budget to spare mislabelled the target")
+
+	// Spent, exactly as it is when the setup commands ran it out.
+	spent, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	assert.Equal(t, string(typeMongod), clusterRole(spent),
+		"the scrape that ran out of time labelled mongodb_up differently, retiring the series every other scrape publishes")
+}

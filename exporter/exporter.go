@@ -49,6 +49,9 @@ type Exporter struct {
 	opts                  *Opts
 	lock                  *sync.Mutex
 	totalCollectionsCount int
+	// nodeType is the last one a lookup succeeded at, and labels the scrapes whose own lookup
+	// did not get an answer. Guarded by lock.
+	nodeType mongoDBNodeType
 }
 
 // pooledClient is the cached client together with the state of its health checks: a
@@ -241,7 +244,7 @@ func (e *Exporter) getTotalCollectionsCount() int {
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
-	nodeType, err := getNodeType(ctx, client)
+	nodeType, err := e.nodeTypeFor(ctx, client)
 	if err != nil {
 		e.logger.Error("Registry - Cannot get node type", "error", err)
 	}
@@ -493,6 +496,31 @@ func (e *Exporter) Handler() http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+// nodeTypeFor returns the node type to label this scrape by, remembering the last one a lookup
+// answered. The lookup runs a command on the scrape's own context, so a scrape that spent its
+// budget in setup never gets an answer, and labelling that scrape by the empty type instead
+// would publish a second mongodb_up beside the one every other scrape of this target produces
+// -- retiring the series that is actually being watched, which is the stale series the general
+// collector is ungated to prevent. A target does not change type between scrapes; when it does,
+// the next lookup to answer picks it up.
+//
+// The error is still returned, since the caller logs it, and the type still comes back empty
+// until some lookup has answered at least once.
+func (e *Exporter) nodeTypeFor(ctx context.Context, client *mongo.Client) (mongoDBNodeType, error) {
+	nodeType, err := getNodeType(ctx, client)
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if err != nil {
+		return e.nodeType, err
+	}
+
+	e.nodeType = nodeType
+
+	return nodeType, nil
 }
 
 // checkClient health-checks the cached client and returns it if the check passes, dropping it
