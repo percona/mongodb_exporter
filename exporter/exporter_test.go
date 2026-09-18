@@ -16,9 +16,12 @@
 package exporter
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +29,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -36,6 +41,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -209,7 +215,7 @@ func TestConnect(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				res, err := http.Get(ts.URL) //nolint:noctx
-				assert.Nil(t, e.client)
+				assert.Nil(t, cachedClient(e))
 				assert.NoError(t, err)
 				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
@@ -243,7 +249,7 @@ func TestConnect(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				res, err := http.Get(ts.URL) //nolint:noctx
-				assert.NotNil(t, e.client)
+				assert.NotNil(t, cachedClient(e))
 				assert.NoError(t, err)
 				g, err := io.ReadAll(res.Body)
 				_ = res.Body.Close()
@@ -254,6 +260,724 @@ func TestConnect(t *testing.T) {
 
 		wg.Wait()
 	})
+}
+
+// newPooledExporter builds an exporter that reuses one client. It skips New, whose
+// background initial connect would race with tests that drive getClient themselves.
+func newPooledExporter(t *testing.T) *Exporter {
+	t.Helper()
+
+	log := promslog.New(&promslog.Config{})
+
+	opts := &Opts{
+		Logger:         log,
+		URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
+		GlobalConnPool: true,
+		DirectConnect:  true,
+	}
+
+	return &Exporter{
+		logger:                log,
+		opts:                  opts,
+		lock:                  &sync.Mutex{},
+		totalCollectionsCount: -1,
+	}
+}
+
+// cachedClient returns the pooled client, or nil if none has been built yet.
+func cachedClient(e *Exporter) *mongo.Client {
+	if pooled := e.client.Load(); pooled != nil {
+		return pooled.Client
+	}
+
+	return nil
+}
+
+// blackHoleMongo returns the address of a listener that accepts connections and never
+// answers, so a driver handshake against it blocks until its own timeout rather than
+// failing fast the way a closed port would. The returned channel is closed once the first
+// connection has been accepted, which is when a connect is provably in flight, and the
+// counter says how many were accepted in all, which tells a hung handshake from a redial loop.
+func blackHoleMongo(t *testing.T) (string, <-chan struct{}, *atomic.Int32) {
+	t.Helper()
+
+	var listenCfg net.ListenConfig
+	listener, err := listenCfg.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close() })
+
+	dialed := make(chan struct{})
+	var accepts atomic.Int32
+	go func() {
+		// Every accepted connection is kept until the listener closes. Dropping the reference
+		// would let the net package's finalizer close it at the next GC, and the driver would
+		// see a reset instead of a hung handshake.
+		var conns []net.Conn
+		defer func() {
+			for _, conn := range conns {
+				_ = conn.Close()
+			}
+		}()
+
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			conns = append(conns, conn)
+			if accepts.Add(1) == 1 {
+				close(dialed)
+			}
+		}
+	}()
+
+	return listener.Addr().String(), dialed, &accepts
+}
+
+// stallingMongo proxies TCP to a live mongod, so a client built through it is a real one, and
+// can then withhold the reply to an operation already sent, which keeps that operation's
+// connection checked out of the driver's pool for as long as the test needs it.
+type stallingMongo struct {
+	listener net.Listener
+	upstream string
+
+	mu      sync.Mutex
+	stalled bool
+	waiters []chan struct{}
+	conns   []net.Conn
+}
+
+func newStallingMongo(t *testing.T, upstream string) *stallingMongo {
+	t.Helper()
+
+	var listenCfg net.ListenConfig
+	listener, err := listenCfg.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	proxy := &stallingMongo{listener: listener, upstream: upstream}
+	go proxy.serve()
+
+	t.Cleanup(func() {
+		_ = listener.Close()
+		proxy.mu.Lock()
+		defer proxy.mu.Unlock()
+
+		for _, conn := range proxy.conns {
+			_ = conn.Close()
+		}
+	})
+
+	return proxy
+}
+
+func (p *stallingMongo) addr() string {
+	return p.listener.Addr().String()
+}
+
+// stall stops forwarding while holding sockets open. The returned channel closes once traffic
+// has actually been withheld, which is when an operation is provably in flight.
+func (p *stallingMongo) stall() <-chan struct{} {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.stalled = true
+	waiter := make(chan struct{})
+	p.waiters = append(p.waiters, waiter)
+
+	return waiter
+}
+
+func (p *stallingMongo) serve() {
+	for {
+		down, err := p.listener.Accept()
+		if err != nil {
+			return
+		}
+
+		p.mu.Lock()
+		p.conns = append(p.conns, down)
+		p.mu.Unlock()
+
+		var dialer net.Dialer
+		up, err := dialer.DialContext(context.Background(), "tcp", p.upstream)
+		if err != nil {
+			_ = down.Close()
+
+			continue
+		}
+
+		p.mu.Lock()
+		p.conns = append(p.conns, up)
+		p.mu.Unlock()
+
+		go p.pipe(up, down)
+		go p.pipe(down, up)
+	}
+}
+
+func (p *stallingMongo) pipe(dst, src net.Conn) {
+	buf := make([]byte, 32*1024)
+
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			p.gate()
+
+			if _, writeErr := dst.Write(buf[:n]); writeErr != nil {
+				return
+			}
+		}
+
+		if err != nil {
+			return
+		}
+	}
+}
+
+// gate blocks for as long as the proxy is stalled, waking whoever is waiting on the first
+// message it withholds.
+func (p *stallingMongo) gate() {
+	p.mu.Lock()
+	stalled := p.stalled
+	for _, waiter := range p.waiters {
+		close(waiter)
+	}
+	p.waiters = nil
+	p.mu.Unlock()
+
+	for stalled {
+		time.Sleep(10 * time.Millisecond)
+
+		p.mu.Lock()
+		stalled = p.stalled
+		p.mu.Unlock()
+	}
+}
+
+// syncBuffer collects log output written from a flight's goroutine while the test reads it.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// bytes.Buffer.Write documents that its error is always nil.
+	n, _ := b.buf.Write(p)
+
+	return n, nil
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+// A client whose health check keeps failing is dropped, so the next scrape builds a new one.
+// Nothing else ever replaces the pooled client, so this is what picks up changes the driver
+// reads once, such as rotated TLS material. One failure is not enough: a server mid-election
+// recovers on its own, and rebuilding would only add churn.
+func TestGlobalConnPoolDropsClientAfterRepeatedPingFailures(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	e := newPooledExporter(t)
+	addr, _, _ := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	e.opts.ConnectTimeoutMS = 200
+
+	// A client that cannot reach its server fails every health check with a selection error.
+	// That is the transient-looking failure the counter exists for, as opposed to the
+	// disconnected sentinel, which is dropped on sight and so would not exercise it.
+	clientOpts, err := clientOptionsFor(e.opts)
+	require.NoError(t, err)
+	unreachable, err := mongo.Connect(ctx, clientOpts)
+	require.NoError(t, err)
+	e.client.Store(&pooledClient{Client: unreachable})
+
+	for range maxConsecutivePingFailures - 1 {
+		_, err = e.getClient(ctx)
+		require.Error(t, err)
+		require.Same(t, unreachable, cachedClient(e), "client was dropped before the failures added up")
+	}
+
+	_, err = e.getClient(ctx)
+	require.Error(t, err)
+	require.Nil(t, cachedClient(e), "failing client stayed cached")
+
+	// The disconnect runs off the scrape's goroutine, so that the scrape does not wait for
+	// in-flight collections to hand their connections back. It still has to happen: a client
+	// left connected keeps its topology and monitor goroutines for the life of the process.
+	require.Eventually(t, func() bool {
+		return errors.Is(unreachable.Ping(ctx, nil), mongo.ErrClientDisconnected)
+	}, 5*time.Second, 20*time.Millisecond, "the dropped client was never disconnected")
+}
+
+// Health checks run concurrently, and one against an unreachable server outlives the recovery
+// it is reporting on: three can be in flight, a later one can pass once the server is back,
+// and the three can then fail. Counting those would evict the client the later check just
+// proved healthy, and disconnect it under the scrape that is collecting on it.
+func TestPooledClientIgnoresHealthChecksOvertakenByAPass(t *testing.T) {
+	t.Parallel()
+
+	pooled := new(pooledClient)
+
+	// Three checks start, then one that started later passes before any of them return.
+	gen := pooled.generation()
+	pooled.pass()
+
+	for range maxConsecutivePingFailures {
+		require.False(t, pooled.fail(gen), "a check the pass overtook counted towards eviction")
+	}
+
+	// Checks that begin after the pass still evict on their own account. A round at a time,
+	// since only the first failure of a round counts.
+	for i := range maxConsecutivePingFailures {
+		last := i == maxConsecutivePingFailures-1
+		assert.Equal(t, last, pooled.fail(pooled.generation()), "failure %d of %d", i+1, maxConsecutivePingFailures)
+	}
+
+	// Reaching the threshold claims the eviction, and no check that passes afterwards can give
+	// the client back: the claiming check has yet to disconnect it.
+	require.False(t, pooled.pass(), "a pass resurrected a client already claimed for eviction")
+
+	// And a pass in the middle of a run starts the count over.
+	pooled = new(pooledClient)
+	gen = pooled.generation()
+	require.False(t, pooled.fail(gen), "one failure is not enough to evict")
+	require.True(t, pooled.pass())
+
+	for i := range maxConsecutivePingFailures {
+		last := i == maxConsecutivePingFailures-1
+		assert.Equal(t, last, pooled.fail(pooled.generation()), "the count did not start over after a pass")
+	}
+}
+
+// A check that runs out of the scrape's budget still tells us the client did not answer, and
+// has to count. While it did not, a wedged client stayed cached for the life of the process
+// whenever the scrape budget was shorter than the driver's server-selection timeout -- which
+// the driver's own 30s default makes the common case, not the exotic one.
+func TestGlobalConnPoolDropsClientWhenScrapesOutrunTheDriverTimeout(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+	addr, _, _ := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	// Server selection outlasts every scrape below, so no check can fail on anything but the
+	// scrape's own deadline.
+	e.opts.ConnectTimeoutMS = 30000
+
+	clientOpts, err := clientOptionsFor(e.opts)
+	require.NoError(t, err)
+	unreachable, err := mongo.Connect(t.Context(), clientOpts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = unreachable.Disconnect(context.Background()) })
+	e.client.Store(&pooledClient{Client: unreachable})
+
+	for range maxConsecutivePingFailures {
+		scrape, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		_, err = e.getClient(scrape)
+		cancel()
+		require.Error(t, err)
+	}
+
+	require.Nil(t, cachedClient(e), "a client that never answers inside the scrape budget stayed cached")
+}
+
+// The other half of that: a scrape Prometheus hung up on has its context cancelled mid-ping,
+// and what comes back is evidence about the cancellation, not about the client. Three of those
+// in a row must not evict a client with nothing wrong with it.
+func TestGlobalConnPoolIgnoresCancelledHealthChecks(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+	addr, _, _ := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	// Long enough that nothing but the cancellation can end a ping.
+	e.opts.ConnectTimeoutMS = 30000
+
+	clientOpts, err := clientOptionsFor(e.opts)
+	require.NoError(t, err)
+	unreachable, err := mongo.Connect(t.Context(), clientOpts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = unreachable.Disconnect(context.Background()) })
+	e.client.Store(&pooledClient{Client: unreachable})
+
+	for range maxConsecutivePingFailures {
+		ctx, cancel := context.WithCancel(t.Context())
+		time.AfterFunc(50*time.Millisecond, cancel)
+
+		_, err = e.getClient(ctx)
+		cancel()
+		require.Error(t, err)
+	}
+
+	require.Same(t, unreachable, cachedClient(e), "scrapes their caller hung up on evicted the client")
+}
+
+// A passing health check retires the failures before it, which is what makes the count
+// consecutive. Without that, any three failures across a client's whole life would evict it.
+func TestGlobalConnPoolPassRetiresEarlierFailures(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	e := newPooledExporter(t)
+
+	first, err := e.getClient(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+
+	pooled := e.client.Load()
+	require.NotNil(t, pooled)
+
+	// One short of the threshold, then a real health check passes through getClient.
+	for range maxConsecutivePingFailures - 1 {
+		require.False(t, pooled.fail(pooled.generation()))
+	}
+	before := pooled.generation()
+
+	_, err = e.getClient(ctx)
+	require.NoError(t, err)
+	require.Greater(t, pooled.generation(), before, "a passing health check did not start a new generation")
+
+	// So the count starts over, and the same number of failures no longer evicts.
+	for range maxConsecutivePingFailures - 1 {
+		require.False(t, pooled.fail(pooled.generation()))
+	}
+	require.NotNil(t, cachedClient(e), "failures a pass should have retired evicted the client")
+}
+
+// The threshold and the eviction are two steps, and the client stays in the cache between
+// them. A scrape whose own health check passes in that window must not collect on a client the
+// claiming check is about to disconnect underneath it.
+func TestGlobalConnPoolPassDoesNotHandOutAClaimedClient(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	e := newPooledExporter(t)
+
+	client, err := e.getClient(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+	pooled := e.client.Load()
+	require.NotNil(t, pooled)
+
+	// A concurrent check fails the last time it can, claiming the eviction, and is descheduled
+	// before it swaps the client out of the cache.
+	for i := range maxConsecutivePingFailures {
+		last := i == maxConsecutivePingFailures-1
+		require.Equal(t, last, pooled.fail(pooled.generation()), "failure %d of %d", i+1, maxConsecutivePingFailures)
+	}
+
+	// This scrape's health check passes -- the server is reachable -- and is refused anyway.
+	_, err = e.getClient(ctx)
+	require.ErrorIs(t, err, errClientEvicted)
+	require.Same(t, client, cachedClient(e), "the passing check evicted the client itself")
+}
+
+// A concurrency guard for the packed health word: many checks in one generation, released
+// together. -race catches the word losing its atomicity, and the totals catch the arithmetic
+// going wrong under contention -- including the compare-and-swap giving way to a plain store,
+// which at this many checks loses enough of them to fail outright rather than intermittently.
+func TestPooledClientHealthStateUnderConcurrency(t *testing.T) {
+	t.Parallel()
+
+	// Enough checks, released together, that a read-modify-write would lose some of them.
+	const checksPerRound = 500
+
+	pooled := new(pooledClient)
+
+	var drops atomic.Int32
+
+	// A round's worth of checks all fail together, and the rounds are consecutive. However the
+	// checks within a round interleave, the round counts once.
+	for range maxConsecutivePingFailures {
+		gen := pooled.generation()
+
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+
+		for range checksPerRound {
+			wg.Go(func() {
+				<-start
+
+				if pooled.fail(gen) {
+					drops.Add(1)
+				}
+			})
+		}
+		close(start)
+		wg.Wait()
+	}
+
+	// Exactly one check stores the count that crosses the threshold, so exactly one is told it
+	// has the eviction.
+	assert.Equal(t, int32(1), drops.Load(), "the eviction was claimed more than once")
+
+	// One failure per round and no more: a lost update would leave the total short, and a round
+	// counting twice would overshoot.
+	assert.Equal(t, uint64(maxConsecutivePingFailures), pooled.health.Load()&healthFailureMask,
+		"a round did not count exactly one of its concurrent checks")
+}
+
+// The whole point of the pool: the client outlives the request that built it, and the next
+// scrape reuses that same live client rather than building its own.
+func TestGlobalConnPoolHandlerReusesOneLiveClient(t *testing.T) {
+	t.Parallel()
+
+	e := New(&Opts{
+		Logger:         promslog.New(&promslog.Config{}),
+		URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
+		GlobalConnPool: true,
+		DirectConnect:  true,
+	})
+
+	ts := httptest.NewServer(e.Handler())
+	t.Cleanup(ts.Close)
+
+	scrape := func() {
+		res, err := http.Get(ts.URL) //nolint:noctx
+		require.NoError(t, err)
+		body, err := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		require.NoError(t, err)
+		require.Contains(t, string(body), `mongodb_up{cluster_role="mongod"} 1`)
+	}
+
+	scrape()
+	first := cachedClient(e)
+	require.NotNil(t, first, "the scrape did not leave a client in the pool")
+
+	scrape()
+	require.Same(t, first, cachedClient(e), "the second scrape replaced the pooled client")
+	require.NoError(t, first.Ping(t.Context(), nil), "the pooled client was disconnected after the scrape")
+
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+}
+
+// A disconnected client never recovers, so waiting for it to fail the count out would report
+// mongodb_up 0 for scrapes that could have been served by a new client.
+func TestGlobalConnPoolDropsDisconnectedClientAtOnce(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	e := newPooledExporter(t)
+
+	first, err := e.getClient(ctx)
+	require.NoError(t, err)
+	require.NoError(t, first.Disconnect(ctx))
+
+	_, err = e.getClient(ctx)
+	require.Error(t, err)
+	require.Nil(t, cachedClient(e), "disconnected client stayed cached")
+
+	second, err := e.getClient(ctx)
+	require.NoError(t, err)
+	assert.NotSame(t, first, second)
+	assert.NoError(t, second.Ping(ctx, nil))
+
+	require.NoError(t, second.Disconnect(ctx))
+}
+
+// The pooled client is built during whichever scrape happens to find the cache empty, but
+// it has to outlive that scrape. This holds because the driver connects the topology
+// without a context and does not retain the one passed to mongo.Connect.
+func TestGlobalConnPoolClientOutlivesCreatingScrape(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+
+	scrape, cancel := context.WithCancel(t.Context())
+	first, err := e.getClient(scrape)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+
+	// The scrape that created the client ends.
+	cancel()
+
+	second, err := e.getClient(t.Context())
+	require.NoError(t, err)
+	assert.Same(t, first, second, "pooled client was lost when its creating scrape ended")
+	assert.NoError(t, second.Ping(t.Context(), nil))
+}
+
+// Giving up on the scrape budget must not cancel the connect: a budget shorter than one
+// connect would otherwise leave the pool permanently empty, so every scrape would keep
+// paying for an attempt that can never finish.
+func TestGlobalConnPoolCacheWarmsAfterScrapeGivesUp(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+	// Keep the flight's budget under the wait below, so a flight still running when the test
+	// ends cannot land a client nobody disconnects.
+	e.opts.ConnectTimeoutMS = 5000
+	t.Cleanup(func() {
+		if client := cachedClient(e); client != nil {
+			_ = client.Disconnect(context.Background())
+		}
+	})
+
+	// No budget at all, so the scrape cannot wait for the connect it starts.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := e.getClient(ctx)
+	require.Error(t, err)
+
+	require.Eventually(t, func() bool {
+		return cachedClient(e) != nil
+	}, 15*time.Second, 50*time.Millisecond,
+		"the connect was cancelled along with the scrape, leaving the pool empty")
+}
+
+// A scrape must not wait out a connect somebody else started -- the one New runs in the
+// background, or another scrape's -- even though that connect is deliberately given a
+// budget of its own, longer than any single scrape's.
+func TestGlobalConnPoolScrapeGivesUpOnConnectInFlight(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+	addr, dialed, accepts := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	e.opts.ConnectTimeoutMS = 3000
+
+	inFlight := make(chan struct{})
+	go func() {
+		defer close(inFlight)
+		_, _ = e.getClient(context.Background())
+	}()
+
+	// Only once the listener has accepted is a connect provably under way. Without this the
+	// scrape below could win the race and simply do its own connect.
+	select {
+	case <-dialed:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the background connect never dialled")
+	}
+
+	budget := 300 * time.Millisecond
+	ctx, cancel := context.WithTimeout(t.Context(), budget)
+	defer cancel()
+
+	start := time.Now()
+	_, err := e.getClient(ctx)
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+
+	// Anchored to the flight's budget -- connect plus selection -- rather than to a small
+	// multiple of the scrape's. What the scrape must not do is wait for the flight, and a loaded
+	// runner that adds a second to a 300ms deadline is not that.
+	flightBudget := 2 * time.Duration(e.opts.ConnectTimeoutMS) * time.Millisecond
+	assert.Less(t, elapsed, flightBudget/2,
+		"scrape waited for the in-flight connect instead of giving up on its budget")
+
+	// Well past the flight's budget of connect plus selection timeout.
+	select {
+	case <-inFlight:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the background connect never returned")
+	}
+
+	// A handshake the listener holds open is dialled once, or a few times if the heartbeat times
+	// out and redials before selection gives up. How often the driver does that is not a
+	// contract, so the bound is only tight enough to catch the fixture letting the socket go,
+	// which would hand the driver a reset every half second and dial into double figures.
+	assert.Less(t, accepts.Load(), int32(6), "the black hole did not hold the connection open")
+}
+
+// A flight nobody waits on any more still has to say why it failed: the scrapes that started
+// it logged only their own deadline, and nothing else sees the cause.
+func TestGlobalConnPoolLogsConnectFailureAfterScrapesGaveUp(t *testing.T) {
+	t.Parallel()
+
+	var logs syncBuffer
+	e := newPooledExporter(t)
+	e.logger = slog.New(slog.NewTextHandler(&logs, nil))
+	addr, _, _ := blackHoleMongo(t)
+	e.opts.URI = "mongodb://" + addr + "/admin"
+	e.opts.ConnectTimeoutMS = 1000
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := e.getClient(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+
+	require.Eventually(t, func() bool {
+		return strings.Contains(logs.String(), "MongoDB connect attempt failed")
+	}, 5*time.Second, 50*time.Millisecond, "the flight's failure was never logged")
+	assert.Contains(t, logs.String(), "server selection error", "the log carries the cause, not just a deadline")
+}
+
+// singleflight re-raises a panic from a flight on a goroutine of its own, where nothing can
+// recover it, so a connect that panics has to come back as an error from inside the flight.
+func TestGlobalConnPoolBuildTurnsPanicIntoError(t *testing.T) {
+	t.Parallel()
+
+	// Nil options are the cheapest panic to hand the flight.
+	e := &Exporter{logger: promslog.New(&promslog.Config{})}
+
+	res := <-e.clientGroup.DoChan("", e.buildClient)
+	require.ErrorIs(t, res.Err, errConnectPanicked)
+}
+
+// New warms the pool in the background only when there is a pool to warm. Without one a
+// connect at startup serves nobody, since every scrape builds its own client.
+func TestNewConnectsAtStartupOnlyForPool(t *testing.T) {
+	t.Parallel()
+
+	for name, pool := range map[string]bool{"pool on": true, "pool off": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			addr, dialed, _ := blackHoleMongo(t)
+			New(&Opts{
+				Logger:           promslog.New(&promslog.Config{}),
+				URI:              "mongodb://" + addr + "/admin",
+				GlobalConnPool:   pool,
+				DirectConnect:    true,
+				ConnectTimeoutMS: 1000,
+			})
+
+			select {
+			case <-dialed:
+				assert.True(t, pool, "startup connected although every scrape builds its own client")
+			case <-time.After(2 * time.Second):
+				assert.False(t, pool, "the pool was not warmed at startup")
+			}
+		})
+	}
+}
+
+// A scrape that runs out of time must not cost us the pool: the client is healthy, only that
+// request is over. This has to hold however many of them expire, because concurrent scrapes
+// of one target run out independently -- counting them would let three that expire together
+// evict a client with nothing wrong with it.
+func TestGlobalConnPoolKeepsClientOnTransientError(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+
+	first, err := e.getClient(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+
+	for range maxConsecutivePingFailures + 1 {
+		expired, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		_, err = e.getClient(expired)
+		require.Error(t, err)
+		require.Same(t, first, cachedClient(e), "healthy client was dropped after a scrape ran out of time")
+	}
+
+	assert.NoError(t, first.Ping(t.Context(), nil), "the client the scrapes gave up on is still usable")
 }
 
 // How this test works?
@@ -406,10 +1130,10 @@ func TestMongoUpMetric(t *testing.T) {
 	testCases := []testcase{
 		{URI: "mongodb://127.0.0.1:12345/admin", Want: 0},
 		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")), Want: 1, clusterRole: "mongod"},
-		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "27017")), Want: 1, clusterRole: "mongod"},
-		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "27017")), Want: 1, clusterRole: "mongod"},
-		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_ARBITER_PORT", "27017")), Want: 1, clusterRole: "arbiter"},
-		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_MONGOS_PORT", "27017")), Want: 1, clusterRole: "mongos"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "17002")), Want: 1, clusterRole: "mongod"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_S1_ARBITER_PORT", "17011")), Want: 1, clusterRole: "arbiter"},
+		{URI: fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.GetenvDefault("TEST_MONGODB_MONGOS_PORT", "17000")), Want: 1, clusterRole: "mongos"},
 	}
 
 	for _, tc := range testCases {
@@ -450,4 +1174,427 @@ func TestMongoUpMetric(t *testing.T) {
 			assert.Equal(t, true, res)
 		})
 	}
+}
+
+// The connect budget has to be one number, used both for the driver's own timeouts and for
+// the deadline a caller wraps around the attempt. When they disagreed, the outer deadline
+// silently won: a URI asking for more than --mongodb.connect-timeout-ms had its handshake
+// aborted on every scrape, so mongodb_up stayed 0 permanently rather than transiently.
+//
+//nolint:funlen
+func TestClientOptionsForResolvesTimeoutsForBothPaths(t *testing.T) {
+	t.Parallel()
+
+	const uri = "mongodb://127.0.0.1:27017/admin"
+
+	tests := map[string]struct {
+		uri              string
+		connectTimeoutMS int
+		// wantConnect and wantSelection are what a per-scrape client is given, where the
+		// scrape's own context is the bound and a zero is honoured as "no timeout".
+		wantConnect   time.Duration
+		wantSelection time.Duration
+		// wantBoundedConnect, wantBoundedSelection and wantBudget are what the detached pooled
+		// connect is given, where a zero would mean the pool could never fill.
+		wantBoundedConnect   time.Duration
+		wantBoundedSelection time.Duration
+		wantBudget           time.Duration
+	}{
+		// connectTimeoutMS says nothing about how long selection may take, so selection keeps
+		// the driver's default. Deriving it from the connect timeout would shrink the window a
+		// scrape needs to ride out an election.
+		"connect timeout in the uri keeps the default selection window": {
+			uri:                  uri + "?connectTimeoutMS=8000",
+			connectTimeoutMS:     5000,
+			wantConnect:          8 * time.Second,
+			wantSelection:        defaultConnectTimeout,
+			wantBoundedConnect:   8 * time.Second,
+			wantBoundedSelection: defaultConnectTimeout,
+			wantBudget:           8*time.Second + defaultConnectTimeout,
+		},
+		// A zero connect timeout is the driver's "no dial timeout", not an unset one: the flag
+		// must not replace it, nor selection be narrowed as if the URI had said nothing. Only
+		// the detached pooled connect, which has no caller's context to stop it, replaces it.
+		"zero connect timeout in the uri is kept per scrape and bounded for the pool": {
+			uri:                  uri + "?connectTimeoutMS=0",
+			connectTimeoutMS:     5000,
+			wantConnect:          0,
+			wantSelection:        defaultConnectTimeout,
+			wantBoundedConnect:   defaultConnectTimeout,
+			wantBoundedSelection: defaultConnectTimeout,
+			wantBudget:           2 * defaultConnectTimeout,
+		},
+		"flag applies when the uri is silent": {
+			uri:                  uri,
+			connectTimeoutMS:     5000,
+			wantConnect:          5 * time.Second,
+			wantSelection:        5 * time.Second,
+			wantBoundedConnect:   5 * time.Second,
+			wantBoundedSelection: 5 * time.Second,
+			wantBudget:           10 * time.Second,
+		},
+		"explicit selection timeout in the uri is left alone": {
+			uri:                  uri + "?connectTimeoutMS=8000&serverSelectionTimeoutMS=2000",
+			connectTimeoutMS:     5000,
+			wantConnect:          8 * time.Second,
+			wantSelection:        2 * time.Second,
+			wantBoundedConnect:   8 * time.Second,
+			wantBoundedSelection: 2 * time.Second,
+			wantBudget:           10 * time.Second,
+		},
+		// The reverse ordering is the one that used to break: taking the budget from the
+		// connect side alone expired the caller's deadline at 2s while the operator's 8s
+		// selection window was still running, so the scrape reported its own deadline
+		// rather than the setting.
+		"selection timeout longer than connect widens the budget": {
+			uri:                  uri + "?connectTimeoutMS=2000&serverSelectionTimeoutMS=8000",
+			connectTimeoutMS:     5000,
+			wantConnect:          2 * time.Second,
+			wantSelection:        8 * time.Second,
+			wantBoundedConnect:   2 * time.Second,
+			wantBoundedSelection: 8 * time.Second,
+			wantBudget:           10 * time.Second,
+		},
+		"selection timeout alone widens the budget past the flag": {
+			uri:                  uri + "?serverSelectionTimeoutMS=8000",
+			connectTimeoutMS:     5000,
+			wantConnect:          5 * time.Second,
+			wantSelection:        8 * time.Second,
+			wantBoundedConnect:   5 * time.Second,
+			wantBoundedSelection: 8 * time.Second,
+			wantBudget:           13 * time.Second,
+		},
+		// A per-scrape client keeps the zero: the scrape's context is the bound the operator
+		// asked for. The pooled connect has no such bound, and would select forever, leaving
+		// the pool empty for good, so there the zero becomes the fallback.
+		"zero selection timeout in the uri is kept per scrape and bounded for the pool": {
+			uri:                  uri + "?connectTimeoutMS=5000&serverSelectionTimeoutMS=0",
+			connectTimeoutMS:     5000,
+			wantConnect:          5 * time.Second,
+			wantSelection:        0,
+			wantBoundedConnect:   5 * time.Second,
+			wantBoundedSelection: defaultConnectTimeout,
+			wantBudget:           5*time.Second + defaultConnectTimeout,
+		},
+		"nothing set leaves the scrape in charge and falls back for the pool": {
+			uri:                  uri,
+			connectTimeoutMS:     0,
+			wantConnect:          0,
+			wantSelection:        0,
+			wantBoundedConnect:   defaultConnectTimeout,
+			wantBoundedSelection: defaultConnectTimeout,
+			wantBudget:           2 * defaultConnectTimeout,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			clientOpts, err := clientOptionsFor(&Opts{URI: test.uri, ConnectTimeoutMS: test.connectTimeoutMS})
+			require.NoError(t, err)
+
+			require.NotNil(t, clientOpts.ConnectTimeout)
+			assert.Equal(t, test.wantConnect, *clientOpts.ConnectTimeout,
+				"connect timeout a per-scrape client is given")
+			require.NotNil(t, clientOpts.ServerSelectionTimeout,
+				"unset would leave the driver to decide, and the budget could not follow it")
+			assert.Equal(t, test.wantSelection, *clientOpts.ServerSelectionTimeout,
+				"selection timeout a per-scrape client is given")
+
+			budget := boundConnect(clientOpts)
+			assert.Equal(t, test.wantBoundedConnect, *clientOpts.ConnectTimeout,
+				"connect timeout the detached pooled connect is given")
+			assert.Equal(t, test.wantBoundedSelection, *clientOpts.ServerSelectionTimeout,
+				"selection timeout the detached pooled connect is given")
+			assert.Equal(t, test.wantBudget, budget, "budget a caller would bound the attempt with")
+		})
+	}
+}
+
+// The driver never prunes idle connections by default and reuses them without checking they
+// are still open, so a socket a middlebox dropped between scrapes would fail the next one.
+func TestClientOptionsForPrunesIdleConnections(t *testing.T) {
+	t.Parallel()
+
+	const uri = "mongodb://127.0.0.1:27017/admin"
+
+	clientOpts, err := clientOptionsFor(&Opts{URI: uri})
+	require.NoError(t, err)
+	require.NotNil(t, clientOpts.MaxConnIdleTime, "idle connections would never be pruned")
+	assert.Equal(t, 5*time.Minute, *clientOpts.MaxConnIdleTime)
+
+	clientOpts, err = clientOptionsFor(&Opts{URI: uri + "?maxIdleTimeMS=1000"})
+	require.NoError(t, err)
+	require.NotNil(t, clientOpts.MaxConnIdleTime)
+	assert.Equal(t, time.Second, *clientOpts.MaxConnIdleTime, "the uri's own setting was overridden")
+}
+
+// A flight must never displace a client already in the cache. singleflight retires its key
+// when a flight returns, so a scrape that read an empty cache and arrives after an earlier
+// flight finished starts a second flight rather than joining the first. Connecting again
+// would strand the cached client: nothing in the pooled path ever disconnects one, so its
+// topology, monitor goroutines and heartbeat connections would outlive it -- background
+// load on the very MongoDB this pool exists to take load off.
+func TestGlobalConnPoolBuildDoesNotOrphanCachedClient(t *testing.T) {
+	t.Parallel()
+
+	e := newPooledExporter(t)
+
+	first, err := e.getClient(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Disconnect(context.Background()) })
+
+	// Exactly what that second flight runs.
+	got, err := e.buildClient()
+	require.NoError(t, err)
+
+	assert.Same(t, first, got, "the flight connected again instead of taking the cached client")
+	assert.Same(t, first, cachedClient(e), "the cached client was displaced, and nothing disconnects it")
+}
+
+// The context a teardown disconnect runs on has two jobs, and they pull against each other.
+// Disconnect sends endSessions first, which selects a server: against one that went away, with
+// --mongodb.connect-timeout-ms=0 leaving no selection timeout, only the context can stop it
+// waiting. But bounding it with a deadline is what puts the driver into the graceful wait that
+// spins on a core, so the bound has to be cancellation.
+//
+// This is asserted on the context rather than on a disconnect against a server made to vanish:
+// the driver expires its own session pool somewhere in there, and when it wins that race
+// endSessions has nothing to send and comes back at once however it was bounded -- so the
+// end-to-end version reported success for the unfixed code about half the time.
+func TestDisconnectContextIsCancelledAndCarriesNoDeadline(t *testing.T) {
+	t.Parallel()
+
+	scrape, endScrape := context.WithCancel(t.Context())
+	ctx, cancel := disconnectContext(scrape)
+	defer cancel()
+
+	_, hasDeadline := ctx.Deadline()
+	require.False(t, hasDeadline, "a deadline is read by the driver as a request to wait, and that wait spins")
+
+	// The scrape ending is not the teardown ending.
+	endScrape()
+	select {
+	case <-ctx.Done():
+		t.Fatal("the scrape's cancellation cut the teardown short")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(disconnectTimeout + 10*time.Second):
+		t.Fatal("the teardown context is never cancelled, so a disconnect with nothing to answer it never returns")
+	}
+}
+
+// A deadline on Disconnect is read by the driver as a request to wait for checked-out
+// connections to come back, and that wait is a loop with a default branch which spins on a core
+// until the deadline passes. A context that can only be cancelled skips the wait altogether.
+//
+// The control arm is what makes the fast half mean anything: if no connection were checked out,
+// both halves would return at once and the assertion below would pass for the wrong reason.
+func TestDisconnectDoesNotWaitForCheckedOutConnections(t *testing.T) {
+	t.Parallel()
+
+	const graceful = time.Second
+
+	// A proxy each, so that the message one client has withheld cannot be mistaken for the
+	// other's, and so that both connect before either stalls.
+	withHeldConnection := func() *mongo.Client {
+		proxy := newStallingMongo(t, "127.0.0.1:"+tu.MongoDBS1PrimaryPort)
+
+		client, err := connect(t.Context(), &Opts{URI: "mongodb://" + proxy.addr(), DirectConnect: true})
+		require.NoError(t, err)
+
+		gated := proxy.stall()
+		go func() {
+			_, _ = client.Database("admin").Collection("disconnect_test").
+				CountDocuments(context.Background(), bson.M{})
+		}()
+		<-gated
+
+		// The withheld message may have been a heartbeat rather than the count; a moment here
+		// lets the count reach the proxy too. If it has not, the control arm below fails loudly
+		// rather than letting the subject pass for the wrong reason.
+		time.Sleep(200 * time.Millisecond)
+
+		return client
+	}
+
+	control := withHeldConnection()
+	subject := withHeldConnection()
+
+	deadlineCtx, cancel := context.WithTimeout(t.Context(), graceful)
+	defer cancel()
+
+	start := time.Now()
+	_ = control.Disconnect(deadlineCtx)
+	withDeadline := time.Since(start)
+
+	start = time.Now()
+	_ = disconnectClient(t.Context(), subject)
+	withCancel := time.Since(start)
+
+	require.GreaterOrEqual(t, withDeadline, graceful,
+		"a deadline did not hold Disconnect up, so no connection was checked out and this proves nothing")
+	require.Less(t, withCancel, graceful/2,
+		"Disconnect waited for checked-out connections, so it was handed a deadline")
+}
+
+// PMM scrapes one exporter from several jobs at once, so the health checks of a round run
+// concurrently rather than one after another. Counting each of them separately takes a client
+// from healthy to evicted inside a single transient event, which is not the three rounds
+// maxConsecutivePingFailures is meant to buy.
+func TestPooledClientCountsOneFailurePerRound(t *testing.T) {
+	t.Parallel()
+
+	pooled := &pooledClient{}
+
+	gen := pooled.generation()
+	var evictions atomic.Int32
+	var wg sync.WaitGroup
+
+	for range maxConsecutivePingFailures {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			if pooled.fail(gen) {
+				evictions.Add(1)
+			}
+		}()
+	}
+
+	wg.Wait()
+	require.Zero(t, evictions.Load(), "one round of concurrent failures was enough to evict the client")
+
+	// Rounds that really are consecutive still count, and the last of them evicts.
+	var evicted bool
+	for range maxConsecutivePingFailures - 1 {
+		evicted = pooled.fail(pooled.generation())
+	}
+
+	require.True(t, evicted, "consecutive failing rounds never reached the threshold")
+}
+
+// mongodb_up is the one metric a scrape has to carry whatever else went wrong: its absence
+// reads as a stale series rather than as a target that is down, so nothing alerts. A scrape
+// that spent its whole budget in setup -- which is what a replica set with no primary does to
+// the commands makeRegistry runs, now that a secondary is enough to connect -- must still
+// report it.
+//
+// What it reports has to come from a ping that ran. On a spent context the driver fails one
+// instantly, and publishing that as a zero asserts the server is down on no evidence: a
+// deployment whose setup never fits in the budget would then report a healthy server down for
+// as long as it stays large.
+func TestGeneralCollectorReportsUpAfterScrapeBudgetIsSpent(t *testing.T) {
+	t.Parallel()
+
+	upValue := func(t *testing.T, client *mongo.Client) float64 {
+		t.Helper()
+
+		// Spent by the time the collectors are described, exactly as it is when setup ran it out.
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		registry := prometheus.NewRegistry()
+		registry.MustRegister(newGeneralCollector(ctx, client, typeMongod, promslog.NewNopLogger()))
+
+		families, err := registry.Gather()
+		require.NoError(t, err)
+
+		var up *dto.MetricFamily
+		for _, family := range families {
+			if family.GetName() == "mongodb_up" {
+				up = family
+			}
+		}
+
+		require.NotNil(t, up, "the scrape carried no mongodb_up at all, so nothing reports on this target")
+		require.Len(t, up.GetMetric(), 1)
+
+		return up.GetMetric()[0].GetGauge().GetValue()
+	}
+
+	t.Run("server answers", func(t *testing.T) {
+		t.Parallel()
+
+		client, err := connect(t.Context(), &Opts{
+			URI:           "mongodb://127.0.0.1:" + tu.MongoDBS1PrimaryPort,
+			DirectConnect: true,
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+		assert.InDelta(t, 1, upValue(t, client), 0.001,
+			"a server that answers a probe was reported down because the scrape had run out of time")
+	})
+
+	t.Run("server does not answer", func(t *testing.T) {
+		t.Parallel()
+
+		// mongo.Connect does not reach the server, so this is a client to a port nothing
+		// listens on -- the shape of one whose server went away mid-scrape.
+		clientOpts := options.Client().ApplyURI("mongodb://127.0.0.1:1").
+			SetDirect(true).
+			SetServerSelectionTimeout(upProbeTimeout)
+
+		client, err := mongo.Connect(t.Context(), clientOpts)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+		assert.InDelta(t, 0, upValue(t, client), 0.001, "an unreachable server was reported up")
+	})
+}
+
+// Every scrape of one target has to label mongodb_up the same way. The node type is read on
+// the scrape's own context, so a scrape that spent its budget in setup fails that lookup and
+// would fall back to the empty cluster_role -- publishing mongodb_up{cluster_role=""} beside
+// the mongodb_up{cluster_role="mongod"} every earlier scrape produced. The labelled series
+// then goes stale while an unrelated one carries on next to it, which is exactly the stale
+// series the ungated Describe exists to prevent.
+func TestRegistryKeepsClusterRoleWhenScrapeBudgetIsSpent(t *testing.T) {
+	t.Parallel()
+
+	e := New(&Opts{
+		URI:           "mongodb://127.0.0.1:" + tu.MongoDBS1PrimaryPort,
+		DirectConnect: true,
+		Logger:        promslog.NewNopLogger(),
+	})
+
+	client, err := connect(t.Context(), e.opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
+
+	clusterRole := func(ctx context.Context) string {
+		registry := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+		families, err := registry.Gather()
+		require.NoError(t, err)
+
+		for _, family := range families {
+			if family.GetName() != "mongodb_up" {
+				continue
+			}
+
+			require.Len(t, family.GetMetric(), 1)
+
+			return metricLabels(family.GetMetric()[0])["cluster_role"]
+		}
+
+		t.Fatal("the scrape carried no mongodb_up at all")
+
+		return ""
+	}
+
+	require.Equal(t, string(typeMongod), clusterRole(t.Context()), "a scrape with budget to spare mislabelled the target")
+
+	// Spent, exactly as it is when the setup commands ran it out.
+	spent, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	assert.Equal(t, string(typeMongod), clusterRole(spent),
+		"the scrape that ran out of time labelled mongodb_up differently, retiring the series every other scrape publishes")
 }
