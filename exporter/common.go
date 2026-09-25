@@ -269,6 +269,17 @@ func splitNamespace(ns string) (string, string) {
 	return parts[0], strings.Join(parts[1:], ".")
 }
 
+// setShardLabel sets the "shard" label from a single $collStats or $indexStats
+// document; documents reporting no shard get an empty value. The label is set
+// unconditionally because descriptors are built from these labels and
+// MustRegister panics when a collector describes one fully-qualified name with
+// two different label sets. Prometheus drops empty labels at ingestion, so
+// deployments without shards keep the same series.
+func setShardLabel(labels map[string]string, doc bson.M) {
+	shard, _ := doc["shard"].(string)
+	labels["shard"] = shard
+}
+
 func fromMapToSlice(databases map[string][]string) []string {
 	var collections []string
 	for db, cols := range databases {

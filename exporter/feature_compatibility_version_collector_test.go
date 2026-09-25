@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/go-version"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -32,7 +31,7 @@ import (
 )
 
 func TestFCVCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -61,7 +60,7 @@ func TestFCVCollector(t *testing.T) {
 		mversion = "6.0"
 	case "8.0":
 		mversion = "7.0"
-	case "8.2":
+	case "8.2", "8.3":
 		mversion = "8.0"
 	default:
 		mversion = mmv

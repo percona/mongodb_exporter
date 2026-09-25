@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/promslog"
@@ -31,7 +30,7 @@ import (
 //nolint:paralleltest
 func TestShardsCollector(t *testing.T) {
 	t.Skip("This is failing in GitHub actions. Shards are not ready yet")
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
