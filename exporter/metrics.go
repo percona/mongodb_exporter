@@ -425,10 +425,33 @@ func appendMetricValue(metrics []prometheus.Metric, prefix, name string, value a
 	return metrics
 }
 
+// histogramBoundKeys are the fields a histogram bucket uses to name the latency range it
+// counts. Server status reports "lowerBound"; the opLatencies histograms added in MongoDB
+// 8.3 report "micros". The key becomes the label that separates one bucket from the next,
+// named after the field rather than normalised, since the two are not documented as
+// meaning the same thing.
+var histogramBoundKeys = []string{"lowerBound", "micros"}
+
+// histogramBound returns the field a bucket is keyed by, and its value.
+func histogramBound(bucket map[string]any) (string, any, bool) {
+	for _, key := range histogramBoundKeys {
+		if value, ok := bucket[key]; ok {
+			return key, value, true
+		}
+	}
+
+	return "", nil, false
+}
+
 func processHistogramSlice(prefix string, v []any, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0, len(v))
 	for _, item := range v {
 		bucket, ok := asMetricMap(item)
+		if !ok {
+			continue
+		}
+
+		boundKey, bound, ok := histogramBound(bucket)
 		if !ok {
 			continue
 		}
@@ -438,11 +461,22 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 			labels[name] = value
 		}
 
-		labels["lower_bound"] = fmt.Sprint(bucket["lowerBound"])
+		// Without a label naming the bucket, every bucket of the histogram produces the
+		// same series and the registry rejects all but the first.
+		labels[boundLabel(boundKey)] = fmt.Sprint(bound)
 		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
 	}
 
 	return metrics
+}
+
+// boundLabel is the label name for a bucket keyed by boundKey.
+func boundLabel(boundKey string) string {
+	if boundKey == "lowerBound" {
+		return "lower_bound"
+	}
+
+	return boundKey
 }
 
 func isHistogramBucketSlice(prefix string, v []any) bool {
@@ -458,7 +492,7 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 		if !ok {
 			return false
 		}
-		if _, ok := bucket["lowerBound"]; !ok {
+		if _, _, ok := histogramBound(bucket); !ok {
 			return false
 		}
 		if _, ok := bucket["count"]; !ok {
@@ -469,8 +503,17 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 	return true
 }
 
+// isHistogramPath reports whether prefix names a histogram subtree. Both spellings occur:
+// server status uses "histograms", while the opLatencies histograms added in MongoDB 8.3
+// use "histogram".
 func isHistogramPath(prefix string) bool {
-	return prefix == "histograms" || strings.Contains(prefix, ".histograms.") || strings.HasSuffix(prefix, ".histograms") //nolint:goconst
+	for _, name := range []string{"histograms", "histogram"} {
+		if prefix == name || strings.Contains(prefix, "."+name+".") || strings.HasSuffix(prefix, "."+name) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func asMetricMap(item any) (map[string]any, bool) {

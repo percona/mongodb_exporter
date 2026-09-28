@@ -75,7 +75,7 @@ build:                      ## Build exporter binary using plain go build.
 	CGO_ENABLED=0 go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
 
 docker-build: build
-	docker build -t ${NAME}:${IMAGE_TAG} .
+	docker build -t ${NAME}:${IMAGE_TAG} --build-arg BIN_DIR=$(PMM_RELEASE_PATH) .
 
 build-gssapi:                      ## Build exporter binary with GSSAPI support (requires CGO enabled).
 	CGO_ENABLED=1 go build -ldflags="$(GO_BUILD_LDFLAGS)" -tags gssapi  -o $(PMM_RELEASE_PATH)/mongodb_exporter

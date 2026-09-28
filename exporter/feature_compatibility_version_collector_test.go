@@ -60,7 +60,7 @@ func TestFCVCollector(t *testing.T) {
 		mversion = "6.0"
 	case "8.0":
 		mversion = "7.0"
-	case "8.2":
+	case "8.2", "8.3":
 		mversion = "8.0"
 	default:
 		mversion = mmv
