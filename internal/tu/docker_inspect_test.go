@@ -86,7 +86,7 @@ func TestContainerHelpersFailWhenContainerIsNotRunning(t *testing.T) {
 
 			got, err := fn(name)
 
-			require.Error(t, err, "a container that is not running was reported as fine")
+			require.ErrorIs(t, err, errContainerStopped)
 			assert.Empty(t, got)
 			assert.Contains(t, err.Error(), name, "the error does not name the container that is down")
 		})
