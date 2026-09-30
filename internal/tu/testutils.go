@@ -86,13 +86,9 @@ func DefaultTestClientMongoS(ctx context.Context, t *testing.T) *mongo.Client {
 
 // GetImageNameForContainer returns image name and version of a running test container.
 func GetImageNameForContainer(containerName string) (string, string, error) {
-	di, err := InspectContainer(containerName)
+	di, err := runningContainer(containerName)
 	if err != nil {
-		return "", "", fmt.Errorf("cannot inspect container %q: %w", containerName, err)
-	}
-
-	if len(di) == 0 {
-		return "", "", fmt.Errorf("%w: %q", errContainerMissing, containerName)
+		return "", "", err
 	}
 
 	split := strings.Split(di[0].Config.Image, ":")
@@ -166,16 +162,28 @@ func LoadJSON(filename string) (bson.M, error) {
 	return m, nil
 }
 
+// InspectContainer returns the docker inspect output for the container name.
 func InspectContainer(name string) (DockerInspectOutput, error) {
 	var di DockerInspectOutput
 
 	out, err := exec.Command("docker", "inspect", name).Output() //nolint:gosec
 	if err != nil {
-		return di, fmt.Errorf("cannot inspect docker container: %w", err)
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return di, fmt.Errorf("cannot inspect docker container %q: %w", name, err)
+		}
+
+		// docker exits 1 and prints [] both for a missing container and for an unreachable daemon.
+		stderr := strings.TrimSpace(string(exitErr.Stderr))
+		if strings.Contains(strings.ToLower(stderr), "no such object") {
+			return di, fmt.Errorf("%w: %q", errContainerMissing, name)
+		}
+
+		return di, fmt.Errorf("cannot inspect docker container %q: %s: %w", name, stderr, err)
 	}
 
 	if err := json.Unmarshal(out, &di); err != nil {
-		return di, fmt.Errorf("cannot inspect docker container: %w", err)
+		return di, fmt.Errorf("cannot inspect docker container %q: %w", name, err)
 	}
 
 	return di, nil
@@ -198,11 +206,7 @@ var (
 func runningContainer(name string) (DockerInspectOutput, error) {
 	di, err := InspectContainer(name)
 	if err != nil {
-		return nil, fmt.Errorf("cannot inspect container %q: %w", name, err)
-	}
-
-	if len(di) == 0 {
-		return nil, fmt.Errorf("%w: %q", errContainerMissing, name)
+		return nil, err
 	}
 
 	if !di[0].State.Running {

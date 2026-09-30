@@ -24,6 +24,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var containerHelpers = map[string]func(string) (string, error){
+	"IPForContainer":   IPForContainer,
+	"PortForContainer": PortForContainer,
+	"GetImageNameForContainer": func(name string) (string, error) {
+		image, _, err := GetImageNameForContainer(name)
+
+		return image, err
+	},
+}
+
 func TestInspectContainer(t *testing.T) {
 	tests := []struct {
 		containerName string
@@ -72,12 +82,7 @@ func TestContainerHelpersFailWhenContainerIsNotRunning(t *testing.T) {
 		_ = exec.CommandContext(context.Background(), "docker", "rm", "-f", name).Run()
 	})
 
-	helpers := map[string]func(string) (string, error){
-		"IPForContainer":   IPForContainer,
-		"PortForContainer": PortForContainer,
-	}
-
-	for helper, fn := range helpers {
+	for helper, fn := range containerHelpers {
 		t.Run(helper, func(t *testing.T) {
 			t.Parallel()
 
@@ -86,6 +91,23 @@ func TestContainerHelpersFailWhenContainerIsNotRunning(t *testing.T) {
 			require.Error(t, err, "a container that is not running was reported as fine")
 			assert.Empty(t, got)
 			assert.Contains(t, err.Error(), name, "the error does not name the container that is down")
+		})
+	}
+}
+
+// docker inspect exits 1 for a container that does not exist, so the helpers never saw an empty
+// result and the hint to start the test cluster was unreachable.
+func TestContainerHelpersFailWhenContainerIsMissing(t *testing.T) {
+	t.Parallel()
+
+	for helper, fn := range containerHelpers {
+		t.Run(helper, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := fn("mongodb-exporter-missing-container-test")
+
+			require.ErrorIs(t, err, errContainerMissing)
+			assert.Empty(t, got)
 		})
 	}
 }
