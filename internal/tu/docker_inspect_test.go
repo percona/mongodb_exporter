@@ -35,6 +35,8 @@ var containerHelpers = map[string]func(string) (string, error){
 }
 
 func TestInspectContainer(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		containerName string
 		wantPort      string
@@ -51,10 +53,10 @@ func TestInspectContainer(t *testing.T) {
 
 	for _, tc := range tests {
 		di, err := InspectContainer(tc.containerName)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ns := di[0].NetworkSettings.Ports["27017/tcp"][0].HostPort
-		assert.Equal(t, ns, tc.wantPort)
+		assert.Equal(t, tc.wantPort, ns)
 	}
 }
 

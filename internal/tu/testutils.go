@@ -52,6 +52,8 @@ const (
 	MongoDBConfigServer1Port = "17009"
 	// MongoDBStandAloneEncryptedPort MongoDB standalone encrypted instance Port.
 	MongoDBStandAloneEncryptedPort = "27027"
+
+	localhostIP = "127.0.0.1"
 )
 
 // GetenvDefault gets a variable from the environment and returns its value or the
@@ -67,6 +69,8 @@ func GetenvDefault(key, defaultValue string) string {
 // DefaultTestClient returns the default MongoDB connection used for tests. It is a direct
 // connection to the primary server of replicaset 1.
 func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
+	t.Helper()
+
 	port, err := PortForContainer("mongo-1-1")
 	require.NoError(t, err)
 
@@ -122,7 +126,7 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 		port = MongoDBS1PrimaryPort
 	}
 
-	hostname := "127.0.0.1"
+	hostname := localhostIP
 	direct := true
 	to := time.Second
 	co := &options.ClientOptions{
@@ -150,13 +154,13 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 func LoadJSON(filename string) (bson.M, error) {
 	buf, err := os.ReadFile(filepath.Clean(filename))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot read %q: %w", filename, err)
 	}
 
 	var m bson.M
 	err = json.Unmarshal(buf, &m)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot unmarshal %q: %w", filename, err)
 	}
 
 	return m, nil
@@ -166,7 +170,7 @@ func LoadJSON(filename string) (bson.M, error) {
 func InspectContainer(name string) (DockerInspectOutput, error) {
 	var di DockerInspectOutput
 
-	out, err := exec.Command("docker", "inspect", name).Output() //nolint:gosec
+	out, err := exec.Command("docker", "inspect", name).Output() //nolint:gosec,noctx
 	if err != nil {
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
@@ -182,7 +186,8 @@ func InspectContainer(name string) (DockerInspectOutput, error) {
 		return di, fmt.Errorf("cannot inspect docker container %q: %s: %w", name, stderr, err)
 	}
 
-	if err := json.Unmarshal(out, &di); err != nil {
+	err = json.Unmarshal(out, &di)
+	if err != nil {
 		return di, fmt.Errorf("cannot inspect docker container %q: %w", name, err)
 	}
 
@@ -249,9 +254,9 @@ func IPForContainer(name string) (string, error) {
 
 // SetupFakeResolver sets up Fake DNS server to resolve SRV records.
 func SetupFakeResolver() *mockdns.Server {
-	p1, err1 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"), 10, 64)
-	p2, err2 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "17002"), 10, 64)
-	p3, err3 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_SECONDARY2_PORT", "17003"), 10, 64)
+	p1, err1 := strconv.ParseUint(GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"), 10, 16)
+	p2, err2 := strconv.ParseUint(GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "17002"), 10, 16)
+	p3, err3 := strconv.ParseUint(GetenvDefault("TEST_MONGODB_S1_SECONDARY2_PORT", "17003"), 10, 16)
 
 	if err1 != nil || err2 != nil || err3 != nil {
 		panic("Invalid ports")
@@ -279,16 +284,16 @@ func SetupFakeResolver() *mockdns.Server {
 			A:   []string{"1.2.3.4"},
 		},
 		"mongo1.example.com.": {
-			A: []string{"127.0.0.1"},
+			A: []string{localhostIP},
 		},
 		"mongo2.example.com.": {
-			A: []string{"127.0.0.1"},
+			A: []string{localhostIP},
 		},
 		"mongo3.example.com.": {
-			A: []string{"127.0.0.1"},
+			A: []string{localhostIP},
 		},
 		"unexistent.com.": {
-			A: []string{"127.0.0.1"},
+			A: []string{localhostIP},
 		},
 	}
 
