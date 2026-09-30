@@ -79,7 +79,6 @@ func TestGSSAPIAuth(t *testing.T) {
 	configFile := generateKerberosConfigFile(t)
 	defer func() {
 		_ = configFile.Close()
-		t.Setenv("KRB5_CONFIG", "")
 	}()
 
 	t.Setenv("KRB5_CONFIG", configFile.Name())
