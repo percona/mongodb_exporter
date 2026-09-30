@@ -77,7 +77,6 @@ func TestGSSAPIAuth(t *testing.T) {
 	require.NoError(t, err)
 
 	configFile := generateKerberosConfigFile(t)
-	require.NoError(t, err)
 	defer func() {
 		_ = configFile.Close()
 		t.Setenv("KRB5_CONFIG", "")
@@ -102,7 +101,7 @@ func TestGSSAPIAuth(t *testing.T) {
 	}
 
 	client, err := connect(ctx, exporterOpts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	e := New(exporterOpts)
 	nodeType, _ := getNodeType(ctx, client)

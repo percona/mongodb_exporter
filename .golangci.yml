@@ -1,5 +1,10 @@
 version: "2"
 
+run:
+  # Needs the Kerberos development headers (libkrb5-dev), as make test does.
+  build-tags:
+    - gssapi
+
 linters:
   default: all
   enable:
