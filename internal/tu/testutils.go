@@ -88,9 +88,11 @@ func DefaultTestClientMongoS(ctx context.Context, t *testing.T) *mongo.Client {
 	return TestClient(ctx, port, t)
 }
 
-// GetImageNameForContainer returns image name and version of a running test container.
+// GetImageNameForContainer returns image name and version of a test container, running or not.
+// TestGetEncryptionInfo needs the latter: upstream MongoDB cannot start standalone-encrypted, and
+// the test reads its image to skip.
 func GetImageNameForContainer(containerName string) (string, string, error) {
-	di, err := runningContainer(containerName)
+	di, err := InspectContainer(containerName)
 	if err != nil {
 		return "", "", err
 	}

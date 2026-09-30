@@ -18,21 +18,12 @@ package tu
 import (
 	"context"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-var containerHelpers = map[string]func(string) (string, error){
-	"IPForContainer":   IPForContainer,
-	"PortForContainer": PortForContainer,
-	"GetImageNameForContainer": func(name string) (string, error) {
-		image, _, err := GetImageNameForContainer(name)
-
-		return image, err
-	},
-}
 
 func TestInspectContainer(t *testing.T) {
 	t.Parallel()
@@ -84,7 +75,12 @@ func TestContainerHelpersFailWhenContainerIsNotRunning(t *testing.T) {
 		_ = exec.CommandContext(context.Background(), "docker", "rm", "-f", name).Run()
 	})
 
-	for helper, fn := range containerHelpers {
+	helpers := map[string]func(string) (string, error){
+		"IPForContainer":   IPForContainer,
+		"PortForContainer": PortForContainer,
+	}
+
+	for helper, fn := range helpers {
 		t.Run(helper, func(t *testing.T) {
 			t.Parallel()
 
@@ -95,6 +91,17 @@ func TestContainerHelpersFailWhenContainerIsNotRunning(t *testing.T) {
 			assert.Contains(t, err.Error(), name, "the error does not name the container that is down")
 		})
 	}
+
+	// The image is still known, see GetImageNameForContainer.
+	t.Run("GetImageNameForContainer", func(t *testing.T) {
+		t.Parallel()
+
+		image, version, err := GetImageNameForContainer(name)
+
+		require.NoError(t, err)
+		assert.Equal(t, strings.Split(di[0].Config.Image, ":")[0], image)
+		assert.NotEmpty(t, version)
+	})
 }
 
 // docker inspect exits 1 for a container that does not exist, so the helpers never saw an empty
@@ -102,7 +109,17 @@ func TestContainerHelpersFailWhenContainerIsNotRunning(t *testing.T) {
 func TestContainerHelpersFailWhenContainerIsMissing(t *testing.T) {
 	t.Parallel()
 
-	for helper, fn := range containerHelpers {
+	helpers := map[string]func(string) (string, error){
+		"IPForContainer":   IPForContainer,
+		"PortForContainer": PortForContainer,
+		"GetImageNameForContainer": func(name string) (string, error) {
+			image, _, err := GetImageNameForContainer(name)
+
+			return image, err
+		},
+	}
+
+	for helper, fn := range helpers {
 		t.Run(helper, func(t *testing.T) {
 			t.Parallel()
 
