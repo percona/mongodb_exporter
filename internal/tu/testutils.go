@@ -182,7 +182,7 @@ func InspectContainer(name string) (DockerInspectOutput, error) {
 		// docker exits 1 and prints [] both for a missing container and for an unreachable daemon.
 		stderr := strings.TrimSpace(string(exitErr.Stderr))
 		if strings.Contains(strings.ToLower(stderr), "no such object") {
-			return di, fmt.Errorf("%w: %q", errContainerMissing, name)
+			return di, fmt.Errorf("%w: %q, %s", errContainerMissing, name, startTestClusterHint)
 		}
 
 		return di, fmt.Errorf("cannot inspect docker container %q: %s: %w", name, stderr, err)
@@ -196,8 +196,10 @@ func InspectContainer(name string) (DockerInspectOutput, error) {
 	return di, nil
 }
 
+const startTestClusterHint = "start the test cluster with `make test-cluster`"
+
 var (
-	errContainerMissing   = errors.New("container does not exist, start the test cluster with `make test-cluster`")
+	errContainerMissing   = errors.New("container does not exist")
 	errContainerStopped   = errors.New("container is not running")
 	errNoHostPort         = errors.New("container publishes no host port for 27017/tcp")
 	errNoContainerAddress = errors.New("container has no address on the exporter's docker network")
@@ -210,18 +212,32 @@ var (
 // fields are empty by then. Without this check a caller gets an empty string back and fails much
 // later on, against an address that was never there, rather than being told which container of
 // the test cluster is not running.
+//
+// State.Running does not do for the check: docker sets it for a paused or restarting container
+// too, and a paused one keeps its address and ports while nothing in it answers.
 func runningContainer(name string) (DockerInspectOutput, error) {
 	di, err := InspectContainer(name)
 	if err != nil {
 		return nil, err
 	}
 
-	if !di[0].State.Running {
-		return nil, fmt.Errorf("%w: %q (state: %s, exit code: %d)",
-			errContainerStopped, name, di[0].State.Status, di[0].State.ExitCode)
+	state := di[0].State
+	if state.Status == "running" {
+		return di, nil
 	}
 
-	return di, nil
+	// make test-cluster starts a created or exited container, and fails on a paused one.
+	var hint string
+
+	switch state.Status {
+	case "created", "exited":
+		hint = ", " + startTestClusterHint
+	case "paused":
+		hint = fmt.Sprintf(", unpause it with `docker unpause %s`", name)
+	}
+
+	return nil, fmt.Errorf("%w: %q (state: %s, exit code: %d)%s",
+		errContainerStopped, name, state.Status, state.ExitCode, hint)
 }
 
 // PortForContainer returns the host port a running container publishes for 27017/tcp.

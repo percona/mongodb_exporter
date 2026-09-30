@@ -56,52 +56,83 @@ func TestInspectContainer(t *testing.T) {
 // a nil error: errors.Wrapf returns nil when the error it wraps is nil, so every guard below
 // the inspect reported success. The caller then failed much later against a host that had never
 // existed, saying nothing about the container that was down.
+//
+// A paused container fails differently: docker reports it as Running, with its address and ports
+// in place, and the caller hangs on a connection nothing answers.
 func TestContainerHelpersFailWhenContainerIsNotRunning(t *testing.T) {
 	t.Parallel()
 
-	const name = "mongodb-exporter-stopped-container-test"
-
-	// Created and never started, from an image the test cluster has already pulled.
+	// From an image the test cluster has already pulled.
 	di, err := InspectContainer("standalone")
 	require.NoError(t, err)
 	require.NotEmpty(t, di)
 
-	_ = exec.CommandContext(t.Context(), "docker", "rm", "-f", name).Run()
-	out, err := exec.CommandContext(t.Context(), "docker", "create", "--name", name, di[0].Config.Image).CombinedOutput() //nolint:gosec,lll
-	require.NoError(t, err, string(out))
+	image := di[0].Config.Image
 
-	t.Cleanup(func() {
-		// Not t.Context(): it is cancelled before cleanups run.
-		_ = exec.CommandContext(context.Background(), "docker", "rm", "-f", name).Run()
-	})
+	setups := map[string]func(t *testing.T, name string){
+		"created": func(t *testing.T, name string) {
+			t.Helper()
+			docker(t, "create", "--name", name, image)
+		},
+		"paused": func(t *testing.T, name string) {
+			t.Helper()
+			docker(t, "run", "--detach", "--name", name, "--entrypoint", "sleep", image, "infinity")
+			docker(t, "pause", name)
+		},
+	}
 
 	helpers := map[string]func(string) (string, error){
 		"IPForContainer":   IPForContainer,
 		"PortForContainer": PortForContainer,
 	}
 
-	for helper, fn := range helpers {
-		t.Run(helper, func(t *testing.T) {
+	for state, setup := range setups {
+		t.Run(state, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := fn(name)
+			name := "mongodb-exporter-" + state + "-container-test"
 
-			require.ErrorIs(t, err, errContainerStopped)
-			assert.Empty(t, got)
-			assert.Contains(t, err.Error(), name, "the error does not name the container that is down")
+			_ = exec.CommandContext(t.Context(), "docker", "rm", "-f", name).Run() //nolint:gosec
+
+			t.Cleanup(func() {
+				// Not t.Context(): it is cancelled before cleanups run.
+				_ = exec.CommandContext(context.Background(), "docker", "rm", "-f", name).Run() //nolint:gosec
+			})
+
+			setup(t, name)
+
+			for helper, fn := range helpers {
+				t.Run(helper, func(t *testing.T) {
+					t.Parallel()
+
+					got, err := fn(name)
+
+					require.ErrorIs(t, err, errContainerStopped)
+					assert.Empty(t, got)
+					assert.Contains(t, err.Error(), name, "the error does not name the container that is down")
+				})
+			}
+
+			// The image is still known, see GetImageNameForContainer.
+			t.Run("GetImageNameForContainer", func(t *testing.T) {
+				t.Parallel()
+
+				gotImage, version, err := GetImageNameForContainer(name)
+
+				require.NoError(t, err)
+				assert.Equal(t, strings.Split(image, ":")[0], gotImage)
+				assert.NotEmpty(t, version)
+			})
 		})
 	}
+}
 
-	// The image is still known, see GetImageNameForContainer.
-	t.Run("GetImageNameForContainer", func(t *testing.T) {
-		t.Parallel()
+// docker runs a docker command and fails the test if it does.
+func docker(t *testing.T, args ...string) {
+	t.Helper()
 
-		image, version, err := GetImageNameForContainer(name)
-
-		require.NoError(t, err)
-		assert.Equal(t, strings.Split(di[0].Config.Image, ":")[0], image)
-		assert.NotEmpty(t, version)
-	})
+	out, err := exec.CommandContext(t.Context(), "docker", args...).CombinedOutput() //nolint:gosec
+	require.NoError(t, err, string(out))
 }
 
 // docker inspect exits 1 for a container that does not exist, so the helpers never saw an empty
