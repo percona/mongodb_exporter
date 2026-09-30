@@ -82,6 +82,17 @@ make init
 
 It will install `goimports`, `goreleaser`, `golangci-lint` and `reviewdog`.
 
+### Kerberos development headers
+
+`make check` and the `make test` targets build with `-tags gssapi`, which compiles the MongoDB driver's GSSAPI support with cgo. On Linux this needs a C compiler and the Kerberos development headers:
+
+```
+sudo apt-get install libkrb5-dev   # Debian, Ubuntu
+sudo dnf install krb5-devel        # Fedora, RHEL
+```
+
+On macOS the driver uses the system GSS framework and nothing else is needed. Without the tag, as in a plain `go test ./...`, `TestGSSAPIAuth` is not built.
+
 ## Tests
 
 ### Starting the sandbox
