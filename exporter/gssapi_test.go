@@ -96,7 +96,7 @@ func TestGSSAPIAuth(t *testing.T) {
 		Logger:         logger,
 		CollectAll:     true,
 		GlobalConnPool: false,
-		DirectConnect:  true,
+		DirectConnect:  new(true),
 		// Left at 0, connect() sets no connect or server selection timeout, and a psmdb-kerberos
 		// that is running but unreachable hangs the test until the package timeout panics.
 		ConnectTimeoutMS: 5000,
