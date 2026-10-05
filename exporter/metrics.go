@@ -503,11 +503,12 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 	return true
 }
 
-// isHistogramPath reports whether prefix names a histogram subtree. Both spellings occur:
-// server status uses "histograms", while the opLatencies histograms added in MongoDB 8.3
-// use "histogram".
+// isHistogramPath reports whether prefix names a histogram subtree. Server status uses
+// "histograms", the opLatencies histograms added in MongoDB 8.3 use "histogram", and the
+// queue wait time histograms added in MongoDB 9.0 are the "queueWaitTimeMicros" arrays
+// themselves.
 func isHistogramPath(prefix string) bool {
-	for _, name := range []string{"histograms", "histogram"} {
+	for _, name := range []string{"histograms", "histogram", "queueWaitTimeMicros"} {
 		if prefix == name || strings.Contains(prefix, "."+name+".") || strings.HasSuffix(prefix, "."+name) {
 			return true
 		}
