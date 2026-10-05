@@ -387,3 +387,61 @@ func TestOpLatenciesHistogramSkippedByDefault(t *testing.T) {
 		assert.NotContains(t, metric.Desc().String(), "histogram")
 	}
 }
+
+// MongoDB 9.0 added queue wait time histograms to serverStatus().queues and to the
+// wiredTiger.concurrentTransactions section of getDiagnosticData. They are arrays of
+// lowerBound buckets on a path with no "histogram" in it, so every bucket produced the
+// same series and the registry rejected all but the first.
+func TestQueueWaitTimeHistogram(t *testing.T) {
+	t.Parallel()
+
+	const prefix = "serverStatus.queues.execution.read.normalPriority"
+	m := bson.M{
+		"queueWaitTimeMicros": primitive.A{
+			bson.M{"lowerBound": int64(0), "count": int64(291)},
+			bson.M{"lowerBound": int64(1), "count": int64(2)},
+			bson.M{"lowerBound": int64(10), "count": int64(0)},
+		},
+		"processing": int64(1),
+	}
+
+	t.Run("buckets do not collide", func(t *testing.T) {
+		t.Parallel()
+
+		reg := prometheus.NewPedanticRegistry()
+		reg.MustRegister(staticCollector(makeMetricsWithHistograms(prefix, m, nil, true, true)))
+
+		gatheredMetrics, err := reg.Gather()
+		require.NoError(t, err, "metrics with the same name and labels must not be exported")
+
+		metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
+		for _, metric := range gatheredMetrics {
+			metricsByName[metric.GetName()] = metric
+		}
+
+		assert.NotContains(t, metricsByName, "mongodb_ss_wt_concurrentTransactions_read_normalPriority_queueWaitTimeMicros_lowerBound")
+
+		bucketCounts, ok := metricsByName["mongodb_ss_wt_concurrentTransactions_read_normalPriority_queueWaitTimeMicros_count"]
+		if !assert.True(t, ok) {
+			return
+		}
+
+		valuesByBound := make(map[string]float64, len(bucketCounts.GetMetric()))
+		for _, metric := range bucketCounts.GetMetric() {
+			valuesByBound[metricLabels(metric)["lower_bound"]] = metric.GetCounter().GetValue()
+		}
+		assert.Equal(t, map[string]float64{"0": 291, "1": 2, "10": 0}, valuesByBound)
+
+		assert.Contains(t, metricsByName, "mongodb_ss_wt_concurrentTransactions_read_normalPriority_processing")
+	})
+
+	t.Run("skipped by default", func(t *testing.T) {
+		t.Parallel()
+
+		metrics := makeMetrics(prefix, m, nil, true)
+		require.NotEmpty(t, metrics)
+		for _, metric := range metrics {
+			assert.NotContains(t, metric.Desc().String(), "queueWaitTimeMicros")
+		}
+	})
+}
