@@ -132,13 +132,16 @@ func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.Hand
 				e.logger.Error("Cannot connect to MongoDB", "error", err)
 			}
 
-			// Close client after usage.
+			// Close client after usage. Off the serving goroutine: a client whose server vanished
+			// takes disconnectTimeout to give up, and this request has its answer already.
 			if !e.opts.GlobalConnPool {
 				defer func() {
 					if client != nil {
-						if err := client.Disconnect(ctx); err != nil {
-							logger.Error("Cannot disconnect client", "error", err)
-						}
+						go func() {
+							if err := disconnectClient(ctx, client); err != nil {
+								logger.Error("Cannot disconnect client", "error", err)
+							}
+						}()
 					}
 				}()
 			}
