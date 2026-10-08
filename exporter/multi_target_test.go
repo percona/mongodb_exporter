@@ -35,22 +35,22 @@ func TestMultiTarget(t *testing.T) {
 	opts := []*Opts{
 		{
 			URI:              fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017"))),
-			DirectConnect:    true,
+			DirectConnect:    new(true),
 			ConnectTimeoutMS: 1000,
 		},
 		{
 			URI:              fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"))),
-			DirectConnect:    true,
+			DirectConnect:    new(true),
 			ConnectTimeoutMS: 1000,
 		},
 		{
 			URI:              fmt.Sprintf("mongodb://admin:admin@%s", net.JoinHostPort(hostname, tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"))),
-			DirectConnect:    true,
+			DirectConnect:    new(true),
 			ConnectTimeoutMS: 1000,
 		},
 		{
 			URI:              fmt.Sprintf("mongodb://%s", net.JoinHostPort(hostname, "12345")),
-			DirectConnect:    true,
+			DirectConnect:    new(true),
 			ConnectTimeoutMS: 1000,
 		},
 	}
@@ -82,25 +82,25 @@ func TestOverallHandler(t *testing.T) {
 		{
 			NodeName:         "standalone",
 			URI:              fmt.Sprintf("mongodb://127.0.0.1:%s", tu.GetenvDefault("TEST_MONGODB_STANDALONE_PORT", "27017")),
-			DirectConnect:    true,
+			DirectConnect:    new(true),
 			ConnectTimeoutMS: 1000,
 		},
 		{
 			NodeName:         "s1",
 			URI:              fmt.Sprintf("mongodb://127.0.0.1:%s", tu.GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001")),
-			DirectConnect:    true,
+			DirectConnect:    new(true),
 			ConnectTimeoutMS: 1000,
 		},
 		{
 			NodeName:         "s2",
 			URI:              fmt.Sprintf("mongodb://127.0.0.1:%s", tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004")),
-			DirectConnect:    true,
+			DirectConnect:    new(true),
 			ConnectTimeoutMS: 1000,
 		},
 		{
 			NodeName:         "s3",
 			URI:              "mongodb://127.0.0.1:12345",
-			DirectConnect:    true,
+			DirectConnect:    new(true),
 			ConnectTimeoutMS: 1000,
 		},
 	}

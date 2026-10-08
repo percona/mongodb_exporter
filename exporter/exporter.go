@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promslog"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
 )
@@ -47,7 +48,7 @@ type Exporter struct {
 // Opts holds new exporter options.
 type Opts struct {
 	CompatibleMode         bool
-	DirectConnect          bool
+	DirectConnect          *bool
 	ConnectTimeoutMS       int
 	DisableDefaultRegistry bool
 	DiscoveringMode        bool
@@ -420,13 +421,24 @@ func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 	return requestOpts
 }
 
+// applyDirectConnect sets whether the driver connects directly to the host in the URI.
+// An explicit flag wins over directConnection in the URI; with neither, a direct connection is made.
+func applyDirectConnect(clientOpts *options.ClientOptions, directConnect *bool) {
+	switch {
+	case directConnect != nil:
+		clientOpts.SetDirect(*directConnect)
+	case clientOpts.Direct == nil:
+		clientOpts.SetDirect(true)
+	}
+}
+
 func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
 
-	clientOpts.SetDirect(opts.DirectConnect)
+	applyDirectConnect(clientOpts, opts.DirectConnect)
 	clientOpts.SetAppName("mongodb_exporter")
 
 	if clientOpts.ConnectTimeout == nil {
