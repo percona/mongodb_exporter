@@ -1,11 +1,14 @@
 module github.com/percona/mongodb_exporter
 
-go 1.26.7
+go 1.27.2
 
 require (
 	github.com/AlekSi/pointer v1.2.0
 	github.com/alecthomas/kong v1.16.1
+	github.com/foxcpp/go-mockdns v1.3.0
+	github.com/hashicorp/go-version v1.9.0
 	github.com/percona/exporter_shared v0.7.6
+	github.com/percona/percona-backup-mongodb v1.8.1-0.20251124214042-d06cab743541
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.3
@@ -13,13 +16,6 @@ require (
 	github.com/prometheus/exporter-toolkit v0.20.0
 	github.com/stretchr/testify v1.12.1
 	go.mongodb.org/mongo-driver v1.17.10
-)
-
-require github.com/foxcpp/go-mockdns v1.3.0
-
-require (
-	github.com/hashicorp/go-version v1.9.0
-	github.com/percona/percona-backup-mongodb v1.8.1-0.20251124214042-d06cab743541
 )
 
 require (

@@ -1,6 +1,6 @@
 module github.com/percona/mongodb_exporter/tools
 
-go 1.26.7
+go 1.27.2
 
 require github.com/golangci/golangci-lint/v2 v2.14.0
 
