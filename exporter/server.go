@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -32,50 +33,41 @@ import (
 	"github.com/percona/mongodb_exporter/internal/redact"
 )
 
-// ServerMap stores http handlers for each host
+var (
+	errNoExporters          = errors.New("no exporters were built; specify --mongodb.uri, MONGODB_URI, or a dynamic target config")
+	errTargetRequired       = errors.New("target is required")
+	errInvalidTarget        = errors.New("invalid MongoDB target")
+	errUnsupportedTargetURL = errors.New("target must contain only one MongoDB host and optional port")
+)
+
+// ServerMap stores http handlers for each host.
 type ServerMap map[string]http.Handler
+
+// DynamicTargetFactory builds a handler for a target supplied at scrape time.
+type DynamicTargetFactory func(target, authModule string) (http.Handler, error)
 
 // ServerOpts is the options for the main http handler
 type ServerOpts struct {
 	Path                   string
 	MultiTargetPath        string
+	DynamicTargetPath      string
 	OverallTargetPath      string
 	WebListenAddress       string
 	TLSConfigPath          string
 	DisableDefaultRegistry bool
+	DynamicTargetFactory   DynamicTargetFactory
 }
 
 // RunWebServer runs the main web-server
 func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
-	mux := http.NewServeMux()
-
-	if len(exporters) == 0 {
-		panic("No exporters were built. You must specify --mongodb.uri command argument or MONGODB_URI environment variable")
+	handler, err := newWebHandler(opts, exporters, log)
+	if err != nil {
+		panic(err)
 	}
-
-	serverMap := buildServerMap(exporters, log)
-
-	defaultExporter := exporters[0]
-	mux.Handle(opts.Path, defaultExporter.Handler())
-	mux.HandleFunc(opts.MultiTargetPath, multiTargetHandler(serverMap))
-	mux.HandleFunc(opts.OverallTargetPath, OverallTargetsHandler(exporters, log))
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(`<html>
-            <head><title>MongoDB Exporter</title></head>
-            <body>
-            <h1>MongoDB Exporter</h1>
-            <p><a href='/metrics'>Metrics</a></p>
-            </body>
-            </html>`))
-		if err != nil {
-			log.Error("error writing response", "error", err)
-		}
-	})
 
 	server := &http.Server{
 		ReadHeaderTimeout: 2 * time.Second,
-		Handler:           mux,
+		Handler:           handler,
 	}
 	flags := &web.FlagConfig{
 		WebListenAddresses: &[]string{opts.WebListenAddress},
@@ -87,7 +79,52 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
 	}
 }
 
-func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
+func newWebHandler(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) (http.Handler, error) {
+	if len(exporters) == 0 && opts.DynamicTargetFactory == nil {
+		return nil, errNoExporters
+	}
+
+	mux := http.NewServeMux()
+	serverMap := buildServerMap(exporters, log)
+	switch {
+	case len(exporters) > 0:
+		mux.Handle(opts.Path, exporters[0].Handler())
+	case opts.DisableDefaultRegistry:
+		mux.Handle(opts.Path, promhttp.HandlerFor(prometheus.NewRegistry(), promhttp.HandlerOpts{}))
+	default:
+		mux.Handle(opts.Path, promhttp.Handler())
+	}
+
+	targetHandler := multiTargetHandler(serverMap, opts.DynamicTargetFactory)
+	if opts.MultiTargetPath != "" {
+		mux.HandleFunc(opts.MultiTargetPath, targetHandler)
+	}
+	if opts.DynamicTargetPath != "" && opts.DynamicTargetPath != opts.MultiTargetPath {
+		mux.HandleFunc(opts.DynamicTargetPath, targetHandler)
+	}
+	if opts.OverallTargetPath != "" {
+		mux.HandleFunc(opts.OverallTargetPath, OverallTargetsHandler(exporters, log))
+	}
+
+	if opts.Path != "/" {
+		mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			_, err := w.Write([]byte(`<html>
+            <head><title>MongoDB Exporter</title></head>
+            <body>
+            <h1>MongoDB Exporter</h1>
+            <p><a href='/metrics'>Metrics</a></p>
+            </body>
+            </html>`))
+			if err != nil {
+				log.Error("error writing response", "error", err)
+			}
+		})
+	}
+
+	return mux, nil
+}
+
+func multiTargetHandler(serverMap ServerMap, factory DynamicTargetFactory) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		targetHost := r.URL.Query().Get("target")
 		if targetHost != "" {
@@ -97,12 +134,58 @@ func multiTargetHandler(serverMap ServerMap) http.HandlerFunc {
 			if uri, err := url.Parse(targetHost); err == nil {
 				if e, ok := serverMap[uri.Host]; ok {
 					e.ServeHTTP(w, r)
+
 					return
 				}
 			}
 		}
-		http.Error(w, "Unable to find target", http.StatusNotFound)
+
+		if factory != nil {
+			target, err := parseDynamicTarget(targetHost)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+
+				return
+			}
+
+			handler, err := factory(target, r.URL.Query().Get("auth_module"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+
+				return
+			}
+			if handler == nil {
+				http.Error(w, "unable to build target handler", http.StatusInternalServerError)
+
+				return
+			}
+
+			handler.ServeHTTP(w, r)
+
+			return
+		}
+
+		http.Error(w, "unable to find target", http.StatusNotFound)
 	}
+}
+
+func parseDynamicTarget(target string) (string, error) {
+	if target == "" {
+		return "", errTargetRequired
+	}
+	if !strings.HasPrefix(target, "mongodb://") {
+		target = "mongodb://" + target
+	}
+
+	uri, err := url.Parse(target)
+	if err != nil || uri.Host == "" {
+		return "", errInvalidTarget
+	}
+	if uri.Scheme != "mongodb" || uri.User != nil || uri.Path != "" || uri.RawQuery != "" || uri.Fragment != "" || strings.Contains(uri.Host, ",") {
+		return "", errUnsupportedTargetURL
+	}
+
+	return uri.Host, nil
 }
 
 // OverallTargetsHandler is a handler to scrape all the targets in one request.

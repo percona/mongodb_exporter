@@ -16,19 +16,104 @@
 package exporter
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
+
+func TestDynamicTarget(t *testing.T) {
+	t.Parallel()
+
+	var gotTarget, gotAuthModule string
+	factory := func(target, authModule string) (http.Handler, error) {
+		gotTarget = target
+		gotAuthModule = authModule
+
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}), nil
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/probe?target=mongo.example.com:3717&auth_module=cloud_mongo", nil)
+	multiTargetHandler(nil, factory)(rr, req)
+
+	assert.Equal(t, http.StatusNoContent, rr.Code)
+	assert.Equal(t, "mongo.example.com:3717", gotTarget)
+	assert.Equal(t, "cloud_mongo", gotAuthModule)
+}
+
+func TestDynamicTargetValidation(t *testing.T) {
+	t.Parallel()
+
+	factory := func(_, _ string) (http.Handler, error) {
+		return nil, assert.AnError
+	}
+	tests := []string{
+		"mongodb://user:password@mongo.example.com:3717",
+		"mongodb://mongo.example.com:3717/admin",
+		"mongodb://mongo.example.com:3717?tls=true",
+	}
+
+	for _, target := range tests {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/probe?target="+url.QueryEscape(target), nil)
+		multiTargetHandler(nil, factory)(rr, req)
+		assert.Equal(t, http.StatusBadRequest, rr.Code, target)
+	}
+}
+
+func TestDynamicOnlyServer(t *testing.T) {
+	t.Parallel()
+
+	factory := func(target, authModule string) (http.Handler, error) {
+		assert.Equal(t, "mongo.example.com:3717", target)
+		assert.Equal(t, "cloud_mongo", authModule)
+
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}), nil
+	}
+	opts := &ServerOpts{
+		Path:                   "/metrics",
+		MultiTargetPath:        "/scrape",
+		DynamicTargetPath:      "/probe",
+		DisableDefaultRegistry: true,
+		DynamicTargetFactory:   factory,
+	}
+
+	handler, err := newWebHandler(opts, nil, promslog.New(&promslog.Config{}))
+	require.NoError(t, err)
+
+	metricsRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(metricsRecorder, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", nil))
+	assert.Equal(t, http.StatusOK, metricsRecorder.Code)
+	assert.Empty(t, strings.TrimSpace(metricsRecorder.Body.String()))
+
+	probeRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(probeRecorder, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/probe?target=mongo.example.com:3717&auth_module=cloud_mongo", nil))
+	assert.Equal(t, http.StatusNoContent, probeRecorder.Code)
+}
+
+func TestServerRequiresStaticOrDynamicTarget(t *testing.T) {
+	t.Parallel()
+
+	_, err := newWebHandler(&ServerOpts{Path: "/metrics"}, nil, promslog.New(&promslog.Config{}))
+	assert.ErrorContains(t, err, "no exporters were built")
+}
 
 func TestMultiTarget(t *testing.T) {
 	hostname := "127.0.0.1"
@@ -71,7 +156,7 @@ func TestMultiTarget(t *testing.T) {
 
 	// Test all targets
 	for sn, opt := range opts {
-		assert.HTTPBodyContains(t, multiTargetHandler(serverMap), "GET", fmt.Sprintf("?target=%s", opt.URI), nil, expected[sn])
+		assert.HTTPBodyContains(t, multiTargetHandler(serverMap, nil), "GET", "?target="+opt.URI, nil, expected[sn])
 	}
 }
 

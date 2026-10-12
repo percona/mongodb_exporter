@@ -302,6 +302,21 @@ func (e *Exporter) getClient(ctx context.Context) (*mongo.Client, error) {
 	return client, nil
 }
 
+// Disconnect closes the shared MongoDB client, when one exists.
+func (e *Exporter) Disconnect(ctx context.Context) error {
+	e.clientMu.Lock()
+	defer e.clientMu.Unlock()
+
+	if e.client == nil {
+		return nil
+	}
+
+	err := e.client.Disconnect(ctx)
+	e.client = nil
+
+	return err
+}
+
 // Handler returns an http.Handler that serves metrics. Can be used instead of
 // run for hooking up custom HTTP servers.
 func (e *Exporter) Handler() http.Handler {
