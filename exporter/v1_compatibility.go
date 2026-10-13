@@ -1038,7 +1038,8 @@ func replSetMetrics(d bson.M, l *slog.Logger) []prometheus.Metric { //nolint:cyc
 				float64(m.ElectionTime.T), labels)
 		}
 		if t := m.OptimeDate.Time(); gotPrimary && t.Unix() != 0 && m.StateStr != "PRIMARY" {
-			val := math.Abs(float64(t.Unix() - primaryOpTime.Unix()))
+			// A member can be newer than the heartbeat-reported primary optime without being behind.
+			val := math.Max(0, float64(primaryOpTime.Unix()-t.Unix()))
 			createMetric("member_replication_lag",
 				"The replication lag that this member has with the primary.",
 				val, labels)
