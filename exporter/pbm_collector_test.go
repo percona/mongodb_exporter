@@ -17,13 +17,16 @@ package exporter
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -62,4 +65,200 @@ func TestPBMCollector(t *testing.T) {
 		count := testutil.CollectAndCount(c, filter...)
 		assert.Equal(t, expectedLength, count, "PBM metrics are missing")
 	})
+
+	t.Run("pbm pitr metric", func(t *testing.T) {
+		filter := []string{
+			"mongodb_pbm_cluster_pitr_backup_enabled",
+		}
+		expected := strings.NewReader(`
+		# HELP mongodb_pbm_cluster_pitr_backup_enabled PBM PITR backups are enabled for the cluster
+		# TYPE mongodb_pbm_cluster_pitr_backup_enabled gauge
+		mongodb_pbm_cluster_pitr_backup_enabled 0` + "\n")
+		err = testutil.CollectAndCompare(c, expected, filter...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("pbm backup metrics", func(t *testing.T) {
+		// The test cluster setup takes one backup of rs2.
+		for _, name := range []string{
+			"mongodb_pbm_backup_size_bytes",
+			"mongodb_pbm_backup_last_transition_ts",
+			"mongodb_pbm_backup_duration_seconds",
+		} {
+			assert.Positive(t, testutil.CollectAndCount(c, name), name)
+		}
+	})
+}
+
+// testPBMClusterTime is the cluster time the agent status tests are evaluated at.
+var testPBMClusterTime = primitive.Timestamp{T: 1_000_000}
+
+// healthyPBMAgent returns the status document of a healthy agent with a recent heartbeat.
+func healthyPBMAgent(state int, stateStr string) *pbmAgent {
+	return &pbmAgent{
+		State:         state,
+		StateStr:      stateStr,
+		PBMStatus:     pbmSubsystemStatus{OK: true},
+		NodeStatus:    pbmSubsystemStatus{OK: true},
+		StorageStatus: pbmSubsystemStatus{OK: true},
+		Heartbeat:     primitive.Timestamp{T: testPBMClusterTime.T - 5},
+	}
+}
+
+func TestPBMNodesWithAgent(t *testing.T) {
+	t.Parallel()
+
+	delayed := healthyPBMAgent(memberStateSecondary, "SECONDARY")
+	delayed.DelaySecs = 3600
+	hidden := healthyPBMAgent(memberStateSecondary, "SECONDARY")
+	hidden.Hidden = true
+	storageError := healthyPBMAgent(memberStateSecondary, "SECONDARY")
+	storageError.StorageStatus = pbmSubsystemStatus{OK: false}
+	lost := healthyPBMAgent(memberStateSecondary, "SECONDARY")
+	lost.Heartbeat = primitive.Timestamp{T: testPBMClusterTime.T - pbmStaleAgentSecs - 1}
+	lostBoundary := healthyPBMAgent(memberStateSecondary, "SECONDARY")
+	lostBoundary.Heartbeat = primitive.Timestamp{T: testPBMClusterTime.T - pbmStaleAgentSecs}
+
+	agents := map[string]*pbmAgent{
+		"primary:27017":       healthyPBMAgent(memberStatePrimary, "PRIMARY"),
+		"secondary:27017":     healthyPBMAgent(memberStateSecondary, "SECONDARY"),
+		"arbiter:27017":       healthyPBMAgent(memberStateArbiter, "ARBITER"),
+		"delayed:27017":       delayed,
+		"hidden:27017":        hidden,
+		"recovering:27017":    healthyPBMAgent(3, "RECOVERING"),
+		"storage-error:27017": storageError,
+		"lost:27017":          lost,
+		"lost-boundary:27017": lostBoundary,
+	}
+
+	// The member configuration does not matter when the member has an agent.
+	members := []pbmMember{
+		{Host: "primary:27017"},
+		{Host: "secondary:27017"},
+		{Host: "arbiter:27017"},
+		{Host: "delayed:27017"},
+		{Host: "hidden:27017", ArbiterOnly: true},
+		{Host: "recovering:27017"},
+		{Host: "storage-error:27017"},
+		{Host: "lost:27017"},
+		{Host: "lost-boundary:27017"},
+	}
+
+	assert.Equal(t, []pbmNode{
+		{host: "primary:27017", role: pbmRolePrimary, status: pbmAgentStatusOK},
+		{host: "secondary:27017", role: pbmRoleSecondary, status: pbmAgentStatusOK},
+		{host: "arbiter:27017", role: pbmRoleArbiter, status: pbmAgentStatusOK},
+		{host: "delayed:27017", role: pbmRoleDelayed, status: pbmAgentStatusOK},
+		{host: "hidden:27017", role: pbmRoleHidden, status: pbmAgentStatusOK},
+		{host: "recovering:27017", role: "RECOVERING", status: pbmAgentStatusOK},
+		{host: "storage-error:27017", role: pbmRoleSecondary, status: pbmAgentStatusError},
+		{host: "lost:27017", role: pbmRoleSecondary, status: pbmAgentStatusLost},
+		{host: "lost-boundary:27017", role: pbmRoleSecondary, status: pbmAgentStatusOK},
+	}, pbmNodes(members, agents, testPBMClusterTime))
+}
+
+func TestPBMNodesWithoutAgent(t *testing.T) {
+	t.Parallel()
+
+	// Agents of other replica set members do not count.
+	agents := map[string]*pbmAgent{"other:27017": healthyPBMAgent(memberStatePrimary, "PRIMARY")}
+
+	members := []pbmMember{
+		{Host: "member:27017"},
+		{Host: "arbiter:27017", ArbiterOnly: true},
+		{Host: "hidden:27017", Hidden: true},
+		{Host: "delayed:27017", SecondaryDelaySecs: 3600},
+		{Host: "slave-delay:27017", SlaveDelay: 3600},
+	}
+
+	assert.Equal(t, []pbmNode{
+		{host: "member:27017", role: "", status: pbmAgentStatusError},
+		{host: "arbiter:27017", role: pbmRoleArbiter, status: pbmAgentStatusError},
+		{host: "hidden:27017", role: pbmRoleHidden, status: pbmAgentStatusError},
+		{host: "delayed:27017", role: pbmRoleDelayed, status: pbmAgentStatusError},
+		{host: "slave-delay:27017", role: pbmRoleDelayed, status: pbmAgentStatusError},
+	}, pbmNodes(members, agents, testPBMClusterTime))
+	assert.Empty(t, pbmNodes(nil, nil, testPBMClusterTime))
+}
+
+func TestReplsetsFromShardMap(t *testing.T) {
+	t.Parallel()
+
+	// Older servers also map every host and shard connection string to its replica set.
+	shardMap := map[string]string{
+		"config":                     "cfg/cfg1:27019,cfg2:27019",
+		"shard01":                    "rs1/rs1a:27018,rs1b:27018",
+		"rs1/rs1a:27018,rs1b:27018":  "rs1/rs1a:27018,rs1b:27018",
+		"rs1a:27018":                 "rs1/rs1a:27018,rs1b:27018",
+		"shard02":                    "rs2/rs2a:27018",
+		"standalone-shard-not-valid": "rs3a:27018",
+	}
+
+	replsets := replsetsFromShardMap(shardMap)
+	sort.Slice(replsets, func(i, j int) bool { return replsets[i].name < replsets[j].name })
+
+	assert.Equal(t, []pbmReplset{
+		{name: "cfg", hosts: []string{"cfg1:27019", "cfg2:27019"}},
+		{name: "rs1", hosts: []string{"rs1a:27018", "rs1b:27018"}},
+		{name: "rs2", hosts: []string{"rs2a:27018"}},
+	}, replsets)
+}
+
+func TestParseReplsetHosts(t *testing.T) {
+	t.Parallel()
+
+	for _, s := range []string{"", "rs0", "rs0/", "/host:27017"} {
+		_, ok := parseReplsetHosts(s)
+		assert.False(t, ok, s)
+	}
+
+	rs, ok := parseReplsetHosts("cfg/cfg1:27019,cfg2:27019")
+	require.True(t, ok)
+	assert.Equal(t, pbmReplset{name: "cfg", hosts: []string{"cfg1:27019", "cfg2:27019"}}, rs)
+}
+
+func TestPBMBackupsMetrics(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1_700_001_000, 0)
+	backups := []pbmBackup{
+		{
+			Type:             "physical",
+			OPID:             "op-running",
+			Name:             "2023-11-14T22:30:00Z",
+			Replsets:         []pbmBackupReplset{{Name: "rs0", Node: "rs0a:27017"}},
+			Size:             0,
+			StartTS:          1_700_000_000,
+			LastTransitionTS: 1_700_000_100,
+			Status:           "running",
+		},
+		{
+			Type:             pbmLogicalBackup,
+			OPID:             "op-done",
+			Name:             "2023-11-14T20:00:00Z",
+			Replsets:         []pbmBackupReplset{{Name: "rs0", Node: "rs0b:27017"}},
+			Size:             2048,
+			StartTS:          1_699_990_000,
+			LastTransitionTS: 1_699_990_060,
+			Status:           pbmBackupStatus(statusDone),
+		},
+	}
+
+	expected := strings.NewReader(`
+	# HELP mongodb_pbm_backup_duration_seconds Duration of PBM backup
+	# TYPE mongodb_pbm_backup_duration_seconds gauge
+	mongodb_pbm_backup_duration_seconds{host="rs0a:27017",name="2023-11-14T22:30:00Z",opid="op-running",replica_set="rs0",self="1",status="running",type="physical"} 1000
+	mongodb_pbm_backup_duration_seconds{host="rs0b:27017",name="2023-11-14T20:00:00Z",opid="op-done",replica_set="rs0",self="0",status="done",type="logical"} 60
+	# HELP mongodb_pbm_backup_last_transition_ts Last transition timestamp of PBM backup (seconds since epoch)
+	# TYPE mongodb_pbm_backup_last_transition_ts gauge
+	mongodb_pbm_backup_last_transition_ts{host="rs0a:27017",name="2023-11-14T22:30:00Z",opid="op-running",replica_set="rs0",self="1",status="running",type="physical"} 1.7000001e+09
+	mongodb_pbm_backup_last_transition_ts{host="rs0b:27017",name="2023-11-14T20:00:00Z",opid="op-done",replica_set="rs0",self="0",status="done",type="logical"} 1.69999006e+09
+	# HELP mongodb_pbm_backup_size_bytes Size of PBM backup
+	# TYPE mongodb_pbm_backup_size_bytes gauge
+	mongodb_pbm_backup_size_bytes{host="rs0a:27017",name="2023-11-14T22:30:00Z",opid="op-running",replica_set="rs0",self="1",status="running",type="physical"} 0
+	mongodb_pbm_backup_size_bytes{host="rs0b:27017",name="2023-11-14T20:00:00Z",opid="op-done",replica_set="rs0",self="0",status="done",type="logical"} 2048
+	`)
+
+	err := testutil.CollectAndCompare(staticCollector(pbmBackupsMetrics(backups, "rs0a:27017", now)), expected)
+	assert.NoError(t, err)
 }
