@@ -22,11 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -64,6 +66,42 @@ func TestPBMCollector(t *testing.T) {
 		expectedLength := 4 // we expect 4 metrics for each member of the RS (1 primary, 2 secondaries, 1 arbiter).
 		count := testutil.CollectAndCount(c, filter...)
 		assert.Equal(t, expectedLength, count, "PBM metrics are missing")
+	})
+
+	t.Run("pbm agent status values", func(t *testing.T) {
+		// mongo-2-1 is a secondary of rs2. The three data members run a PBM agent; the arbiter does not.
+		reg := prometheus.NewRegistry()
+		require.NoError(t, reg.Register(c))
+		families, err := reg.Gather()
+		require.NoError(t, err)
+
+		roles := make(map[string]int)
+		self := 0
+		for _, family := range families {
+			if family.GetName() != "mongodb_pbm_agent_status" {
+				continue
+			}
+			for _, m := range family.GetMetric() {
+				labels := make(map[string]string)
+				for _, l := range m.GetLabel() {
+					labels[l.GetName()] = l.GetValue()
+				}
+				roles[labels["role"]]++
+				if labels["self"] == "1" {
+					self++
+					assert.Equal(t, pbmRoleSecondary, labels["role"])
+				}
+
+				want := float64(pbmAgentStatusOK)
+				if labels["role"] == pbmRoleArbiter {
+					want = pbmAgentStatusError
+				}
+				assert.InDelta(t, want, m.GetGauge().GetValue(), 0, "%v", labels)
+			}
+		}
+
+		assert.Equal(t, map[string]int{pbmRolePrimary: 1, pbmRoleSecondary: 2, pbmRoleArbiter: 1}, roles)
+		assert.Equal(t, 1, self)
 	})
 
 	t.Run("pbm pitr metric", func(t *testing.T) {
@@ -169,6 +207,7 @@ func TestPBMNodesWithoutAgent(t *testing.T) {
 		{Host: "hidden:27017", Hidden: true},
 		{Host: "delayed:27017", SecondaryDelaySecs: 3600},
 		{Host: "slave-delay:27017", SlaveDelay: 3600},
+		{Host: "hidden-delayed:27017", Hidden: true, SecondaryDelaySecs: 3600},
 	}
 
 	assert.Equal(t, []pbmNode{
@@ -177,8 +216,62 @@ func TestPBMNodesWithoutAgent(t *testing.T) {
 		{host: "hidden:27017", role: pbmRoleHidden, status: pbmAgentStatusError},
 		{host: "delayed:27017", role: pbmRoleDelayed, status: pbmAgentStatusError},
 		{host: "slave-delay:27017", role: pbmRoleDelayed, status: pbmAgentStatusError},
+		{host: "hidden-delayed:27017", role: pbmRoleDelayed, status: pbmAgentStatusError},
 	}, pbmNodes(members, agents, testPBMClusterTime))
 	assert.Empty(t, pbmNodes(nil, nil, testPBMClusterTime))
+}
+
+func TestPBMSourceFor(t *testing.T) {
+	t.Parallel()
+
+	primary := &pbmHello{SetName: "rs0", IsMaster: true}
+	secondary := &pbmHello{SetName: "rs0"}
+	standalone := &pbmHello{IsMaster: true}
+	mongos := &pbmHello{IsMaster: true, Msg: typeIsDBGrid}
+
+	for _, tc := range []struct {
+		role string
+		self *pbmHello
+		want pbmSource
+	}{
+		{role: "", self: primary, want: pbmSourceLocal},
+		{role: "", self: secondary, want: pbmSourceReplset},
+		{role: "", self: standalone, want: pbmSourceLocal},
+		{role: "configsvr", self: primary, want: pbmSourceLocal},
+		{role: "configsvr", self: secondary, want: pbmSourceReplset},
+		{role: string(typeShardServer), self: primary, want: pbmSourceConfigsvr},
+		{role: string(typeShardServer), self: secondary, want: pbmSourceConfigsvr},
+		{role: string(typeMongos), self: mongos, want: pbmSourceLocal},
+	} {
+		assert.Equal(t, tc.want, pbmSourceFor(tc.role, tc.self), "role %q, %+v", tc.role, *tc.self)
+	}
+}
+
+func TestPBMClientOptions(t *testing.T) {
+	t.Parallel()
+
+	// The URI PMM gives the exporter: one node, connected to directly.
+	uri := "mongodb://user:p%40ss@node1:27017/?directConnection=true&replicaSet=rs0&tls=true&authSource=admin" //nolint:gosec
+	hosts := []string{"cfg1:27019", "cfg2:27019"}
+
+	opts, err := pbmClientOptions(uri, hosts)
+	require.NoError(t, err)
+
+	assert.Equal(t, hosts, opts.Hosts)
+	require.NotNil(t, opts.Direct)
+	assert.False(t, *opts.Direct)
+	assert.Nil(t, opts.ReplicaSet)
+	require.NotNil(t, opts.Auth)
+	assert.Equal(t, "user", opts.Auth.Username)
+	assert.Equal(t, "p@ss", opts.Auth.Password)
+	assert.Equal(t, "admin", opts.Auth.AuthSource)
+	assert.NotNil(t, opts.TLSConfig)
+	assert.Equal(t, readpref.PrimaryMode, opts.ReadPreference.Mode())
+	assert.Equal(t, "majority", opts.ReadConcern.Level)
+	require.NoError(t, opts.Validate())
+
+	_, err = pbmClientOptions("mongodb://node1:27017,node2:27017/?directConnection=true", hosts)
+	assert.Error(t, err)
 }
 
 func TestReplsetsFromShardMap(t *testing.T) {

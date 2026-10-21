@@ -28,11 +28,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
-	"github.com/percona/mongodb_exporter/internal/proto"
 	"github.com/percona/mongodb_exporter/internal/redact"
-	"github.com/percona/mongodb_exporter/internal/util"
 )
 
 // pbm collector collects metrics from PBM (Percona Backup for MongoDb).
@@ -167,6 +167,27 @@ type pbmNode struct {
 	status int
 }
 
+// pbmHello is the part of a hello response that the collector uses.
+type pbmHello struct {
+	Me          string   `bson:"me"`
+	SetName     string   `bson:"setName"`
+	Hosts       []string `bson:"hosts"`
+	IsMaster    bool     `bson:"ismaster"`
+	Msg         string   `bson:"msg"`
+	ClusterTime *struct {
+		ClusterTime primitive.Timestamp `bson:"clusterTime"`
+	} `bson:"$clusterTime"`
+}
+
+// pbmSource is where the collector reads PBM's collections from.
+type pbmSource int
+
+const (
+	pbmSourceLocal     pbmSource = iota // the exporter's own client
+	pbmSourceReplset                    // the primary of the replica set the exporter is connected to
+	pbmSourceConfigsvr                  // the primary of the config server replica set
+)
+
 func createPBMMetric(name, help string, value float64, labels map[string]string) prometheus.Metric { //nolint:ireturn
 	const prefix = "mongodb_pbm_"
 	d := prometheus.NewDesc(prefix+name, help, nil, labels)
@@ -196,13 +217,21 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	logger := p.base.logger
 
 	pbmEnabledMetric := 0
-	role, err := getClusterRole(p.ctx, p.base.client, logger)
+	currentNode, err := getPBMHello(p.ctx, p.base.client)
 	if err != nil {
-		logger.Warn("failed to get the cluster role", "error", err)
+		logger.Error("failed to get current node info", "error", err.Error())
+
 		return
 	}
 
-	control, closeControl, err := p.controlClient(p.ctx, role)
+	role, err := pbmClusterRole(p.ctx, p.base.client, currentNode)
+	if err != nil {
+		logger.Warn("failed to get the cluster role", "error", err.Error())
+
+		return
+	}
+
+	control, closeControl, err := p.controlClient(p.ctx, role, currentNode)
 	if err != nil {
 		// The error can carry the URI the collector connected with.
 		logger.Warn("failed to connect to the PBM control collections", "error", redact.Error(err))
@@ -228,14 +257,8 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 			"PBM PITR backups are enabled for the cluster",
 			float64(pitrEnabledMetric), nil))
 
-		// Get current node info once for both agent and backup metrics
-		currentNode, err := util.MyRole(p.ctx, p.base.client)
-		if err != nil {
-			logger.Error("failed to get current node info", "error", err.Error())
-		} else {
-			metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, control, logger, currentNode)...)
-			metrics = append(metrics, p.pbmAgentMetrics(p.ctx, control, role, logger, currentNode)...)
-		}
+		metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, control, logger, currentNode)...)
+		metrics = append(metrics, p.pbmAgentMetrics(p.ctx, control, role, logger, currentNode)...)
 	}
 
 	metrics = append(metrics, createPBMMetric("cluster_backup_configured",
@@ -247,53 +270,139 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// controlClient returns a client for the admin database that holds PBM's collections, and a function
-// that releases it. That is the exporter's own client, except on a shard member: PBM keeps its
-// collections on the config server replica set, so a short-lived client is opened to it.
-func (p *pbmCollector) controlClient(ctx context.Context, role string) (*mongo.Client, func(), error) {
-	noop := func() {}
-	if role != string(typeShardServer) {
-		return p.base.client, noop, nil
+// getPBMHello returns the hello response of the node a client is connected to (or, through a client to
+// a replica set, of its primary).
+func getPBMHello(ctx context.Context, client *mongo.Client) (*pbmHello, error) {
+	var hello pbmHello
+	err := client.Database("admin").RunCommand(ctx, bson.D{{Key: "isMaster", Value: 1}}).Decode(&hello)
+	if err != nil {
+		return nil, fmt.Errorf("isMaster: %w", err)
 	}
 
+	return &hello, nil
+}
+
+// pbmClusterRole returns the sharding role of the node: mongos, configsvr, shardsvr, or "" when it is
+// not part of a sharded cluster. Like PBM, it takes the role of a mongod from its command line options
+// and fails when it cannot read them.
+func pbmClusterRole(ctx context.Context, client *mongo.Client, self *pbmHello) (string, error) {
+	if self.Msg == typeIsDBGrid {
+		return string(typeMongos), nil
+	}
+
+	var opts struct {
+		Parsed struct {
+			Sharding struct {
+				ClusterRole string `bson:"clusterRole"`
+			} `bson:"sharding"`
+		} `bson:"parsed"`
+	}
+	err := client.Database("admin").RunCommand(ctx, bson.D{{Key: "getCmdLineOpts", Value: 1}}).Decode(&opts) //nolint:goconst
+	if err != nil {
+		return "", fmt.Errorf("getCmdLineOpts: %w", err)
+	}
+
+	return opts.Parsed.Sharding.ClusterRole, nil
+}
+
+// pbmSourceFor returns where PBM's collections are read from on a node with the given sharding role.
+// PBM keeps them on the replica set itself or, in a sharded cluster, on the config server replica set,
+// and reads them from the primary. A node the exporter is directly connected to can be a lagging,
+// delayed or recovering secondary, so the primary is reached through a separate client.
+func pbmSourceFor(role string, self *pbmHello) pbmSource {
+	switch {
+	case role == string(typeShardServer):
+		return pbmSourceConfigsvr
+	case role == string(typeMongos), self.SetName == "", self.IsMaster:
+		return pbmSourceLocal
+	}
+
+	return pbmSourceReplset
+}
+
+// controlClient returns a client for the admin database that holds PBM's collections, and a function
+// that releases it: the exporter's own client, or a short-lived one to the primary that holds them.
+func (p *pbmCollector) controlClient(ctx context.Context, role string, self *pbmHello) (*mongo.Client, func(), error) {
+	noop := func() {}
+
+	var rs pbmReplset
+	switch pbmSourceFor(role, self) {
+	case pbmSourceLocal:
+		return p.base.client, noop, nil
+	case pbmSourceReplset:
+		rs = pbmReplset{name: self.SetName, hosts: self.Hosts}
+	case pbmSourceConfigsvr:
+		var err error
+		rs, err = p.configsvrReplset(ctx)
+		if err != nil {
+			return nil, noop, err
+		}
+	}
+
+	client, err := p.connect(ctx, rs.hosts)
+	if err != nil {
+		return nil, noop, fmt.Errorf("cannot connect to replica set %s: %w", rs.name, err)
+	}
+
+	return client, func() { p.disconnect(ctx, client) }, nil
+}
+
+// configsvrReplset returns the config server replica set of the shard the exporter is connected to,
+// from the shard identity document, as PBM finds it.
+func (p *pbmCollector) configsvrReplset(ctx context.Context) (pbmReplset, error) {
 	var identity struct {
 		ConfigsvrConnectionString string `bson:"configsvrConnectionString"`
 	}
 	err := p.base.client.Database("admin").Collection("system.version").
 		FindOne(ctx, bson.M{"_id": "shardIdentity"}).Decode(&identity) //nolint:goconst
 	if err != nil {
-		return nil, noop, fmt.Errorf("cannot get the config server address: %w", err)
+		return pbmReplset{}, fmt.Errorf("cannot get the config server address: %w", err)
 	}
 
-	cfgsvr, ok := parseReplsetHosts(identity.ConfigsvrConnectionString)
+	rs, ok := parseReplsetHosts(identity.ConfigsvrConnectionString)
 	if !ok {
-		return nil, noop, fmt.Errorf("%w: %q", errPBMConfigsvrAddress, identity.ConfigsvrConnectionString)
+		return pbmReplset{}, fmt.Errorf("%w: %q", errPBMConfigsvrAddress, identity.ConfigsvrConnectionString)
 	}
 
-	client, err := p.connect(ctx, cfgsvr.hosts)
-	if err != nil {
-		return nil, noop, fmt.Errorf("cannot connect to the config server replica set %s: %w", cfgsvr.name, err)
-	}
-
-	return client, func() { p.disconnect(ctx, client) }, nil
+	return rs, nil
 }
 
-// connect opens a client to a replica set by its seed list, with the credentials and TLS settings of
-// the exporter's URI.
-func (p *pbmCollector) connect(ctx context.Context, hosts []string) (*mongo.Client, error) {
-	opts, err := dsn_fix.ClientOptionsForDSN(p.mongoURI)
+// pbmClientOptions returns the options of a client to a replica set by its seed list: the credentials
+// and TLS settings of the exporter's URI, with the primary read preference and the majority read
+// concern PBM uses.
+func pbmClientOptions(uri string, hosts []string) (*options.ClientOptions, error) {
+	opts, err := dsn_fix.ClientOptionsForDSN(uri)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
 
 	// The exporter's URI points at one node, often with directConnection=true; the replica set is
 	// discovered from the seed list instead.
-	opts.SetHosts(hosts).SetDirect(false).SetAppName("mongodb_exporter")
+	opts.SetHosts(hosts).SetDirect(false).SetAppName("mongodb_exporter").
+		SetReadPreference(readpref.Primary()).SetReadConcern(readconcern.Majority())
 	opts.ReplicaSet = nil
+
+	return opts, nil
+}
+
+// connect opens a client to a replica set by its seed list and checks that it reaches the primary, so
+// an unreachable replica set fails here rather than as a missing PBM configuration.
+func (p *pbmCollector) connect(ctx context.Context, hosts []string) (*mongo.Client, error) {
+	opts, err := pbmClientOptions(p.mongoURI, hosts)
+	if err != nil {
+		return nil, err
+	}
 
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect: %w", err)
+	}
+
+	err = client.Ping(ctx, nil)
+	if err != nil {
+		p.disconnect(ctx, client)
+
+		return nil, fmt.Errorf("ping: %w", err)
 	}
 
 	return client, nil
@@ -306,9 +415,14 @@ func (p *pbmCollector) disconnect(ctx context.Context, client *mongo.Client) {
 	}
 }
 
+// pbmAdminDB returns the admin database with the majority read concern PBM reads its collections with.
+func pbmAdminDB(client *mongo.Client) *mongo.Database {
+	return client.Database("admin", options.Database().SetReadConcern(readconcern.Majority()))
+}
+
 func getPBMConfig(ctx context.Context, client *mongo.Client) (*pbmConfig, error) {
 	var cfg pbmConfig
-	err := client.Database("admin").Collection(pbmConfigCollection).
+	err := pbmAdminDB(client).Collection(pbmConfigCollection).
 		FindOne(ctx, bson.D{{Key: "profile", Value: nil}}).Decode(&cfg)
 	if err != nil {
 		return nil, fmt.Errorf("get: %w", err)
@@ -317,7 +431,7 @@ func getPBMConfig(ctx context.Context, client *mongo.Client) (*pbmConfig, error)
 	return &cfg, nil
 }
 
-func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Client, role string, l *slog.Logger, currentNode *proto.HelloResponse) []prometheus.Metric {
+func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Client, role string, l *slog.Logger, currentNode *pbmHello) []prometheus.Metric {
 	clusterStatus, err := p.clusterStatus(ctx, control, role, currentNode)
 	if err != nil {
 		// The error can carry the URI the collector connected with.
@@ -351,14 +465,8 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Clien
 
 // clusterStatus returns the PBM agent status of every member of every replica set in the cluster,
 // the way PBM's status command (cli.ClusterStatus) does.
-func (p *pbmCollector) clusterStatus(ctx context.Context, control *mongo.Client, role string, currentNode *proto.HelloResponse) (map[string][]pbmNode, error) {
-	var hello struct {
-		SetName     string `bson:"setName"`
-		ClusterTime *struct {
-			ClusterTime primitive.Timestamp `bson:"clusterTime"`
-		} `bson:"$clusterTime"`
-	}
-	err := control.Database("admin").RunCommand(ctx, bson.D{{Key: "isMaster", Value: 1}}).Decode(&hello)
+func (p *pbmCollector) clusterStatus(ctx context.Context, control *mongo.Client, role string, currentNode *pbmHello) (map[string][]pbmNode, error) {
+	hello, err := getPBMHello(ctx, control)
 	if err != nil {
 		return nil, fmt.Errorf("read cluster time: %w", err)
 	}
@@ -394,7 +502,7 @@ func (p *pbmCollector) clusterStatus(ctx context.Context, control *mongo.Client,
 
 // listPBMAgents returns the PBM agent status documents by replica set name and node.
 func listPBMAgents(ctx context.Context, client *mongo.Client) (map[string]map[string]*pbmAgent, error) {
-	cur, err := client.Database("admin").Collection(pbmAgentsCollection).Find(ctx, bson.D{})
+	cur, err := pbmAdminDB(client).Collection(pbmAgentsCollection).Find(ctx, bson.D{})
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
@@ -419,7 +527,7 @@ func listPBMAgents(ctx context.Context, client *mongo.Client) (map[string]map[st
 
 // clusterReplsets returns the replica sets of the cluster: this one when it is not sharded, otherwise
 // the shards and the config server replica set.
-func clusterReplsets(ctx context.Context, control *mongo.Client, role string, currentNode *proto.HelloResponse) ([]pbmReplset, error) {
+func clusterReplsets(ctx context.Context, control *mongo.Client, role string, currentNode *pbmHello) ([]pbmReplset, error) {
 	if role == "" {
 		if currentNode.SetName == "" {
 			return nil, errPBMNotReplicaSet
@@ -557,7 +665,7 @@ func (a *pbmAgent) role() string {
 }
 
 func listPBMBackups(ctx context.Context, client *mongo.Client) ([]pbmBackup, error) {
-	cur, err := client.Database("admin").Collection(pbmBackupsCollection).
+	cur, err := pbmAdminDB(client).Collection(pbmBackupsCollection).
 		Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "start_ts", Value: -1}}))
 	if err != nil {
 		return nil, fmt.Errorf("query mongo: %w", err)
@@ -578,7 +686,7 @@ func listPBMBackups(ctx context.Context, client *mongo.Client) ([]pbmBackup, err
 	return backups, nil
 }
 
-func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, control *mongo.Client, l *slog.Logger, currentNode *proto.HelloResponse) []prometheus.Metric {
+func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, control *mongo.Client, l *slog.Logger, currentNode *pbmHello) []prometheus.Metric {
 	backupsList, err := listPBMBackups(ctx, control)
 	if err != nil {
 		l.Error("failed to get PBM backup list", "error", err.Error())
