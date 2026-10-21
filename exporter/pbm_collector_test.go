@@ -27,10 +27,9 @@ import (
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-
-	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 //nolint:paralleltest
@@ -40,10 +39,12 @@ func TestPBMCollector(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
-	port, err := tu.PortForContainer("mongo-2-1")
-	require.NoError(t, err)
-	client := tu.TestClient(ctx, port, t)
 	mongoURI := "mongodb://admin:admin@127.0.0.1:17006/?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000" //nolint:gosec
+
+	// The exporter gives the collector its own client, built from the same URI (see makeRegistry).
+	client, err := connect(ctx, &Opts{URI: mongoURI, DirectConnect: true})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
 
 	c := newPbmCollector(ctx, client, mongoURI, promslog.New(&promslog.Config{}))
 
@@ -117,13 +118,25 @@ func TestPBMCollector(t *testing.T) {
 	})
 
 	t.Run("pbm backup metrics", func(t *testing.T) {
-		// The test cluster setup takes one backup of rs2.
+		// One series of each per replica set of each backup. The test cluster setup tries to take a
+		// backup of rs2, which fails when the agents are not ready yet, so there may be none.
+		cur, err := client.Database("admin").Collection(pbmBackupsCollection).Find(ctx, bson.D{})
+		require.NoError(t, err)
+		var backups []bson.M
+		require.NoError(t, cur.All(ctx, &backups))
+
+		want := 0
+		for _, backup := range backups {
+			replsets, _ := backup["replsets"].(bson.A)
+			want += len(replsets)
+		}
+
 		for _, name := range []string{
 			"mongodb_pbm_backup_size_bytes",
 			"mongodb_pbm_backup_last_transition_ts",
 			"mongodb_pbm_backup_duration_seconds",
 		} {
-			assert.Positive(t, testutil.CollectAndCount(c, name), name)
+			assert.Equal(t, want, testutil.CollectAndCount(c, name), name)
 		}
 	})
 }
