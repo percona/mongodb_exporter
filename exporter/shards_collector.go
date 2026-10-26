@@ -191,14 +191,14 @@ func (d *shardsCollector) getChunksForCollection(row primitive.M) []bson.M {
 	client := d.base.client
 	logger := d.base.logger
 
-	cur, err := client.Database("config").Collection("chunks").Aggregate(context.Background(), aggregation)
+	cur, err := client.Database("config").Collection("chunks").Aggregate(d.ctx, aggregation)
 	if err != nil {
 		logger.Error("cannot get $shards cursor for collection config.chunks", "error", err)
 		return nil
 	}
 
 	var chunks []bson.M
-	err = cur.All(context.Background(), &chunks)
+	err = cur.All(d.ctx, &chunks)
 	if err != nil {
 		logger.Error("cannot decode $shards for collection config.chunks", "error", err)
 		return nil

@@ -20,9 +20,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alecthomas/kong"
 	"github.com/foxcpp/go-mockdns"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -97,6 +99,32 @@ func TestSplitCluster(t *testing.T) {
 	for test, expected := range tests {
 		actual := parseURIList(strings.Split(test, ","), logger, true)
 		assert.Equal(t, expected, actual)
+	}
+}
+
+func TestGlobalConnPoolFlagDefault(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		args []string
+		want bool
+	}{
+		"default":  {args: []string{}, want: true},
+		"negated":  {args: []string{"--no-mongodb.global-conn-pool"}, want: false},
+		"explicit": {args: []string{"--mongodb.global-conn-pool"}, want: true},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var opts GlobalFlags
+			parser, err := kong.New(&opts, kong.Vars{"version": ""})
+			require.NoError(t, err)
+
+			_, err = parser.Parse(append(test.args, "--mongodb.uri=mongodb://127.0.0.1:27017"))
+			require.NoError(t, err)
+			assert.Equal(t, test.want, opts.GlobalConnPool)
+		})
 	}
 }
 

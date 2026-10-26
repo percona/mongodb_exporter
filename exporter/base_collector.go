@@ -50,6 +50,21 @@ func (d *baseCollector) Describe(ctx context.Context, ch chan<- *prometheus.Desc
 	default:
 	}
 
+	d.describe(ch, collect)
+}
+
+func (d *baseCollector) Collect(ch chan<- prometheus.Metric) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	for _, metric := range d.metricsCache {
+		ch <- metric
+	}
+}
+
+// describe runs collect and caches what it produces, whatever is left of the scrape's budget.
+// It is what a collector that must report even on a spent budget uses in place of Describe.
+func (d *baseCollector) describe(ch chan<- *prometheus.Desc, collect func(mCh chan<- prometheus.Metric)) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -67,14 +82,5 @@ func (d *baseCollector) Describe(ctx context.Context, ch chan<- *prometheus.Desc
 	for m := range metrics {
 		d.metricsCache = append(d.metricsCache, m) // populate the cache
 		ch <- m.Desc()
-	}
-}
-
-func (d *baseCollector) Collect(ch chan<- prometheus.Metric) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	for _, metric := range d.metricsCache {
-		ch <- metric
 	}
 }
