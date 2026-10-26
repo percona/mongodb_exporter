@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -361,6 +362,59 @@ func TestMongoUpMetric(t *testing.T) {
 
 			res := r.Unregister(gc)
 			assert.Equal(t, true, res)
+		})
+	}
+}
+
+// Since MongoDB 8.1 buildInfo requires authentication, which an arbiter can't provide: it stores no users.
+// makeRegistry runs on every scrape, so it must not warn about that on an arbiter.
+func TestMakeRegistryBuildInfoWarning(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	testCases := []struct {
+		name     string
+		port     string
+		wantWarn bool
+	}{
+		{name: "arbiter", port: tu.GetenvDefault("TEST_MONGODB_S2_ARBITER_PORT", "17012")},
+		{name: "primary", port: tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"), wantWarn: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			logHandler := newErrorCountHandler(nil)
+			exporterOpts := &Opts{
+				Logger:           slog.New(logHandler),
+				URI:              fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tc.port),
+				ConnectTimeoutMS: 1000,
+				DirectConnect:    true,
+			}
+
+			client, err := connect(ctx, exporterOpts)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				assert.NoError(t, client.Disconnect(ctx))
+			})
+
+			_, err = retrieveMongoDBBuildInfo(ctx, client, exporterOpts.Logger)
+			if err == nil {
+				t.Skip("buildInfo doesn't require authentication before MongoDB 8.1")
+			}
+
+			e := New(exporterOpts) //nolint:contextcheck // New takes no context.
+			e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+			warned := false
+			for _, r := range logHandler.logRecords {
+				if r.Message == "Registry - Cannot get MongoDB buildInfo" {
+					warned = true
+				}
+			}
+			assert.Equal(t, tc.wantWarn, warned)
 		})
 	}
 }
