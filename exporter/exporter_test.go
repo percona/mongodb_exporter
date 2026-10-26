@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -177,7 +178,7 @@ func TestConnect(t *testing.T) {
 		for name, port := range ports {
 			exporterOpts := &Opts{
 				URI:           fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, port)),
-				DirectConnect: true,
+				DirectConnect: new(true),
 			}
 			client, err := connect(ctx, exporterOpts)
 			assert.NoError(t, err, name)
@@ -194,7 +195,7 @@ func TestConnect(t *testing.T) {
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: false,
-			DirectConnect:  true,
+			DirectConnect:  new(true),
 		}
 
 		e := New(exporterOpts)
@@ -228,7 +229,7 @@ func TestConnect(t *testing.T) {
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: true,
-			DirectConnect:  true,
+			DirectConnect:  new(true),
 		}
 
 		e := New(exporterOpts)
@@ -287,7 +288,7 @@ func TestMongoS(t *testing.T) {
 		exporterOpts := &Opts{
 			Logger:                 promslog.New(&promslog.Config{}),
 			URI:                    fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, test.port)),
-			DirectConnect:          true,
+			DirectConnect:          new(true),
 			GlobalConnPool:         false,
 			EnableReplicasetStatus: true,
 		}
@@ -331,7 +332,7 @@ func TestMongoUpMetric(t *testing.T) {
 				Logger:           promslog.New(&promslog.Config{}),
 				URI:              tc.URI,
 				ConnectTimeoutMS: 200,
-				DirectConnect:    true,
+				DirectConnect:    new(true),
 				GlobalConnPool:   false,
 				CollectAll:       true,
 			}
@@ -361,6 +362,36 @@ func TestMongoUpMetric(t *testing.T) {
 
 			res := r.Unregister(gc)
 			assert.Equal(t, true, res)
+		})
+	}
+}
+
+func TestApplyDirectConnect(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		uri           string
+		directConnect *bool
+		expected      bool
+	}{
+		{name: "neither set", uri: "mongodb://127.0.0.1:27017/", expected: true},
+		{name: "URI false", uri: "mongodb://127.0.0.1:27017/?directConnection=false", expected: false},
+		{name: "URI true", uri: "mongodb://127.0.0.1:27017/?directConnection=true", expected: true},
+		{name: "flag false overrides URI true", uri: "mongodb://127.0.0.1:27017/?directConnection=true", directConnect: new(false), expected: false},
+		{name: "flag true overrides URI false", uri: "mongodb://127.0.0.1:27017/?directConnection=false", directConnect: new(true), expected: true},
+		{name: "flag false without URI parameter", uri: "mongodb://127.0.0.1:27017/", directConnect: new(false), expected: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			clientOpts := options.Client().ApplyURI(tt.uri)
+			require.NoError(t, clientOpts.Validate())
+
+			applyDirectConnect(clientOpts, tt.directConnect)
+			require.NotNil(t, clientOpts.Direct)
+			assert.Equal(t, tt.expected, *clientOpts.Direct)
 		})
 	}
 }
