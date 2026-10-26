@@ -44,10 +44,12 @@ import (
 // imports every PBM storage backend (S3, Azure, GCS, MinIO, ...), which nearly doubled the exporter
 // binary and the memory it has resident after a start.
 type pbmCollector struct {
-	ctx            context.Context
-	mongoURI       string
+	ctx      context.Context
+	mongoURI string
+	base     *baseCollector
+
+	// connectTimeout is the exporter's --mongodb.connect-timeout-ms.
 	connectTimeout time.Duration
-	base           *baseCollector
 }
 
 type pbmAgentStatus string
@@ -76,6 +78,9 @@ const (
 
 	// pbmLogicalBackup is the type PBM assumes for backup metadata that has none.
 	pbmLogicalBackup = "logical"
+
+	// pbmDisconnectTimeout bounds closing a short-lived client.
+	pbmDisconnectTimeout = 5 * time.Second
 )
 
 // Values of the role label, the same as PBM's topo.NodeRole.
@@ -98,6 +103,7 @@ var (
 	errPBMNoClusterTime    = errors.New("no cluster time in the hello response")
 	errPBMNotReplicaSet    = errors.New("not a replica set member")
 	errPBMConfigsvrAddress = errors.New("unexpected config server address")
+	errPBMNoHosts          = errors.New("no hosts to connect to")
 )
 
 // pbmConfig is the part of PBM's main configuration document that the collector reads.
@@ -146,10 +152,12 @@ type pbmBackup struct {
 
 // pbmBackupProjection keeps the fields of pbmBackup out of PBM backup metadata, which also holds file
 // lists and storage credentials.
+//
+//nolint:goconst // PBM's field names
 var pbmBackupProjection = bson.D{
 	{Key: "type", Value: 1},
 	{Key: "opid", Value: 1},
-	{Key: "name", Value: 1}, //nolint:goconst
+	{Key: "name", Value: 1},
 	{Key: "replsets.name", Value: 1},
 	{Key: "replsets.node", Value: 1},
 	{Key: "size", Value: 1},
@@ -335,14 +343,12 @@ func pbmClusterRole(ctx context.Context, client *mongo.Client, self *pbmHello) (
 // delayed or recovering secondary, so the primary is reached through a separate client.
 func pbmSourceFor(role string, self *pbmHello) (pbmSource, error) {
 	switch {
-	case role == string(typeShardServer):
-		return pbmSourceConfigsvr, nil
-	case role == string(typeMongos), self.IsMaster:
-		return pbmSourceLocal, nil
 	case self.SetName == "" && self.IsReplicaSet:
 		// PBM cannot reach a primary through such a member either, so it gets no PBM metrics.
 		return 0, fmt.Errorf("%w: it has no valid replica set configuration", errPBMNotReplicaSet)
-	case self.SetName == "":
+	case role == string(typeShardServer):
+		return pbmSourceConfigsvr, nil
+	case role == string(typeMongos), self.IsMaster, self.SetName == "":
 		return pbmSourceLocal, nil
 	}
 
@@ -447,6 +453,11 @@ func pbmClientOptions(uri string, hosts []string, connectTimeout time.Duration) 
 // connect opens a client to a replica set by its seed list and checks that it reaches the primary, so
 // an unreachable replica set fails here rather than as a missing PBM configuration.
 func (p *pbmCollector) connect(ctx context.Context, hosts []string) (*mongo.Client, error) {
+	// With no hosts, the driver would connect to localhost:27017.
+	if len(hosts) == 0 {
+		return nil, errPBMNoHosts
+	}
+
 	opts, err := pbmClientOptions(p.mongoURI, hosts, p.connectTimeout)
 	if err != nil {
 		return nil, err
@@ -467,7 +478,13 @@ func (p *pbmCollector) connect(ctx context.Context, hosts []string) (*mongo.Clie
 	return client, nil
 }
 
+// disconnect closes a short-lived client. It also runs after the scrape context is cancelled (a failed
+// replica set read, a scrape deadline), so it doesn't inherit the cancellation: the driver would then
+// skip ending the client's server sessions, as PBM avoided by disconnecting with context.Background().
 func (p *pbmCollector) disconnect(ctx context.Context, client *mongo.Client) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), pbmDisconnectTimeout)
+	defer cancel()
+
 	err := client.Disconnect(ctx)
 	if err != nil {
 		p.base.logger.Error("failed to close PBM client", "error", err)
@@ -552,7 +569,7 @@ func (p *pbmCollector) clusterStatus(ctx context.Context, control *mongo.Client,
 	}
 
 	// Replica sets whose configuration can be read from their primary without a new connection.
-	clients := make(map[string]*mongo.Client, 2)
+	clients := make(map[string]*mongo.Client)
 	if currentNode.IsMaster && currentNode.SetName != "" {
 		clients[currentNode.SetName] = p.base.client
 	}

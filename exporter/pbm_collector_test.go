@@ -263,8 +263,20 @@ func TestPBMSourceFor(t *testing.T) {
 		assert.Equal(t, tc.want, source, "role %q, %+v", tc.role, *tc.self)
 	}
 
-	_, err := pbmSourceFor("", noConfig)
-	require.ErrorIs(t, err, errPBMNotReplicaSet)
+	// Whatever its sharding role, such a member gets no PBM metrics.
+	for _, role := range []string{"", "configsvr", string(typeShardServer)} {
+		_, err := pbmSourceFor(role, noConfig)
+		require.ErrorIs(t, err, errPBMNotReplicaSet, "role %q", role)
+	}
+}
+
+func TestPBMConnectWithoutHosts(t *testing.T) {
+	t.Parallel()
+
+	// The driver would connect to localhost:27017 with no hosts.
+	p := &pbmCollector{mongoURI: "mongodb://node1:27017/?directConnection=true"}
+	_, err := p.connect(context.Background(), nil)
+	require.ErrorIs(t, err, errPBMNoHosts)
 }
 
 func TestPBMClientOptions(t *testing.T) {
