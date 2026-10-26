@@ -46,7 +46,7 @@ func TestPBMCollector(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
 
-	c := newPbmCollector(ctx, client, mongoURI, promslog.New(&promslog.Config{}))
+	c := newPbmCollector(ctx, client, mongoURI, 1000, promslog.New(&promslog.Config{}))
 
 	t.Run("pbm configured metric", func(t *testing.T) {
 		filter := []string{
@@ -118,8 +118,7 @@ func TestPBMCollector(t *testing.T) {
 	})
 
 	t.Run("pbm backup metrics", func(t *testing.T) {
-		// One series of each per replica set of each backup. The test cluster setup tries to take a
-		// backup of rs2, which fails when the agents are not ready yet, so there may be none.
+		// One series of each per replica set of each backup. The test cluster setup takes a backup of rs2.
 		cur, err := client.Database("admin").Collection(pbmBackupsCollection).Find(ctx, bson.D{})
 		require.NoError(t, err)
 		var backups []bson.M
@@ -130,6 +129,7 @@ func TestPBMCollector(t *testing.T) {
 			replsets, _ := backup["replsets"].(bson.A)
 			want += len(replsets)
 		}
+		require.Positive(t, want, "the test cluster has no PBM backup")
 
 		for _, name := range []string{
 			"mongodb_pbm_backup_size_bytes",
@@ -241,6 +241,8 @@ func TestPBMSourceFor(t *testing.T) {
 	secondary := &pbmHello{SetName: "rs0"}
 	standalone := &pbmHello{IsMaster: true}
 	mongos := &pbmHello{IsMaster: true, Msg: typeIsDBGrid}
+	// A member started with --replSet that is not initiated yet, or was removed.
+	noConfig := &pbmHello{IsReplicaSet: true}
 
 	for _, tc := range []struct {
 		role string
@@ -256,8 +258,13 @@ func TestPBMSourceFor(t *testing.T) {
 		{role: string(typeShardServer), self: secondary, want: pbmSourceConfigsvr},
 		{role: string(typeMongos), self: mongos, want: pbmSourceLocal},
 	} {
-		assert.Equal(t, tc.want, pbmSourceFor(tc.role, tc.self), "role %q, %+v", tc.role, *tc.self)
+		source, err := pbmSourceFor(tc.role, tc.self)
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, source, "role %q, %+v", tc.role, *tc.self)
 	}
+
+	_, err := pbmSourceFor("", noConfig)
+	require.ErrorIs(t, err, errPBMNotReplicaSet)
 }
 
 func TestPBMClientOptions(t *testing.T) {
@@ -267,7 +274,7 @@ func TestPBMClientOptions(t *testing.T) {
 	uri := "mongodb://user:p%40ss@node1:27017/?directConnection=true&replicaSet=rs0&tls=true&authSource=admin" //nolint:gosec
 	hosts := []string{"cfg1:27019", "cfg2:27019"}
 
-	opts, err := pbmClientOptions(uri, hosts)
+	opts, err := pbmClientOptions(uri, hosts, 5*time.Second)
 	require.NoError(t, err)
 
 	assert.Equal(t, hosts, opts.Hosts)
@@ -283,7 +290,18 @@ func TestPBMClientOptions(t *testing.T) {
 	assert.Equal(t, "majority", opts.ReadConcern.Level)
 	require.NoError(t, opts.Validate())
 
-	_, err = pbmClientOptions("mongodb://node1:27017,node2:27017/?directConnection=true", hosts)
+	// Without a connect timeout in the URI, the exporter's applies, as in its own client.
+	require.NotNil(t, opts.ConnectTimeout)
+	assert.Equal(t, 5*time.Second, *opts.ConnectTimeout)
+	require.NotNil(t, opts.ServerSelectionTimeout)
+	assert.Equal(t, 5*time.Second, *opts.ServerSelectionTimeout)
+
+	opts, err = pbmClientOptions(uri+"&connectTimeoutMS=1000", hosts, 5*time.Second)
+	require.NoError(t, err)
+	require.NotNil(t, opts.ConnectTimeout)
+	assert.Equal(t, time.Second, *opts.ConnectTimeout)
+
+	_, err = pbmClientOptions("mongodb://node1:27017,node2:27017/?directConnection=true", hosts, 0)
 	assert.Error(t, err)
 }
 

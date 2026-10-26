@@ -9,7 +9,8 @@ docker exec pbm-mongo-2-1 bash -c "pbm config --file /etc/config/pbm.yaml"
 # Wait until agents are restarted after config has been updated
 sleep 5
 
-docker exec pbm-mongo-2-1 bash -c "pbm backup"
-
-# Wait for backup to complete
-sleep 3
+# The agents accept a backup only after they have checked the new storage, so retry until one is taken.
+for _ in $(seq 1 12); do
+    docker exec pbm-mongo-2-1 bash -c "pbm backup --wait" && break
+    sleep 5
+done
