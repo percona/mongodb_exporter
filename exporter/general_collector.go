@@ -86,7 +86,8 @@ func mongodbUpMetric(ctx context.Context, client *mongo.Client, nodeType mongoDB
 			defer cancel()
 		}
 
-		if err := client.Ping(probeCtx, readpref.PrimaryPreferred()); err == nil {
+		err := client.Ping(probeCtx, readpref.PrimaryPreferred())
+		if err == nil {
 			value = 1
 		} else {
 			log.Error("error while checking mongodb connection, mongo_up will be set to 0", "error", err.Error())

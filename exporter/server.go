@@ -138,7 +138,8 @@ func OverallTargetsHandler(exporters []*Exporter, logger *slog.Logger) http.Hand
 				defer func() {
 					if client != nil {
 						go func() {
-							if err := disconnectClient(ctx, client); err != nil {
+							err := disconnectClient(ctx, client)
+							if err != nil {
 								logger.Error("Cannot disconnect client", "error", err)
 							}
 						}()

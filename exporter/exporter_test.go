@@ -422,7 +422,8 @@ func (p *stallingMongo) pipe(dst, src net.Conn) {
 		if n > 0 {
 			p.gate()
 
-			if _, writeErr := dst.Write(buf[:n]); writeErr != nil {
+			_, writeErr := dst.Write(buf[:n])
+			if writeErr != nil {
 				return
 			}
 		}
@@ -1369,15 +1370,11 @@ func TestPooledClientCountsOneFailurePerRound(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for range maxConsecutivePingFailures {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			if pooled.fail(gen) {
 				evictions.Add(1)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

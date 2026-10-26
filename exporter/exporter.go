@@ -225,7 +225,8 @@ func New(opts *Opts) *Exporter {
 	// even parse stays quiet from startup until somebody scrapes.
 	if opts.GlobalConnPool {
 		go func() {
-			if _, err := exp.getClient(context.Background()); err != nil {
+			_, err := exp.getClient(context.Background())
+			if err != nil {
 				exp.logger.Error("Cannot connect to MongoDB", "error", err)
 			}
 		}()
@@ -462,7 +463,8 @@ func (e *Exporter) Handler() http.Handler {
 			defer func() {
 				if client != nil {
 					go func() {
-						if err := disconnectClient(ctx, client); err != nil {
+						err := disconnectClient(ctx, client)
+						if err != nil {
 							e.logger.Error("Cannot disconnect client", "error", err)
 						}
 					}()
