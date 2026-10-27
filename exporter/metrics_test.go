@@ -467,3 +467,133 @@ func TestAsMetricMapHandlesBSONM(t *testing.T) {
 	assert.Equal(t, int64(1024), bucket["lowerBound"])
 	assert.Equal(t, int64(7), bucket["count"])
 }
+
+// MongoDB 8.3 added a histogram to serverStatus().opLatencies. Its buckets are keyed by
+// "micros" rather than "lowerBound", and the field is spelled "histogram" rather than
+// "histograms", so neither the bucket shape nor the path was recognised: every bucket
+// produced the same series and the registry rejected all but the first, one error per
+// bucket per scrape.
+func TestOpLatenciesHistogramBucketsDoNotCollide(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetricsWithHistograms("serverStatus.opLatencies.commands", bson.M{
+		"histogram": primitive.A{
+			bson.M{"micros": int64(8), "count": int64(3)},
+			bson.M{"micros": int64(64), "count": int64(7)},
+			bson.M{"micros": int64(512), "count": int64(11)},
+		},
+		"latency": int64(1234),
+		"ops":     int64(5),
+	}, nil, true, true)
+
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(staticCollector(metrics))
+
+	gatheredMetrics, err := reg.Gather()
+	require.NoError(t, err, "metrics with the same name and labels must not be exported")
+
+	metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
+	for _, metric := range gatheredMetrics {
+		metricsByName[metric.GetName()] = metric
+	}
+
+	// The bucket bound is a label, not a measurement of its own.
+	assert.NotContains(t, metricsByName, "mongodb_ss_opLatencies_commands_histogram_micros")
+
+	bucketCounts, ok := metricsByName["mongodb_ss_opLatencies_commands_histogram_count"]
+	if !assert.True(t, ok) {
+		return
+	}
+
+	valuesByBound := make(map[string]float64, len(bucketCounts.GetMetric()))
+	for _, metric := range bucketCounts.GetMetric() {
+		valuesByBound[metricLabels(metric)["micros"]] = metric.GetCounter().GetValue()
+	}
+
+	assert.Equal(t, map[string]float64{
+		"8":   3,
+		"64":  7,
+		"512": 11,
+	}, valuesByBound)
+
+	// Siblings of the histogram are still reported. nodeToPDMetrics turns the op name into a
+	// label for these, which is why they are not scoped by "commands" the way the bucket
+	// counts are.
+	assert.Contains(t, metricsByName, "mongodb_ss_opLatencies_latency")
+	assert.Contains(t, metricsByName, "mongodb_ss_opLatencies_ops")
+}
+
+// The singular spelling is gated like the plural one, so enabling histograms stays the one
+// switch that decides whether bucket series are exported.
+func TestOpLatenciesHistogramSkippedByDefault(t *testing.T) {
+	t.Parallel()
+
+	metrics := makeMetrics("serverStatus.opLatencies.commands", bson.M{
+		"histogram": primitive.A{
+			bson.M{"micros": int64(8), "count": int64(3)},
+		},
+		"ops": int64(5),
+	}, nil, true)
+
+	for _, metric := range metrics {
+		assert.NotContains(t, metric.Desc().String(), "histogram")
+	}
+}
+
+// MongoDB 9.0 added queue wait time histograms to serverStatus().queues and to the
+// wiredTiger.concurrentTransactions section of getDiagnosticData. They are arrays of
+// lowerBound buckets on a path with no "histogram" in it, so every bucket produced the
+// same series and the registry rejected all but the first.
+func TestQueueWaitTimeHistogram(t *testing.T) {
+	t.Parallel()
+
+	const prefix = "serverStatus.queues.execution.read.normalPriority"
+	m := bson.M{
+		"queueWaitTimeMicros": primitive.A{
+			bson.M{"lowerBound": int64(0), "count": int64(291)},
+			bson.M{"lowerBound": int64(1), "count": int64(2)},
+			bson.M{"lowerBound": int64(10), "count": int64(0)},
+		},
+		"processing": int64(1),
+	}
+
+	t.Run("buckets do not collide", func(t *testing.T) {
+		t.Parallel()
+
+		reg := prometheus.NewPedanticRegistry()
+		reg.MustRegister(staticCollector(makeMetricsWithHistograms(prefix, m, nil, true, true)))
+
+		gatheredMetrics, err := reg.Gather()
+		require.NoError(t, err, "metrics with the same name and labels must not be exported")
+
+		metricsByName := make(map[string]*dto.MetricFamily, len(gatheredMetrics))
+		for _, metric := range gatheredMetrics {
+			metricsByName[metric.GetName()] = metric
+		}
+
+		assert.NotContains(t, metricsByName, "mongodb_ss_wt_concurrentTransactions_read_normalPriority_queueWaitTimeMicros_lowerBound")
+
+		bucketCounts, ok := metricsByName["mongodb_ss_wt_concurrentTransactions_read_normalPriority_queueWaitTimeMicros_count"]
+		if !assert.True(t, ok) {
+			return
+		}
+
+		valuesByBound := make(map[string]float64, len(bucketCounts.GetMetric()))
+		for _, metric := range bucketCounts.GetMetric() {
+			valuesByBound[metricLabels(metric)["lower_bound"]] = metric.GetCounter().GetValue()
+		}
+		assert.Equal(t, map[string]float64{"0": 291, "1": 2, "10": 0}, valuesByBound)
+
+		assert.Contains(t, metricsByName, "mongodb_ss_wt_concurrentTransactions_read_normalPriority_processing")
+	})
+
+	t.Run("skipped by default", func(t *testing.T) {
+		t.Parallel()
+
+		metrics := makeMetrics(prefix, m, nil, true)
+		require.NotEmpty(t, metrics)
+		for _, metric := range metrics {
+			assert.NotContains(t, metric.Desc().String(), "queueWaitTimeMicros")
+		}
+	})
+}

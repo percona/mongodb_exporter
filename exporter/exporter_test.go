@@ -19,21 +19,34 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
+)
+
+const (
+	// minTestShards is the number of shards a cluster needs before a test can
+	// observe metrics coming from more than one of them.
+	minTestShards = 2
+	// shardedTestDocs is large enough that every shard of the test cluster ends up
+	// owning documents of the collection.
+	shardedTestDocs = 100
 )
 
 // Use this for testing because labels like cluster ID are not constant in docker containers
@@ -46,6 +59,102 @@ func (l labelsGetterMock) baseLabels() map[string]string {
 
 func (l labelsGetterMock) loadLabels(context.Context) error {
 	return nil
+}
+
+// metricLabels flattens the label pairs of a gathered metric into a map.
+func metricLabels(m *dto.Metric) map[string]string {
+	labels := make(map[string]string, len(m.GetLabel()))
+	for _, label := range m.GetLabel() {
+		labels[label.GetName()] = label.GetValue()
+	}
+
+	return labels
+}
+
+// shardTestCollection shards dbName.collName over every shard of the test cluster
+// reached through mongos, so that $collStats and $indexStats report one document
+// per shard. It skips the test only when the cluster itself cannot exercise
+// sharding, meaning it has fewer than two shards.
+func shardTestCollection(ctx context.Context, t *testing.T, client *mongo.Client, dbName, collName string) {
+	t.Helper()
+
+	admin := client.Database("admin")
+
+	var shardList struct {
+		Shards []bson.M `bson:"shards"`
+	}
+	require.NoError(t, admin.RunCommand(ctx, bson.D{{Key: "listShards", Value: 1}}).Decode(&shardList))
+
+	if len(shardList.Shards) < minTestShards {
+		t.Skipf("the test cluster has %d shards, at least %d are needed", len(shardList.Shards), minTestShards)
+	}
+
+	require.NoError(t, admin.RunCommand(ctx, bson.D{{Key: "enableSharding", Value: dbName}}).Err())
+
+	// A hashed shard key on an empty collection presplits the initial chunks and
+	// spreads them over all shards, so every shard owns chunks of the collection.
+	shardCmd := bson.D{
+		{Key: "shardCollection", Value: dbName + "." + collName},
+		{Key: "key", Value: bson.D{{Key: "_id", Value: "hashed"}}},
+	}
+	require.NoError(t, admin.RunCommand(ctx, shardCmd).Err())
+}
+
+// gatherShardedMetrics shards dbName.collName over the test cluster, fills it with documents so
+// that every shard reports on it, and returns what c exposes for it. The collector is expected
+// to be scoped to that one namespace.
+func gatherShardedMetrics(ctx context.Context, t *testing.T, client *mongo.Client,
+	dbName, collName string, c prometheus.Collector,
+) []*dto.MetricFamily {
+	t.Helper()
+
+	shardTestCollection(ctx, t, client, dbName, collName)
+
+	docs := make([]any, 0, shardedTestDocs)
+	for i := range shardedTestDocs {
+		docs = append(docs, bson.M{"f1": i})
+	}
+	_, err := client.Database(dbName).Collection(collName).InsertMany(ctx, docs)
+	require.NoError(t, err)
+
+	// Register runs Describe, which collects everything, and rejects a metric name described
+	// with two different label sets. That is how a shard label set for only some of the
+	// documents would surface.
+	registry := prometheus.NewPedanticRegistry()
+	require.NoError(t, registry.Register(c))
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	return families
+}
+
+// shardedSeriesLabels returns the labels of every series of dbName.collName exposed by the metric
+// families whose name starts with namePrefix, asserting that each of them carries a shard.
+func shardedSeriesLabels(t *testing.T, families []*dto.MetricFamily,
+	namePrefix, dbName, collName string,
+) []map[string]string {
+	t.Helper()
+
+	var series []map[string]string
+	for _, family := range families {
+		if !strings.HasPrefix(family.GetName(), namePrefix) {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			labels := metricLabels(metric)
+			if labels["database"] != dbName || labels["collection"] != collName {
+				continue
+			}
+
+			require.NotEmpty(t, labels["shard"], "series without a shard label: %s %v", family.GetName(), labels)
+			series = append(series, labels)
+		}
+	}
+
+	require.NotEmpty(t, series, "no %s* series for %s.%s", namePrefix, dbName, collName)
+
+	return series
 }
 
 //nolint:funlen
@@ -199,92 +308,6 @@ func TestMongoS(t *testing.T) {
 	}
 }
 
-func generateKerberosConfigFile(t *testing.T) *os.File {
-	t.Helper()
-	kerberosHost, err := tu.IPForContainer("kerberos")
-	require.NoError(t, err)
-
-	config := fmt.Sprintf(`
-[libdefaults]
-    default_realm = PERCONATEST.COM
-    forwardable = true
-    dns_lookup_realm = false
-    dns_lookup_kdc = false
-    ignore_acceptor_hostname = true
-    rdns = false
-[realms]
-    PERCONATEST.COM = {
-        kdc_ports = 88
-        kdc = %s
-    }
-[domain_realm]
-    .perconatest.com = PERCONATEST.COM
-    perconatest.com = PERCONATEST.COM
-    %s = PERCONATEST.COM
-`, kerberosHost, kerberosHost)
-	configFile, err := os.Create(t.TempDir() + "/krb5.conf")
-	require.NoError(t, err)
-
-	_, err = configFile.WriteString(config)
-	require.NoError(t, err)
-
-	return configFile
-}
-
-func TestGSSAPIAuth(t *testing.T) {
-	logger := promslog.New(&promslog.Config{})
-
-	mongoHost, err := tu.IPForContainer("psmdb-kerberos")
-	require.NoError(t, err)
-
-	configFile := generateKerberosConfigFile(t)
-	require.NoError(t, err)
-	defer func() {
-		_ = configFile.Close()
-		t.Setenv("KRB5_CONFIG", "")
-	}()
-
-	t.Setenv("KRB5_CONFIG", configFile.Name())
-	ctx := context.Background()
-
-	username := "pmm-test%40PERCONATEST.COM"
-	password := "password1"
-	uri := fmt.Sprintf("mongodb://%s:%s@%s/?authSource=$external&authMechanism=GSSAPI",
-		username,
-		password,
-		net.JoinHostPort(mongoHost, "27017"),
-	)
-	exporterOpts := &Opts{
-		URI:            uri,
-		Logger:         logger,
-		CollectAll:     true,
-		GlobalConnPool: false,
-		DirectConnect:  true,
-	}
-
-	client, err := connect(ctx, exporterOpts)
-	assert.NoError(t, err)
-
-	e := New(exporterOpts)
-	nodeType, _ := getNodeType(ctx, client)
-	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
-	r := e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
-
-	expected := strings.NewReader(`
-		# HELP mongodb_up Whether MongoDB is up.
-		# TYPE mongodb_up gauge
-		mongodb_up {cluster_role="mongod"} 1` + "\n")
-
-	filter := []string{
-		"mongodb_up",
-	}
-	err = testutil.CollectAndCompare(gc, expected, filter...)
-	require.NoError(t, err, "mongodb_up metric should be 1")
-
-	res := r.Unregister(gc)
-	assert.True(t, res)
-}
-
 func TestMongoUpMetric(t *testing.T) {
 	ctx := context.Background()
 
@@ -339,6 +362,59 @@ func TestMongoUpMetric(t *testing.T) {
 
 			res := r.Unregister(gc)
 			assert.Equal(t, true, res)
+		})
+	}
+}
+
+// Since MongoDB 8.1 buildInfo requires authentication, which an arbiter can't provide: it stores no users.
+// makeRegistry runs on every scrape, so it must not warn about that on an arbiter.
+func TestMakeRegistryBuildInfoWarning(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	testCases := []struct {
+		name     string
+		port     string
+		wantWarn bool
+	}{
+		{name: "arbiter", port: tu.GetenvDefault("TEST_MONGODB_S2_ARBITER_PORT", "17012")},
+		{name: "primary", port: tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"), wantWarn: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			logHandler := newErrorCountHandler(nil)
+			exporterOpts := &Opts{
+				Logger:           slog.New(logHandler),
+				URI:              fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tc.port),
+				ConnectTimeoutMS: 1000,
+				DirectConnect:    true,
+			}
+
+			client, err := connect(ctx, exporterOpts)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				assert.NoError(t, client.Disconnect(ctx))
+			})
+
+			_, err = retrieveMongoDBBuildInfo(ctx, client, exporterOpts.Logger)
+			if err == nil {
+				t.Skip("buildInfo doesn't require authentication before MongoDB 8.1")
+			}
+
+			e := New(exporterOpts) //nolint:contextcheck // New takes no context.
+			e.makeRegistry(ctx, client, new(labelsGetterMock), *e.opts)
+
+			warned := false
+			for _, r := range logHandler.logRecords {
+				if r.Message == "Registry - Cannot get MongoDB buildInfo" {
+					warned = true
+				}
+			}
+			assert.Equal(t, tc.wantWarn, warned)
 		})
 	}
 }

@@ -19,6 +19,7 @@ package tu
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -30,7 +31,6 @@ import (
 	"time"
 
 	"github.com/foxcpp/go-mockdns"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -52,6 +52,8 @@ const (
 	MongoDBConfigServer1Port = "17009"
 	// MongoDBStandAloneEncryptedPort MongoDB standalone encrypted instance Port.
 	MongoDBStandAloneEncryptedPort = "27027"
+
+	localhostIP = "127.0.0.1"
 )
 
 // GetenvDefault gets a variable from the environment and returns its value or the
@@ -67,6 +69,8 @@ func GetenvDefault(key, defaultValue string) string {
 // DefaultTestClient returns the default MongoDB connection used for tests. It is a direct
 // connection to the primary server of replicaset 1.
 func DefaultTestClient(ctx context.Context, t *testing.T) *mongo.Client {
+	t.Helper()
+
 	port, err := PortForContainer("mongo-1-1")
 	require.NoError(t, err)
 
@@ -84,22 +88,20 @@ func DefaultTestClientMongoS(ctx context.Context, t *testing.T) *mongo.Client {
 	return TestClient(ctx, port, t)
 }
 
-// GetImageNameForContainer returns image name and version of a running test container.
+// GetImageNameForContainer returns image name and version of a test container, running or not.
+// TestGetEncryptionInfo needs the latter: upstream MongoDB cannot start standalone-encrypted, and
+// the test reads its image to skip.
 func GetImageNameForContainer(containerName string) (string, string, error) {
 	di, err := InspectContainer(containerName)
 	if err != nil {
-		return "", "", errors.Wrapf(err, "cannot get error for container %q", "mongo-1-1")
-	}
-
-	if len(di) == 0 {
-		return "", "", errors.Wrapf(err, "cannot get error for container %q (empty array)", "mongo-1-1")
+		return "", "", err
 	}
 
 	split := strings.Split(di[0].Config.Image, ":")
 
 	const numOfImageNameParts = 2
 	if len(split) != numOfImageNameParts {
-		return "", "", errors.New(fmt.Sprintf("image name is not correct: %s", di[0].Config.Image))
+		return "", "", fmt.Errorf("%w: %s", errMalformedImageName, di[0].Config.Image)
 	}
 
 	imageBaseName, version := split[0], split[1]
@@ -126,7 +128,7 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 		port = MongoDBS1PrimaryPort
 	}
 
-	hostname := "127.0.0.1"
+	hostname := localhostIP
 	direct := true
 	to := time.Second
 	co := &options.ClientOptions{
@@ -154,46 +156,100 @@ func TestClient(ctx context.Context, port string, t *testing.T) *mongo.Client {
 func LoadJSON(filename string) (bson.M, error) {
 	buf, err := os.ReadFile(filepath.Clean(filename))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot read %q: %w", filename, err)
 	}
 
 	var m bson.M
 	err = json.Unmarshal(buf, &m)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot unmarshal %q: %w", filename, err)
 	}
 
 	return m, nil
 }
 
+// InspectContainer returns the docker inspect output for the container name.
 func InspectContainer(name string) (DockerInspectOutput, error) {
 	var di DockerInspectOutput
 
-	out, err := exec.Command("docker", "inspect", name).Output() //nolint:gosec
+	out, err := exec.Command("docker", "inspect", name).Output() //nolint:gosec,noctx
 	if err != nil {
-		return di, errors.Wrap(err, "cannot inspect docker container")
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return di, fmt.Errorf("cannot inspect docker container %q: %w", name, err)
+		}
+
+		// docker exits 1 and prints [] both for a missing container and for an unreachable daemon.
+		stderr := strings.TrimSpace(string(exitErr.Stderr))
+		if strings.Contains(strings.ToLower(stderr), "no such object") {
+			return di, fmt.Errorf("%w: %q, %s", errContainerMissing, name, startTestClusterHint)
+		}
+
+		return di, fmt.Errorf("cannot inspect docker container %q: %s: %w", name, stderr, err)
 	}
 
-	if err := json.Unmarshal(out, &di); err != nil {
-		return di, errors.Wrap(err, "cannot inspect docker container")
+	err = json.Unmarshal(out, &di)
+	if err != nil {
+		return di, fmt.Errorf("cannot inspect docker container %q: %w", name, err)
 	}
 
 	return di, nil
 }
 
-func PortForContainer(name string) (string, error) {
+const startTestClusterHint = "start the test cluster with `make test-cluster`"
+
+var (
+	errContainerMissing   = errors.New("container does not exist")
+	errContainerStopped   = errors.New("container is not running")
+	errNoHostPort         = errors.New("container publishes no host port for 27017/tcp")
+	errNoContainerAddress = errors.New("container has no address on the exporter's docker network")
+	errMalformedImageName = errors.New("image name is not correct")
+)
+
+// runningContainer inspects name and fails unless the container is up.
+//
+// docker inspect succeeds for a container that exists but has stopped, and its address and port
+// fields are empty by then. Without this check a caller gets an empty string back and fails much
+// later on, against an address that was never there, rather than being told which container of
+// the test cluster is not running.
+//
+// State.Running does not do for the check: docker sets it for a paused or restarting container
+// too, and a paused one keeps its address and ports while nothing in it answers.
+func runningContainer(name string) (DockerInspectOutput, error) {
 	di, err := InspectContainer(name)
 	if err != nil {
-		return "", errors.Wrapf(err, "cannot get error for container %q", name)
+		return nil, err
 	}
 
-	if len(di) == 0 {
-		return "", errors.Wrapf(err, "cannot get error for container %q (empty array)", name)
+	state := di[0].State
+	if state.Status == "running" {
+		return di, nil
+	}
+
+	// make test-cluster starts a created or exited container, and fails on a paused one.
+	var hint string
+
+	switch state.Status {
+	case "created", "exited":
+		hint = ", " + startTestClusterHint
+	case "paused":
+		hint = fmt.Sprintf(", unpause it with `docker unpause %s`", name)
+	}
+
+	return nil, fmt.Errorf("%w: %q (state: %s, exit code: %d)%s",
+		errContainerStopped, name, state.Status, state.ExitCode, hint)
+}
+
+// PortForContainer returns the host port a running container publishes for 27017/tcp.
+func PortForContainer(name string) (string, error) {
+	di, err := runningContainer(name)
+	if err != nil {
+		return "", err
 	}
 
 	ports := di[0].NetworkSettings.Ports["27017/tcp"]
 	if len(ports) == 0 {
-		return "", errors.Wrapf(err, "cannot get error for container %q (empty ports list)", name)
+		return "", fmt.Errorf("%w: %q", errNoHostPort, name)
 	}
 
 	return ports[0].HostPort, nil
@@ -201,23 +257,24 @@ func PortForContainer(name string) (string, error) {
 
 // IPForContainer returns the IP address of a running container.
 func IPForContainer(name string) (string, error) {
-	di, err := InspectContainer(name)
+	di, err := runningContainer(name)
 	if err != nil {
-		return "", errors.Wrapf(err, "cannot get error for container %q", name)
+		return "", err
 	}
 
-	if len(di) == 0 {
-		return "", errors.Wrapf(err, "cannot get error for container %q (empty array)", name)
+	address := di[0].NetworkSettings.Networks.MongodbExporterDefault.IPAddress
+	if address == "" {
+		return "", fmt.Errorf("%w: %q", errNoContainerAddress, name)
 	}
 
-	return di[0].NetworkSettings.Networks.MongodbExporterDefault.IPAddress, nil
+	return address, nil
 }
 
 // SetupFakeResolver sets up Fake DNS server to resolve SRV records.
 func SetupFakeResolver() *mockdns.Server {
-	p1, err1 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"), 10, 64)
-	p2, err2 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "17002"), 10, 64)
-	p3, err3 := strconv.ParseInt(GetenvDefault("TEST_MONGODB_S1_SECONDARY2_PORT", "17003"), 10, 64)
+	p1, err1 := strconv.ParseUint(GetenvDefault("TEST_MONGODB_S1_PRIMARY_PORT", "17001"), 10, 16)
+	p2, err2 := strconv.ParseUint(GetenvDefault("TEST_MONGODB_S1_SECONDARY1_PORT", "17002"), 10, 16)
+	p3, err3 := strconv.ParseUint(GetenvDefault("TEST_MONGODB_S1_SECONDARY2_PORT", "17003"), 10, 16)
 
 	if err1 != nil || err2 != nil || err3 != nil {
 		panic("Invalid ports")
@@ -245,16 +302,16 @@ func SetupFakeResolver() *mockdns.Server {
 			A:   []string{"1.2.3.4"},
 		},
 		"mongo1.example.com.": {
-			A: []string{"127.0.0.1"},
+			A: []string{localhostIP},
 		},
 		"mongo2.example.com.": {
-			A: []string{"127.0.0.1"},
+			A: []string{localhostIP},
 		},
 		"mongo3.example.com.": {
-			A: []string{"127.0.0.1"},
+			A: []string{localhostIP},
 		},
 		"unexistent.com.": {
-			A: []string{"127.0.0.1"},
+			A: []string{localhostIP},
 		},
 	}
 

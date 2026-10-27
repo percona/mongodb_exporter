@@ -19,7 +19,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
@@ -33,7 +32,7 @@ func TestGeneralCollector(t *testing.T) {
 	t.Parallel()
 	t.Run("mongod cluster role", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 		defer cancel()
 
 		client := tu.DefaultTestClient(ctx, t)
@@ -74,7 +73,7 @@ func TestGeneralCollector(t *testing.T) {
 
 	t.Run("mongos cluster role", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 		defer cancel()
 
 		port, err := tu.PortForContainer("mongos")

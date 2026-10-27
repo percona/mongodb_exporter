@@ -28,6 +28,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/exporter-toolkit/web"
+
+	"github.com/percona/mongodb_exporter/internal/redact"
 )
 
 // ServerMap stores http handlers for each host
@@ -178,7 +180,10 @@ func buildServerMap(exporters []*Exporter, log *slog.Logger) ServerMap {
 		if parsedURL, err := url.Parse(e.opts.URI); err == nil {
 			servers[parsedURL.Host] = e.Handler()
 		} else {
-			log.Error("Unable to parse provided address as url", "address", e.opts.URI, "error", err)
+			// The parse error is not logged: it quotes the URI cut short at the byte url.Parse
+			// choked on, and when that byte is "?" or "#" from the password, the quote keeps the
+			// part before.
+			log.Error("Unable to parse provided address as url", "address", redact.MongoURI(e.opts.URI))
 		}
 	}
 
