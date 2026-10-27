@@ -32,6 +32,10 @@ import (
 
 const (
 	exporterPrefix = "mongodb_"
+
+	// collisionLabel carries the document field a metric was built from. It is set only when
+	// several fields of one document map to the same metric name, and it keeps them apart.
+	collisionLabel = "metric_field"
 )
 
 type rawMetric struct {
@@ -318,20 +322,33 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 		prefix += "."
 	}
 
+	// Fields that are exported as a label value never become a part of the metric name, so they
+	// cannot collide. Indexing them anyway would give the collision label to a part of the
+	// family only, which the registry rejects as inconsistent label names.
+	var colliding map[string]string
+	if !keyBecomesLabelValue(prefix) {
+		colliding = collidingFields(prefix, m)
+	}
+
 	for k, val := range m {
-		nextPrefix := prefix + k
+		// A field sharing its metric name with a sibling is exported under the name of the
+		// canonical field of the group, so that the whole group agrees on the name and on the
+		// help. The collision label carries the real field and keeps the series apart.
+		name, l := k, labels
+		if canonical, ok := colliding[k]; ok {
+			name, l = canonical, withLabel(labels, collisionLabel, k)
+		}
+
+		nextPrefix := prefix + name
 		if !includeHistograms && isHistogramPath(nextPrefix) {
 			continue
 		}
 
-		l := make(map[string]string)
 		if label, ok := keyNodesToLabels[prefix]; ok {
-			maps.Copy(l, labels)
-			l[label] = k
+			l = withLabel(l, label, k)
 			nextPrefix = prefix + label
-		} else {
-			l = labels
 		}
+
 		switch v := val.(type) {
 		case bson.M:
 			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
@@ -345,11 +362,109 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 			}
 			continue
 		default:
-			res = appendMetricValue(res, prefix, k, v, l, compatibleMode)
+			res = appendMetricValue(res, prefix, name, v, l, compatibleMode)
 		}
 	}
 
 	return res
+}
+
+// keyBecomesLabelValue reports whether the fields of a document under prefix are exported as the
+// value of a label instead of as a part of the metric name.
+func keyBecomesLabelValue(prefix string) bool {
+	if _, ok := nodeToPDMetrics[prefix]; ok {
+		return true
+	}
+
+	_, ok := keyNodesToLabels[prefix]
+
+	return ok
+}
+
+// collidingFields maps every field of a document that does not end up with a unique metric name
+// to the canonical field of its group. MongoDB can report several fields whose names differ only
+// in characters that prometheusize collapses, for example the "giant hdr" counters that ethtool
+// exposes with a different amount of leading spaces. Exported as they are, they would be the very
+// same series and the registry would reject the whole scrape, so the group is exported under one
+// name and the collision label keeps its members apart. The name is built with prometheusize
+// itself, because anything less than the full mapping misses collisions: fields differing only in
+// a trailing special character or in a run of underscores share a name too. The canonical field is
+// the lowest one, because the BSON document order is lost when it is decoded into a map and the
+// name has to stay the same between scrapes.
+func collidingFields(prefix string, m bson.M) map[string]string {
+	if len(m) <= 1 || allKeysUnambiguous(m) {
+		return nil
+	}
+
+	fieldsByMetricName := make(map[string][]string, len(m))
+	for k := range m {
+		metricName := prometheusize(prefix + k)
+		fieldsByMetricName[metricName] = append(fieldsByMetricName[metricName], k)
+	}
+
+	var canonical map[string]string
+	for _, fields := range fieldsByMetricName {
+		if len(fields) == 1 {
+			continue
+		}
+
+		if canonical == nil {
+			canonical = make(map[string]string, len(fields))
+		}
+		first := slices.Min(fields)
+		for _, k := range fields {
+			canonical[k] = first
+		}
+	}
+
+	return canonical
+}
+
+// allKeysUnambiguous reports whether every key of a document already looks like the metric name
+// part it maps to. Such keys cannot collide with each other, because prometheusize leaves their
+// tail untouched and a document cannot hold the same key twice. Almost everything MongoDB
+// reports qualifies, so this keeps the collision check off the hot path.
+func allKeysUnambiguous(m bson.M) bool {
+	for k := range m {
+		if !isUnambiguousKey(k) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isUnambiguousKey reports whether k passes through prometheusize unchanged, that is whether it
+// is a non empty sequence of alphanumeric groups joined by single underscores. Anything else can
+// be mapped onto another key: special characters and underscore runs collapse into a single
+// underscore, and a leading or trailing underscore is dropped.
+func isUnambiguousKey(k string) bool {
+	previousIsUnderscore := true
+	for i := range len(k) {
+		switch c := k[i]; {
+		case c == '_':
+			if previousIsUnderscore {
+				return false
+			}
+			previousIsUnderscore = true
+		case c >= '0' && c <= '9', c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z':
+			previousIsUnderscore = false
+		default:
+			return false
+		}
+	}
+
+	return !previousIsUnderscore
+}
+
+// withLabel returns a copy of labels with one more label set, so that the map a document shares
+// with its siblings is never modified in place.
+func withLabel(labels map[string]string, name, value string) map[string]string {
+	extended := make(map[string]string, len(labels)+1)
+	maps.Copy(extended, labels)
+	extended[name] = value
+
+	return extended
 }
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
