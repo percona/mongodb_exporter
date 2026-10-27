@@ -52,17 +52,15 @@ type pbmCollector struct {
 	connectTimeout time.Duration
 }
 
-type pbmAgentStatus string
-
 const (
 	pbmAgentStatusOK    = iota
 	pbmAgentStatusError = iota
 	pbmAgentStatusLost  = iota
 
-	statusDown      pbmAgentStatus = "down"
-	statusDone      pbmAgentStatus = "done"
-	statusCancelled pbmAgentStatus = "canceled"
-	statusError     pbmAgentStatus = "error"
+	statusDown      pbmBackupStatus = "down"
+	statusDone      pbmBackupStatus = "done"
+	statusCancelled pbmBackupStatus = "canceled"
+	statusError     pbmBackupStatus = "error"
 )
 
 // PBM keeps its state in these admin collections of the replica set or, in a sharded cluster, of the
@@ -130,6 +128,20 @@ type pbmAgent struct {
 	NodeStatus    pbmSubsystemStatus  `bson:"nodes"`
 	StorageStatus pbmSubsystemStatus  `bson:"stors"`
 	Heartbeat     primitive.Timestamp `bson:"hb"`
+}
+
+// pbmAgentProjection keeps the fields of pbmAgent out of PBM agent status documents.
+var pbmAgentProjection = bson.D{
+	{Key: "n", Value: 1},
+	{Key: "rs", Value: 1},
+	{Key: "s", Value: 1},
+	{Key: "str", Value: 1},
+	{Key: "hdn", Value: 1},
+	{Key: "delay", Value: 1},
+	{Key: "pbms.ok", Value: 1},
+	{Key: "nodes.ok", Value: 1},
+	{Key: "stors.ok", Value: 1},
+	{Key: "hb", Value: 1},
 }
 
 // pbmBackupType and pbmBackupStatus are PBM's defs.BackupType and defs.Status.
@@ -266,15 +278,18 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	control, closeControl, err := p.controlClient(p.ctx, role, currentNode)
 	if err != nil {
 		// The error can carry the URI the collector connected with.
-		logger.Warn("failed to connect to the PBM control collections", "error", redact.Error(err))
+		logger.Log(p.ctx, pbmControlErrorLevel(err), "failed to connect to the PBM control collections", "error", redact.Error(err))
 
 		return
 	}
 	defer closeControl()
 
+	// PBM is not configured when there is no configuration document. Other errors don't tell.
 	pbmConfig, err := getPBMConfig(p.ctx, control)
-	if err != nil {
-		logger.Info("failed to get PBM configuration", "error", err.Error())
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		logger.Warn("failed to get PBM configuration", "error", err.Error())
+
+		return
 	}
 
 	if pbmConfig != nil {
@@ -353,6 +368,16 @@ func pbmSourceFor(role string, self *pbmHello) (pbmSource, error) {
 	}
 
 	return pbmSourceReplset, nil
+}
+
+// pbmControlErrorLevel returns the level to log a failure of controlClient at. A member without a
+// replica set configuration gets no PBM metrics by design (see pbmSourceFor).
+func pbmControlErrorLevel(err error) slog.Level {
+	if errors.Is(err, errPBMNotReplicaSet) {
+		return slog.LevelDebug
+	}
+
+	return slog.LevelWarn
 }
 
 // controlClient returns a client for the admin database that holds PBM's collections, and a function
@@ -478,11 +503,16 @@ func (p *pbmCollector) connect(ctx context.Context, hosts []string) (*mongo.Clie
 	return client, nil
 }
 
-// disconnect closes a short-lived client. It also runs after the scrape context is cancelled (a failed
-// replica set read, a scrape deadline), so it doesn't inherit the cancellation: the driver would then
-// skip ending the client's server sessions, as PBM avoided by disconnecting with context.Background().
+// disconnect closes a short-lived client. It also runs after a failed replica set read has cancelled
+// the context, so it doesn't inherit the cancellation: the driver would then skip ending the client's
+// server sessions, as PBM avoided by disconnecting with context.Background(). It still stops at the
+// scrape deadline, so that a replica set that doesn't answer doesn't hold the response past it.
 func (p *pbmCollector) disconnect(ctx context.Context, client *mongo.Client) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), pbmDisconnectTimeout)
+	timeout := pbmDisconnectTimeout
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout = min(timeout, time.Until(deadline))
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 	defer cancel()
 
 	err := client.Disconnect(ctx)
@@ -606,7 +636,8 @@ func (p *pbmCollector) clusterStatus(ctx context.Context, control *mongo.Client,
 
 // listPBMAgents returns the PBM agent status documents by replica set name and node.
 func listPBMAgents(ctx context.Context, client *mongo.Client) (map[string]map[string]*pbmAgent, error) {
-	cur, err := pbmAdminDB(client).Collection(pbmAgentsCollection).Find(ctx, bson.D{})
+	cur, err := pbmAdminDB(client).Collection(pbmAgentsCollection).
+		Find(ctx, bson.D{}, options.Find().SetProjection(pbmAgentProjection))
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
@@ -834,7 +865,7 @@ func pbmBackupsMetrics(backupsList []pbmBackup, me string, now time.Time) []prom
 			)
 
 			var endTime int64
-			switch pbmAgentStatus(backup.Status) {
+			switch backup.Status {
 			case statusDone, statusCancelled, statusError, statusDown:
 				endTime = backup.LastTransitionTS
 			default:

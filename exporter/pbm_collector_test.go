@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"log/slog"
 	"sort"
 	"strings"
 	"testing"
@@ -30,6 +31,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+
+	"github.com/percona/mongodb_exporter/internal/tu"
 )
 
 //nolint:paralleltest
@@ -139,6 +142,28 @@ func TestPBMCollector(t *testing.T) {
 			assert.Equal(t, want, testutil.CollectAndCount(c, name), name)
 		}
 	})
+}
+
+func TestPBMCollectorWithoutPBM(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	// The standalone node has no PBM configuration document.
+	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
+	c := newPbmCollector(ctx, client, "mongodb://127.0.0.1:"+tu.MongoDBStandAlonePort, 1000, promslog.New(&promslog.Config{}))
+
+	expected := strings.NewReader(`
+	# HELP mongodb_pbm_cluster_backup_configured PBM backups are configured for the cluster
+	# TYPE mongodb_pbm_cluster_backup_configured gauge
+	mongodb_pbm_cluster_backup_configured 0` + "\n")
+	err := testutil.CollectAndCompare(c, expected,
+		"mongodb_pbm_cluster_backup_configured",
+		"mongodb_pbm_cluster_pitr_backup_enabled",
+		"mongodb_pbm_agent_status",
+		"mongodb_pbm_backup_size_bytes")
+	assert.NoError(t, err)
 }
 
 // testPBMClusterTime is the cluster time the agent status tests are evaluated at.
@@ -270,6 +295,14 @@ func TestPBMSourceFor(t *testing.T) {
 	}
 }
 
+func TestPBMControlErrorLevel(t *testing.T) {
+	t.Parallel()
+
+	_, err := pbmSourceFor("", &pbmHello{IsReplicaSet: true})
+	assert.Equal(t, slog.LevelDebug, pbmControlErrorLevel(err))
+	assert.Equal(t, slog.LevelWarn, pbmControlErrorLevel(errPBMNoHosts))
+}
+
 func TestPBMConnectWithoutHosts(t *testing.T) {
 	t.Parallel()
 
@@ -376,7 +409,7 @@ func TestPBMBackupsMetrics(t *testing.T) {
 			Size:             2048,
 			StartTS:          1_699_990_000,
 			LastTransitionTS: 1_699_990_060,
-			Status:           pbmBackupStatus(statusDone),
+			Status:           statusDone,
 		},
 	}
 

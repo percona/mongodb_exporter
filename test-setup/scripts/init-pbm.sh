@@ -11,6 +11,8 @@ sleep 5
 
 # The agents accept a backup only after they have checked the new storage, so retry until one is taken.
 for _ in $(seq 1 12); do
-    docker exec pbm-mongo-2-1 bash -c "pbm backup --wait" && break
+    docker exec pbm-mongo-2-1 bash -c "pbm backup --wait" && exit 0
     sleep 5
 done
+echo "pbm backup failed after 12 attempts" >&2
+exit 1
