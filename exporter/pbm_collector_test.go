@@ -142,6 +142,27 @@ func TestPBMCollector(t *testing.T) {
 			assert.Equal(t, want, testutil.CollectAndCount(c, name), name)
 		}
 	})
+
+	t.Run("pbm restore metrics", func(t *testing.T) {
+		// One status of the most recent restore, and one series of each per restore.
+		want, err := client.Database("admin").Collection(pbmRestoresCollection).CountDocuments(ctx, bson.D{})
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, testutil.CollectAndCount(c, "mongodb_pbm_restore_status"))
+		if want == 0 {
+			expected := strings.NewReader(`
+			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore: 0 = idle (no restore), 1 = running, 2 = failed, 3 = completed
+			# TYPE mongodb_pbm_restore_status gauge
+			mongodb_pbm_restore_status 0` + "\n")
+			require.NoError(t, testutil.CollectAndCompare(c, expected, "mongodb_pbm_restore_status"))
+		}
+		for _, name := range []string{
+			"mongodb_pbm_restore_last_transition_ts",
+			"mongodb_pbm_restore_duration_seconds",
+		} {
+			assert.Equal(t, int(want), testutil.CollectAndCount(c, name), name)
+		}
+	})
 }
 
 func TestPBMCollectorWithoutPBM(t *testing.T) {
@@ -162,7 +183,10 @@ func TestPBMCollectorWithoutPBM(t *testing.T) {
 		"mongodb_pbm_cluster_backup_configured",
 		"mongodb_pbm_cluster_pitr_backup_enabled",
 		"mongodb_pbm_agent_status",
-		"mongodb_pbm_backup_size_bytes")
+		"mongodb_pbm_backup_size_bytes",
+		"mongodb_pbm_restore_status",
+		"mongodb_pbm_restore_last_transition_ts",
+		"mongodb_pbm_restore_duration_seconds")
 	assert.NoError(t, err)
 }
 
@@ -430,4 +454,110 @@ func TestPBMBackupsMetrics(t *testing.T) {
 
 	err := testutil.CollectAndCompare(staticCollector(pbmBackupsMetrics(backups, "rs0a:27017", now)), expected)
 	assert.NoError(t, err)
+}
+
+func TestPBMRestoresMetrics(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1_700_001_000, 0)
+	clusterTime := primitive.Timestamp{T: 1_700_001_000}
+	restores := []pbmRestore{
+		{
+			Type:             pbmLogicalBackup,
+			OPID:             "op-running",
+			Name:             "2023-11-14T22:30:00.123456789Z",
+			Backup:           "2023-11-14T20:00:00Z",
+			StartTS:          1_700_000_000,
+			LastTransitionTS: 1_700_000_100,
+			Status:           "running",
+			Heartbeat:        primitive.Timestamp{T: 1_700_000_995},
+		},
+		{
+			Type:             "physical",
+			OPID:             "op-done",
+			Name:             "2023-11-14T21:00:00.123456789Z",
+			Backup:           "2023-11-14T20:00:00Z",
+			StartTS:          1_699_995_000,
+			LastTransitionTS: 1_699_995_600,
+			Status:           restoreStatusDone,
+		},
+		{
+			// Its agents stopped without recording a result.
+			Type:             pbmLogicalBackup,
+			OPID:             "op-stale",
+			Name:             "2023-11-14T20:30:00.123456789Z",
+			Backup:           "2023-11-14T20:00:00Z",
+			StartTS:          1_699_993_000,
+			LastTransitionTS: 1_699_993_001,
+			Status:           "starting",
+			Heartbeat:        primitive.Timestamp{T: 1_699_993_030},
+		},
+	}
+
+	expected := strings.NewReader(`
+	# HELP mongodb_pbm_restore_duration_seconds Duration of PBM restore
+	# TYPE mongodb_pbm_restore_duration_seconds gauge
+	mongodb_pbm_restore_duration_seconds{backup="2023-11-14T20:00:00Z",name="2023-11-14T20:30:00.123456789Z",opid="op-stale",status="starting",type="logical"} 30
+	mongodb_pbm_restore_duration_seconds{backup="2023-11-14T20:00:00Z",name="2023-11-14T21:00:00.123456789Z",opid="op-done",status="done",type="physical"} 600
+	mongodb_pbm_restore_duration_seconds{backup="2023-11-14T20:00:00Z",name="2023-11-14T22:30:00.123456789Z",opid="op-running",status="running",type="logical"} 1000
+	# HELP mongodb_pbm_restore_last_transition_ts Last transition timestamp of PBM restore (seconds since epoch)
+	# TYPE mongodb_pbm_restore_last_transition_ts gauge
+	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T20:30:00.123456789Z",opid="op-stale",status="starting",type="logical"} 1.699993001e+09
+	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T21:00:00.123456789Z",opid="op-done",status="done",type="physical"} 1.6999956e+09
+	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T22:30:00.123456789Z",opid="op-running",status="running",type="logical"} 1.7000001e+09
+	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore: 0 = idle (no restore), 1 = running, 2 = failed, 3 = completed
+	# TYPE mongodb_pbm_restore_status gauge
+	mongodb_pbm_restore_status 1
+	`)
+
+	err := testutil.CollectAndCompare(staticCollector(pbmRestoresMetrics(restores, clusterTime, now)), expected)
+	assert.NoError(t, err)
+}
+
+func TestPBMRestoresMetricsWithoutRestore(t *testing.T) {
+	t.Parallel()
+
+	expected := strings.NewReader(`
+	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore: 0 = idle (no restore), 1 = running, 2 = failed, 3 = completed
+	# TYPE mongodb_pbm_restore_status gauge
+	mongodb_pbm_restore_status 0
+	`)
+
+	err := testutil.CollectAndCompare(staticCollector(pbmRestoresMetrics(nil, testPBMClusterTime, time.Now())), expected)
+	assert.NoError(t, err)
+}
+
+func TestPBMRestoreStatus(t *testing.T) {
+	t.Parallel()
+
+	recent := primitive.Timestamp{T: testPBMClusterTime.T - pbmStaleAgentSecs}
+	stale := primitive.Timestamp{T: testPBMClusterTime.T - pbmStaleAgentSecs - 1}
+	recentPhysical := primitive.Timestamp{T: testPBMClusterTime.T - pbmStalePhysicalRestoreSecs}
+	stalePhysical := primitive.Timestamp{T: testPBMClusterTime.T - pbmStalePhysicalRestoreSecs - 1}
+
+	for _, tc := range []struct {
+		restore  pbmRestore
+		want     int
+		finished bool
+	}{
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "starting", Heartbeat: recent}, want: pbmRestoreRunning},
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: recent}, want: pbmRestoreRunning},
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "dumpDone", Heartbeat: recent}, want: pbmRestoreRunning},
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: restoreStatusDone, Heartbeat: stale}, want: pbmRestoreCompleted, finished: true},
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: restoreStatusError, Heartbeat: recent}, want: pbmRestoreFailed, finished: true},
+		// The agents of the restore stopped without recording a result.
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: stale}, want: pbmRestoreFailed},
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: recentPhysical}, want: pbmRestoreFailed},
+		{restore: pbmRestore{Type: "physical", Status: restoreStatusPartlyDone}, want: pbmRestoreCompleted, finished: true},
+		{restore: pbmRestore{Type: "physical", Status: restoreStatusCancelled}, want: pbmRestoreFailed, finished: true},
+		{restore: pbmRestore{Type: "physical", Status: "running", Heartbeat: recentPhysical}, want: pbmRestoreRunning},
+		{restore: pbmRestore{Type: "physical", Status: "running", Heartbeat: stalePhysical}, want: pbmRestoreFailed},
+		{restore: pbmRestore{Type: "incremental", Status: "copyDone", Heartbeat: recentPhysical}, want: pbmRestoreRunning},
+		// The storage had no heartbeat of the restore.
+		{restore: pbmRestore{Type: "physical", Status: "running"}, want: pbmRestoreFailed},
+	} {
+		assert.Equal(t, tc.want, tc.restore.status(testPBMClusterTime), "%+v", tc.restore)
+		_, finished := tc.restore.result()
+		assert.Equal(t, tc.finished, finished, "%+v", tc.restore)
+	}
 }
