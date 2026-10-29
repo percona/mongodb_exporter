@@ -110,6 +110,7 @@ privileges: [
        { resource: { db: "admin", collection: "pbmBackups" }, actions: [ "find" ] },
        { resource: { db: "admin", collection: "pbmAgents" }, actions: [ "find" ] },
        { resource: { db: "admin", collection: "pbmConfig" }, actions: [ "find" ] },
+       { resource: { db: "admin", collection: "pbmRestores" }, actions: [ "find" ] },
        ...
 ],
 ```
