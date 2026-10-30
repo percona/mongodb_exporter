@@ -28,7 +28,10 @@ jobs:
           - percona/percona-server-mongodb:8.0
           - percona/percona-server-mongodb:latest
 
-    runs-on: ubuntu-latest
+    # MongoDB 8.0 before 8.0.37 and 8.3 before 8.3.16 refuse to start on ubuntu-latest's
+    # 7.0.0 kernel (https://jira.mongodb.org/browse/SERVER-131779). Back to ubuntu-latest
+    # once the 8.0 and latest images used here have the fix.
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
