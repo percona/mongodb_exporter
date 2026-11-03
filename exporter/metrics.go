@@ -451,6 +451,8 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 			labels[name] = value
 		}
 
+		// Without a label naming the bucket, every bucket of the histogram produces the
+		// same series and the registry rejects all but the first.
 		labels[histogramBoundLabel] = fmt.Sprint(bucket[boundKey])
 		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
 	}
@@ -513,12 +515,18 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 	return true
 }
 
+// isHistogramPath reports whether prefix names a histogram subtree. Server status uses
+// "histograms", the opLatencies histograms added in MongoDB 8.3 use "histogram", and the
+// queue wait time histograms added in MongoDB 9.0 are the "queueWaitTimeMicros" arrays
+// themselves.
 func isHistogramPath(prefix string) bool {
-	return isPathNode(prefix, "histograms") || isPathNode(prefix, "histogram")
-}
+	for _, name := range []string{"histograms", "histogram", "queueWaitTimeMicros"} {
+		if prefix == name || strings.Contains(prefix, "."+name+".") || strings.HasSuffix(prefix, "."+name) {
+			return true
+		}
+	}
 
-func isPathNode(prefix, node string) bool {
-	return prefix == node || strings.Contains(prefix, "."+node+".") || strings.HasSuffix(prefix, "."+node)
+	return false
 }
 
 func asMetricMap(item any) (map[string]any, bool) {

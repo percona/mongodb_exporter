@@ -48,11 +48,13 @@ func TestCurrentopCollectorMetrics(t *testing.T) {
 	ch := make(chan struct{})
 	wg.Add(1)
 
-	// Generate slow operation
+	// Generate slow operation: $where sleeps 100 ms per document, which takes about 3.5 times
+	// as long on MongoDB 9.0 (javascriptEngine mozjs-wasm). With 100 documents the query
+	// outlasted the 30 s context there.
 	go func() {
 		defer wg.Done()
 		coll := "testcol_01"
-		for j := 0; j < 100; j++ { //nolint:intrange // false positive
+		for j := range 30 {
 			_, err := database.Collection(coll).InsertOne(ctx, bson.M{"f1": j, "f2": "2"})
 			assert.NoError(t, err)
 		}

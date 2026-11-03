@@ -22,23 +22,27 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/percona/mongodb_exporter/internal/redact"
 )
 
 // GetSeedListFromSRV converts mongodb+srv URI to flat connection string.
 func GetSeedListFromSRV(uri string, logger *slog.Logger) string { //nolint:cyclop
 	uriParsed, err := url.Parse(uri)
 	if err != nil {
-		log.Fatalf("Failed to parse URI %s: %v", uri, err)
+		// The parse error is not logged: it quotes the URI cut short at the byte url.Parse choked
+		// on, and when that byte is "?" or "#" from the password, the quote keeps the part before.
+		log.Fatalf("Failed to parse URI %s", redact.MongoURI(uri))
 	}
 
 	cname, srvRecords, err := net.LookupSRV("mongodb", "tcp", uriParsed.Hostname())
 	if err != nil {
-		logger.Error("Failed to lookup SRV records", "uri", uri, "error", err)
+		logger.Error("Failed to lookup SRV records", "uri", redact.MongoURI(uri), "error", err)
 		return uri
 	}
 
 	if len(srvRecords) == 0 {
-		logger.Error("No SRV records found", "uri", uri)
+		logger.Error("No SRV records found", "uri", redact.MongoURI(uri))
 		return uri
 	}
 

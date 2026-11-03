@@ -19,7 +19,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
@@ -29,7 +28,7 @@ import (
 )
 
 func TestReplsetStatusCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -59,7 +58,7 @@ func TestReplsetStatusCollector(t *testing.T) {
 }
 
 func TestReplsetStatusCollectorNoSharding(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
