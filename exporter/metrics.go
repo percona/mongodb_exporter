@@ -316,57 +316,111 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 }
 
 func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
+	return makeFamilyMetrics(prefix, []familyMember{{doc: m, labels: labels}}, compatibleMode, includeHistograms)
+}
+
+// familyMember is one of the documents whose fields are exported under the same metric names,
+// along with the labels that keep its series apart from the series of the other members.
+type familyMember struct {
+	doc    bson.M
+	labels map[string]string
+}
+
+// makeFamilyMetrics exports the fields of a family of documents sharing one prefix: the entries
+// of an array, the documents under fields exported as a label value and the documents under
+// colliding fields. The members are walked together, so that a collision found in one of them
+// labels the same field of all the others as well. A collision label given to a part of the
+// family only makes the registry reject the scrape just like the collision itself.
+func makeFamilyMetrics(prefix string, family []familyMember, compatibleMode, includeHistograms bool) []prometheus.Metric {
 	var res []prometheus.Metric
 
 	if prefix != "" {
 		prefix += "."
 	}
 
-	// Fields that are exported as a label value never become a part of the metric name, so they
-	// cannot collide. Indexing them anyway would give the collision label to a part of the
-	// family only, which the registry rejects as inconsistent label names.
-	var colliding map[string]string
-	if !keyBecomesLabelValue(prefix) {
-		colliding = collidingFields(prefix, m)
+	colliding := familyCollisions(prefix, family)
+
+	// The documents found under one prefix make up the next family, which is walked once all of
+	// its members are known.
+	var nextFamilies map[string][]familyMember
+
+	for _, member := range family {
+		for k, val := range member.doc {
+			// A field sharing its metric name with a sibling is exported under the name of the
+			// canonical field of the group, so that the whole group agrees on the name and on
+			// the help. The collision label carries the real field and keeps the series apart.
+			name, l := k, member.labels
+			if canonical, ok := colliding[k]; ok {
+				name, l = canonical, withLabel(member.labels, collisionLabel, k)
+			}
+
+			nextPrefix := prefix + name
+			if !includeHistograms && isHistogramPath(nextPrefix) {
+				continue
+			}
+
+			if label, ok := keyNodesToLabels[prefix]; ok {
+				l = withLabel(l, label, k)
+				nextPrefix = prefix + label
+			}
+
+			switch v := val.(type) {
+			case bson.M, map[string]any:
+				doc, _ := asMetricMap(v)
+				nextFamilies = addFamilyMembers(nextFamilies, nextPrefix, familyMember{doc: doc, labels: l})
+			case primitive.A:
+				if isHistogramBucketSlice(nextPrefix, v) {
+					res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
+
+					continue
+				}
+				nextFamilies = addFamilyMembers(nextFamilies, nextPrefix, arrayMembers(v, l)...)
+			case []any:
+				if isHistogramBucketSlice(nextPrefix, v) {
+					res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
+				}
+			default:
+				res = appendMetricValue(res, prefix, name, v, l, compatibleMode)
+			}
+		}
 	}
 
-	for k, val := range m {
-		// A field sharing its metric name with a sibling is exported under the name of the
-		// canonical field of the group, so that the whole group agrees on the name and on the
-		// help. The collision label carries the real field and keeps the series apart.
-		name, l := k, labels
-		if canonical, ok := colliding[k]; ok {
-			name, l = canonical, withLabel(labels, collisionLabel, k)
-		}
-
-		nextPrefix := prefix + name
-		if !includeHistograms && isHistogramPath(nextPrefix) {
-			continue
-		}
-
-		if label, ok := keyNodesToLabels[prefix]; ok {
-			l = withLabel(l, label, k)
-			nextPrefix = prefix + label
-		}
-
-		switch v := val.(type) {
-		case bson.M:
-			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
-		case map[string]any:
-			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
-		case primitive.A:
-			res = append(res, processMetricSlice(nextPrefix, v, l, compatibleMode, includeHistograms)...)
-		case []any:
-			if isHistogramBucketSlice(nextPrefix, v) {
-				res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
-			}
-			continue
-		default:
-			res = appendMetricValue(res, prefix, name, v, l, compatibleMode)
-		}
+	for nextPrefix, members := range nextFamilies {
+		res = append(res, makeFamilyMetrics(nextPrefix, members, compatibleMode, includeHistograms)...)
 	}
 
 	return res
+}
+
+// familyCollisions maps the colliding fields of a family to the canonical field of their group.
+// Fields that are exported as a label value never become a part of the metric name, so they
+// cannot collide. Indexing them anyway would give the collision label to a part of the family
+// only, which the registry rejects as inconsistent label names.
+func familyCollisions(prefix string, family []familyMember) map[string]string {
+	if keyBecomesLabelValue(prefix) {
+		return nil
+	}
+
+	docs := make([]bson.M, 0, len(family))
+	for _, member := range family {
+		docs = append(docs, member.doc)
+	}
+
+	return collidingFields(prefix, docs...)
+}
+
+// addFamilyMembers adds members to the family exported under prefix.
+func addFamilyMembers(families map[string][]familyMember, prefix string, members ...familyMember) map[string][]familyMember {
+	if len(members) == 0 {
+		return families
+	}
+
+	if families == nil {
+		families = make(map[string][]familyMember)
+	}
+	families[prefix] = append(families[prefix], members...)
+
+	return families
 }
 
 // keyBecomesLabelValue reports whether the fields of a document under prefix are exported as the
@@ -390,16 +444,22 @@ func keyBecomesLabelValue(prefix string) bool {
 // itself, because anything less than the full mapping misses collisions: fields differing only in
 // a trailing special character or in a run of underscores share a name too. The canonical field is
 // the lowest one, because the BSON document order is lost when it is decoded into a map and the
-// name has to stay the same between scrapes.
-func collidingFields(prefix string, m bson.M) map[string]string {
-	if len(m) <= 1 || allKeysUnambiguous(m) {
+// name has to stay the same between scrapes. All documents of a family share the metric names,
+// so their fields are grouped together.
+func collidingFields(prefix string, docs ...bson.M) map[string]string {
+	if allKeysUnambiguous(docs) {
 		return nil
 	}
 
-	fieldsByMetricName := make(map[string][]string, len(m))
-	for k := range m {
-		metricName := prometheusize(prefix + k)
-		fieldsByMetricName[metricName] = append(fieldsByMetricName[metricName], k)
+	fieldsByMetricName := make(map[string][]string, len(docs[0]))
+	for _, m := range docs {
+		for k := range m {
+			metricName := prometheusize(prefix + k)
+			// Documents of one family mostly have the same fields, each of them is grouped once.
+			if fields := fieldsByMetricName[metricName]; !slices.Contains(fields, k) {
+				fieldsByMetricName[metricName] = append(fields, k)
+			}
+		}
 	}
 
 	var canonical map[string]string
@@ -420,14 +480,16 @@ func collidingFields(prefix string, m bson.M) map[string]string {
 	return canonical
 }
 
-// allKeysUnambiguous reports whether every key of a document already looks like the metric name
-// part it maps to. Such keys cannot collide with each other, because prometheusize leaves their
-// tail untouched and a document cannot hold the same key twice. Almost everything MongoDB
-// reports qualifies, so this keeps the collision check off the hot path.
-func allKeysUnambiguous(m bson.M) bool {
-	for k := range m {
-		if !isUnambiguousKey(k) {
-			return false
+// allKeysUnambiguous reports whether every key of the documents already looks like the metric
+// name part it maps to. Such keys cannot collide with each other, because prometheusize leaves
+// their tail untouched, so two of them share a name only when they are the same field. Almost
+// everything MongoDB reports qualifies, so this keeps the collision check off the hot path.
+func allKeysUnambiguous(docs []bson.M) bool {
+	for _, m := range docs {
+		for k := range m {
+			if !isUnambiguousKey(k) {
+				return false
+			}
 		}
 	}
 
@@ -467,10 +529,11 @@ func withLabel(labels map[string]string, name, value string) map[string]string {
 	return extended
 }
 
-// Extract maps from arrays. Only some structures like replicasets have arrays of members
-// and each member is represented by a map[string]any.
-func processSlice(prefix string, v []any, commonLabels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
-	metrics := make([]prometheus.Metric, 0)
+// arrayMembers extracts maps from arrays, as members of the family exported under the prefix of
+// the array. Only some structures like replicasets have arrays of members and each member is
+// represented by a map[string]any.
+func arrayMembers(v []any, commonLabels map[string]string) []familyMember {
+	members := make([]familyMember, 0, len(v))
 	labels := make(map[string]string)
 	maps.Copy(labels, commonLabels)
 
@@ -491,18 +554,12 @@ func processSlice(prefix string, v []any, commonLabels map[string]string, compat
 			labels["member_idx"] = host
 		}
 
-		metrics = append(metrics, makeMetricsWithHistograms(prefix, s, labels, compatibleMode, includeHistograms)...)
+		// The member is walked only once the whole family is known, so it keeps the labels as
+		// they are at its entry.
+		members = append(members, familyMember{doc: s, labels: maps.Clone(labels)})
 	}
 
-	return metrics
-}
-
-func processMetricSlice(prefix string, v []any, commonLabels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
-	if isHistogramBucketSlice(prefix, v) {
-		return processHistogramSlice(prefix, v, commonLabels, compatibleMode)
-	}
-
-	return processSlice(prefix, v, commonLabels, compatibleMode, includeHistograms)
+	return members
 }
 
 func appendMetricValue(metrics []prometheus.Metric, prefix, name string, value any, labels map[string]string, compatibleMode bool) []prometheus.Metric {

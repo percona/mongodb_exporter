@@ -445,6 +445,70 @@ func TestFieldsExportedAsLabelValuesAreNotIndexed(t *testing.T) {
 	assert.Empty(t, labelValues(sizes, collisionLabel))
 }
 
+// Array entries, and the documents whose keys are exported as a label value, share their metric
+// names. A collision found in one of them only has to label the same field everywhere else as
+// well, otherwise the family has two label sets and the registry rejects the whole scrape.
+func TestCollisionLabelsCoverTheWholeFamily(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		prefix string
+		doc    bson.M
+		family string
+		fields []string
+	}{
+		{
+			name:   "collision in one array entry only",
+			prefix: "replSetGetStatus",
+			doc: bson.M{"members": primitive.A{
+				bson.M{"name": "rs1", "a b": int64(1), "a_b": int64(2)},
+				bson.M{"name": "rs2", "a b": int64(3)},
+			}},
+			family: "mongodb_rs_members_a_b",
+			fields: []string{"a b", "a_b", "a b"},
+		},
+		{
+			name:   "colliding field without a metric value",
+			prefix: "replSetGetStatus",
+			doc: bson.M{"members": primitive.A{
+				bson.M{"name": "rs1", "a b": "text", "a_b": int64(2)},
+				bson.M{"name": "rs2", "a_b": int64(3)},
+			}},
+			family: "mongodb_rs_members_a_b",
+			fields: []string{"a_b", "a_b"},
+		},
+		{
+			name:   "collision in a document nested in one array entry only",
+			prefix: "replSetGetStatus",
+			doc: bson.M{"members": primitive.A{
+				bson.M{"name": "rs1", "stats": bson.M{"a b": int64(1), "a_b": int64(2)}},
+				bson.M{"name": "rs2", "stats": bson.M{"a b": int64(3)}},
+			}},
+			family: "mongodb_rs_members_stats_a_b",
+			fields: []string{"a b", "a_b", "a b"},
+		},
+		{
+			name:   "collision in one document exported under a label value only",
+			prefix: "collstats.storageStats",
+			doc: bson.M{"indexDetails": bson.M{
+				"_id_": bson.M{"a b": int64(1), "a_b": int64(2)},
+				"b_1":  bson.M{"a b": int64(3)},
+			}},
+			family: "mongodb_collstats_storageStats_indexDetails_index_name_a_b",
+			fields: []string{"a b", "a_b", "a b"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			family, ok := gatherMetrics(t, makeMetrics(tc.prefix, tc.doc, nil, false))[tc.family]
+			require.True(t, ok)
+			assert.ElementsMatch(t, tc.fields, labelValues(family, collisionLabel))
+		})
+	}
+}
+
 func TestIsUnambiguousKey(t *testing.T) {
 	t.Parallel()
 
