@@ -430,7 +430,7 @@ func TestOpLatenciesHistogramBucketsDoNotCollide(t *testing.T) {
 
 	valuesByBound := make(map[string]float64, len(bucketCounts.GetMetric()))
 	for _, metric := range bucketCounts.GetMetric() {
-		valuesByBound[metricLabels(metric)["micros"]] = metric.GetCounter().GetValue()
+		valuesByBound[metricLabels(metric)["lower_bound"]] = metric.GetCounter().GetValue()
 	}
 
 	assert.Equal(t, map[string]float64{
