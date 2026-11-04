@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -120,6 +121,7 @@ type pbmSubsystemStatus struct {
 type pbmAgent struct {
 	Node          string              `bson:"n"`
 	RS            string              `bson:"rs"`
+	Version       string              `bson:"v"` // like 2.12.0
 	State         int                 `bson:"s"`
 	StateStr      string              `bson:"str"`
 	Hidden        bool                `bson:"hdn"`
@@ -134,6 +136,7 @@ type pbmAgent struct {
 var pbmAgentProjection = bson.D{
 	{Key: "n", Value: 1},
 	{Key: "rs", Value: 1},
+	{Key: "v", Value: 1},
 	{Key: "s", Value: 1},
 	{Key: "str", Value: 1},
 	{Key: "hdn", Value: 1},
@@ -203,6 +206,8 @@ type pbmNode struct {
 	host   string
 	role   string
 	status int
+	// version is the version the agent last reported, empty for a member without an agent.
+	version string
 }
 
 // pbmHello is the part of a hello response that the collector uses.
@@ -548,6 +553,12 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Clien
 		return nil
 	}
 
+	return pbmAgentMetrics(clusterStatus, currentNode.Me)
+}
+
+// pbmAgentMetrics returns the status of the PBM agent of each member of each replica set and, for each
+// member with an agent, its version. me is the node the exporter is connected to.
+func pbmAgentMetrics(clusterStatus map[string][]pbmNode, me string) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0, len(clusterStatus))
 	for replsetName, nodes := range clusterStatus {
 		for _, node := range nodes {
@@ -557,7 +568,7 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Clien
 				"role":        node.role,
 				"self":        "0",
 			}
-			if node.host == currentNode.Me {
+			if node.host == me {
 				labels["self"] = "1"
 			}
 			metrics = append(metrics, createPBMMetric("agent_status",
@@ -566,6 +577,20 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Clien
 				labels,
 			),
 			)
+
+			if node.version == "" {
+				continue
+			}
+
+			// The same labels without the role, which changes on a failover while the version does not.
+			versionLabels := maps.Clone(labels)
+			delete(versionLabels, "role")
+			versionLabels["version"] = node.version
+			metrics = append(metrics, createPBMMetric("agent_version_info",
+				"The version of the PBM agent",
+				1,
+				versionLabels,
+			))
 		}
 	}
 
@@ -752,6 +777,7 @@ func pbmNodes(members []pbmMember, agents map[string]*pbmAgent, clusterTime prim
 		}
 
 		node.role = agent.role()
+		node.version = agent.Version
 		switch {
 		case agent.Heartbeat.T+pbmStaleAgentSecs < clusterTime.T:
 			node.status = pbmAgentStatusLost
