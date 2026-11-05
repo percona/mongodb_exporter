@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"log/slog"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -30,7 +31,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -50,6 +53,24 @@ func TestPBMCollector(t *testing.T) {
 	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
 
 	c := newPbmCollector(ctx, client, mongoURI, 1000, promslog.New(&promslog.Config{}))
+
+	// PBM's backup list on the primary the collector reads it from, written with majority write concern
+	// for the collector's majority reads.
+	hello, err := getPBMHello(ctx, client)
+	require.NoError(t, err)
+	role, err := pbmClusterRole(ctx, client, hello)
+	require.NoError(t, err)
+	control, closeControl, err := c.controlClient(ctx, role, hello)
+	require.NoError(t, err)
+	t.Cleanup(closeControl)
+	pbmBackups := control.Database("admin", options.Database().SetWriteConcern(writeconcern.Majority())).
+		Collection(pbmBackupsCollection)
+
+	// The record of a stuck backup that a subtest writes. A run killed before the subtest's cleanup
+	// leaves it behind.
+	stuckBackup := bson.D{{Key: "name", Value: "PMM-15219-stuck-backup"}}
+	_, err = pbmBackups.DeleteMany(ctx, stuckBackup)
+	require.NoError(t, err)
 
 	t.Run("pbm configured metric", func(t *testing.T) {
 		filter := []string{
@@ -120,6 +141,55 @@ func TestPBMCollector(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("pbm backup failures metric", func(t *testing.T) {
+		// The test cluster setup retries a logical backup of rs2 until one succeeds, so no backup has
+		// failed after the last successful one.
+		filter := []string{
+			"mongodb_pbm_cluster_backup_failures_since_last_success",
+		}
+		expected := strings.NewReader(`
+		# HELP mongodb_pbm_cluster_backup_failures_since_last_success Number of recorded PBM backups of the type that failed after the last successful one
+		# TYPE mongodb_pbm_cluster_backup_failures_since_last_success gauge
+		mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 0` + "\n")
+		err = testutil.CollectAndCompare(c, expected, filter...)
+		require.NoError(t, err)
+
+		// A backup read without its heartbeat would count as failed while it runs.
+		backups, err := listPBMBackups(ctx, client)
+		require.NoError(t, err)
+		require.NotEmpty(t, backups)
+		for _, backup := range backups {
+			assert.NotZero(t, backup.Heartbeat.T, backup.Name)
+		}
+	})
+
+	t.Run("pbm backup failures metric counts a stuck backup", func(t *testing.T) {
+		// The record of an external backup whose agent stopped right after it started: unfinished, with
+		// a heartbeat far behind the cluster time.
+		_, err := pbmBackups.InsertOne(ctx, append(bson.D{
+			{Key: "type", Value: "external"},
+			{Key: "status", Value: "running"},
+			{Key: "start_ts", Value: time.Now().Unix()},
+			{Key: "hb", Value: primitive.Timestamp{T: 1, I: 1}},
+		}, stuckBackup...))
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			// ctx may be past its deadline by the time the cleanup runs.
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer cancel()
+			_, err := pbmBackups.DeleteMany(cleanupCtx, stuckBackup)
+			assert.NoError(t, err)
+		})
+
+		expected := strings.NewReader(`
+		# HELP mongodb_pbm_cluster_backup_failures_since_last_success Number of recorded PBM backups of the type that failed after the last successful one
+		# TYPE mongodb_pbm_cluster_backup_failures_since_last_success gauge
+		mongodb_pbm_cluster_backup_failures_since_last_success{type="external"} 1
+		mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 0` + "\n")
+		err = testutil.CollectAndCompare(c, expected, "mongodb_pbm_cluster_backup_failures_since_last_success")
+		assert.NoError(t, err)
+	})
+
 	t.Run("pbm backup metrics", func(t *testing.T) {
 		// One series of each per replica set of each backup. The test cluster setup takes a backup of rs2.
 		cur, err := client.Database("admin").Collection(pbmBackupsCollection).Find(ctx, bson.D{})
@@ -142,6 +212,7 @@ func TestPBMCollector(t *testing.T) {
 			assert.Equal(t, want, testutil.CollectAndCount(c, name), name)
 		}
 	})
+
 }
 
 func TestPBMCollectorWithoutPBM(t *testing.T) {
@@ -162,7 +233,8 @@ func TestPBMCollectorWithoutPBM(t *testing.T) {
 		"mongodb_pbm_cluster_backup_configured",
 		"mongodb_pbm_cluster_pitr_backup_enabled",
 		"mongodb_pbm_agent_status",
-		"mongodb_pbm_backup_size_bytes")
+		"mongodb_pbm_backup_size_bytes",
+		"mongodb_pbm_cluster_backup_failures_since_last_success")
 	assert.NoError(t, err)
 }
 
@@ -384,6 +456,197 @@ func TestParseReplsetHosts(t *testing.T) {
 	rs, ok := parseReplsetHosts("cfg/cfg1:27019,cfg2:27019")
 	require.True(t, ok)
 	assert.Equal(t, pbmReplset{name: "cfg", hosts: []string{"cfg1:27019", "cfg2:27019"}}, rs)
+}
+
+//nolint:funlen
+func TestPBMBackupFailureMetrics(t *testing.T) {
+	t.Parallel()
+
+	// backup returns a backup whose heartbeat is 5 seconds behind testPBMClusterTime.
+	backup := func(backupType pbmBackupType, status pbmBackupStatus, startTS int64) pbmBackup {
+		return pbmBackup{
+			Type:      backupType,
+			Status:    status,
+			StartTS:   startTS,
+			Heartbeat: primitive.Timestamp{T: testPBMClusterTime.T - 5},
+		}
+	}
+	// stale returns b with a heartbeat that PBM considers stale.
+	stale := func(b pbmBackup) pbmBackup {
+		b.Heartbeat = primitive.Timestamp{T: testPBMClusterTime.T - pbmStaleAgentSecs - 1}
+
+		return b
+	}
+
+	const header = `
+	# HELP mongodb_pbm_cluster_backup_failures_since_last_success Number of recorded PBM backups of the type that failed after the last successful one
+	# TYPE mongodb_pbm_cluster_backup_failures_since_last_success gauge
+	`
+
+	for _, tc := range []struct {
+		name    string
+		backups []pbmBackup
+		// noClusterTime is set when the cluster time could not be read.
+		noClusterTime bool
+		expected      string
+	}{
+		{
+			name: "no backups",
+		},
+		{
+			name: "failures after the last success",
+			// Newest first, as listPBMBackups returns them.
+			backups: []pbmBackup{
+				backup(pbmLogicalBackup, statusError, 600),
+				backup(pbmLogicalBackup, statusError, 500),
+				backup(pbmLogicalBackup, statusDone, 400),
+				backup(pbmLogicalBackup, statusError, 300),
+				backup(pbmLogicalBackup, statusDone, 200),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 2` + "\n",
+		},
+		{
+			name: "the newest backup succeeded",
+			backups: []pbmBackup{
+				backup(pbmLogicalBackup, statusDone, 300),
+				backup(pbmLogicalBackup, statusError, 200),
+				backup(pbmLogicalBackup, statusError, 100),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 0` + "\n",
+		},
+		{
+			name: "no backup succeeded",
+			backups: []pbmBackup{
+				backup(pbmLogicalBackup, statusError, 200),
+				backup(pbmLogicalBackup, statusError, 100),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 2` + "\n",
+		},
+		{
+			name: "cancelled and running backups neither fail nor succeed",
+			backups: []pbmBackup{
+				backup(pbmLogicalBackup, "running", 500),
+				backup(pbmLogicalBackup, statusError, 400),
+				backup(pbmLogicalBackup, statusCancelled, 300),
+				backup(pbmLogicalBackup, statusError, 200),
+				backup(pbmLogicalBackup, statusDone, 100),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 2` + "\n",
+		},
+		{
+			name: "an unfinished backup whose agent stopped failed",
+			// PBM's status command reports such a backup as failed before PBM marks it so.
+			backups: []pbmBackup{
+				stale(backup(pbmLogicalBackup, "running", 400)),
+				stale(backup(pbmLogicalBackup, "starting", 300)),
+				backup(pbmLogicalBackup, statusError, 200),
+				backup(pbmLogicalBackup, statusDone, 100),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 3` + "\n",
+		},
+		{
+			name: "a finished backup keeps its status however old its heartbeat is",
+			backups: []pbmBackup{
+				stale(backup(pbmLogicalBackup, statusCancelled, 300)),
+				stale(backup(pbmLogicalBackup, statusDone, 200)),
+				backup(pbmLogicalBackup, statusError, 100),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 0` + "\n",
+		},
+		{
+			name: "without the cluster time only backups marked failed count",
+			backups: []pbmBackup{
+				stale(backup(pbmLogicalBackup, "running", 300)),
+				backup(pbmLogicalBackup, statusError, 200),
+				backup(pbmLogicalBackup, statusDone, 100),
+			},
+			noClusterTime: true,
+			expected:      header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 1` + "\n",
+		},
+		{
+			name: "each type has its own count",
+			// A successful logical backup does not hide failing physical ones.
+			backups: []pbmBackup{
+				backup(pbmLogicalBackup, statusDone, 500),
+				backup("physical", statusError, 400),
+				backup(pbmLogicalBackup, statusError, 300),
+				backup("physical", statusError, 200),
+				backup("physical", statusDone, 100),
+				backup("incremental", "running", 50),
+			},
+			expected: header + `
+			mongodb_pbm_cluster_backup_failures_since_last_success{type="incremental"} 0
+			mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 0
+			mongodb_pbm_cluster_backup_failures_since_last_success{type="physical"} 2
+			`,
+		},
+		{
+			name: "the order of the list does not matter",
+			// The newest success is not the first one in the list.
+			backups: []pbmBackup{
+				backup(pbmLogicalBackup, statusError, 300),
+				backup(pbmLogicalBackup, statusDone, 200),
+				backup(pbmLogicalBackup, statusError, 100),
+				backup(pbmLogicalBackup, statusError, 500),
+				backup(pbmLogicalBackup, statusDone, 400),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 1` + "\n",
+		},
+		{
+			name: "a heartbeat as old as PBM's stale frame is not stale yet",
+			backups: []pbmBackup{
+				{
+					Type:      pbmLogicalBackup,
+					Status:    "running",
+					StartTS:   200,
+					Heartbeat: primitive.Timestamp{T: testPBMClusterTime.T - pbmStaleAgentSecs},
+				},
+				backup(pbmLogicalBackup, statusDone, 100),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 0` + "\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			clusterTime := testPBMClusterTime
+			if tc.noClusterTime {
+				clusterTime = primitive.Timestamp{}
+			}
+			metrics := pbmBackupFailureMetrics(tc.backups, clusterTime)
+			if tc.expected == "" {
+				assert.Empty(t, metrics)
+
+				return
+			}
+			err := testutil.CollectAndCompare(staticCollector(metrics), strings.NewReader(tc.expected))
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// TestPBMBackupProjection checks that the projection keeps every field that pbmBackup decodes. A field
+// left out decodes as its zero value: without the heartbeat, every running backup would count as failed.
+func TestPBMBackupProjection(t *testing.T) {
+	t.Parallel()
+
+	projected := make(map[string]bool, len(pbmBackupProjection))
+	for _, e := range pbmBackupProjection {
+		projected[e.Key] = true
+	}
+
+	for prefix, typ := range map[string]reflect.Type{
+		"":          reflect.TypeFor[pbmBackup](),
+		"replsets.": reflect.TypeFor[pbmBackupReplset](),
+	} {
+		for field := range typ.Fields() {
+			if field.Type == reflect.TypeFor[[]pbmBackupReplset]() {
+				continue // checked field by field
+			}
+			key, _, _ := strings.Cut(field.Tag.Get("bson"), ",")
+			assert.True(t, projected[prefix+key], "%s (%s) is not in pbmBackupProjection", prefix+key, field.Name)
+		}
+	}
 }
 
 func TestPBMBackupsMetrics(t *testing.T) {
