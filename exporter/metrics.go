@@ -31,8 +31,16 @@ import (
 )
 
 const (
-	exporterPrefix = "mongodb_"
+	exporterPrefix         = "mongodb_"
+	histogramLowerBoundKey = "lowerBound"
+	histogramMicrosKey     = "micros"
+	histogramBoundLabel    = "lower_bound"
 )
+
+// Fields holding a histogram bucket boundary, sorted by precedence. See histogramBoundKey.
+//
+//nolint:gochecknoglobals
+var histogramBoundKeys = []string{histogramLowerBoundKey, histogramMicrosKey}
 
 type rawMetric struct {
 	// Full Qualified Name
@@ -320,7 +328,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 
 	for k, val := range m {
 		nextPrefix := prefix + k
-		if !includeHistograms && isHistogramPath(nextPrefix) {
+		if !includeHistograms && isHistogramBucketValue(nextPrefix, val) {
 			continue
 		}
 
@@ -425,24 +433,6 @@ func appendMetricValue(metrics []prometheus.Metric, prefix, name string, value a
 	return metrics
 }
 
-// histogramBoundKeys are the fields a histogram bucket uses to name the latency range it
-// counts. Server status reports "lowerBound"; the opLatencies histograms added in MongoDB
-// 8.3 report "micros". The key becomes the label that separates one bucket from the next,
-// named after the field rather than normalised, since the two are not documented as
-// meaning the same thing.
-var histogramBoundKeys = []string{"lowerBound", "micros"}
-
-// histogramBound returns the field a bucket is keyed by, and its value.
-func histogramBound(bucket map[string]any) (string, any, bool) {
-	for _, key := range histogramBoundKeys {
-		if value, ok := bucket[key]; ok {
-			return key, value, true
-		}
-	}
-
-	return "", nil, false
-}
-
 func processHistogramSlice(prefix string, v []any, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0, len(v))
 	for _, item := range v {
@@ -451,7 +441,7 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 			continue
 		}
 
-		boundKey, bound, ok := histogramBound(bucket)
+		boundKey, ok := histogramBoundKey(bucket)
 		if !ok {
 			continue
 		}
@@ -463,20 +453,42 @@ func processHistogramSlice(prefix string, v []any, commonLabels map[string]strin
 
 		// Without a label naming the bucket, every bucket of the histogram produces the
 		// same series and the registry rejects all but the first.
-		labels[boundLabel(boundKey)] = fmt.Sprint(bound)
+		labels[histogramBoundLabel] = fmt.Sprint(bucket[boundKey])
 		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
 	}
 
 	return metrics
 }
 
-// boundLabel is the label name for a bucket keyed by boundKey.
-func boundLabel(boundKey string) string {
-	if boundKey == "lowerBound" {
-		return "lower_bound"
+// histogramBoundKey returns the field holding the bucket boundary. getDiagnosticData names it
+// two ways, both documented as the lower bound of the bucket: "lowerBound" under "histograms"
+// nodes and "micros" under the "histogram" arrays of serverStatus.opLatencies. Both are exposed
+// under histogramBoundLabel so that a query does not have to know which shape it came from.
+// The order decides which one wins should a bucket ever carry both.
+func histogramBoundKey(bucket map[string]any) (string, bool) {
+	for _, key := range histogramBoundKeys {
+		if _, ok := bucket[key]; ok {
+			return key, true
+		}
 	}
 
-	return boundKey
+	return "", false
+}
+
+// isHistogramBucketValue reports whether the value holds histogram buckets, so that
+// includeHistograms gates the buckets themselves rather than every node that happens to be
+// named "histogram" or "histograms". Only the diagnostic data collector can enable them,
+// every other collector passes includeHistograms=false; see the "latencyStats" request of
+// the collstats collector and PMM-9568.
+func isHistogramBucketValue(prefix string, val any) bool {
+	switch v := val.(type) {
+	case primitive.A:
+		return isHistogramBucketSlice(prefix, v)
+	case []any:
+		return isHistogramBucketSlice(prefix, v)
+	default:
+		return false
+	}
 }
 
 func isHistogramBucketSlice(prefix string, v []any) bool {
@@ -492,7 +504,7 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 		if !ok {
 			return false
 		}
-		if _, _, ok := histogramBound(bucket); !ok {
+		if _, ok := histogramBoundKey(bucket); !ok {
 			return false
 		}
 		if _, ok := bucket["count"]; !ok {
