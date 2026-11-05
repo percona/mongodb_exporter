@@ -937,9 +937,12 @@ func pbmBackupsMetrics(backupsList []pbmBackup, me string, now time.Time) []prom
 	return metrics
 }
 
-// listPBMRestores returns PBM's restore metadata, the most recent restore first. A physical restore
-// empties it, and gets there only with the resync PBM requires after it; while it runs, the database is
-// down. A resync replaces all of it.
+// listPBMRestores returns PBM's restore metadata, the most recent restore first. PBM records a logical
+// restore there as it runs. A physical, incremental or external restore records its progress and result only
+// in the backup storage, and empties the collection in its last step; while it runs, the database is down.
+// It gets there only with the resync PBM requires after it, which imports the metadata the leader writes to
+// the storage once it has finished: a restore that fails before that is never there. A resync replaces all
+// of it.
 func listPBMRestores(ctx context.Context, client *mongo.Client) ([]pbmRestore, error) {
 	cur, err := pbmAdminDB(client).Collection(pbmRestoresCollection).
 		Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "start_ts", Value: -1}}).SetProjection(pbmRestoreProjection))
@@ -995,7 +998,7 @@ func pbmRestoresMetrics(restores []pbmRestore, clusterTime primitive.Timestamp, 
 
 	metrics := make([]prometheus.Metric, 0, 1+2*len(restores))
 	metrics = append(metrics, createPBMMetric("restore_status",
-		"Status of the most recent PBM restore: 0 = idle (no restore), 1 = running, 2 = failed, 3 = completed",
+		"Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do",
 		float64(status), nil))
 
 	for _, restore := range restores {

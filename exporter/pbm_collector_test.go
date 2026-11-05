@@ -151,7 +151,7 @@ func TestPBMCollector(t *testing.T) {
 		assert.Equal(t, 1, testutil.CollectAndCount(c, "mongodb_pbm_restore_status"))
 		if want == 0 {
 			expected := strings.NewReader(`
-			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore: 0 = idle (no restore), 1 = running, 2 = failed, 3 = completed
+			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 			# TYPE mongodb_pbm_restore_status gauge
 			mongodb_pbm_restore_status 0` + "\n")
 			require.NoError(t, testutil.CollectAndCompare(c, expected, "mongodb_pbm_restore_status"))
@@ -505,7 +505,7 @@ func TestPBMRestoresMetrics(t *testing.T) {
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T20:30:00.123456789Z",opid="op-stale",status="starting",type="logical"} 1.699993001e+09
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T21:00:00.123456789Z",opid="op-done",status="done",type="physical"} 1.6999956e+09
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T22:30:00.123456789Z",opid="op-running",status="running",type="logical"} 1.7000001e+09
-	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore: 0 = idle (no restore), 1 = running, 2 = failed, 3 = completed
+	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 	# TYPE mongodb_pbm_restore_status gauge
 	mongodb_pbm_restore_status 1
 	`)
@@ -518,7 +518,7 @@ func TestPBMRestoresMetricsWithoutRestore(t *testing.T) {
 	t.Parallel()
 
 	expected := strings.NewReader(`
-	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore: 0 = idle (no restore), 1 = running, 2 = failed, 3 = completed
+	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 	# TYPE mongodb_pbm_restore_status gauge
 	mongodb_pbm_restore_status 0
 	`)
