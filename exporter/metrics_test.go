@@ -282,6 +282,29 @@ func TestHistogramMetricsAreSkippedByDefault(t *testing.T) {
 	assert.Empty(t, metrics)
 }
 
+// Buckets are recognized by their shape, so a histogram under a name the exporter does not know
+// neither collides when histograms are enabled nor is collected when they are not.
+func TestHistogramBucketsUnderAnyName(t *testing.T) {
+	t.Parallel()
+
+	m := bson.M{
+		"waitTimeMicros": primitive.A{
+			bson.M{"lowerBound": int64(0), "count": int64(5)},
+			bson.M{"lowerBound": int64(100), "count": int64(9)},
+		},
+		"processing": int64(1),
+	}
+
+	metricsByName := gatherMetrics(t, makeMetricsWithHistograms("serverStatus.someFeature", m, nil, false, true))
+	assert.NotContains(t, metricsByName, "mongodb_ss_someFeature_waitTimeMicros_lowerBound")
+	bucketCounts, ok := metricsByName["mongodb_ss_someFeature_waitTimeMicros_count"]
+	require.True(t, ok)
+	assert.Equal(t, map[string]float64{"0": 5, "100": 9}, countsByLowerBound(bucketCounts))
+
+	assert.ElementsMatch(t, []string{"mongodb_ss_someFeature_processing"},
+		gatheredMetricNames(t, makeMetrics("serverStatus.someFeature", m, nil, false)))
+}
+
 // Only the buckets are gated by includeHistograms. A node named "histogram" that holds
 // something else must be collected like any other node.
 func TestNonBucketHistogramNodeIsNotSkipped(t *testing.T) {

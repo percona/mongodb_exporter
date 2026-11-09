@@ -328,7 +328,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 
 	for k, val := range m {
 		nextPrefix := prefix + k
-		if !includeHistograms && isHistogramBucketValue(nextPrefix, val) {
+		if !includeHistograms && isHistogramBucketValue(val) {
 			continue
 		}
 
@@ -348,7 +348,7 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 		case primitive.A:
 			res = append(res, processMetricSlice(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case []any:
-			if isHistogramBucketSlice(nextPrefix, v) {
+			if isHistogramBucketSlice(v) {
 				res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
 			}
 			continue
@@ -391,7 +391,7 @@ func processSlice(prefix string, v []any, commonLabels map[string]string, compat
 }
 
 func processMetricSlice(prefix string, v []any, commonLabels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
-	if isHistogramBucketSlice(prefix, v) {
+	if isHistogramBucketSlice(v) {
 		return processHistogramSlice(prefix, v, commonLabels, compatibleMode)
 	}
 
@@ -480,22 +480,20 @@ func histogramBoundKey(bucket map[string]any) (string, bool) {
 // named "histogram" or "histograms". Only the diagnostic data collector can enable them,
 // every other collector passes includeHistograms=false; see the "latencyStats" request of
 // the collstats collector and PMM-9568.
-func isHistogramBucketValue(prefix string, val any) bool {
+func isHistogramBucketValue(val any) bool {
 	switch v := val.(type) {
 	case primitive.A:
-		return isHistogramBucketSlice(prefix, v)
+		return isHistogramBucketSlice(v)
 	case []any:
-		return isHistogramBucketSlice(prefix, v)
+		return isHistogramBucketSlice(v)
 	default:
 		return false
 	}
 }
 
-func isHistogramBucketSlice(prefix string, v []any) bool {
+// isHistogramBucketSlice reports whether every element of v is a bucket with a bound and a count, whatever its path.
+func isHistogramBucketSlice(v []any) bool {
 	if len(v) == 0 {
-		return false
-	}
-	if !isHistogramPath(prefix) {
 		return false
 	}
 
@@ -513,20 +511,6 @@ func isHistogramBucketSlice(prefix string, v []any) bool {
 	}
 
 	return true
-}
-
-// isHistogramPath reports whether prefix names a histogram subtree. Server status uses
-// "histograms", the opLatencies histograms added in MongoDB 8.3 use "histogram", and the
-// queue wait time histograms added in MongoDB 9.0 are the "queueWaitTimeMicros" arrays
-// themselves.
-func isHistogramPath(prefix string) bool {
-	for _, name := range []string{"histograms", "histogram", "queueWaitTimeMicros"} {
-		if prefix == name || strings.Contains(prefix, "."+name+".") || strings.HasSuffix(prefix, "."+name) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func asMetricMap(item any) (map[string]any, bool) {
