@@ -624,8 +624,8 @@ func TestPBMBackupFailureMetrics(t *testing.T) {
 	}
 }
 
-// TestPBMBackupProjection checks that the projection keeps every field that pbmBackup decodes. A field
-// left out decodes as its zero value: without the heartbeat, every running backup would count as failed.
+// TestPBMBackupProjection checks that the projection keeps every field pbmBackup decodes, since without
+// the heartbeat every running backup would count as failed.
 func TestPBMBackupProjection(t *testing.T) {
 	t.Parallel()
 
@@ -639,8 +639,9 @@ func TestPBMBackupProjection(t *testing.T) {
 		"replsets.": reflect.TypeFor[pbmBackupReplset](),
 	} {
 		for field := range typ.Fields() {
+			// Checked field by field under "replsets.".
 			if field.Type == reflect.TypeFor[[]pbmBackupReplset]() {
-				continue // checked field by field
+				continue
 			}
 			key, _, _ := strings.Cut(field.Tag.Get("bson"), ",")
 			assert.True(t, projected[prefix+key], "%s (%s) is not in pbmBackupProjection", prefix+key, field.Name)

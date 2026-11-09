@@ -853,44 +853,21 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, control *mongo.Cli
 	return append(metrics, pbmBackupFailureMetrics(backupsList, clusterTime)...)
 }
 
-// failed reports whether a backup failed: PBM marked it failed, or it is unfinished and its heartbeat
-// is stale because no agent runs it any more, which is how PBM's status command tells a stuck backup.
-// PBM's own record of such a backup can stay unfinished: PBM marks it failed only if a later operation
-// finds its lock stale.
+// failed reports whether PBM marked the backup failed or, as PBM's status command does, whether it is
+// unfinished with a stale heartbeat because its agent stopped.
 func (b *pbmBackup) failed(clusterTime primitive.Timestamp) bool {
 	switch b.Status {
 	case statusError:
 		return true
-	case statusDone, statusCancelled, statusDown: // PBM sets down on restores only
+	case statusDone, statusCancelled, statusDown:
 		return false
 	default:
 		return b.Heartbeat.T+pbmStaleAgentSecs < clusterTime.T
 	}
 }
 
-// pbmBackupFailureMetrics returns, for each type of backup in the list, how many backups of that type
-// failed after the newest one that succeeded, or all failed ones when none succeeded. Backups of the
-// cluster run one at a time, so their start times order them. clusterTime is the cluster time of the
-// node the list was read from; when it is zero, only the backups PBM marked failed count.
-//
-// PBM does not retry a failed backup. The attempts a physical, incremental or external backup makes to
-// open MongoDB's backup cursor are retries within one backup, which PBM logs at debug level only.
-// PMM's backup retries and external schedulers (cron) start a new backup, so each failed retry adds
-// one. A cancelled backup is neither a failure nor a success, although PBM's status command lists it
-// as failed.
-//
-// The count only covers the backups PBM keeps a record of. Most backups that PBM refuses to start,
-// such as one requested while another operation runs, leave no record, and PBM can delete, rebuild or
-// empty its list of backups:
-//   - pbm cleanup and pbm delete-backup --older-than delete failed backups too.
-//   - A resync of the backup storage leaves failed backups out, and marks the ones whose files are
-//     missing as failed. PMM runs one before every restore, and on a backup to another location or
-//     folder than PBM's current storage.
-//   - A physical restore empties the list.
-//
-// Otherwise a count stays until a backup of the type succeeds, including the count of a record that
-// stays unfinished because no agent took the backup. For a signal that survives all of this, alert on
-// the age of the last successful backup (mongodb_pbm_backup_last_transition_ts{status="done"}).
+// pbmBackupFailureMetrics returns, for each backup type, how many backups that started after the newest
+// successful one failed, with stale unfinished ones counted only when clusterTime is set (see PMM-15219).
 func pbmBackupFailureMetrics(backups []pbmBackup, clusterTime primitive.Timestamp) []prometheus.Metric {
 	lastDone := make(map[pbmBackupType]int64)
 	for _, backup := range backups {
