@@ -445,6 +445,26 @@ func TestFieldsExportedAsLabelValuesAreNotIndexed(t *testing.T) {
 	assert.Empty(t, labelValues(sizes, collisionLabel))
 }
 
+// A collision inside documents that collided themselves keeps both fields in the label, quoted, so
+// that a field name containing a dot cannot make two paths read the same.
+func TestNestedCollisionsStayDistinct(t *testing.T) {
+	t.Parallel()
+
+	metricsByName := gatherMetrics(t, makeMetrics("systemMetrics.ethtool", bson.M{
+		"a":  bson.M{".x": int64(1), "x": int64(2)},
+		"a.": bson.M{"x": int64(3), ".x": int64(4)},
+	}, nil, false))
+
+	collided, ok := metricsByName["mongodb_sys_ethtool_a_x"]
+	require.True(t, ok)
+	assert.Equal(t, map[string]float64{
+		`"a".".x"`:  1,
+		`"a"."x"`:   2,
+		`"a."."x"`:  3,
+		`"a.".".x"`: 4,
+	}, valuesByLabel(collided, collisionLabel))
+}
+
 // Array entries, and the documents whose keys are exported as a label value, share their metric
 // names. A collision found in one of them only has to label the same field everywhere else as
 // well, otherwise the family has two label sets and the registry rejects the whole scrape.

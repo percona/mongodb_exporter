@@ -20,6 +20,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -324,6 +325,8 @@ func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string
 type familyMember struct {
 	doc    bson.M
 	labels map[string]string
+	// collisionPath lists the colliding fields on the way to doc; see collisionLabelValue.
+	collisionPath []string
 }
 
 // makeFamilyMetrics exports the fields of a family of documents sharing one prefix: the entries
@@ -349,9 +352,10 @@ func makeFamilyMetrics(prefix string, family []familyMember, compatibleMode, inc
 			// A field sharing its metric name with a sibling is exported under the name of the
 			// canonical field of the group, so that the whole group agrees on the name and on
 			// the help. The collision label carries the real field and keeps the series apart.
-			name, l := k, member.labels
+			name, l, path := k, member.labels, member.collisionPath
 			if canonical, ok := colliding[k]; ok {
-				name, l = canonical, withLabel(member.labels, collisionLabel, k)
+				path = append(slices.Clone(member.collisionPath), k)
+				name, l = canonical, withLabel(member.labels, collisionLabel, collisionLabelValue(path))
 			}
 
 			nextPrefix := prefix + name
@@ -367,14 +371,14 @@ func makeFamilyMetrics(prefix string, family []familyMember, compatibleMode, inc
 			switch v := val.(type) {
 			case bson.M, map[string]any:
 				doc, _ := asMetricMap(v)
-				nextFamilies = addFamilyMembers(nextFamilies, nextPrefix, familyMember{doc: doc, labels: l})
+				nextFamilies = addFamilyMembers(nextFamilies, nextPrefix, familyMember{doc: doc, labels: l, collisionPath: path})
 			case primitive.A:
 				if isHistogramBucketSlice(nextPrefix, v) {
 					res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
 
 					continue
 				}
-				nextFamilies = addFamilyMembers(nextFamilies, nextPrefix, arrayMembers(v, l)...)
+				nextFamilies = addFamilyMembers(nextFamilies, nextPrefix, arrayMembers(v, l, path)...)
 			case []any:
 				if isHistogramBucketSlice(nextPrefix, v) {
 					res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
@@ -519,6 +523,21 @@ func isUnambiguousKey(k string) bool {
 	return !previousIsUnderscore
 }
 
+// collisionLabelValue is the field itself for a single collision and each field quoted for nested ones, as a
+// dot-joined path would let a field name containing a dot read as another path.
+func collisionLabelValue(path []string) string {
+	if len(path) == 1 {
+		return path[0]
+	}
+
+	quoted := make([]string, len(path))
+	for i, field := range path {
+		quoted[i] = strconv.Quote(field)
+	}
+
+	return strings.Join(quoted, ".")
+}
+
 // withLabel returns a copy of labels with one more label set, so that the map a document shares
 // with its siblings is never modified in place.
 func withLabel(labels map[string]string, name, value string) map[string]string {
@@ -532,7 +551,7 @@ func withLabel(labels map[string]string, name, value string) map[string]string {
 // arrayMembers extracts maps from arrays, as members of the family exported under the prefix of
 // the array. Only some structures like replicasets have arrays of members and each member is
 // represented by a map[string]any.
-func arrayMembers(v []any, commonLabels map[string]string) []familyMember {
+func arrayMembers(v []any, commonLabels map[string]string, collisionPath []string) []familyMember {
 	members := make([]familyMember, 0, len(v))
 	labels := make(map[string]string)
 	maps.Copy(labels, commonLabels)
@@ -556,7 +575,7 @@ func arrayMembers(v []any, commonLabels map[string]string) []familyMember {
 
 		// The member is walked only once the whole family is known, so it keeps the labels as
 		// they are at its entry.
-		members = append(members, familyMember{doc: s, labels: maps.Clone(labels)})
+		members = append(members, familyMember{doc: s, labels: maps.Clone(labels), collisionPath: collisionPath})
 	}
 
 	return members
