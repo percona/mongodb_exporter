@@ -212,7 +212,6 @@ func TestPBMCollector(t *testing.T) {
 			assert.Equal(t, want, testutil.CollectAndCount(c, name), name)
 		}
 	})
-
 }
 
 func TestPBMCollectorWithoutPBM(t *testing.T) {
