@@ -477,7 +477,7 @@ func TestPBMPITRMetrics(t *testing.T) {
 	}
 
 	expected := strings.NewReader(`
-	# HELP mongodb_pbm_cluster_pitr_last_write_ts Oldest of the replica sets' last PBM PITR oplog writes (seconds since epoch). It advances once per oplog chunk, every pitr.oplogSpanMin (10 min by default), and not while a backup runs
+	# HELP mongodb_pbm_cluster_pitr_last_write_ts Oldest of the replica sets' last PBM PITR oplog writes (seconds since epoch). It advances once per oplog chunk, every pitr.oplogSpanMin (10 min by default); PBM pauses PITR during a logical backup and other operations such as a restore
 	# TYPE mongodb_pbm_cluster_pitr_last_write_ts gauge
 	mongodb_pbm_cluster_pitr_last_write_ts 1.7000003e+09
 	# HELP mongodb_pbm_pitr_last_write_ts Time of the last oplog write in the newest PBM PITR oplog chunk of the replica set (seconds since epoch)
@@ -509,7 +509,8 @@ func TestLastPITRChunkEnds(t *testing.T) {
 	filter := bson.D{{Key: "rs", Value: bson.D{{Key: "$in", Value: bson.A{"last-chunk-rs0", "last-chunk-rs1"}}}}}
 	_, err := chunks.DeleteMany(ctx, filter)
 	require.NoError(t, err)
-	t.Cleanup(func() { _, _ = chunks.DeleteMany(ctx, filter) })
+	// Cleanup runs after ctx is cancelled.
+	t.Cleanup(func() { _, _ = chunks.DeleteMany(context.Background(), filter) })
 
 	// Out of order, as the newest chunk of a replica set is the one that starts last.
 	_, err = chunks.InsertMany(ctx, []any{
@@ -562,4 +563,83 @@ func TestLastPITRChunkEnds(t *testing.T) {
 	ends, err = lastPITRChunkEnds(cancelled, client, replsets)
 	require.Error(t, err)
 	assert.Nil(t, ends)
+}
+
+func TestPBMCollectorPITRMetrics(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	// The sharded cluster runs no PBM, so a configuration with PITR enabled starts no slicing there.
+	client := tu.DefaultTestClientMongoS(ctx, t)
+	port, err := tu.PortForContainer("mongos")
+	require.NoError(t, err)
+
+	hello, err := getPBMHello(ctx, client)
+	require.NoError(t, err)
+	replsets, err := clusterReplsets(ctx, client, string(typeMongos), hello)
+	require.NoError(t, err)
+	require.NotEmpty(t, replsets)
+
+	majority := options.Collection().SetWriteConcern(writeconcern.Majority())
+	config := client.Database("admin").Collection(pbmConfigCollection, majority)
+	chunks := client.Database("admin").Collection(pbmPITRChunksCollection, majority)
+	// Cleanup runs after ctx is cancelled. A sharded cluster doesn't drop collections of admin.
+	clean := func() {
+		_, _ = config.DeleteMany(context.Background(), bson.D{})
+		_, _ = chunks.DeleteMany(context.Background(), bson.D{})
+	}
+	clean()
+	t.Cleanup(clean)
+
+	_, err = config.InsertOne(ctx, bson.D{{Key: "pitr", Value: bson.D{{Key: "enabled", Value: true}}}})
+	require.NoError(t, err)
+
+	// The cluster's last write is the oldest of the replica sets': the first one's.
+	const oldest = 1_700_000_000
+	want := map[string]float64{"": oldest}
+	for i, rs := range replsets {
+		end := uint32(oldest + 600*i)
+		_, err = chunks.InsertOne(ctx, bson.D{
+			{Key: "rs", Value: rs.name},
+			{Key: "fname", Value: "pbmPitr/" + rs.name},
+			{Key: "start_ts", Value: primitive.Timestamp{T: end - 600, I: 1}},
+			{Key: "end_ts", Value: primitive.Timestamp{T: end, I: 1}},
+		})
+		require.NoError(t, err)
+		want[rs.name] = float64(end)
+	}
+
+	c := newPbmCollector(ctx, client, "mongodb://127.0.0.1:"+port, 1000, promslog.New(&promslog.Config{}))
+
+	assert.Equal(t, want, pitrLastWrites(t, c))
+}
+
+// pitrLastWrites returns the PITR last write series of a collector by replica set, the cluster's as "".
+func pitrLastWrites(t *testing.T, c prometheus.Collector) map[string]float64 {
+	t.Helper()
+
+	reg := prometheus.NewRegistry()
+	require.NoError(t, reg.Register(c))
+	families, err := reg.Gather()
+	require.NoError(t, err)
+
+	got := make(map[string]float64)
+	for _, family := range families {
+		name := family.GetName()
+		if name != "mongodb_pbm_cluster_pitr_last_write_ts" && name != "mongodb_pbm_pitr_last_write_ts" {
+			continue
+		}
+		for _, m := range family.GetMetric() {
+			rs := ""
+			for _, l := range m.GetLabel() {
+				rs = l.GetValue()
+			}
+			require.Equal(t, name == "mongodb_pbm_pitr_last_write_ts", rs != "")
+			got[rs] = m.GetGauge().GetValue()
+		}
+	}
+
+	return got
 }

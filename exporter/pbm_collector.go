@@ -619,7 +619,7 @@ func pbmPITRMetrics(lastWrites map[string]primitive.Timestamp) []prometheus.Metr
 	}
 
 	return append(metrics, createPBMMetric("cluster_pitr_last_write_ts",
-		"Oldest of the replica sets' last PBM PITR oplog writes (seconds since epoch). It advances once per oplog chunk, every pitr.oplogSpanMin (10 min by default), and not while a backup runs",
+		"Oldest of the replica sets' last PBM PITR oplog writes (seconds since epoch). It advances once per oplog chunk, every pitr.oplogSpanMin (10 min by default); PBM pauses PITR during a logical backup and other operations such as a restore",
 		float64(cluster), nil))
 }
 
