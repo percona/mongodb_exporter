@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -66,9 +67,10 @@ const (
 // PBM keeps its state in these admin collections of the replica set or, in a sharded cluster, of the
 // config server replica set.
 const (
-	pbmConfigCollection  = "pbmConfig"
-	pbmAgentsCollection  = "pbmAgents"
-	pbmBackupsCollection = "pbmBackups"
+	pbmConfigCollection     = "pbmConfig"
+	pbmAgentsCollection     = "pbmAgents"
+	pbmBackupsCollection    = "pbmBackups"
+	pbmPITRChunksCollection = "pbmPITRChunks"
 
 	// pbmStaleAgentSecs is PBM's defs.StaleFrameSec: an agent whose last heartbeat is further behind
 	// the cluster time is lost.
@@ -298,6 +300,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 		pitrEnabledMetric := 0
 		if pbmConfig.PITR.Enabled {
 			pitrEnabledMetric = 1
+			metrics = append(metrics, p.pbmPITRMetrics(p.ctx, control, role, logger, currentNode)...)
 		}
 
 		metrics = append(metrics, createPBMMetric("cluster_pitr_backup_enabled",
@@ -538,6 +541,86 @@ func getPBMConfig(ctx context.Context, client *mongo.Client) (*pbmConfig, error)
 	}
 
 	return &cfg, nil
+}
+
+// pbmPITRChunk is the part of PBM's metadata of a PITR oplog chunk that the collector reads.
+type pbmPITRChunk struct {
+	EndTS primitive.Timestamp `bson:"end_ts"`
+}
+
+// lastPITRChunkEnd returns the time of the last oplog write in the newest PITR oplog chunk of a replica
+// set, the one that starts last, as PBM's oplog.PITRLastChunkMeta finds it.
+func lastPITRChunkEnd(ctx context.Context, client *mongo.Client, rs string) (primitive.Timestamp, error) {
+	var chunk pbmPITRChunk
+	// Without _id, PBM's index on rs, start_ts and end_ts covers the query.
+	err := pbmAdminDB(client).Collection(pbmPITRChunksCollection).
+		FindOne(ctx, bson.D{{Key: "rs", Value: rs}}, options.FindOne().
+			SetSort(bson.D{{Key: "start_ts", Value: -1}}).
+			SetProjection(bson.D{{Key: "_id", Value: 0}, {Key: "end_ts", Value: 1}})).Decode(&chunk)
+	if err != nil {
+		return primitive.Timestamp{}, fmt.Errorf("find chunk of replica set %s: %w", rs, err)
+	}
+
+	return chunk.EndTS, nil
+}
+
+// lastPITRChunkEnds returns the result of lastPITRChunkEnd for each of the replica sets that has a chunk.
+func lastPITRChunkEnds(ctx context.Context, client *mongo.Client, replsets []pbmReplset) (map[string]primitive.Timestamp, error) {
+	ends := make(map[string]primitive.Timestamp, len(replsets))
+	for _, rs := range replsets {
+		end, err := lastPITRChunkEnd(ctx, client, rs.name)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			// Like PBM, leave a replica set without chunks out of the cluster's PITR range.
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		ends[rs.name] = end
+	}
+
+	return ends, nil
+}
+
+// pbmPITRMetrics returns the PITR metrics of the replica sets of the cluster, the ones PBM's
+// oplog.PITRTimelines looks for chunks of.
+func (p *pbmCollector) pbmPITRMetrics(ctx context.Context, control *mongo.Client, role string, l *slog.Logger, currentNode *pbmHello) []prometheus.Metric {
+	replsets, err := clusterReplsets(ctx, control, role, currentNode)
+	if err != nil {
+		l.Error("failed to get the replica sets for PBM PITR metrics", "error", err.Error())
+
+		return nil
+	}
+
+	lastWrites, err := lastPITRChunkEnds(ctx, control, replsets)
+	if err != nil {
+		l.Error("failed to get the last PITR chunk", "error", err.Error())
+
+		return nil
+	}
+
+	return pbmPITRMetrics(lastWrites)
+}
+
+// pbmPITRMetrics returns the last PITR oplog write of each replica set in lastWrites, and the oldest of
+// them as the cluster's.
+func pbmPITRMetrics(lastWrites map[string]primitive.Timestamp) []prometheus.Metric {
+	if len(lastWrites) == 0 {
+		return nil
+	}
+
+	metrics := make([]prometheus.Metric, 0, 1+len(lastWrites))
+	cluster := uint32(math.MaxUint32)
+	for rs, end := range lastWrites {
+		cluster = min(cluster, end.T)
+		metrics = append(metrics, createPBMMetric("pitr_last_write_ts",
+			"Time of the last oplog write in the newest PBM PITR oplog chunk of the replica set (seconds since epoch)",
+			float64(end.T), map[string]string{"replica_set": rs})) //nolint:goconst // the label of the other PBM metrics
+	}
+
+	return append(metrics, createPBMMetric("cluster_pitr_last_write_ts",
+		"Oldest of the replica sets' last PBM PITR oplog writes (seconds since epoch). It advances once per oplog chunk, every pitr.oplogSpanMin (10 min by default), and not while a backup runs",
+		float64(cluster), nil))
 }
 
 func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Client, role string, l *slog.Logger, currentNode *pbmHello) []prometheus.Metric {
