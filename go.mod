@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/AlekSi/pointer v1.2.0
-	github.com/alecthomas/kong v1.16.1
+	github.com/alecthomas/kong v1.17.0
 	github.com/foxcpp/go-mockdns v1.3.0
 	github.com/hashicorp/go-version v1.9.0
 	github.com/percona/exporter_shared v0.7.6
