@@ -30,7 +30,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -120,6 +123,36 @@ func TestPBMCollector(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("no pbm pitr write metrics while pitr is disabled", func(t *testing.T) {
+		// PITR is disabled in the test cluster. Chunks stay after PITR is disabled, so give rs2 one.
+		hello, err := getPBMHello(ctx, client)
+		require.NoError(t, err)
+		primary, err := c.connect(ctx, hello.Hosts)
+		require.NoError(t, err)
+		t.Cleanup(func() { c.disconnect(ctx, primary) })
+
+		chunks := primary.Database("admin").Collection(pbmPITRChunksCollection,
+			options.Collection().SetWriteConcern(writeconcern.Majority()))
+		chunk := bson.D{
+			{Key: "rs", Value: hello.SetName},
+			{Key: "fname", Value: "pbmPitr/test-pitr-disabled"},
+			{Key: "start_ts", Value: primitive.Timestamp{T: 1, I: 1}},
+			{Key: "end_ts", Value: primitive.Timestamp{T: 2, I: 1}},
+		}
+		_, err = chunks.DeleteMany(ctx, chunk)
+		require.NoError(t, err)
+		_, err = chunks.InsertOne(ctx, chunk)
+		require.NoError(t, err)
+		t.Cleanup(func() { _, _ = chunks.DeleteMany(ctx, chunk) })
+
+		end, err := lastPITRChunkEnd(ctx, primary, hello.SetName)
+		require.NoError(t, err)
+		require.NotZero(t, end.T)
+
+		assert.Zero(t, testutil.CollectAndCount(c,
+			"mongodb_pbm_cluster_pitr_last_write_ts", "mongodb_pbm_pitr_last_write_ts"))
+	})
+
 	t.Run("pbm backup metrics", func(t *testing.T) {
 		// One series of each per replica set of each backup. The test cluster setup takes a backup of rs2.
 		cur, err := client.Database("admin").Collection(pbmBackupsCollection).Find(ctx, bson.D{})
@@ -162,7 +195,9 @@ func TestPBMCollectorWithoutPBM(t *testing.T) {
 		"mongodb_pbm_cluster_backup_configured",
 		"mongodb_pbm_cluster_pitr_backup_enabled",
 		"mongodb_pbm_agent_status",
-		"mongodb_pbm_backup_size_bytes")
+		"mongodb_pbm_backup_size_bytes",
+		"mongodb_pbm_cluster_pitr_last_write_ts",
+		"mongodb_pbm_pitr_last_write_ts")
 	assert.NoError(t, err)
 }
 
@@ -430,4 +465,181 @@ func TestPBMBackupsMetrics(t *testing.T) {
 
 	err := testutil.CollectAndCompare(staticCollector(pbmBackupsMetrics(backups, "rs0a:27017", now)), expected)
 	assert.NoError(t, err)
+}
+
+func TestPBMPITRMetrics(t *testing.T) {
+	t.Parallel()
+
+	lastWrites := map[string]primitive.Timestamp{
+		"rs0": {T: 1_700_000_600, I: 2},
+		"rs1": {T: 1_700_000_300, I: 7},
+		"cfg": {T: 1_700_000_900, I: 1},
+	}
+
+	expected := strings.NewReader(`
+	# HELP mongodb_pbm_cluster_pitr_last_write_ts Oldest of the replica sets' last PBM PITR oplog writes (seconds since epoch). It advances once per oplog chunk, every pitr.oplogSpanMin (10 min by default); PBM pauses PITR during a logical backup and other operations such as a restore
+	# TYPE mongodb_pbm_cluster_pitr_last_write_ts gauge
+	mongodb_pbm_cluster_pitr_last_write_ts 1.7000003e+09
+	# HELP mongodb_pbm_pitr_last_write_ts Time of the last oplog write in the newest PBM PITR oplog chunk of the replica set (seconds since epoch)
+	# TYPE mongodb_pbm_pitr_last_write_ts gauge
+	mongodb_pbm_pitr_last_write_ts{replica_set="cfg"} 1.7000009e+09
+	mongodb_pbm_pitr_last_write_ts{replica_set="rs0"} 1.7000006e+09
+	mongodb_pbm_pitr_last_write_ts{replica_set="rs1"} 1.7000003e+09
+	`)
+
+	err := testutil.CollectAndCompare(staticCollector(pbmPITRMetrics(lastWrites)), expected)
+	assert.NoError(t, err)
+}
+
+func TestPBMPITRMetricsWithoutChunks(t *testing.T) {
+	t.Parallel()
+
+	assert.Empty(t, pbmPITRMetrics(nil))
+}
+
+func TestLastPITRChunkEnds(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	// The standalone node has no PBM, so these are the only chunks of these replica sets there.
+	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
+	chunks := client.Database("admin").Collection(pbmPITRChunksCollection)
+	filter := bson.D{{Key: "rs", Value: bson.D{{Key: "$in", Value: bson.A{"last-chunk-rs0", "last-chunk-rs1"}}}}}
+	_, err := chunks.DeleteMany(ctx, filter)
+	require.NoError(t, err)
+	// Cleanup runs after ctx is cancelled.
+	t.Cleanup(func() { _, _ = chunks.DeleteMany(context.Background(), filter) })
+
+	// Out of order, as the newest chunk of a replica set is the one that starts last.
+	_, err = chunks.InsertMany(ctx, []any{
+		bson.D{
+			{Key: "rs", Value: "last-chunk-rs0"},
+			{Key: "fname", Value: "pbmPitr/last-chunk-rs0/1"},
+			{Key: "start_ts", Value: primitive.Timestamp{T: 1_700_000_000, I: 1}},
+			{Key: "end_ts", Value: primitive.Timestamp{T: 1_700_000_600, I: 4}},
+		},
+		bson.D{
+			{Key: "rs", Value: "last-chunk-rs0"},
+			{Key: "fname", Value: "pbmPitr/last-chunk-rs0/3"},
+			{Key: "start_ts", Value: primitive.Timestamp{T: 1_700_001_200, I: 2}},
+			{Key: "end_ts", Value: primitive.Timestamp{T: 1_700_001_800, I: 3}},
+		},
+		bson.D{
+			{Key: "rs", Value: "last-chunk-rs0"},
+			{Key: "fname", Value: "pbmPitr/last-chunk-rs0/2"},
+			{Key: "start_ts", Value: primitive.Timestamp{T: 1_700_000_600, I: 4}},
+			{Key: "end_ts", Value: primitive.Timestamp{T: 1_700_001_200, I: 2}},
+		},
+		bson.D{
+			{Key: "rs", Value: "last-chunk-rs1"},
+			{Key: "fname", Value: "pbmPitr/last-chunk-rs1/1"},
+			{Key: "start_ts", Value: primitive.Timestamp{T: 1_700_005_000, I: 1}},
+			{Key: "end_ts", Value: primitive.Timestamp{T: 1_700_005_600, I: 1}},
+		},
+	})
+	require.NoError(t, err)
+
+	end, err := lastPITRChunkEnd(ctx, client, "last-chunk-rs0")
+	require.NoError(t, err)
+	assert.Equal(t, primitive.Timestamp{T: 1_700_001_800, I: 3}, end)
+
+	_, err = lastPITRChunkEnd(ctx, client, "last-chunk-rs2")
+	require.ErrorIs(t, err, mongo.ErrNoDocuments)
+
+	// A replica set without chunks is left out.
+	replsets := []pbmReplset{{name: "last-chunk-rs0"}, {name: "last-chunk-rs1"}, {name: "last-chunk-rs2"}}
+	ends, err := lastPITRChunkEnds(ctx, client, replsets)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]primitive.Timestamp{
+		"last-chunk-rs0": {T: 1_700_001_800, I: 3},
+		"last-chunk-rs1": {T: 1_700_005_600, I: 1},
+	}, ends)
+
+	// A failed read gives no partial result.
+	cancelled, cancelNow := context.WithCancel(ctx)
+	cancelNow()
+	ends, err = lastPITRChunkEnds(cancelled, client, replsets)
+	require.Error(t, err)
+	assert.Nil(t, ends)
+}
+
+func TestPBMCollectorPITRMetrics(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	// The sharded cluster runs no PBM, so a configuration with PITR enabled starts no slicing there.
+	client := tu.DefaultTestClientMongoS(ctx, t)
+	port, err := tu.PortForContainer("mongos")
+	require.NoError(t, err)
+
+	hello, err := getPBMHello(ctx, client)
+	require.NoError(t, err)
+	replsets, err := clusterReplsets(ctx, client, string(typeMongos), hello)
+	require.NoError(t, err)
+	require.NotEmpty(t, replsets)
+
+	majority := options.Collection().SetWriteConcern(writeconcern.Majority())
+	config := client.Database("admin").Collection(pbmConfigCollection, majority)
+	chunks := client.Database("admin").Collection(pbmPITRChunksCollection, majority)
+	// Cleanup runs after ctx is cancelled. A sharded cluster doesn't drop collections of admin.
+	clean := func() {
+		_, _ = config.DeleteMany(context.Background(), bson.D{})
+		_, _ = chunks.DeleteMany(context.Background(), bson.D{})
+	}
+	clean()
+	t.Cleanup(clean)
+
+	_, err = config.InsertOne(ctx, bson.D{{Key: "pitr", Value: bson.D{{Key: "enabled", Value: true}}}})
+	require.NoError(t, err)
+
+	// The cluster's last write is the oldest of the replica sets': the first one's.
+	const oldest = 1_700_000_000
+	want := map[string]float64{"": oldest}
+	for i, rs := range replsets {
+		end := uint32(oldest + 600*i)
+		_, err = chunks.InsertOne(ctx, bson.D{
+			{Key: "rs", Value: rs.name},
+			{Key: "fname", Value: "pbmPitr/" + rs.name},
+			{Key: "start_ts", Value: primitive.Timestamp{T: end - 600, I: 1}},
+			{Key: "end_ts", Value: primitive.Timestamp{T: end, I: 1}},
+		})
+		require.NoError(t, err)
+		want[rs.name] = float64(end)
+	}
+
+	c := newPbmCollector(ctx, client, "mongodb://127.0.0.1:"+port, 1000, promslog.New(&promslog.Config{}))
+
+	assert.Equal(t, want, pitrLastWrites(t, c))
+}
+
+// pitrLastWrites returns the PITR last write series of a collector by replica set, the cluster's as "".
+func pitrLastWrites(t *testing.T, c prometheus.Collector) map[string]float64 {
+	t.Helper()
+
+	reg := prometheus.NewRegistry()
+	require.NoError(t, reg.Register(c))
+	families, err := reg.Gather()
+	require.NoError(t, err)
+
+	got := make(map[string]float64)
+	for _, family := range families {
+		name := family.GetName()
+		if name != "mongodb_pbm_cluster_pitr_last_write_ts" && name != "mongodb_pbm_pitr_last_write_ts" {
+			continue
+		}
+		for _, m := range family.GetMetric() {
+			rs := ""
+			for _, l := range m.GetLabel() {
+				rs = l.GetValue()
+			}
+			require.Equal(t, name == "mongodb_pbm_pitr_last_write_ts", rs != "")
+			got[rs] = m.GetGauge().GetValue()
+		}
+	}
+
+	return got
 }
