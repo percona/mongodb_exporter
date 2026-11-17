@@ -108,6 +108,44 @@ func TestPBMCollector(t *testing.T) {
 		assert.Equal(t, 1, self)
 	})
 
+	t.Run("pbm agent version metric", func(t *testing.T) {
+		// One series, for the agent of the member the collector is connected to, with the version from the
+		// agent's status document.
+		hello, err := getPBMHello(ctx, client)
+		require.NoError(t, err)
+		var agent struct {
+			Version string `bson:"v"`
+		}
+		err = client.Database("admin").Collection(pbmAgentsCollection).
+			FindOne(ctx, bson.D{{Key: "n", Value: hello.Me}}).Decode(&agent)
+		require.NoError(t, err)
+		require.NotEmpty(t, agent.Version)
+
+		reg := prometheus.NewRegistry()
+		require.NoError(t, reg.Register(c))
+		families, err := reg.Gather()
+		require.NoError(t, err)
+
+		var got []map[string]string
+		for _, family := range families {
+			if family.GetName() != "mongodb_pbm_agent_version_info" {
+				continue
+			}
+			for _, m := range family.GetMetric() {
+				labels := make(map[string]string)
+				for _, l := range m.GetLabel() {
+					labels[l.GetName()] = l.GetValue()
+				}
+				assert.InDelta(t, 1, m.GetGauge().GetValue(), 0, "%v", labels)
+				got = append(got, labels)
+			}
+		}
+
+		assert.Equal(t, []map[string]string{
+			{"host": hello.Me, "replica_set": "rs2", "self": "1", "version": agent.Version},
+		}, got)
+	})
+
 	t.Run("pbm pitr metric", func(t *testing.T) {
 		filter := []string{
 			"mongodb_pbm_cluster_pitr_backup_enabled",
@@ -162,6 +200,7 @@ func TestPBMCollectorWithoutPBM(t *testing.T) {
 		"mongodb_pbm_cluster_backup_configured",
 		"mongodb_pbm_cluster_pitr_backup_enabled",
 		"mongodb_pbm_agent_status",
+		"mongodb_pbm_agent_version_info",
 		"mongodb_pbm_backup_size_bytes")
 	assert.NoError(t, err)
 }
@@ -169,9 +208,13 @@ func TestPBMCollectorWithoutPBM(t *testing.T) {
 // testPBMClusterTime is the cluster time the agent status tests are evaluated at.
 var testPBMClusterTime = primitive.Timestamp{T: 1_000_000}
 
+// testPBMAgentVersion is the version healthyPBMAgent reports, in the form PBM stores it.
+const testPBMAgentVersion = "2.12.0"
+
 // healthyPBMAgent returns the status document of a healthy agent with a recent heartbeat.
 func healthyPBMAgent(state int, stateStr string) *pbmAgent {
 	return &pbmAgent{
+		Version:       testPBMAgentVersion,
 		State:         state,
 		StateStr:      stateStr,
 		PBMStatus:     pbmSubsystemStatus{OK: true},
@@ -192,6 +235,8 @@ func TestPBMNodesWithAgent(t *testing.T) {
 	storageError.StorageStatus = pbmSubsystemStatus{OK: false}
 	lost := healthyPBMAgent(memberStateSecondary, "SECONDARY")
 	lost.Heartbeat = primitive.Timestamp{T: testPBMClusterTime.T - pbmStaleAgentSecs - 1}
+	// A lost agent keeps the version it last reported.
+	lost.Version = "2.11.0"
 	lostBoundary := healthyPBMAgent(memberStateSecondary, "SECONDARY")
 	lostBoundary.Heartbeat = primitive.Timestamp{T: testPBMClusterTime.T - pbmStaleAgentSecs}
 
@@ -220,17 +265,80 @@ func TestPBMNodesWithAgent(t *testing.T) {
 		{Host: "lost-boundary:27017"},
 	}
 
+	v := testPBMAgentVersion
 	assert.Equal(t, []pbmNode{
-		{host: "primary:27017", role: pbmRolePrimary, status: pbmAgentStatusOK},
-		{host: "secondary:27017", role: pbmRoleSecondary, status: pbmAgentStatusOK},
-		{host: "arbiter:27017", role: pbmRoleArbiter, status: pbmAgentStatusOK},
-		{host: "delayed:27017", role: pbmRoleDelayed, status: pbmAgentStatusOK},
-		{host: "hidden:27017", role: pbmRoleHidden, status: pbmAgentStatusOK},
-		{host: "recovering:27017", role: "RECOVERING", status: pbmAgentStatusOK},
-		{host: "storage-error:27017", role: pbmRoleSecondary, status: pbmAgentStatusError},
-		{host: "lost:27017", role: pbmRoleSecondary, status: pbmAgentStatusLost},
-		{host: "lost-boundary:27017", role: pbmRoleSecondary, status: pbmAgentStatusOK},
+		{host: "primary:27017", role: pbmRolePrimary, status: pbmAgentStatusOK, version: v},
+		{host: "secondary:27017", role: pbmRoleSecondary, status: pbmAgentStatusOK, version: v},
+		{host: "arbiter:27017", role: pbmRoleArbiter, status: pbmAgentStatusOK, version: v},
+		{host: "delayed:27017", role: pbmRoleDelayed, status: pbmAgentStatusOK, version: v},
+		{host: "hidden:27017", role: pbmRoleHidden, status: pbmAgentStatusOK, version: v},
+		{host: "recovering:27017", role: "RECOVERING", status: pbmAgentStatusOK, version: v},
+		{host: "storage-error:27017", role: pbmRoleSecondary, status: pbmAgentStatusError, version: v},
+		{host: "lost:27017", role: pbmRoleSecondary, status: pbmAgentStatusLost, version: "2.11.0"},
+		{host: "lost-boundary:27017", role: pbmRoleSecondary, status: pbmAgentStatusOK, version: v},
 	}, pbmNodes(members, agents, testPBMClusterTime))
+}
+
+func TestPBMAgentMetrics(t *testing.T) {
+	t.Parallel()
+
+	// A member without an agent gets a status but no version.
+	status := map[string][]pbmNode{
+		"rs0": {
+			{host: "rs0a:27017", role: pbmRolePrimary, status: pbmAgentStatusOK, version: "2.12.0"},
+			{host: "rs0b:27017", role: pbmRoleSecondary, status: pbmAgentStatusLost, version: "2.11.0"},
+			{host: "rs0c:27017", role: pbmRoleArbiter, status: pbmAgentStatusError},
+		},
+		"cfg": {
+			{host: "cfg1:27019", role: pbmRolePrimary, status: pbmAgentStatusOK, version: "2.12.0"},
+		},
+	}
+
+	for _, tc := range []struct {
+		name     string
+		me       string
+		expected string
+	}{
+		{
+			name: "a member reports its own version",
+			me:   "rs0a:27017",
+			expected: `
+			# HELP mongodb_pbm_agent_status PBM Agent Status
+			# TYPE mongodb_pbm_agent_status gauge
+			mongodb_pbm_agent_status{host="cfg1:27019",replica_set="cfg",role="P",self="0"} 0
+			mongodb_pbm_agent_status{host="rs0a:27017",replica_set="rs0",role="P",self="1"} 0
+			mongodb_pbm_agent_status{host="rs0b:27017",replica_set="rs0",role="S",self="0"} 2
+			mongodb_pbm_agent_status{host="rs0c:27017",replica_set="rs0",role="A",self="0"} 1
+			# HELP mongodb_pbm_agent_version_info The version of the PBM agent
+			# TYPE mongodb_pbm_agent_version_info gauge
+			mongodb_pbm_agent_version_info{host="rs0a:27017",replica_set="rs0",self="1",version="2.12.0"} 1
+			`,
+		},
+		{
+			name: "mongos, which is no member, reports every member's",
+			expected: `
+			# HELP mongodb_pbm_agent_status PBM Agent Status
+			# TYPE mongodb_pbm_agent_status gauge
+			mongodb_pbm_agent_status{host="cfg1:27019",replica_set="cfg",role="P",self="0"} 0
+			mongodb_pbm_agent_status{host="rs0a:27017",replica_set="rs0",role="P",self="0"} 0
+			mongodb_pbm_agent_status{host="rs0b:27017",replica_set="rs0",role="S",self="0"} 2
+			mongodb_pbm_agent_status{host="rs0c:27017",replica_set="rs0",role="A",self="0"} 1
+			# HELP mongodb_pbm_agent_version_info The version of the PBM agent
+			# TYPE mongodb_pbm_agent_version_info gauge
+			mongodb_pbm_agent_version_info{host="cfg1:27019",replica_set="cfg",self="0",version="2.12.0"} 1
+			mongodb_pbm_agent_version_info{host="rs0a:27017",replica_set="rs0",self="0",version="2.12.0"} 1
+			mongodb_pbm_agent_version_info{host="rs0b:27017",replica_set="rs0",self="0",version="2.11.0"} 1
+			`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			metrics := pbmAgentStatusMetrics(status, tc.me)
+			err := testutil.CollectAndCompare(staticCollector(metrics), strings.NewReader(tc.expected))
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestPBMNodesWithoutAgent(t *testing.T) {
