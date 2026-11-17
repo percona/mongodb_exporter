@@ -31,9 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -54,8 +52,7 @@ func TestPBMCollector(t *testing.T) {
 
 	c := newPbmCollector(ctx, client, mongoURI, 1000, promslog.New(&promslog.Config{}))
 
-	// PBM's backup list on the primary the collector reads it from, written with majority write concern
-	// for the collector's majority reads.
+	// The client the collector reads PBM's collections with.
 	hello, err := getPBMHello(ctx, client)
 	require.NoError(t, err)
 	role, err := pbmClusterRole(ctx, client, hello)
@@ -63,14 +60,6 @@ func TestPBMCollector(t *testing.T) {
 	control, closeControl, err := c.controlClient(ctx, role, hello)
 	require.NoError(t, err)
 	t.Cleanup(closeControl)
-	pbmBackups := control.Database("admin", options.Database().SetWriteConcern(writeconcern.Majority())).
-		Collection(pbmBackupsCollection)
-
-	// The record of a stuck backup that a subtest writes. A run killed before the subtest's cleanup
-	// leaves it behind.
-	stuckBackup := bson.D{{Key: "name", Value: "PMM-15219-stuck-backup"}}
-	_, err = pbmBackups.DeleteMany(ctx, stuckBackup)
-	require.NoError(t, err)
 
 	t.Run("pbm configured metric", func(t *testing.T) {
 		filter := []string{
@@ -164,21 +153,18 @@ func TestPBMCollector(t *testing.T) {
 	})
 
 	t.Run("pbm backup failures metric counts a stuck backup", func(t *testing.T) {
-		// The record of an external backup whose agent stopped right after it started: unfinished, with
-		// a heartbeat far behind the cluster time.
-		_, err := pbmBackups.InsertOne(ctx, append(bson.D{
-			{Key: "type", Value: "external"},
-			{Key: "status", Value: "running"},
-			{Key: "start_ts", Value: time.Now().Unix()},
-			{Key: "hb", Value: primitive.Timestamp{T: 1, I: 1}},
-		}, stuckBackup...))
+		controlHello, err := c.controlHello(ctx, control, hello)
 		require.NoError(t, err)
-		t.Cleanup(func() {
-			// ctx may be past its deadline by the time the cleanup runs.
-			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-			defer cancel()
-			_, err := pbmBackups.DeleteMany(cleanupCtx, stuckBackup)
-			assert.NoError(t, err)
+
+		// The cluster's own list, read-only, and an external backup whose agent stopped right after it
+		// started: unfinished, with a heartbeat far behind the cluster time.
+		backups, err := listPBMBackups(ctx, control)
+		require.NoError(t, err)
+		backups = append(backups, pbmBackup{
+			Type:      "external",
+			Status:    "running",
+			StartTS:   time.Now().Unix(),
+			Heartbeat: primitive.Timestamp{T: 1, I: 1},
 		})
 
 		expected := strings.NewReader(`
@@ -186,7 +172,8 @@ func TestPBMCollector(t *testing.T) {
 		# TYPE mongodb_pbm_cluster_backup_failures_since_last_success gauge
 		mongodb_pbm_cluster_backup_failures_since_last_success{type="external"} 1
 		mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 0` + "\n")
-		err = testutil.CollectAndCompare(c, expected, "mongodb_pbm_cluster_backup_failures_since_last_success")
+		metrics := pbmBackupFailureMetrics(backups, controlHello.ClusterTime.ClusterTime)
+		err = testutil.CollectAndCompare(staticCollector(metrics), expected)
 		assert.NoError(t, err)
 	})
 
@@ -457,6 +444,44 @@ func TestParseReplsetHosts(t *testing.T) {
 	assert.Equal(t, pbmReplset{name: "cfg", hosts: []string{"cfg1:27019", "cfg2:27019"}}, rs)
 }
 
+// TestPBMCollectorWithoutClusterTime covers a node whose hello response has no cluster time, as a standalone
+// node's has none: the backup failure series stays, and only the agent status, which needs it, is left out.
+//
+//nolint:paralleltest // TestPBMCollectorWithoutPBM expects no PBM configuration on the standalone node.
+func TestPBMCollectorWithoutClusterTime(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	// The standalone node has no PBM, so these are the only PBM documents there.
+	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
+	config := client.Database("admin").Collection(pbmConfigCollection)
+	backups := client.Database("admin").Collection(pbmBackupsCollection)
+	clean := func() {
+		_, _ = config.DeleteMany(context.WithoutCancel(ctx), bson.D{})
+		_, _ = backups.DeleteMany(context.WithoutCancel(ctx), bson.D{})
+	}
+	clean()
+	t.Cleanup(clean)
+	_, err := config.InsertOne(ctx, bson.D{{Key: "pitr", Value: bson.D{{Key: "enabled", Value: false}}}})
+	require.NoError(t, err)
+	_, err = backups.InsertOne(ctx, bson.D{
+		{Key: "name", Value: "PMM-15219-no-cluster-time"},
+		{Key: "type", Value: "logical"},
+		{Key: "status", Value: "error"},
+		{Key: "start_ts", Value: 100},
+	})
+	require.NoError(t, err)
+
+	c := newPbmCollector(ctx, client, "mongodb://127.0.0.1:"+tu.MongoDBStandAlonePort, 1000, promslog.New(&promslog.Config{}))
+
+	expected := strings.NewReader(`
+	# HELP mongodb_pbm_cluster_backup_failures_since_last_success Number of recorded PBM backups of the type that failed after the last successful one
+	# TYPE mongodb_pbm_cluster_backup_failures_since_last_success gauge
+	mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 1` + "\n")
+	err = testutil.CollectAndCompare(c, expected, "mongodb_pbm_cluster_backup_failures_since_last_success", "mongodb_pbm_agent_status")
+	assert.NoError(t, err)
+}
+
 //nolint:funlen
 func TestPBMBackupFailureMetrics(t *testing.T) {
 	t.Parallel()
@@ -469,6 +494,12 @@ func TestPBMBackupFailureMetrics(t *testing.T) {
 			StartTS:   startTS,
 			Heartbeat: primitive.Timestamp{T: testPBMClusterTime.T - 5},
 		}
+	}
+	// ended returns b with its last transition at lastTransitionTS.
+	ended := func(b pbmBackup, lastTransitionTS int64) pbmBackup {
+		b.LastTransitionTS = lastTransitionTS
+
+		return b
 	}
 	// stale returns b with a heartbeat that PBM considers stale.
 	stale := func(b pbmBackup) pbmBackup {
@@ -588,6 +619,22 @@ func TestPBMBackupFailureMetrics(t *testing.T) {
 				backup(pbmLogicalBackup, statusError, 100),
 				backup(pbmLogicalBackup, statusError, 500),
 				backup(pbmLogicalBackup, statusDone, 400),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 1` + "\n",
+		},
+		{
+			name: "a failure in the same second as the last success that ended before it",
+			backups: []pbmBackup{
+				ended(backup(pbmLogicalBackup, statusDone, 300), 360),
+				ended(backup(pbmLogicalBackup, statusError, 300), 300),
+			},
+			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 0` + "\n",
+		},
+		{
+			name: "a failure in the same second as the last success that ended after it",
+			backups: []pbmBackup{
+				ended(backup(pbmLogicalBackup, statusError, 300), 301),
+				ended(backup(pbmLogicalBackup, statusDone, 300), 300),
 			},
 			expected: header + `mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 1` + "\n",
 		},
