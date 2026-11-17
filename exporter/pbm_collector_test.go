@@ -31,7 +31,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -479,6 +481,50 @@ func TestPBMCollectorWithoutClusterTime(t *testing.T) {
 	# TYPE mongodb_pbm_cluster_backup_failures_since_last_success gauge
 	mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 1` + "\n")
 	err = testutil.CollectAndCompare(c, expected, "mongodb_pbm_cluster_backup_failures_since_last_success", "mongodb_pbm_agent_status")
+	assert.NoError(t, err)
+}
+
+// TestPBMCollectorWithClusterTime covers the collector passing the cluster time on to the backup failure
+// metrics: through mongos, which has one, a backup whose agent stopped counts as failed.
+//
+//nolint:paralleltest // TestPBMCollectorPITRMetrics writes a PBM configuration through mongos too.
+func TestPBMCollectorWithClusterTime(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	// The sharded cluster runs no PBM, so the record of a running backup there stays as written.
+	client := tu.DefaultTestClientMongoS(ctx, t)
+	port, err := tu.PortForContainer("mongos")
+	require.NoError(t, err)
+
+	majority := options.Collection().SetWriteConcern(writeconcern.Majority())
+	config := client.Database("admin").Collection(pbmConfigCollection, majority)
+	backups := client.Database("admin").Collection(pbmBackupsCollection, majority)
+	stuck := bson.D{{Key: "name", Value: "PMM-15219-stuck-backup"}}
+	clean := func() {
+		_, _ = config.DeleteMany(context.WithoutCancel(ctx), bson.D{})
+		_, _ = backups.DeleteMany(context.WithoutCancel(ctx), stuck)
+	}
+	clean()
+	t.Cleanup(clean)
+	_, err = config.InsertOne(ctx, bson.D{{Key: "pitr", Value: bson.D{{Key: "enabled", Value: false}}}})
+	require.NoError(t, err)
+	// Unfinished, with a heartbeat far behind the cluster time.
+	_, err = backups.InsertOne(ctx, append(bson.D{
+		{Key: "type", Value: "logical"},
+		{Key: "status", Value: "running"},
+		{Key: "start_ts", Value: time.Now().Unix()},
+		{Key: "hb", Value: primitive.Timestamp{T: 1, I: 1}},
+	}, stuck...))
+	require.NoError(t, err)
+
+	c := newPbmCollector(ctx, client, "mongodb://127.0.0.1:"+port, 1000, promslog.New(&promslog.Config{}))
+
+	expected := strings.NewReader(`
+	# HELP mongodb_pbm_cluster_backup_failures_since_last_success Number of recorded PBM backups of the type that failed after the last successful one
+	# TYPE mongodb_pbm_cluster_backup_failures_since_last_success gauge
+	mongodb_pbm_cluster_backup_failures_since_last_success{type="logical"} 1` + "\n")
+	err = testutil.CollectAndCompare(c, expected, "mongodb_pbm_cluster_backup_failures_since_last_success")
 	assert.NoError(t, err)
 }
 
