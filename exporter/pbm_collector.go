@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -206,7 +205,8 @@ type pbmNode struct {
 	host   string
 	role   string
 	status int
-	// version is the version the agent last reported, empty for a member without an agent.
+	// version is the version the agent last reported, empty when the member has no agent or the agent
+	// reported none.
 	version string
 }
 
@@ -553,13 +553,13 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Clien
 		return nil
 	}
 
-	return pbmAgentMetrics(clusterStatus, currentNode.Me)
+	return pbmAgentStatusMetrics(clusterStatus, currentNode.Me)
 }
 
-// pbmAgentMetrics returns the status of the PBM agent of each member of each replica set and, for each
-// member with an agent, its version. me is the node the exporter is connected to.
-func pbmAgentMetrics(clusterStatus map[string][]pbmNode, me string) []prometheus.Metric {
-	metrics := make([]prometheus.Metric, 0, len(clusterStatus))
+// pbmAgentStatusMetrics returns the status of the PBM agent of each member of each replica set, and the version of
+// the agent of me, the member the exporter is connected to, or of every member's agent on mongos, where me is empty.
+func pbmAgentStatusMetrics(clusterStatus map[string][]pbmNode, me string) []prometheus.Metric {
+	var metrics []prometheus.Metric
 	for replsetName, nodes := range clusterStatus {
 		for _, node := range nodes {
 			labels := map[string]string{
@@ -578,14 +578,18 @@ func pbmAgentMetrics(clusterStatus map[string][]pbmNode, me string) []prometheus
 			),
 			)
 
-			if node.version == "" {
+			// The version is a property of the node, so each member's own exporter reports it.
+			if node.version == "" || (me != "" && node.host != me) {
 				continue
 			}
 
-			// The same labels without the role, which changes on a failover while the version does not.
-			versionLabels := maps.Clone(labels)
-			delete(versionLabels, "role")
-			versionLabels["version"] = node.version
+			// Without the role, which changes on a failover while the version does not.
+			versionLabels := map[string]string{
+				"host":        node.host,
+				"replica_set": replsetName,
+				"self":        labels["self"],
+				"version":     node.version, //nolint:goconst // a label name, unrelated to the FCV collector's
+			}
 			metrics = append(metrics, createPBMMetric("agent_version_info",
 				"The version of the PBM agent",
 				1,

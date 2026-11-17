@@ -109,30 +109,24 @@ func TestPBMCollector(t *testing.T) {
 	})
 
 	t.Run("pbm agent version metric", func(t *testing.T) {
-		// One series per PBM agent of rs2, with the version from the agent's status document. The arbiter
-		// has no agent.
-		cur, err := client.Database("admin").Collection(pbmAgentsCollection).Find(ctx, bson.D{{Key: "rs", Value: "rs2"}})
+		// One series, for the agent of the member the collector is connected to, with the version from the
+		// agent's status document.
+		hello, err := getPBMHello(ctx, client)
 		require.NoError(t, err)
-		var agents []struct {
-			Node    string `bson:"n"`
+		var agent struct {
 			Version string `bson:"v"`
 		}
-		require.NoError(t, cur.All(ctx, &agents))
-
-		want := make(map[string]string, len(agents))
-		for _, agent := range agents {
-			require.NotEmpty(t, agent.Version, agent.Node)
-			want[agent.Node] = agent.Version
-		}
-		require.Len(t, want, 3, "the test cluster runs a PBM agent on each data member of rs2")
+		err = client.Database("admin").Collection(pbmAgentsCollection).
+			FindOne(ctx, bson.D{{Key: "n", Value: hello.Me}}).Decode(&agent)
+		require.NoError(t, err)
+		require.NotEmpty(t, agent.Version)
 
 		reg := prometheus.NewRegistry()
 		require.NoError(t, reg.Register(c))
 		families, err := reg.Gather()
 		require.NoError(t, err)
 
-		got := make(map[string]string)
-		self := 0
+		var got []map[string]string
 		for _, family := range families {
 			if family.GetName() != "mongodb_pbm_agent_version_info" {
 				continue
@@ -142,17 +136,14 @@ func TestPBMCollector(t *testing.T) {
 				for _, l := range m.GetLabel() {
 					labels[l.GetName()] = l.GetValue()
 				}
-				assert.Equal(t, "rs2", labels["replica_set"], "%v", labels)
 				assert.InDelta(t, 1, m.GetGauge().GetValue(), 0, "%v", labels)
-				got[labels["host"]] = labels["version"]
-				if labels["self"] == "1" {
-					self++
-				}
+				got = append(got, labels)
 			}
 		}
 
-		assert.Equal(t, want, got)
-		assert.Equal(t, 1, self)
+		assert.Equal(t, []map[string]string{
+			{"host": hello.Me, "replica_set": "rs2", "self": "1", "version": agent.Version},
+		}, got)
 	})
 
 	t.Run("pbm pitr metric", func(t *testing.T) {
@@ -303,22 +294,51 @@ func TestPBMAgentMetrics(t *testing.T) {
 		},
 	}
 
-	expected := strings.NewReader(`
-	# HELP mongodb_pbm_agent_status PBM Agent Status
-	# TYPE mongodb_pbm_agent_status gauge
-	mongodb_pbm_agent_status{host="cfg1:27019",replica_set="cfg",role="P",self="0"} 0
-	mongodb_pbm_agent_status{host="rs0a:27017",replica_set="rs0",role="P",self="1"} 0
-	mongodb_pbm_agent_status{host="rs0b:27017",replica_set="rs0",role="S",self="0"} 2
-	mongodb_pbm_agent_status{host="rs0c:27017",replica_set="rs0",role="A",self="0"} 1
-	# HELP mongodb_pbm_agent_version_info The version of the PBM agent
-	# TYPE mongodb_pbm_agent_version_info gauge
-	mongodb_pbm_agent_version_info{host="cfg1:27019",replica_set="cfg",self="0",version="2.12.0"} 1
-	mongodb_pbm_agent_version_info{host="rs0a:27017",replica_set="rs0",self="1",version="2.12.0"} 1
-	mongodb_pbm_agent_version_info{host="rs0b:27017",replica_set="rs0",self="0",version="2.11.0"} 1
-	`)
+	for _, tc := range []struct {
+		name     string
+		me       string
+		expected string
+	}{
+		{
+			name: "a member reports its own version",
+			me:   "rs0a:27017",
+			expected: `
+			# HELP mongodb_pbm_agent_status PBM Agent Status
+			# TYPE mongodb_pbm_agent_status gauge
+			mongodb_pbm_agent_status{host="cfg1:27019",replica_set="cfg",role="P",self="0"} 0
+			mongodb_pbm_agent_status{host="rs0a:27017",replica_set="rs0",role="P",self="1"} 0
+			mongodb_pbm_agent_status{host="rs0b:27017",replica_set="rs0",role="S",self="0"} 2
+			mongodb_pbm_agent_status{host="rs0c:27017",replica_set="rs0",role="A",self="0"} 1
+			# HELP mongodb_pbm_agent_version_info The version of the PBM agent
+			# TYPE mongodb_pbm_agent_version_info gauge
+			mongodb_pbm_agent_version_info{host="rs0a:27017",replica_set="rs0",self="1",version="2.12.0"} 1
+			`,
+		},
+		{
+			name: "mongos, which is no member, reports every member's",
+			expected: `
+			# HELP mongodb_pbm_agent_status PBM Agent Status
+			# TYPE mongodb_pbm_agent_status gauge
+			mongodb_pbm_agent_status{host="cfg1:27019",replica_set="cfg",role="P",self="0"} 0
+			mongodb_pbm_agent_status{host="rs0a:27017",replica_set="rs0",role="P",self="0"} 0
+			mongodb_pbm_agent_status{host="rs0b:27017",replica_set="rs0",role="S",self="0"} 2
+			mongodb_pbm_agent_status{host="rs0c:27017",replica_set="rs0",role="A",self="0"} 1
+			# HELP mongodb_pbm_agent_version_info The version of the PBM agent
+			# TYPE mongodb_pbm_agent_version_info gauge
+			mongodb_pbm_agent_version_info{host="cfg1:27019",replica_set="cfg",self="0",version="2.12.0"} 1
+			mongodb_pbm_agent_version_info{host="rs0a:27017",replica_set="rs0",self="0",version="2.12.0"} 1
+			mongodb_pbm_agent_version_info{host="rs0b:27017",replica_set="rs0",self="0",version="2.11.0"} 1
+			`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	err := testutil.CollectAndCompare(staticCollector(pbmAgentMetrics(status, "rs0a:27017")), expected)
-	assert.NoError(t, err)
+			metrics := pbmAgentStatusMetrics(status, tc.me)
+			err := testutil.CollectAndCompare(staticCollector(metrics), strings.NewReader(tc.expected))
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestPBMNodesWithoutAgent(t *testing.T) {
