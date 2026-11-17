@@ -63,10 +63,11 @@ nfpms:
     bindir: /usr/bin
     scripts:
       postinstall: ".scripts/postinst"
+      preremove: ".scripts/preremove"
+      postremove: ".scripts/postremove"
     contents:
       - src: .scripts/systemd/mongodb_exporter.service
-        dst: /etc/systemd/system/mongodb_exporter.service
-        type: "config|noreplace"
+        dst: /usr/lib/systemd/system/mongodb_exporter.service
       - src: .scripts/default/mongodb_exporter.example
         dst: /etc/default/mongodb_exporter.example
       - src: LICENSE
