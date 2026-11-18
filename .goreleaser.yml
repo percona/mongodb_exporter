@@ -62,6 +62,7 @@ nfpms:
     - rpm
     bindir: /usr/bin
     scripts:
+      preinstall: ".scripts/preinst"
       postinstall: ".scripts/postinst"
       preremove: ".scripts/preremove"
       postremove: ".scripts/postremove"
