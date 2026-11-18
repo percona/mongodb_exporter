@@ -717,7 +717,7 @@ func pbmAgentStatusMetrics(clusterStatus map[string][]pbmNode, me string) []prom
 	for replsetName, nodes := range clusterStatus {
 		for _, node := range nodes {
 			labels := map[string]string{
-				"host":        node.host,
+				"host":        node.host, //nolint:goconst // a label name, as in the other PBM metrics
 				"replica_set": replsetName,
 				"role":        node.role,
 				"self":        "0",
