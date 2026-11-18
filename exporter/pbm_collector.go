@@ -182,6 +182,8 @@ type pbmBackup struct {
 	StartTS          int64              `bson:"start_ts"`
 	LastTransitionTS int64              `bson:"last_transition_ts"`
 	Status           pbmBackupStatus    `bson:"status"`
+	// Heartbeat is the cluster time the agent leading the backup last reported while it ran.
+	Heartbeat primitive.Timestamp `bson:"hb"`
 }
 
 // pbmBackupProjection keeps the fields of pbmBackup out of PBM backup metadata, which also holds file
@@ -198,6 +200,7 @@ var pbmBackupProjection = bson.D{
 	{Key: "start_ts", Value: 1},
 	{Key: "last_transition_ts", Value: 1},
 	{Key: "status", Value: 1},
+	{Key: "hb", Value: 1},
 }
 
 type pbmBackupReplset struct {
@@ -355,13 +358,13 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 			"PBM PITR backups are enabled for the cluster",
 			float64(pitrEnabledMetric), nil))
 
-		// Read once for the restore and agent metrics, which compare PBM's heartbeats with its cluster time.
+		// Read once for the backup, restore and agent metrics, which compare PBM's heartbeats with its cluster time.
 		hello, err := p.controlHello(p.ctx, control)
 		if err != nil {
 			// The error can carry the URI the collector connected with.
 			logger.Error("failed to read the cluster time for PBM heartbeats", "error", redact.Error(err))
 		}
-		metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, control, logger, currentNode)...)
+		metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, control, logger, currentNode, hello)...)
 		metrics = append(metrics, p.pbmRestoresMetrics(p.ctx, control, logger, hello)...)
 		if hello != nil {
 			metrics = append(metrics, p.pbmAgentMetrics(p.ctx, control, role, logger, currentNode, hello)...)
@@ -997,14 +1000,81 @@ func listPBMBackups(ctx context.Context, client *mongo.Client) ([]pbmBackup, err
 	return backups, nil
 }
 
-func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, control *mongo.Client, l *slog.Logger, currentNode *pbmHello) []prometheus.Metric {
+// pbmBackupsMetrics returns the metrics of PBM's backups; hello is controlHello's response, nil if it failed.
+func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, control *mongo.Client, l *slog.Logger, currentNode, hello *pbmHello) []prometheus.Metric {
 	backupsList, err := listPBMBackups(ctx, control)
 	if err != nil {
 		l.Error("failed to get PBM backup list", "error", err.Error())
 		return nil
 	}
 
-	return pbmBackupsMetrics(backupsList, currentNode.Me, time.Now())
+	metrics := pbmBackupsMetrics(backupsList, currentNode.Me, time.Now())
+
+	// Without the cluster time, a backup whose agent stopped counts only once PBM marks it failed.
+	var clusterTime primitive.Timestamp
+	if hello != nil {
+		clusterTime = hello.ClusterTime.ClusterTime
+	}
+
+	return append(metrics, pbmBackupFailureMetrics(backupsList, clusterTime)...)
+}
+
+// failed reports whether PBM marked the backup failed or, as PBM's status command does, whether it is
+// unfinished with a stale heartbeat because its agent stopped.
+func (b *pbmBackup) failed(clusterTime primitive.Timestamp) bool {
+	switch b.Status {
+	case statusError:
+		return true
+	case statusDone, statusCancelled, statusDown:
+		return false
+	default:
+		return b.Heartbeat.T+pbmStaleAgentSecs < clusterTime.T
+	}
+}
+
+// startedAfter reports whether b started after o. StartTS has whole seconds, so of two backups that started in
+// the same second the one whose last transition is later started later; clocks of different leaders can disagree.
+func (b *pbmBackup) startedAfter(o *pbmBackup) bool {
+	if b.StartTS != o.StartTS {
+		return b.StartTS > o.StartTS
+	}
+
+	return b.LastTransitionTS > o.LastTransitionTS
+}
+
+// pbmBackupFailureMetrics returns, for each backup type, how many backups that started after the newest
+// successful one failed, with stale unfinished ones counted only when clusterTime is set (see PMM-15219).
+func pbmBackupFailureMetrics(backups []pbmBackup, clusterTime primitive.Timestamp) []prometheus.Metric {
+	lastDone := make(map[pbmBackupType]*pbmBackup)
+	for i := range backups {
+		backup := &backups[i]
+		done := lastDone[backup.Type]
+		if backup.Status == statusDone && (done == nil || backup.startedAfter(done)) {
+			lastDone[backup.Type] = backup
+		}
+	}
+
+	failures := make(map[pbmBackupType]int)
+	for i := range backups {
+		backup := &backups[i]
+		n := failures[backup.Type]
+		done := lastDone[backup.Type]
+		if (done == nil || backup.startedAfter(done)) && backup.failed(clusterTime) {
+			n++
+		}
+		failures[backup.Type] = n
+	}
+
+	metrics := make([]prometheus.Metric, 0, len(failures))
+	for backupType, n := range failures {
+		metrics = append(metrics, createPBMMetric("cluster_backup_failures_since_last_success",
+			"Number of recorded PBM backups of the type that failed after the last successful one",
+			float64(n),
+			map[string]string{"type": string(backupType)},
+		))
+	}
+
+	return metrics
 }
 
 func pbmBackupsMetrics(backupsList []pbmBackup, me string, now time.Time) []prometheus.Metric {
