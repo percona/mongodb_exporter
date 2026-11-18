@@ -1022,7 +1022,7 @@ func (p *pbmCollector) pbmBackupsMetrics(ctx context.Context, control *mongo.Cli
 // failed reports whether PBM marked the backup failed or, as PBM's status command does, whether it is
 // unfinished with a stale heartbeat because its agent stopped.
 func (b *pbmBackup) failed(clusterTime primitive.Timestamp) bool {
-	switch b.Status {
+	switch b.Status { //nolint:exhaustive // statusPartlyDone is a restore's; every other status is a backup in progress
 	case statusError:
 		return true
 	case statusDone, statusCancelled, statusDown:
