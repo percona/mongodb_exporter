@@ -487,7 +487,7 @@ func TestPBMCollectorWithoutClusterTime(t *testing.T) {
 // TestPBMCollectorWithClusterTime covers the collector passing the cluster time on to the backup failure
 // metrics: through mongos, which has one, a backup whose agent stopped counts as failed.
 //
-//nolint:paralleltest // TestPBMCollectorPITRMetrics writes a PBM configuration through mongos too.
+//nolint:paralleltest // it deletes every pbmConfig document on the sharded test cluster
 func TestPBMCollectorWithClusterTime(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
