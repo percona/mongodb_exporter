@@ -70,7 +70,6 @@ const (
 	pbmRestoreRunning
 	pbmRestoreFailed
 	pbmRestoreCompleted
-	pbmRestorePartlyDone
 )
 
 // PBM keeps its state in these admin collections of the replica set or, in a sharded cluster, of the
@@ -914,7 +913,7 @@ func pbmBackupsMetrics(backupsList []pbmBackup, me string, now time.Time) []prom
 
 			var endTime int64
 			switch backup.Status {
-			case statusDone, statusCancelled, statusError, statusDown:
+			case statusDone, statusPartlyDone, statusCancelled, statusError, statusDown:
 				endTime = backup.LastTransitionTS
 			default:
 				endTime = now.Unix()
@@ -954,11 +953,11 @@ func listPBMRestores(ctx context.Context, client *mongo.Client) ([]pbmRestore, e
 	return restores, nil
 }
 
-// findPBMSorted returns the documents of a PBM collection projected into T, the most recently started first,
-// at most limit of them unless it is 0.
+// findPBMSorted returns the documents of a PBM collection projected into T, the most recently started first
+// and, of those started in the same second, the first inserted first; at most limit of them unless it is 0.
 func findPBMSorted[T any](ctx context.Context, collection *mongo.Collection, projection bson.D, limit int64) ([]T, error) {
-	cur, err := collection.Find(ctx, bson.D{},
-		options.Find().SetSort(bson.D{{Key: "start_ts", Value: -1}}).SetProjection(projection).SetLimit(limit))
+	sort := bson.D{{Key: "start_ts", Value: -1}, {Key: "_id", Value: 1}}
+	cur, err := collection.Find(ctx, bson.D{}, options.Find().SetSort(sort).SetProjection(projection).SetLimit(limit))
 	if err != nil {
 		return nil, fmt.Errorf("query mongo: %w", err)
 	}
@@ -1002,12 +1001,13 @@ func pbmRestoresMetrics(restores []pbmRestore, clusterTime primitive.Timestamp, 
 
 	metrics := make([]prometheus.Metric, 0, 1+2*len(restores))
 	metrics = append(metrics, createPBMMetric("restore_status",
-		"Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do",
+		"Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. A partly done physical restore failed on some nodes, which need an initial sync, and counts as failed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do",
 		float64(status), nil))
 
 	seen := make(map[string]bool, len(restores))
 	for _, restore := range restores {
-		// Without a unique index on name, PBM's agents can record a restore that fails early twice.
+		// Without a unique index on name, PBM's agents can record a restore that fails early twice; the first
+		// inserted is the one PBM goes on updating.
 		if seen[restore.Name] {
 			continue
 		}
@@ -1047,15 +1047,13 @@ func pbmRestoresMetrics(restores []pbmRestore, clusterTime primitive.Timestamp, 
 }
 
 // result returns the value of mongodb_pbm_restore_status for the result PBM recorded for the restore,
-// and false when it has recorded none. A physical restore is partly done when some nodes failed: PBM's
-// restore command takes it for a success, but those nodes need a resync.
+// and false when it has recorded none. A physical restore is partly done when it failed on some nodes:
+// PBM's restore command takes it for a success, but those nodes need an initial sync, so it failed here.
 func (r *pbmRestore) result() (int, bool) {
 	switch r.Status { //nolint:exhaustive // statusDown is a backup's; every other status is a restore in progress
 	case statusDone:
 		return pbmRestoreCompleted, true
-	case statusPartlyDone:
-		return pbmRestorePartlyDone, true
-	case statusError, statusCancelled:
+	case statusError, statusCancelled, statusPartlyDone:
 		return pbmRestoreFailed, true
 	}
 

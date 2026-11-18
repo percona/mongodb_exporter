@@ -155,7 +155,7 @@ func TestPBMCollector(t *testing.T) {
 		assert.Equal(t, 1, testutil.CollectAndCount(c, "mongodb_pbm_restore_status"))
 		if want == 0 {
 			expected := strings.NewReader(`
-			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. A partly done physical restore failed on some nodes, which need an initial sync, and counts as failed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 			# TYPE mongodb_pbm_restore_status gauge
 			mongodb_pbm_restore_status 0` + "\n")
 			require.NoError(t, testutil.CollectAndCompare(c, expected, "mongodb_pbm_restore_status"))
@@ -463,7 +463,7 @@ func TestPBMBackupsMetrics(t *testing.T) {
 // TestPBMCollectorRestores runs the collector on restore metadata shaped like PBM's, through mongos, which has
 // PBM's collections but no PBM to change them.
 //
-//nolint:funlen,paralleltest // TestPBMCollectorPITRMetrics writes a PBM configuration through mongos too.
+//nolint:funlen,paralleltest // it writes a PBM configuration through mongos, which other tests share
 func TestPBMCollectorRestores(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
@@ -493,7 +493,7 @@ func TestPBMCollectorRestores(t *testing.T) {
 
 		now := time.Now().Unix()
 		nowT := uint32(now) //nolint:gosec // seconds since the epoch fit until 2106
-		// PBM leaves the type out of a logical restore's metadata, which also holds each replica set's progress.
+		// Older PBM versions leave the type out of a logical restore's metadata.
 		done := bson.D{
 			{Key: "opid", Value: "PMM-15220-done"},
 			{Key: "name", Value: "2026-11-18T08:00:00.000000001Z"},
@@ -502,7 +502,6 @@ func TestPBMCollectorRestores(t *testing.T) {
 			{Key: "last_transition_ts", Value: now - 3000},
 			{Key: "status", Value: "done"},
 			{Key: "hb", Value: primitive.Timestamp{T: nowT - 3000, I: 1}},
-			{Key: "replsets", Value: bson.A{bson.D{{Key: "name", Value: "rs0"}, {Key: "status", Value: "done"}}}},
 		}
 		// Its agents stopped: unfinished, with a heartbeat far behind the cluster time.
 		stuck := bson.D{
@@ -530,7 +529,7 @@ func TestPBMCollectorRestores(t *testing.T) {
 		# TYPE mongodb_pbm_restore_last_transition_ts gauge
 		mongodb_pbm_restore_last_transition_ts{backup="2026-11-18T07:00:00Z",name="2026-11-18T08:00:00.000000001Z",opid="PMM-15220-done",status="done",type="logical"} %d
 		mongodb_pbm_restore_last_transition_ts{backup="2026-11-18T07:00:00Z",name="2026-11-18T09:00:00.000000001Z",opid="PMM-15220-stuck",status="running",type="logical"} %d
-		# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+		# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. A partly done physical restore failed on some nodes, which need an initial sync, and counts as failed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 		# TYPE mongodb_pbm_restore_status gauge
 		mongodb_pbm_restore_status 2
 		`, now-3000, now-590))
@@ -601,7 +600,7 @@ func TestPBMCollectorRestoresWithoutClusterTime(t *testing.T) {
 			require.NoError(t, err)
 
 			expected := strings.NewReader(fmt.Sprintf(`
-			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. A partly done physical restore failed on some nodes, which need an initial sync, and counts as failed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 			# TYPE mongodb_pbm_restore_status gauge
 			mongodb_pbm_restore_status %d
 			`, tc.want))
@@ -671,7 +670,7 @@ func TestPBMRestoresMetrics(t *testing.T) {
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T20:30:00.123456789Z",opid="op-stale",status="starting",type="logical"} 1.699993001e+09
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T21:00:00.123456789Z",opid="op-done",status="done",type="physical"} 1.6999956e+09
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T22:30:00.123456789Z",opid="op-running",status="running",type="logical"} 1.7000001e+09
-	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. A partly done physical restore failed on some nodes, which need an initial sync, and counts as failed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 	# TYPE mongodb_pbm_restore_status gauge
 	mongodb_pbm_restore_status 1
 	`)
@@ -684,7 +683,7 @@ func TestPBMRestoresMetricsWithoutRestore(t *testing.T) {
 	t.Parallel()
 
 	expected := strings.NewReader(`
-	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. A partly done physical restore failed on some nodes, which need an initial sync, and counts as failed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 	# TYPE mongodb_pbm_restore_status gauge
 	mongodb_pbm_restore_status 0
 	`)
@@ -714,7 +713,7 @@ func TestPBMRestoreStatus(t *testing.T) {
 		// The agents of the restore stopped without recording a result.
 		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: stale}, want: pbmRestoreFailed},
 		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: recentPhysical}, want: pbmRestoreFailed},
-		{restore: pbmRestore{Type: "physical", Status: statusPartlyDone}, want: pbmRestorePartlyDone, finished: true},
+		{restore: pbmRestore{Type: "physical", Status: statusPartlyDone}, want: pbmRestoreFailed, finished: true},
 		{restore: pbmRestore{Type: "physical", Status: statusCancelled}, want: pbmRestoreFailed, finished: true},
 		{restore: pbmRestore{Type: "physical", Status: "running", Heartbeat: recentPhysical}, want: pbmRestoreRunning},
 		{restore: pbmRestore{Type: "physical", Status: "running", Heartbeat: stalePhysical}, want: pbmRestoreFailed},
