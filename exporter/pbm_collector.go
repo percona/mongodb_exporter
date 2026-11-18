@@ -57,22 +57,40 @@ const (
 	pbmAgentStatusError = iota
 	pbmAgentStatusLost  = iota
 
-	statusDown      pbmBackupStatus = "down"
-	statusDone      pbmBackupStatus = "done"
-	statusCancelled pbmBackupStatus = "canceled"
-	statusError     pbmBackupStatus = "error"
+	statusDown       pbmBackupStatus = "down"
+	statusDone       pbmBackupStatus = "done"
+	statusPartlyDone pbmBackupStatus = "partlyDone"
+	statusCancelled  pbmBackupStatus = "canceled"
+	statusError      pbmBackupStatus = "error"
+)
+
+// Values of mongodb_pbm_restore_status.
+const (
+	pbmRestoreIdle = iota
+	pbmRestoreRunning
+	pbmRestoreFailed
+	pbmRestoreCompleted
 )
 
 // PBM keeps its state in these admin collections of the replica set or, in a sharded cluster, of the
 // config server replica set.
 const (
-	pbmConfigCollection  = "pbmConfig"
-	pbmAgentsCollection  = "pbmAgents"
-	pbmBackupsCollection = "pbmBackups"
+	pbmConfigCollection   = "pbmConfig"
+	pbmAgentsCollection   = "pbmAgents"
+	pbmBackupsCollection  = "pbmBackups"
+	pbmRestoresCollection = "pbmRestores"
 
-	// pbmStaleAgentSecs is PBM's defs.StaleFrameSec: an agent whose last heartbeat is further behind
-	// the cluster time is lost.
+	// pbmStaleAgentSecs is PBM's defs.StaleFrameSec: an agent, or a logical restore, whose last
+	// heartbeat is further behind the cluster time is lost.
 	pbmStaleAgentSecs = 30
+
+	// pbmStalePhysicalRestoreSecs is how far PBM's restore command lets the heartbeat of a restore other
+	// than a logical one fall behind.
+	pbmStalePhysicalRestoreSecs = 3 * 60
+
+	// pbmRestoresListed is how many of the most recent restores have series of their own: PBM removes
+	// restore metadata only with a resync or a physical restore.
+	pbmRestoresListed = 10
 
 	// pbmLogicalBackup is the type PBM assumes for backup metadata that has none.
 	pbmLogicalBackup = "logical"
@@ -144,7 +162,7 @@ var pbmAgentProjection = bson.D{
 	{Key: "hb", Value: 1},
 }
 
-// pbmBackupType and pbmBackupStatus are PBM's defs.BackupType and defs.Status.
+// pbmBackupType and pbmBackupStatus are PBM's defs.BackupType and defs.Status, of backups and restores alike.
 type (
 	pbmBackupType   string
 	pbmBackupStatus string
@@ -181,6 +199,31 @@ var pbmBackupProjection = bson.D{
 type pbmBackupReplset struct {
 	Name string `bson:"name"`
 	Node string `bson:"node"`
+}
+
+// pbmRestore is the part of PBM restore metadata that the collector reads.
+type pbmRestore struct {
+	Type             pbmBackupType       `bson:"type"`
+	OPID             string              `bson:"opid"`
+	Name             string              `bson:"name"`
+	Backup           string              `bson:"backup"`
+	StartTS          int64               `bson:"start_ts"`
+	LastTransitionTS int64               `bson:"last_transition_ts"`
+	Status           pbmBackupStatus     `bson:"status"`
+	Heartbeat        primitive.Timestamp `bson:"hb"`
+}
+
+// pbmRestoreProjection keeps the fields of pbmRestore out of PBM restore metadata, which also holds the
+// transactions a restore applied.
+var pbmRestoreProjection = bson.D{
+	{Key: "type", Value: 1},
+	{Key: "opid", Value: 1},
+	{Key: "name", Value: 1},
+	{Key: "backup", Value: 1},
+	{Key: "start_ts", Value: 1},
+	{Key: "last_transition_ts", Value: 1},
+	{Key: "status", Value: 1},
+	{Key: "hb", Value: 1},
 }
 
 // pbmMember is the part of a replica set configuration member that the collector reads.
@@ -304,8 +347,17 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 			"PBM PITR backups are enabled for the cluster",
 			float64(pitrEnabledMetric), nil))
 
+		// Read once for the restore and agent metrics, which compare PBM's heartbeats with its cluster time.
+		hello, err := p.controlHello(p.ctx, control)
+		if err != nil {
+			// The error can carry the URI the collector connected with.
+			logger.Error("failed to read the cluster time for PBM heartbeats", "error", redact.Error(err))
+		}
 		metrics = append(metrics, p.pbmBackupsMetrics(p.ctx, control, logger, currentNode)...)
-		metrics = append(metrics, p.pbmAgentMetrics(p.ctx, control, role, logger, currentNode)...)
+		metrics = append(metrics, p.pbmRestoresMetrics(p.ctx, control, logger, hello)...)
+		if hello != nil {
+			metrics = append(metrics, p.pbmAgentMetrics(p.ctx, control, role, logger, currentNode, hello)...)
+		}
 	}
 
 	metrics = append(metrics, createPBMMetric("cluster_backup_configured",
@@ -540,8 +592,8 @@ func getPBMConfig(ctx context.Context, client *mongo.Client) (*pbmConfig, error)
 	return &cfg, nil
 }
 
-func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Client, role string, l *slog.Logger, currentNode *pbmHello) []prometheus.Metric {
-	clusterStatus, err := p.clusterStatus(ctx, control, role, currentNode)
+func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Client, role string, l *slog.Logger, currentNode, hello *pbmHello) []prometheus.Metric {
+	clusterStatus, err := p.clusterStatus(ctx, control, role, currentNode, hello)
 	if err != nil {
 		// The error can carry the URI the collector connected with.
 		l.Error("failed to get cluster status", "error", redact.Error(err))
@@ -573,21 +625,8 @@ func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, control *mongo.Clien
 }
 
 // clusterStatus returns the PBM agent status of every member of every replica set in the cluster,
-// the way PBM's status command (cli.ClusterStatus) does.
-func (p *pbmCollector) clusterStatus(ctx context.Context, control *mongo.Client, role string, currentNode *pbmHello) (map[string][]pbmNode, error) {
-	// The cluster time is read from the node the collections are read from.
-	hello := currentNode
-	if control != p.base.client {
-		var err error
-		hello, err = getPBMHello(ctx, control)
-		if err != nil {
-			return nil, fmt.Errorf("read cluster time: %w", err)
-		}
-	}
-	if hello.ClusterTime == nil {
-		return nil, errPBMNoClusterTime
-	}
-
+// the way PBM's status command (cli.ClusterStatus) does. hello is controlHello's response.
+func (p *pbmCollector) clusterStatus(ctx context.Context, control *mongo.Client, role string, currentNode, hello *pbmHello) (map[string][]pbmNode, error) {
 	agents, err := listPBMAgents(ctx, control)
 	if err != nil {
 		return nil, fmt.Errorf("get agent statuses: %w", err)
@@ -632,6 +671,21 @@ func (p *pbmCollector) clusterStatus(ctx context.Context, control *mongo.Client,
 	}
 
 	return status, nil
+}
+
+// controlHello reads the hello response of the node PBM's collections are read from, whose cluster time
+// PBM's heartbeats are compared with, and fails when it has none. Read after PBM's configuration, like PBM's
+// topo.GetClusterTime after its read, so that on mongos the cluster time includes the config server's latest.
+func (p *pbmCollector) controlHello(ctx context.Context, control *mongo.Client) (*pbmHello, error) {
+	hello, err := getPBMHello(ctx, control)
+	if err != nil {
+		return nil, fmt.Errorf("read cluster time: %w", err)
+	}
+	if hello.ClusterTime == nil {
+		return nil, errPBMNoClusterTime
+	}
+
+	return hello, nil
 }
 
 // listPBMAgents returns the PBM agent status documents by replica set name and node.
@@ -800,16 +854,9 @@ func (a *pbmAgent) role() string {
 }
 
 func listPBMBackups(ctx context.Context, client *mongo.Client) ([]pbmBackup, error) {
-	cur, err := pbmAdminDB(client).Collection(pbmBackupsCollection).
-		Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "start_ts", Value: -1}}).SetProjection(pbmBackupProjection))
+	backups, err := findPBMSorted[pbmBackup](ctx, pbmAdminDB(client).Collection(pbmBackupsCollection), pbmBackupProjection, 0)
 	if err != nil {
-		return nil, fmt.Errorf("query mongo: %w", err)
-	}
-
-	var backups []pbmBackup
-	err = cur.All(ctx, &backups)
-	if err != nil {
-		return nil, fmt.Errorf("message decode: %w", err)
+		return nil, err
 	}
 
 	for i := range backups {
@@ -866,7 +913,7 @@ func pbmBackupsMetrics(backupsList []pbmBackup, me string, now time.Time) []prom
 
 			var endTime int64
 			switch backup.Status {
-			case statusDone, statusCancelled, statusError, statusDown:
+			case statusDone, statusPartlyDone, statusCancelled, statusError, statusDown:
 				endTime = backup.LastTransitionTS
 			default:
 				endTime = now.Unix()
@@ -880,6 +927,162 @@ func pbmBackupsMetrics(backupsList []pbmBackup, me string, now time.Time) []prom
 		}
 	}
 	return metrics
+}
+
+// listPBMRestores returns PBM's restore metadata, the most recent restore first. PBM records a logical
+// restore there as it runs. A physical, incremental or external restore records its progress and result only
+// in the backup storage, and empties the collection in its last step; while it runs, the database is down.
+// It gets there only with the resync PBM requires after it, which imports the metadata the leader writes to
+// the storage once it has finished: a restore that fails before that is never there. A resync replaces all
+// of it.
+func listPBMRestores(ctx context.Context, client *mongo.Client) ([]pbmRestore, error) {
+	// Local, not majority: the heartbeat is compared with the primary's cluster time, which a majority read
+	// trails by the replication lag, see stale.
+	restoresCollection := pbmAdminDB(client).Collection(pbmRestoresCollection, options.Collection().SetReadConcern(readconcern.Local()))
+	restores, err := findPBMSorted[pbmRestore](ctx, restoresCollection, pbmRestoreProjection, pbmRestoresListed)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range restores {
+		if restores[i].Type == "" {
+			restores[i].Type = pbmLogicalBackup
+		}
+	}
+
+	return restores, nil
+}
+
+// findPBMSorted returns the documents of a PBM collection projected into T, the most recently started first
+// and, of those started in the same second, the first inserted first; at most limit of them unless it is 0.
+func findPBMSorted[T any](ctx context.Context, collection *mongo.Collection, projection bson.D, limit int64) ([]T, error) {
+	sort := bson.D{{Key: "start_ts", Value: -1}, {Key: "_id", Value: 1}}
+	cur, err := collection.Find(ctx, bson.D{}, options.Find().SetSort(sort).SetProjection(projection).SetLimit(limit))
+	if err != nil {
+		return nil, fmt.Errorf("query mongo: %w", err)
+	}
+
+	var docs []T
+	err = cur.All(ctx, &docs)
+	if err != nil {
+		return nil, fmt.Errorf("message decode: %w", err)
+	}
+
+	return docs, nil
+}
+
+// pbmRestoresMetrics reads the metrics of PBM's restores; hello is controlHello's response, nil if it failed.
+func (p *pbmCollector) pbmRestoresMetrics(ctx context.Context, control *mongo.Client, l *slog.Logger, hello *pbmHello) []prometheus.Metric {
+	restores, err := listPBMRestores(ctx, control)
+	if err != nil {
+		// Warn, like failing to read pbmConfig: a user granted only the collections the PBM metrics needed
+		// before may lack find on pbmRestores.
+		l.Warn("failed to get PBM restore list", "error", err.Error())
+
+		return nil
+	}
+
+	// Without the cluster time, an unfinished restore whose agents stopped reads as running.
+	var clusterTime primitive.Timestamp
+	if hello != nil {
+		clusterTime = hello.ClusterTime.ClusterTime
+	}
+
+	return pbmRestoresMetrics(restores, clusterTime, time.Now())
+}
+
+// pbmRestoresMetrics returns the status of the most recent restore and the metrics of each restore.
+// restores is sorted by start time, the most recent restore first.
+func pbmRestoresMetrics(restores []pbmRestore, clusterTime primitive.Timestamp, now time.Time) []prometheus.Metric {
+	status := pbmRestoreIdle
+	if len(restores) > 0 {
+		status = restores[0].status(clusterTime)
+	}
+
+	metrics := make([]prometheus.Metric, 0, 1+2*len(restores))
+	metrics = append(metrics, createPBMMetric("restore_status",
+		"Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. A partly done physical restore failed on some nodes, which need an initial sync, and counts as failed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do",
+		float64(status), nil))
+
+	seen := make(map[string]bool, len(restores))
+	for _, restore := range restores {
+		// Without a unique index on name, PBM's agents can record a restore that fails early twice; the first
+		// inserted is the one PBM goes on updating.
+		if seen[restore.Name] {
+			continue
+		}
+		seen[restore.Name] = true
+
+		labels := map[string]string{
+			"opid":   restore.OPID,
+			"name":   restore.Name,
+			"backup": restore.Backup,
+			"status": string(restore.Status),
+			"type":   string(restore.Type),
+		}
+
+		metrics = append(metrics, createPBMMetric("restore_last_transition_ts",
+			fmt.Sprintf("Last transition timestamp of each of the %d most recent PBM restores (seconds since epoch)", pbmRestoresListed),
+			float64(restore.LastTransitionTS), labels),
+		)
+
+		var endTime int64
+		_, finished := restore.result()
+		switch {
+		case finished:
+			endTime = restore.LastTransitionTS
+		case restore.stale(clusterTime):
+			// It ended with its last sign of life.
+			endTime = max(int64(restore.Heartbeat.T), restore.LastTransitionTS)
+		default:
+			endTime = now.Unix()
+		}
+		metrics = append(metrics, createPBMMetric("restore_duration_seconds",
+			fmt.Sprintf("Duration of each of the %d most recent PBM restores", pbmRestoresListed),
+			float64(endTime-restore.StartTS), labels),
+		)
+	}
+
+	return metrics
+}
+
+// result returns the value of mongodb_pbm_restore_status for the result PBM recorded for the restore,
+// and false when it has recorded none. A physical restore is partly done when it failed on some nodes:
+// PBM's restore command takes it for a success, but those nodes need an initial sync, so it failed here.
+func (r *pbmRestore) result() (int, bool) {
+	switch r.Status { //nolint:exhaustive // statusDown is a backup's; every other status is a restore in progress
+	case statusDone:
+		return pbmRestoreCompleted, true
+	case statusError, statusCancelled, statusPartlyDone:
+		return pbmRestoreFailed, true
+	}
+
+	return pbmRestoreRunning, false
+}
+
+// stale tells whether the heartbeat of the restore is further behind the cluster time than PBM's restore
+// command allows. The leader of a logical restore keeps it in the database while the restore runs. The
+// metadata of a physical restore, with the heartbeat its agents kept in the storage, gets into the database
+// only with a resync after the restore.
+func (r *pbmRestore) stale(clusterTime primitive.Timestamp) bool {
+	var frame uint32 = pbmStaleAgentSecs
+	if r.Type != pbmLogicalBackup {
+		frame = pbmStalePhysicalRestoreSecs
+	}
+
+	return r.Heartbeat.T+frame < clusterTime.T
+}
+
+// status returns the value of mongodb_pbm_restore_status for the restore. A stale restore without a result
+// failed: PBM's restore command stops waiting for it, as its agents stopped without recording one. Without
+// the cluster time (zero), no restore is stale.
+func (r *pbmRestore) status(clusterTime primitive.Timestamp) int {
+	status, finished := r.result()
+	if !finished && r.stale(clusterTime) {
+		return pbmRestoreFailed
+	}
+
+	return status
 }
 
 var _ prometheus.Collector = (*pbmCollector)(nil)
