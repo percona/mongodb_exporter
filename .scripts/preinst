@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+# Up to v0.54.0 the deb shipped the unit as a conffile in /etc/systemd/system,
+# where it overrides the one now shipped in /usr/lib/systemd/system.
+# Remove it on upgrade if unmodified (a modified one is kept as .dpkg-bak).
+# DPKG_MAINTSCRIPT_PACKAGE is only set when dpkg runs this script, so rpm skips it.
+if [ -n "$DPKG_MAINTSCRIPT_PACKAGE" ]; then
+    dpkg-maintscript-helper rm_conffile /etc/systemd/system/mongodb_exporter.service 0.54.1~ -- "$@"
+fi
+
+exit 0

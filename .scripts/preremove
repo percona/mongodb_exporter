@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -e
+
+# Stop and disable the service on removal, but not on upgrade.
+# deb passes "remove" or "upgrade"; rpm passes the number of
+# versions left after the transaction (0 = removal).
+case "$1" in
+    remove|0)
+        systemctl --system stop mongodb_exporter.service >/dev/null 2>&1 || true
+        systemctl --system disable mongodb_exporter.service >/dev/null 2>&1 || true
+        ;;
+esac
+
+exit 0
