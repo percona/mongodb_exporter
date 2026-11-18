@@ -17,6 +17,7 @@ package exporter
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sort"
 	"strings"
@@ -30,7 +31,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -144,14 +147,15 @@ func TestPBMCollector(t *testing.T) {
 	})
 
 	t.Run("pbm restore metrics", func(t *testing.T) {
-		// One status of the most recent restore, and one series of each per restore.
-		want, err := client.Database("admin").Collection(pbmRestoresCollection).CountDocuments(ctx, bson.D{})
+		// One status of the most recent restore, and one series of each per recent restore.
+		count, err := client.Database("admin").Collection(pbmRestoresCollection).CountDocuments(ctx, bson.D{})
 		require.NoError(t, err)
+		want := min(count, pbmRestoresListed)
 
 		assert.Equal(t, 1, testutil.CollectAndCount(c, "mongodb_pbm_restore_status"))
 		if want == 0 {
 			expected := strings.NewReader(`
-			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 			# TYPE mongodb_pbm_restore_status gauge
 			mongodb_pbm_restore_status 0` + "\n")
 			require.NoError(t, testutil.CollectAndCompare(c, expected, "mongodb_pbm_restore_status"))
@@ -456,6 +460,158 @@ func TestPBMBackupsMetrics(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestPBMCollectorRestores runs the collector on restore metadata shaped like PBM's, through mongos, which has
+// PBM's collections but no PBM to change them.
+//
+//nolint:funlen,paralleltest // TestPBMCollectorPITRMetrics writes a PBM configuration through mongos too.
+func TestPBMCollectorRestores(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	client := tu.DefaultTestClientMongoS(ctx, t)
+	port, err := tu.PortForContainer("mongos")
+	require.NoError(t, err)
+
+	majority := options.Collection().SetWriteConcern(writeconcern.Majority())
+	config := client.Database("admin").Collection(pbmConfigCollection, majority)
+	restores := client.Database("admin").Collection(pbmRestoresCollection, majority)
+	ours := bson.D{{Key: "opid", Value: bson.D{{Key: "$regex", Value: "^PMM-15220-"}}}}
+	clean := func() {
+		_, _ = config.DeleteMany(context.WithoutCancel(ctx), bson.D{})
+		_, _ = restores.DeleteMany(context.WithoutCancel(ctx), ours)
+	}
+	clean()
+	t.Cleanup(clean)
+	_, err = config.InsertOne(ctx, bson.D{{Key: "pitr", Value: bson.D{{Key: "enabled", Value: false}}}})
+	require.NoError(t, err)
+
+	c := newPbmCollector(ctx, client, "mongodb://127.0.0.1:"+port, 1000, promslog.New(&promslog.Config{}))
+
+	t.Run("documents as PBM writes them", func(t *testing.T) {
+		_, err := restores.DeleteMany(ctx, ours)
+		require.NoError(t, err)
+
+		now := time.Now().Unix()
+		nowT := uint32(now) //nolint:gosec // seconds since the epoch fit until 2106
+		// PBM leaves the type out of a logical restore's metadata, which also holds each replica set's progress.
+		done := bson.D{
+			{Key: "opid", Value: "PMM-15220-done"},
+			{Key: "name", Value: "2026-11-18T08:00:00.000000001Z"},
+			{Key: "backup", Value: "2026-11-18T07:00:00Z"},
+			{Key: "start_ts", Value: now - 3600},
+			{Key: "last_transition_ts", Value: now - 3000},
+			{Key: "status", Value: "done"},
+			{Key: "hb", Value: primitive.Timestamp{T: nowT - 3000, I: 1}},
+			{Key: "replsets", Value: bson.A{bson.D{{Key: "name", Value: "rs0"}, {Key: "status", Value: "done"}}}},
+		}
+		// Its agents stopped: unfinished, with a heartbeat far behind the cluster time.
+		stuck := bson.D{
+			{Key: "type", Value: "logical"},
+			{Key: "opid", Value: "PMM-15220-stuck"},
+			{Key: "name", Value: "2026-11-18T09:00:00.000000001Z"},
+			{Key: "backup", Value: "2026-11-18T07:00:00Z"},
+			{Key: "start_ts", Value: now - 600},
+			{Key: "last_transition_ts", Value: now - 590},
+			{Key: "status", Value: "running"},
+			{Key: "hb", Value: primitive.Timestamp{T: nowT - 580, I: 1}},
+		}
+		// done twice, as PBM's agents can record a restore that fails early
+		for _, restore := range []bson.D{done, done, stuck} {
+			_, err = restores.InsertOne(ctx, restore)
+			require.NoError(t, err)
+		}
+
+		expected := strings.NewReader(fmt.Sprintf(`
+		# HELP mongodb_pbm_restore_duration_seconds Duration of each of the 10 most recent PBM restores
+		# TYPE mongodb_pbm_restore_duration_seconds gauge
+		mongodb_pbm_restore_duration_seconds{backup="2026-11-18T07:00:00Z",name="2026-11-18T08:00:00.000000001Z",opid="PMM-15220-done",status="done",type="logical"} 600
+		mongodb_pbm_restore_duration_seconds{backup="2026-11-18T07:00:00Z",name="2026-11-18T09:00:00.000000001Z",opid="PMM-15220-stuck",status="running",type="logical"} 20
+		# HELP mongodb_pbm_restore_last_transition_ts Last transition timestamp of each of the 10 most recent PBM restores (seconds since epoch)
+		# TYPE mongodb_pbm_restore_last_transition_ts gauge
+		mongodb_pbm_restore_last_transition_ts{backup="2026-11-18T07:00:00Z",name="2026-11-18T08:00:00.000000001Z",opid="PMM-15220-done",status="done",type="logical"} %d
+		mongodb_pbm_restore_last_transition_ts{backup="2026-11-18T07:00:00Z",name="2026-11-18T09:00:00.000000001Z",opid="PMM-15220-stuck",status="running",type="logical"} %d
+		# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+		# TYPE mongodb_pbm_restore_status gauge
+		mongodb_pbm_restore_status 2
+		`, now-3000, now-590))
+		err = testutil.CollectAndCompare(c, expected,
+			"mongodb_pbm_restore_status", "mongodb_pbm_restore_last_transition_ts", "mongodb_pbm_restore_duration_seconds")
+		assert.NoError(t, err)
+	})
+
+	t.Run("only the most recent restores", func(t *testing.T) {
+		_, err := restores.DeleteMany(ctx, ours)
+		require.NoError(t, err)
+
+		for i := range pbmRestoresListed + 1 {
+			_, err = restores.InsertOne(ctx, bson.D{
+				{Key: "opid", Value: fmt.Sprintf("PMM-15220-%d", i)},
+				{Key: "name", Value: fmt.Sprintf("restore-%d", i)},
+				{Key: "start_ts", Value: int64(1_700_000_000 + i)},
+				{Key: "status", Value: "done"},
+			})
+			require.NoError(t, err)
+		}
+
+		assert.Equal(t, pbmRestoresListed, testutil.CollectAndCount(c, "mongodb_pbm_restore_last_transition_ts"))
+	})
+}
+
+// TestPBMCollectorRestoresWithoutClusterTime covers a node without a cluster time, as a standalone node has
+// none: a recorded result still counts, and only an unfinished restore can't be told stale.
+//
+//nolint:paralleltest // TestPBMCollectorWithoutPBM expects no PBM configuration on the standalone node.
+func TestPBMCollectorRestoresWithoutClusterTime(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	// The standalone node has no PBM, so these are the only PBM documents there.
+	client := tu.TestClient(ctx, tu.MongoDBStandAlonePort, t)
+	config := client.Database("admin").Collection(pbmConfigCollection)
+	restores := client.Database("admin").Collection(pbmRestoresCollection)
+	clean := func() {
+		_, _ = config.DeleteMany(context.WithoutCancel(ctx), bson.D{})
+		_, _ = restores.DeleteMany(context.WithoutCancel(ctx), bson.D{})
+	}
+	clean()
+	t.Cleanup(clean)
+	_, err := config.InsertOne(ctx, bson.D{{Key: "pitr", Value: bson.D{{Key: "enabled", Value: false}}}})
+	require.NoError(t, err)
+
+	c := newPbmCollector(ctx, client, "mongodb://127.0.0.1:"+tu.MongoDBStandAlonePort, 1000, promslog.New(&promslog.Config{}))
+
+	for _, tc := range []struct {
+		status pbmBackupStatus
+		want   int
+	}{
+		{status: statusError, want: pbmRestoreFailed},
+		{status: "running", want: pbmRestoreRunning},
+	} {
+		t.Run(string(tc.status), func(t *testing.T) {
+			_, err := restores.DeleteMany(ctx, bson.D{})
+			require.NoError(t, err)
+			// Its heartbeat would make an unfinished restore stale, had the node a cluster time.
+			_, err = restores.InsertOne(ctx, bson.D{
+				{Key: "opid", Value: "PMM-15220-no-cluster-time"},
+				{Key: "name", Value: "2026-11-18T08:00:00.000000001Z"},
+				{Key: "start_ts", Value: int64(100)},
+				{Key: "status", Value: string(tc.status)},
+				{Key: "hb", Value: primitive.Timestamp{T: 100, I: 1}},
+			})
+			require.NoError(t, err)
+
+			expected := strings.NewReader(fmt.Sprintf(`
+			# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+			# TYPE mongodb_pbm_restore_status gauge
+			mongodb_pbm_restore_status %d
+			`, tc.want))
+			err = testutil.CollectAndCompare(c, expected, "mongodb_pbm_restore_status")
+			assert.NoError(t, err)
+		})
+	}
+}
+
+//nolint:funlen
 func TestPBMRestoresMetrics(t *testing.T) {
 	t.Parallel()
 
@@ -479,7 +635,17 @@ func TestPBMRestoresMetrics(t *testing.T) {
 			Backup:           "2023-11-14T20:00:00Z",
 			StartTS:          1_699_995_000,
 			LastTransitionTS: 1_699_995_600,
-			Status:           restoreStatusDone,
+			Status:           statusDone,
+		},
+		{
+			// The same restore again: without a unique index on name, PBM's agents can insert it twice.
+			Type:             "physical",
+			OPID:             "op-done",
+			Name:             "2023-11-14T21:00:00.123456789Z",
+			Backup:           "2023-11-14T20:00:00Z",
+			StartTS:          1_699_995_000,
+			LastTransitionTS: 1_699_995_600,
+			Status:           statusDone,
 		},
 		{
 			// Its agents stopped without recording a result.
@@ -495,17 +661,17 @@ func TestPBMRestoresMetrics(t *testing.T) {
 	}
 
 	expected := strings.NewReader(`
-	# HELP mongodb_pbm_restore_duration_seconds Duration of PBM restore
+	# HELP mongodb_pbm_restore_duration_seconds Duration of each of the 10 most recent PBM restores
 	# TYPE mongodb_pbm_restore_duration_seconds gauge
 	mongodb_pbm_restore_duration_seconds{backup="2023-11-14T20:00:00Z",name="2023-11-14T20:30:00.123456789Z",opid="op-stale",status="starting",type="logical"} 30
 	mongodb_pbm_restore_duration_seconds{backup="2023-11-14T20:00:00Z",name="2023-11-14T21:00:00.123456789Z",opid="op-done",status="done",type="physical"} 600
 	mongodb_pbm_restore_duration_seconds{backup="2023-11-14T20:00:00Z",name="2023-11-14T22:30:00.123456789Z",opid="op-running",status="running",type="logical"} 1000
-	# HELP mongodb_pbm_restore_last_transition_ts Last transition timestamp of PBM restore (seconds since epoch)
+	# HELP mongodb_pbm_restore_last_transition_ts Last transition timestamp of each of the 10 most recent PBM restores (seconds since epoch)
 	# TYPE mongodb_pbm_restore_last_transition_ts gauge
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T20:30:00.123456789Z",opid="op-stale",status="starting",type="logical"} 1.699993001e+09
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T21:00:00.123456789Z",opid="op-done",status="done",type="physical"} 1.6999956e+09
 	mongodb_pbm_restore_last_transition_ts{backup="2023-11-14T20:00:00Z",name="2023-11-14T22:30:00.123456789Z",opid="op-running",status="running",type="logical"} 1.7000001e+09
-	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 	# TYPE mongodb_pbm_restore_status gauge
 	mongodb_pbm_restore_status 1
 	`)
@@ -518,7 +684,7 @@ func TestPBMRestoresMetricsWithoutRestore(t *testing.T) {
 	t.Parallel()
 
 	expected := strings.NewReader(`
-	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed. Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
+	# HELP mongodb_pbm_restore_status Status of the most recent PBM restore in admin.pbmRestores: 0 = idle (none recorded), 1 = running, 2 = failed, 3 = completed, 4 = partly done (restored on some nodes; the others failed and need a resync). Covers logical restores; physical, incremental and external restores appear only after a resync, and most failed ones never do
 	# TYPE mongodb_pbm_restore_status gauge
 	mongodb_pbm_restore_status 0
 	`)
@@ -543,13 +709,13 @@ func TestPBMRestoreStatus(t *testing.T) {
 		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "starting", Heartbeat: recent}, want: pbmRestoreRunning},
 		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: recent}, want: pbmRestoreRunning},
 		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "dumpDone", Heartbeat: recent}, want: pbmRestoreRunning},
-		{restore: pbmRestore{Type: pbmLogicalBackup, Status: restoreStatusDone, Heartbeat: stale}, want: pbmRestoreCompleted, finished: true},
-		{restore: pbmRestore{Type: pbmLogicalBackup, Status: restoreStatusError, Heartbeat: recent}, want: pbmRestoreFailed, finished: true},
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: statusDone, Heartbeat: stale}, want: pbmRestoreCompleted, finished: true},
+		{restore: pbmRestore{Type: pbmLogicalBackup, Status: statusError, Heartbeat: recent}, want: pbmRestoreFailed, finished: true},
 		// The agents of the restore stopped without recording a result.
 		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: stale}, want: pbmRestoreFailed},
 		{restore: pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: recentPhysical}, want: pbmRestoreFailed},
-		{restore: pbmRestore{Type: "physical", Status: restoreStatusPartlyDone}, want: pbmRestoreCompleted, finished: true},
-		{restore: pbmRestore{Type: "physical", Status: restoreStatusCancelled}, want: pbmRestoreFailed, finished: true},
+		{restore: pbmRestore{Type: "physical", Status: statusPartlyDone}, want: pbmRestorePartlyDone, finished: true},
+		{restore: pbmRestore{Type: "physical", Status: statusCancelled}, want: pbmRestoreFailed, finished: true},
 		{restore: pbmRestore{Type: "physical", Status: "running", Heartbeat: recentPhysical}, want: pbmRestoreRunning},
 		{restore: pbmRestore{Type: "physical", Status: "running", Heartbeat: stalePhysical}, want: pbmRestoreFailed},
 		{restore: pbmRestore{Type: "incremental", Status: "copyDone", Heartbeat: recentPhysical}, want: pbmRestoreRunning},
@@ -560,4 +726,9 @@ func TestPBMRestoreStatus(t *testing.T) {
 		_, finished := tc.restore.result()
 		assert.Equal(t, tc.finished, finished, "%+v", tc.restore)
 	}
+
+	// Without the cluster time, a recorded result still counts, and an unfinished restore reads as running.
+	noClusterTime := primitive.Timestamp{}
+	assert.Equal(t, pbmRestoreFailed, (&pbmRestore{Type: pbmLogicalBackup, Status: statusError}).status(noClusterTime))
+	assert.Equal(t, pbmRestoreRunning, (&pbmRestore{Type: pbmLogicalBackup, Status: "running", Heartbeat: stale}).status(noClusterTime))
 }

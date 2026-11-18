@@ -115,6 +115,8 @@ privileges: [
 ],
 ```
 However, this is not recommended as the list of internal collections may change in future releases.
+The restore metrics, for example, need `find` on `pbmRestores`, which earlier versions of the exporter didn't read: without it,
+they are missing and the exporter logs a warning on each scrape.
 
 More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
 
