@@ -96,6 +96,25 @@ Connecting user should have sufficient rights to query needed stats:
          "db":"local"
       }
 ```
+
+The exporter reads the cluster ID from `admin.system.version` on every scrape. The `clusterMonitor` role does not grant access
+to `system.*` collections, so without an extra privilege `mongod` logs a `Checking authorization failed` message
+(`not authorized on admin to execute command { find: "system.version" ... }`) for each scrape. To avoid this, create a role
+with `find` on that collection and grant it to the exporter user:
+```
+db.getSiblingDB("admin").createRole({
+  role: "exporterClusterID",
+  privileges: [
+    { resource: { db: "admin", collection: "system.version" }, actions: [ "find" ] }
+  ],
+  roles: []
+})
+
+db.getSiblingDB("admin").grantRolesToUser("<exporter user>", [ { role: "exporterClusterID", db: "admin" } ])
+```
+
+When monitoring shards directly on MongoDB 8.0 or newer, the user also needs the `directShardOperations` role in the `admin` database.
+
 When using the PBM collector to get metrics from Percona Backup for MongoDB, the user should also have sufficient privileges
 to query the PBM internal collections (in the `admin` database). One option is to grant `find` privileges on the `admin` collection:
 ```
