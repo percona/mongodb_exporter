@@ -84,57 +84,39 @@ docker run -d -p 9216:9216 ghcr.io/percona/mongodb_exporter:0.53 --mongodb.uri=m
 ```
 
 ### Permissions
-Connecting user should have sufficient rights to query needed stats:
+Create a dedicated role for the exporter, then create a user with that role. Run these commands in the `admin` database:
 
-```
-      {
-         "role":"clusterMonitor",
-         "db":"admin"
-      },
-      {
-         "role":"read",
-         "db":"local"
-      }
-```
-
-The exporter reads the cluster ID from `admin.system.version` on every scrape. The `clusterMonitor` role does not grant access
-to `system.*` collections, so without an extra privilege `mongod` logs a `Checking authorization failed` message
-(`not authorized on admin to execute command { find: "system.version" ... }`) for each scrape. To avoid this, create a role
-with `find` on that collection and grant it to the exporter user:
-```
+```javascript
 db.getSiblingDB("admin").createRole({
-  role: "exporterClusterID",
+  role: "mongodbExporter",
   privileges: [
-    { resource: { db: "admin", collection: "system.version" }, actions: [ "find" ] }
+    // Cluster ID lookup. Without this, mongod logs an authorization failure on every scrape.
+    { resource: { db: "admin", collection: "system.version" }, actions: [ "find" ] },
+    // PBM collector (--collector.pbm). Remove this if you don't use Percona Backup for MongoDB.
+    { resource: { db: "admin", collection: "" }, actions: [ "find" ] }
   ],
-  roles: []
+  roles: [
+    { role: "clusterMonitor", db: "admin" },
+    { role: "read", db: "local" }
+    // MongoDB 8.0+ sharded clusters only: uncomment to monitor shards directly.
+    // , { role: "directShardOperations", db: "admin" }
+  ]
 })
 
-db.getSiblingDB("admin").grantRolesToUser("<exporter user>", [ { role: "exporterClusterID", db: "admin" } ])
+db.getSiblingDB("admin").createUser({
+  user: "mongodb_exporter",
+  pwd: passwordPrompt(),
+  roles: [ { role: "mongodbExporter", db: "admin" } ]
+})
 ```
 
-When monitoring shards directly on MongoDB 8.0 or newer, the user also needs the `directShardOperations` role in the `admin` database.
+The role includes:
+- `clusterMonitor` and `read` on `local`: the server, replication and diagnostic statistics used by most collectors.
+- `find` on `admin.system.version`: lets the exporter read the cluster ID.
+- `find` on the `admin` database: needed by the PBM collector to read the PBM control collections. Granting `find` on the whole database instead of each [PBM collection](https://docs.percona.com/percona-backup-mongodb/details/control-collections.html) means the role keeps working when PBM adds new collections.
+- `directShardOperations`: required on MongoDB 8.0 and newer when the exporter connects directly to shard members. Older versions don't need it, and servers that don't have this built-in role (such as 5.0) reject the `createRole` command if you include it.
 
-When using the PBM collector to get metrics from Percona Backup for MongoDB, the user should also have sufficient privileges
-to query the PBM internal collections (in the `admin` database). One option is to grant `find` privileges on the `admin` collection:
-```
-privileges: [
-        { resource: { db: "admin", collection: "" }, actions: [ "find" ] },
-],
-```
-
-Alternatively, you can grant the `find` privilege for each PBM internal collection (see: https://docs.percona.com/percona-backup-mongodb/details/control-collections.html):
-```
-privileges: [
-       { resource: { db: "admin", collection: "pbmBackups" }, actions: [ "find" ] },
-       { resource: { db: "admin", collection: "pbmAgents" }, actions: [ "find" ] },
-       { resource: { db: "admin", collection: "pbmConfig" }, actions: [ "find" ] },
-       ...
-],
-```
-However, this is not recommended as the list of internal collections may change in future releases.
-
-More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
+More info about built-in roles in the MongoDB [documentation](https://www.mongodb.com/docs/manual/reference/built-in-roles/).
 
 #### Example
 ```sh
