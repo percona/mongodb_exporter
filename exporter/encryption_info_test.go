@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
@@ -37,7 +36,7 @@ func TestGetEncryptionInfo(t *testing.T) {
 		t.Skip("Test is only for Percona MongoDB as upstream MongoDB does not support encryption")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.TestClient(ctx, tu.MongoDBStandAloneEncryptedPort, t)
@@ -52,7 +51,7 @@ func TestGetEncryptionInfo(t *testing.T) {
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
-	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo, false)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(fmt.Sprintf(`

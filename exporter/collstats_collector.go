@@ -81,13 +81,14 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
 		if err != nil {
 			logger.Error("cannot list collections", "error", err.Error())
+
 			return
 		}
 	}
 
 	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
-		if len(parts) < 2 { //nolint:gomnd
+		if len(parts) < 2 { //nolint:mnd
 			continue
 		}
 
@@ -142,14 +143,12 @@ func (d *collstatsCollector) collect(ch chan<- prometheus.Metric) {
 		debugResult(logger, stats)
 
 		prefix := "collstats"
-		labels := d.topologyInfo.baseLabels()
-		labels["database"] = database
-		labels["collection"] = collection
 
 		for _, metrics := range stats {
-			if shard, ok := metrics["shard"].(string); ok {
-				labels["shard"] = shard
-			}
+			labels := d.topologyInfo.baseLabels()
+			labels["database"] = database
+			labels["collection"] = collection
+			setShardLabel(labels, metrics)
 
 			for _, metric := range makeMetrics(prefix, metrics, labels, d.compatibleMode) {
 				ch <- metric

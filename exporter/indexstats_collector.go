@@ -87,7 +87,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 	for _, dbCollection := range collections {
 		parts := strings.Split(dbCollection, ".")
-		if len(parts) < 2 { //nolint:gomnd
+		if len(parts) < 2 { //nolint:mnd
 			continue
 		}
 
@@ -135,6 +135,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 			labels["database"] = database
 			labels["collection"] = collection
 			labels["key_name"] = indexName
+			setShardLabel(labels, metric)
 
 			metrics := sanitizeMetrics(metric)
 			for _, metric := range makeMetrics(prefix, metrics, labels, false) {

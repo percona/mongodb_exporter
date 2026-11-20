@@ -19,7 +19,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/promslog"
@@ -30,7 +29,7 @@ import (
 )
 
 func TestProfileCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)

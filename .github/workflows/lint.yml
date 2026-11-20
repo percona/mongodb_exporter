@@ -1,29 +1,32 @@
 name: Lint
 
 on:
-  schedule:
-    # run every Sunday
-    - cron: '0 13 * * 0'
   push:
     branches:
       - main
-      - release-0.1x
     tags:
       - v[0-9]+.[0-9]+.[0-9]+*
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   lint:
     name: Lint Check
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ github.workspace }}/go.mod
 
@@ -34,9 +37,23 @@ jobs:
         run: |
           make format
           git diff --exit-code
-      - name: Run checks/linters
+
+      - name: Install kerberos development libraries
         run: |
-          # use GITHUB_TOKEN because only it has access to GitHub Checks API
-          bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
-          bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
+          sudo apt-get update
+          sudo apt-get install libkrb5-dev
+
+      - name: Run code linters
+        uses: reviewdog/action-golangci-lint@284129a3ac23bc5d8ac1522e0b6511df74a8836d # v2.10.2
+        with:
+          go_version_file: ${{ github.workspace }}/go.mod
+          reporter: github-pr-review
+          fail_level: error
+          filter_mode: added
+          cache: false
+          golangci_lint_flags: "--config=.golangci.yml"
+          golangci_lint_version: v2.14.0
+
+      - name: Run license check
+        run: |
           make check-license

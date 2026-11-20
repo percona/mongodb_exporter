@@ -178,7 +178,7 @@ func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collecti
 
 	filteredCollections := []string{}
 	for _, collection := range removeEmptyStrings(collections) {
-		if len(strings.Split(collection, ".")) < 2 { //nolint:gomnd
+		if len(strings.Split(collection, ".")) < 2 { //nolint:mnd
 			continue
 		}
 
@@ -258,13 +258,26 @@ func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includ
 	return count, nil
 }
 
-func splitNamespace(ns string) (database, collection string) {
+// splitNamespace splits the namespace into database and collection.
+func splitNamespace(ns string) (string, string) {
 	parts := strings.Split(ns, ".")
-	if len(parts) < 2 { // there is no collection?
+	// there is no collection?
+	if len(parts) < 2 { //nolint:mnd
 		return parts[0], ""
 	}
 
 	return parts[0], strings.Join(parts[1:], ".")
+}
+
+// setShardLabel sets the "shard" label from a single $collStats or $indexStats
+// document; documents reporting no shard get an empty value. The label is set
+// unconditionally because descriptors are built from these labels and
+// MustRegister panics when a collector describes one fully-qualified name with
+// two different label sets. Prometheus drops empty labels at ingestion, so
+// deployments without shards keep the same series.
+func setShardLabel(labels map[string]string, doc bson.M) {
+	shard, _ := doc["shard"].(string)
+	labels["shard"] = shard
 }
 
 func fromMapToSlice(databases map[string][]string) []string {

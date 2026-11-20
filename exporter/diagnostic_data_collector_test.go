@@ -39,7 +39,7 @@ import (
 )
 
 func TestDiagnosticDataCollector(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -49,7 +49,7 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
-	c := newDiagnosticDataCollector(ctx, client, logger, false, ti, dbBuildInfo)
+	c := newDiagnosticDataCollector(ctx, client, logger, false, ti, dbBuildInfo, false)
 
 	prefix := "local.oplog.rs.stats.storageStats.wiredTiger"
 	if dbBuildInfo.VersionArray[0] < 7 {
@@ -181,10 +181,9 @@ func TestCollectorWithCompatibleMode(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
 			port, err := tu.PortForContainer(tt.containerName)
@@ -196,7 +195,7 @@ func TestCollectorWithCompatibleMode(t *testing.T) {
 			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 			require.NoError(t, err)
 
-			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo, false)
 
 			err = testutil.CollectAndCompare(c, tt.expectedMetrics(), tt.metricsFilter...)
 			assert.NoError(t, err)
@@ -205,7 +204,7 @@ func TestCollectorWithCompatibleMode(t *testing.T) {
 }
 
 func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -221,7 +220,7 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
-	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo, false)
 
 	reg := prometheus.NewRegistry()
 	err = reg.Register(c)
@@ -361,7 +360,7 @@ func TestDiagnosticDataErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 			defer cancel()
 
 			port, err := tu.PortForContainer(tc.containerName)
@@ -375,7 +374,7 @@ func TestDiagnosticDataErrors(t *testing.T) {
 			dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 			require.NoError(t, err)
 
-			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
+			c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo, false)
 
 			reg := prometheus.NewRegistry()
 			err = reg.Register(c)
@@ -417,7 +416,7 @@ func TestContextTimeout(t *testing.T) {
 	cctx, ccancel := context.WithCancel(context.Background())
 	ccancel()
 
-	c := newDiagnosticDataCollector(cctx, client, logger, true, ti, dbBuildInfo)
+	c := newDiagnosticDataCollector(cctx, client, logger, true, ti, dbBuildInfo, false)
 	// it should not panic
 	helpers.CollectMetrics(c)
 }
@@ -504,7 +503,7 @@ func TestDisconnectedDiagnosticDataCollector(t *testing.T) {
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.Error(t, err)
 
-	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo, false)
 
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`

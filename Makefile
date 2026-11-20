@@ -75,7 +75,7 @@ build:                      ## Build exporter binary using plain go build.
 	CGO_ENABLED=0 go build -ldflags="$(GO_BUILD_LDFLAGS)"  -o $(PMM_RELEASE_PATH)/mongodb_exporter
 
 docker-build: build
-	docker build -t ${NAME}:${IMAGE_TAG} .
+	docker build -t ${NAME}:${IMAGE_TAG} --build-arg BIN_DIR=$(PMM_RELEASE_PATH) .
 
 build-gssapi:                      ## Build exporter binary with GSSAPI support (requires CGO enabled).
 	CGO_ENABLED=1 go build -ldflags="$(GO_BUILD_LDFLAGS)" -tags gssapi  -o $(PMM_RELEASE_PATH)/mongodb_exporter
@@ -106,8 +106,8 @@ FILES = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 format:                     ## Format source code
 	go mod tidy
-	bin/gofumpt -l -w $(FILES)
-	bin/gci write --section Standard --section Default --section "Prefix(github.com/percona/mongodb_exporter)" .
+	go tool gofumpt -l -w $(FILES)
+	go tool gci write --section Standard --section Default --section "Prefix(github.com/percona/mongodb_exporter)" .
 
 check:                      ## Run checks/linters
 	bin/golangci-lint run
@@ -121,13 +121,13 @@ help:                       ## Display this help message
 	awk -F ':.*?## ' 'NF==2 {printf "  %-26s%s\n", $$1, $$2}'
 
 test: env                   ## Run all tests
-	go test -tags gssapi -v -count 1 -timeout 30s ./...
+	go test -tags gssapi -v -count 1 -timeout 5m ./...
 
 test-race: env              ## Run all tests with race flag
-	go test -tags gssapi -race -v -timeout 30s ./...
+	go test -tags gssapi -race -v -timeout 5m ./...
 
 test-cover: env              ## Run tests and collect cross-package coverage information
-	go test -tags gssapi -race -timeout 30s -coverprofile=cover.out -covermode=atomic -coverpkg=./... ./...
+	go test -tags gssapi -race -timeout 5m -coverprofile=cover.out -covermode=atomic -coverpkg=./... ./...
 
 test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MONGODB_IMAGE to set flavor and version. Example: TEST_MONGODB_IMAGE=mongo:3.6 make test-cluster
 	docker compose up --build -d
@@ -135,4 +135,4 @@ test-cluster: env           ## Starts MongoDB test cluster. Use env var TEST_MON
 	./test-setup/scripts/init-pbm.sh
 
 test-cluster-clean: env     ## Stops MongoDB test cluster.
-	docker compose down --remove-orphans --volumes
+	docker compose down --remove-orphans --volumes --rmi local

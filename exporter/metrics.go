@@ -16,7 +16,10 @@
 package exporter
 
 import (
+	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -206,7 +209,7 @@ func nameAndLabel(prefix, name string) (string, string) {
 
 // makeRawMetric creates a Prometheus metric based on the parameters we collected by
 // traversing the MongoDB structures returned by the collector functions.
-func makeRawMetric(prefix, name string, value interface{}, labels map[string]string) (*rawMetric, error) {
+func makeRawMetric(prefix, name string, value any, labels map[string]string) (*rawMetric, error) {
 	f, err := asFloat64(value)
 	if err != nil {
 		return nil, err
@@ -220,7 +223,10 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 	fqName, label := nameAndLabel(prefix, name)
 
 	metricType := prometheus.UntypedValue
-	if strings.HasSuffix(strings.ToLower(name), "count") {
+
+	// reservedPrefixes are used for metrics that might include the word ‘count’ in their name but are not actual counters.
+	reservedPrefixes := []string{"collstats.storageStats.indexSizes."}
+	if !slices.Contains(reservedPrefixes, prefix) && strings.HasSuffix(strings.ToLower(name), "count") {
 		metricType = prometheus.CounterValue
 	}
 
@@ -248,7 +254,7 @@ func makeRawMetric(prefix, name string, value interface{}, labels map[string]str
 	return rm, nil
 }
 
-func asFloat64(value interface{}) (*float64, error) {
+func asFloat64(value any) (*float64, error) {
 	var f float64
 	switch v := value.(type) {
 	case bool:
@@ -283,7 +289,7 @@ func rawToPrometheusMetric(rm *rawMetric) (prometheus.Metric, error) {
 }
 
 // metricHelp builds the metric help.
-// It is a very very very simple function, but the idea is if the future we want
+// It is a very simple function, but the idea is if the future we want
 // to improve the help somehow, there is only one place to change it for the real
 // functions and for all the tests.
 // Use only prefix or name but not both because 2 metrics cannot have same name but different help.
@@ -302,6 +308,10 @@ func metricHelp(prefix, name string) string {
 }
 
 func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMode bool) []prometheus.Metric {
+	return makeMetricsWithHistograms(prefix, m, labels, compatibleMode, false)
+}
+
+func makeMetricsWithHistograms(prefix string, m bson.M, labels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
 	var res []prometheus.Metric
 
 	if prefix != "" {
@@ -309,17 +319,14 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 	}
 
 	for k, val := range m {
-		// histogram metrics are currently unsupported (PMM-14337)
-		if k == "histograms" {
+		nextPrefix := prefix + k
+		if !includeHistograms && isHistogramPath(nextPrefix) {
 			continue
 		}
-		nextPrefix := prefix + k
 
 		l := make(map[string]string)
 		if label, ok := keyNodesToLabels[prefix]; ok {
-			for k, v := range labels {
-				l[k] = v
-			}
+			maps.Copy(l, labels)
 			l[label] = k
 			nextPrefix = prefix + label
 		} else {
@@ -327,47 +334,18 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 		}
 		switch v := val.(type) {
 		case bson.M:
-			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
-		case map[string]interface{}:
-			res = append(res, makeMetrics(nextPrefix, v, l, compatibleMode)...)
+			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
+		case map[string]any:
+			res = append(res, makeMetricsWithHistograms(nextPrefix, v, l, compatibleMode, includeHistograms)...)
 		case primitive.A:
-			res = append(res, processSlice(nextPrefix, v, l, compatibleMode)...)
-		case []interface{}:
+			res = append(res, processMetricSlice(nextPrefix, v, l, compatibleMode, includeHistograms)...)
+		case []any:
+			if isHistogramBucketSlice(nextPrefix, v) {
+				res = append(res, processHistogramSlice(nextPrefix, v, l, compatibleMode)...)
+			}
 			continue
 		default:
-			rm, err := makeRawMetric(prefix, k, v, l)
-			if err != nil {
-				invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-				res = append(res, invalidMetric)
-				continue
-			}
-
-			// makeRawMetric returns a nil metric for some data types like strings
-			// because we cannot extract data from all types
-			if rm == nil {
-				continue
-			}
-
-			metrics := []*rawMetric{rm}
-
-			if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
-				metrics = renamedMetrics
-			}
-
-			for _, m := range metrics {
-				metric, err := rawToPrometheusMetric(m)
-				if err != nil {
-					invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
-					res = append(res, invalidMetric)
-					continue
-				}
-
-				res = append(res, metric)
-
-				if compatibleMode {
-					res = appendCompatibleMetric(res, m)
-				}
-			}
+			res = appendMetricValue(res, prefix, k, v, l, compatibleMode)
 		}
 	}
 
@@ -375,23 +353,15 @@ func makeMetrics(prefix string, m bson.M, labels map[string]string, compatibleMo
 }
 
 // Extract maps from arrays. Only some structures like replicasets have arrays of members
-// and each member is represented by a map[string]interface{}.
-func processSlice(prefix string, v []interface{}, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
+// and each member is represented by a map[string]any.
+func processSlice(prefix string, v []any, commonLabels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
 	metrics := make([]prometheus.Metric, 0)
 	labels := make(map[string]string)
-	for name, value := range commonLabels {
-		labels[name] = value
-	}
+	maps.Copy(labels, commonLabels)
 
 	for _, item := range v {
-		var s map[string]interface{}
-
-		switch i := item.(type) {
-		case map[string]interface{}:
-			s = i
-		case primitive.M:
-			s = map[string]interface{}(i)
-		default:
+		s, ok := asMetricMap(item)
+		if !ok {
 			continue
 		}
 
@@ -406,10 +376,156 @@ func processSlice(prefix string, v []interface{}, commonLabels map[string]string
 			labels["member_idx"] = host
 		}
 
-		metrics = append(metrics, makeMetrics(prefix, s, labels, compatibleMode)...)
+		metrics = append(metrics, makeMetricsWithHistograms(prefix, s, labels, compatibleMode, includeHistograms)...)
 	}
 
 	return metrics
+}
+
+func processMetricSlice(prefix string, v []any, commonLabels map[string]string, compatibleMode, includeHistograms bool) []prometheus.Metric {
+	if isHistogramBucketSlice(prefix, v) {
+		return processHistogramSlice(prefix, v, commonLabels, compatibleMode)
+	}
+
+	return processSlice(prefix, v, commonLabels, compatibleMode, includeHistograms)
+}
+
+func appendMetricValue(metrics []prometheus.Metric, prefix, name string, value any, labels map[string]string, compatibleMode bool) []prometheus.Metric {
+	rm, err := makeRawMetric(prefix, name, value, labels)
+	if err != nil {
+		invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+		return append(metrics, invalidMetric)
+	}
+
+	// makeRawMetric returns a nil metric for some data types like strings
+	// because we cannot extract data from all types
+	if rm == nil {
+		return metrics
+	}
+
+	rawMetrics := []*rawMetric{rm}
+	if renamedMetrics := metricRenameAndLabel(rm, specialConversions); renamedMetrics != nil {
+		rawMetrics = renamedMetrics
+	}
+
+	for _, rawMetric := range rawMetrics {
+		metric, err := rawToPrometheusMetric(rawMetric)
+		if err != nil {
+			invalidMetric := prometheus.NewInvalidMetric(prometheus.NewInvalidDesc(err), err)
+			metrics = append(metrics, invalidMetric)
+			continue
+		}
+
+		metrics = append(metrics, metric)
+		if compatibleMode {
+			metrics = appendCompatibleMetric(metrics, rawMetric)
+		}
+	}
+
+	return metrics
+}
+
+// histogramBoundKeys are the fields a histogram bucket uses to name the latency range it
+// counts. Server status reports "lowerBound"; the opLatencies histograms added in MongoDB
+// 8.3 report "micros". The key becomes the label that separates one bucket from the next,
+// named after the field rather than normalised, since the two are not documented as
+// meaning the same thing.
+var histogramBoundKeys = []string{"lowerBound", "micros"}
+
+// histogramBound returns the field a bucket is keyed by, and its value.
+func histogramBound(bucket map[string]any) (string, any, bool) {
+	for _, key := range histogramBoundKeys {
+		if value, ok := bucket[key]; ok {
+			return key, value, true
+		}
+	}
+
+	return "", nil, false
+}
+
+func processHistogramSlice(prefix string, v []any, commonLabels map[string]string, compatibleMode bool) []prometheus.Metric {
+	metrics := make([]prometheus.Metric, 0, len(v))
+	for _, item := range v {
+		bucket, ok := asMetricMap(item)
+		if !ok {
+			continue
+		}
+
+		boundKey, bound, ok := histogramBound(bucket)
+		if !ok {
+			continue
+		}
+
+		labels := make(map[string]string, len(commonLabels)+1)
+		for name, value := range commonLabels {
+			labels[name] = value
+		}
+
+		// Without a label naming the bucket, every bucket of the histogram produces the
+		// same series and the registry rejects all but the first.
+		labels[boundLabel(boundKey)] = fmt.Sprint(bound)
+		metrics = appendMetricValue(metrics, prefix+".", "count", bucket["count"], labels, compatibleMode)
+	}
+
+	return metrics
+}
+
+// boundLabel is the label name for a bucket keyed by boundKey.
+func boundLabel(boundKey string) string {
+	if boundKey == "lowerBound" {
+		return "lower_bound"
+	}
+
+	return boundKey
+}
+
+func isHistogramBucketSlice(prefix string, v []any) bool {
+	if len(v) == 0 {
+		return false
+	}
+	if !isHistogramPath(prefix) {
+		return false
+	}
+
+	for _, item := range v {
+		bucket, ok := asMetricMap(item)
+		if !ok {
+			return false
+		}
+		if _, _, ok := histogramBound(bucket); !ok {
+			return false
+		}
+		if _, ok := bucket["count"]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isHistogramPath reports whether prefix names a histogram subtree. Server status uses
+// "histograms", the opLatencies histograms added in MongoDB 8.3 use "histogram", and the
+// queue wait time histograms added in MongoDB 9.0 are the "queueWaitTimeMicros" arrays
+// themselves.
+func isHistogramPath(prefix string) bool {
+	for _, name := range []string{"histograms", "histogram", "queueWaitTimeMicros"} {
+		if prefix == name || strings.Contains(prefix, "."+name+".") || strings.HasSuffix(prefix, "."+name) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func asMetricMap(item any) (map[string]any, bool) {
+	switch value := item.(type) {
+	case map[string]any:
+		return value, true
+	case primitive.M:
+		return map[string]any(value), true
+	default:
+		return nil, false
+	}
 }
 
 type conversion struct {

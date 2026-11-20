@@ -19,9 +19,9 @@ import (
 	"context"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -60,7 +60,7 @@ func cleanupDB(ctx context.Context, client *mongo.Client) {
 
 //nolint:paralleltest
 func TestListDatabases(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -92,7 +92,7 @@ func TestListDatabases(t *testing.T) {
 
 //nolint:paralleltest
 func TestListCollections(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)
@@ -188,9 +188,52 @@ func TestSplitNamespace(t *testing.T) {
 	}
 }
 
+func TestSetShardLabel(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		doc  bson.M
+		want map[string]string
+	}{
+		{
+			name: "shard set",
+			doc:  bson.M{"shard": "shard-1"},
+			want: map[string]string{"database": "testdb", "shard": "shard-1"},
+		},
+		{
+			name: "empty shard",
+			doc:  bson.M{"shard": ""},
+			want: map[string]string{"database": "testdb", "shard": ""},
+		},
+		{
+			name: "shard field absent",
+			doc:  bson.M{},
+			want: map[string]string{"database": "testdb", "shard": ""},
+		},
+		{
+			name: "shard field is not a string",
+			doc:  bson.M{"shard": 42},
+			want: map[string]string{"database": "testdb", "shard": ""},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			// A shard from a previous document must not leak into this one.
+			labels := map[string]string{"database": "testdb", "shard": "shard-0"}
+			setShardLabel(labels, test.doc)
+
+			require.Equal(t, test.want, labels)
+		})
+	}
+}
+
 //nolint:paralleltest
 func TestCheckNamespacesForViews(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	client := tu.DefaultTestClient(ctx, t)

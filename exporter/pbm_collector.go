@@ -27,6 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/percona/mongodb_exporter/internal/proto"
+	"github.com/percona/mongodb_exporter/internal/redact"
 	"github.com/percona/mongodb_exporter/internal/util"
 )
 
@@ -87,7 +88,7 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 	pbmEnabledMetric := 0
 	pbmClient, err := sdk.NewClient(p.ctx, p.mongoURI)
 	if err != nil {
-		logger.Warn("failed to create PBM client", "error", err.Error())
+		logger.Warn("failed to create PBM client", "error", redact.Error(err))
 		return
 	}
 	defer func() {
@@ -136,7 +137,8 @@ func (p *pbmCollector) collect(ch chan<- prometheus.Metric) {
 func (p *pbmCollector) pbmAgentMetrics(ctx context.Context, pbmClient *sdk.Client, l *slog.Logger, currentNode *proto.HelloResponse) []prometheus.Metric {
 	clusterStatus, err := cli.ClusterStatus(ctx, pbmClient, cli.RSConfGetter(p.mongoURI))
 	if err != nil {
-		l.Error("failed to get cluster status", "error", err.Error())
+		// PBM wraps the URI it was handed into this error, so it cannot be logged as it comes.
+		l.Error("failed to get cluster status", "error", redact.Error(err))
 		return nil
 	}
 
