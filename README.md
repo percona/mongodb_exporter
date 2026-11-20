@@ -92,7 +92,7 @@ db.getSiblingDB("admin").createRole({
   privileges: [
     // Cluster ID lookup. Without this, mongod logs an authorization failure on every scrape.
     { resource: { db: "admin", collection: "system.version" }, actions: [ "find" ] },
-    // PBM collector (--collector.pbm). Remove this if you don't use Percona Backup for MongoDB.
+    // PBM collector (--collector.pbm). This grants find on all non-system admin collections, including PBM configuration. Remove it if you don't use Percona Backup for MongoDB.
     { resource: { db: "admin", collection: "" }, actions: [ "find" ] }
   ],
   roles: [
