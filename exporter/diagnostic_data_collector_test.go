@@ -253,40 +253,37 @@ func TestAllDiagnosticDataCollectorMetrics(t *testing.T) {
 	}
 }
 
+// TestMongosDiagnosticDataCollectorMetrics checks that connection metrics are exposed for mongos.
+// The test cluster mongos runs without --logpath, so FTDC is disabled and getDiagnosticData
+// returns empty data, exercising the serverStatus fallback.
 func TestMongosDiagnosticDataCollectorMetrics(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
-
-	logLevel := promslog.NewLevel()
-	err := logLevel.Set("debug")
-	require.NoError(t, err)
-	logger := promslog.New(&promslog.Config{
-		Level: logLevel,
-	})
+	logger := promslog.New(&promslog.Config{})
 	ti := newTopologyInfo(ctx, client, logger)
 
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, logger.With("component", "test"))
 	require.NoError(t, err)
 
-	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo)
+	c := newDiagnosticDataCollector(ctx, client, logger, true, ti, dbBuildInfo, false)
 
 	reg := prometheus.NewRegistry()
 	err = reg.Register(c)
 	require.NoError(t, err)
-	metrics := helpers.CollectMetrics(c)
-	actualMetrics := helpers.ReadMetrics(metrics)
+
 	filters := []string{
+		"mongodb_connections",
 		"mongodb_ss_connections",
 	}
-	actualMetrics = filterMetrics(actualMetrics, filters)
-	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
-	metricNames := getMetricNames(actualLines)
+	actualMetrics := filterMetrics(helpers.ReadMetrics(helpers.CollectMetrics(c)), filters)
+	metricNames := getMetricNames(helpers.Format(helpers.WriteMetrics(actualMetrics)))
 
-	sort.Strings(filters)
 	for _, want := range filters {
-		assert.True(t, metricNames[want], fmt.Sprintf("missing %q metric", want))
+		assert.True(t, metricNames[want], "missing %q metric", want)
 	}
 }
 
