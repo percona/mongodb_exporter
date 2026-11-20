@@ -116,6 +116,11 @@ The role includes:
 - `find` on the `admin` database: needed by the PBM collector to read the PBM control collections. Granting `find` on the whole database instead of each [PBM collection](https://docs.percona.com/percona-backup-mongodb/details/control-collections.html) means the role keeps working when PBM adds new collections.
 - `directShardOperations`: required on MongoDB 8.0 and newer when the exporter connects directly to shard members. Older versions don't need it, and servers that don't have this built-in role (such as 5.0) reject the `createRole` command if you include it.
 
+#### Sharded clusters
+Where you create the role and user depends on how the exporter connects:
+- Through `mongos`: run the commands above through `mongos`. The role and user are stored on the config server replica set.
+- Directly to shard members: users created through `mongos` can't authenticate to a shard directly, so also run the commands on the primary of each shard replica set. Keep the user and role on the config servers as well (create them through `mongos`), because the PBM collector reconnects from the shard to the config server replica set with the same credentials.
+
 More info about built-in roles in the MongoDB [documentation](https://www.mongodb.com/docs/manual/reference/built-in-roles/).
 
 #### Example
