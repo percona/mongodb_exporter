@@ -29,6 +29,8 @@ const (
 	kmipEncryption         = "kmip"
 	vaultEncryption        = "vault"
 	localKeyFileEncryption = "localKeyFile"
+
+	serverStatusCmd = "serverStatus"
 )
 
 type diagnosticDataCollector struct {
@@ -112,6 +114,14 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			logger.Error("cannot decode getDiagnosticData", "error", err)
 		}
 
+		// mongos returns empty diagnostic data when FTDC is disabled (e.g. no --logpath),
+		// so fall back to serverStatus to keep the mongodb_ss_* metrics available.
+		if nodeType == typeMongos && len(m) == 0 {
+			if ss := d.mongosServerStatus(); ss != nil {
+				m = ss
+			}
+		}
+
 		logger.Debug("getDiagnosticData result")
 		debugResult(logger, m)
 
@@ -166,6 +176,26 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	for _, metric := range metrics {
 		ch <- metric
 	}
+}
+
+// mongosServerStatus runs serverStatus and wraps the result the same way getDiagnosticData does,
+// so the existing metric names (mongodb_ss_*) are preserved. It returns nil on failure.
+func (d *diagnosticDataCollector) mongosServerStatus() bson.M {
+	logger := d.base.logger
+	logger.Debug("getDiagnosticData returned empty data for mongos, falling back to serverStatus")
+
+	res := d.base.client.Database("admin").RunCommand(d.ctx, bson.D{{Key: serverStatusCmd, Value: 1}})
+
+	var ss bson.M
+
+	err := res.Decode(&ss)
+	if err != nil {
+		logger.Error("failed to run serverStatus for mongos", "error", err)
+
+		return nil
+	}
+
+	return bson.M{serverStatusCmd: ss}
 }
 
 func (d *diagnosticDataCollector) getSecurityMetricFromLineOptions(client *mongo.Client) (prometheus.Metric, error) {
