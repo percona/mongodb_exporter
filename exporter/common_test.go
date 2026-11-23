@@ -157,14 +157,14 @@ func TestListCollections(t *testing.T) {
 	})
 
 	t.Run("Count basic", func(t *testing.T) {
-		count, complete, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+		count, complete, err := nonSystemCollectionsCount(ctx, client, nil)
 		assert.NoError(t, err)
 		assert.True(t, complete)
 		assert.Equal(t, 9, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {
-		count, complete, err := nonSystemCollectionsCount(ctx, client, nil, []string{testDBs[0] + ".col0", testDBs[0] + ".colx"})
+		count, complete, err := nonSystemCollectionsCount(ctx, client, []string{testDBs[0] + ".col0", testDBs[0] + ".colx"})
 		assert.NoError(t, err)
 		assert.True(t, complete)
 		assert.Equal(t, 6, count)
@@ -295,7 +295,7 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 		assert.Equal(t, []string{allowedDB}, dbs)
 		assert.Positive(t, proxy.rejected.Load())
 
-		count, complete, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+		count, complete, err := nonSystemCollectionsCount(ctx, client, nil)
 		require.NoError(t, err)
 		assert.True(t, complete)
 		assert.Equal(t, 2, count)
@@ -318,7 +318,7 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, map[string][]string{allowedDB: {"c1", "c2"}}, namespaces)
 
-		count, complete, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+		count, complete, err := nonSystemCollectionsCount(ctx, client, nil)
 		require.NoError(t, err)
 		assert.False(t, complete, "the denied database must be reported as skipped")
 		assert.Equal(t, 2, count)

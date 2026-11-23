@@ -137,13 +137,6 @@ func (e *Exporter) getTotalCollectionsCount() int {
 	return e.totalCollectionsCount
 }
 
-func (e *Exporter) collectionsCountNeeded() bool {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	return !e.collectionsCountFinal || e.totalCollectionsCount <= 0
-}
-
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
 	registry := prometheus.NewRegistry()
 
@@ -343,7 +336,7 @@ func (e *Exporter) Handler() http.Handler {
 		}
 
 		if client != nil && e.collectionsCountNeeded() {
-			count, complete, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+			count, complete, err := nonSystemCollectionsCount(ctx, client, nil)
 			if err == nil {
 				e.lock.Lock()
 				e.totalCollectionsCount = count
@@ -394,6 +387,13 @@ func (e *Exporter) Handler() http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+func (e *Exporter) collectionsCountNeeded() bool {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	return !e.collectionsCountFinal || e.totalCollectionsCount <= 0
 }
 
 // GetRequestOpts makes exporter.Opts structure from request filters and default options.

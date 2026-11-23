@@ -397,8 +397,8 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 // nonSystemCollectionsCount counts the non-system collections. Databases the user isn't
 // authorized on are skipped; complete is false when that happens, so the count only covers
 // the databases that could be read.
-func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includeNamespaces []string, filterInCollections []string) (int, bool, error) {
-	databases, err := databases(ctx, client, includeNamespaces, systemDBs)
+func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, filterInCollections []string) (int, bool, error) {
+	databases, err := databases(ctx, client, nil, systemDBs)
 	if err != nil {
 		return 0, false, errors.Wrap(err, "cannot retrieve the collection names for count collections")
 	}
@@ -411,6 +411,7 @@ func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includ
 		if err != nil {
 			if isUnauthorizedError(err) {
 				complete = false
+
 				continue
 			}
 
