@@ -78,6 +78,12 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	for _, db := range databases {
 		res, err := client.Database(db).Collection("system.profile").CountDocuments(d.ctx, cmd)
 		if err != nil {
+			// Can happen when the user's privileges couldn't be read (see authorizedDatabaseNames).
+			// Skip the database so the authorized ones are still collected.
+			if isUnauthorizedError(err) {
+				continue
+			}
+
 			logger.Warn("cannot get profile count for database", "database", db, "error", err)
 			break
 		}

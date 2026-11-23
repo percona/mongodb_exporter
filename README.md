@@ -115,7 +115,7 @@ privileges: [
 ```
 However, this is not recommended as the list of internal collections may change in future releases.
 
-The dbstats, collstats, indexstats and profile collectors only collect from databases the exporter user has privileges on, so a custom role limited to some databases doesn't produce authorization errors. Some managed MongoDB services put a proxy in front of the server that rejects some `listDatabases` options, with errors like `Unallowed argument in listDatabases command: authorizedDatabases`. In that case the exporter reads the user's privileges with `connectionStatus` and filters the database list itself.
+The dbstats, collstats, indexstats and profile collectors only look at databases the exporter user has at least one privilege on, so a custom role limited to some databases doesn't make them query the other databases. This only limits which databases are discovered: each collector still needs the privileges for its own command on those databases (for example `dbStats` for dbstats, `collStats` for collstats). Some managed MongoDB services put a proxy in front of the server that rejects some `listDatabases` options, with errors like `Unallowed argument in listDatabases command: authorizedDatabases`. In that case the exporter reads the user's privileges with `connectionStatus` and filters the database list itself.
 
 More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
 

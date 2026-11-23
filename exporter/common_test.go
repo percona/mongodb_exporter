@@ -19,9 +19,12 @@ import (
 	"context"
 	"net"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
@@ -154,14 +157,16 @@ func TestListCollections(t *testing.T) {
 	})
 
 	t.Run("Count basic", func(t *testing.T) {
-		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+		count, complete, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		assert.NoError(t, err)
+		assert.True(t, complete)
 		assert.Equal(t, 9, count)
 	})
 
 	t.Run("Filtered count", func(t *testing.T) {
-		count, err := nonSystemCollectionsCount(ctx, client, nil, []string{testDBs[0] + ".col0", testDBs[0] + ".colx"})
+		count, complete, err := nonSystemCollectionsCount(ctx, client, nil, []string{testDBs[0] + ".col0", testDBs[0] + ".colx"})
 		assert.NoError(t, err)
+		assert.True(t, complete)
 		assert.Equal(t, 6, count)
 	})
 }
@@ -180,7 +185,7 @@ func proxyTestClient(ctx context.Context, t *testing.T, uri string) *mongo.Clien
 	return client
 }
 
-// Some managed services reject listDatabases arguments outside an allow-list (issue #571, #412).
+// Some managed services reject listDatabases arguments outside an allow-list (issue #597, #412).
 //
 //nolint:paralleltest
 func TestListDatabasesStrictProxy(t *testing.T) {
@@ -251,6 +256,7 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 		{Key: "privileges", Value: bson.A{
 			bson.M{"resource": bson.M{"cluster": true}, "actions": bson.A{"listDatabases", "serverStatus"}},
 			bson.M{"resource": bson.M{"db": allowedDB, "collection": ""}, "actions": bson.A{"dbStats", "collStats", "indexStats", "listCollections", "find"}},
+			bson.M{"resource": bson.M{"db": allowedDB, "collection": "system.profile"}, "actions": bson.A{"find"}},
 		}},
 		{Key: "roles", Value: bson.A{}},
 	}).Err())
@@ -289,8 +295,9 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 		assert.Equal(t, []string{allowedDB}, dbs)
 		assert.Positive(t, proxy.rejected.Load())
 
-		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+		count, complete, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		require.NoError(t, err)
+		assert.True(t, complete)
 		assert.Equal(t, 2, count)
 	})
 
@@ -311,10 +318,76 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, map[string][]string{allowedDB: {"c1", "c2"}}, namespaces)
 
-		count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+		count, complete, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 		require.NoError(t, err)
+		assert.False(t, complete, "the denied database must be reported as skipped")
 		assert.Equal(t, 2, count)
+
+		// admin is listed first and is unauthorized; the allowed database must still be collected.
+		c := newProfileCollector(ctx, client, promslog.New(&promslog.Config{}), false, labelsGetterMock{}, 30)
+		expected := strings.NewReader(`
+	# HELP mongodb_profile_slow_query_count profile_slow_query.count
+	# TYPE mongodb_profile_slow_query_count counter
+	mongodb_profile_slow_query_count{database="` + allowedDB + `"} 0` + "\n")
+		assert.NoError(t, testutil.CollectAndCompare(c, expected, "mongodb_profile_slow_query_count"))
 	})
+}
+
+// A privilege on all databases ({db: "", collection: ""}) doesn't cover local and config. The
+// fallback must return the same list as the server.
+//
+//nolint:paralleltest
+func TestListDatabasesAllDatabasesPrivilege(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	const (
+		role     = "privtestAllDBsRole"
+		user     = "privtestalldbs"
+		password = "privtestalldbs"
+	)
+
+	addr := net.JoinHostPort("127.0.0.1", tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"))
+	admin := proxyTestClient(ctx, t, "mongodb://admin:admin@"+addr)
+
+	adminDB := admin.Database("admin")
+	adminDB.RunCommand(ctx, bson.D{{Key: "dropUser", Value: user}})
+	adminDB.RunCommand(ctx, bson.D{{Key: "dropRole", Value: role}})
+	require.NoError(t, adminDB.RunCommand(ctx, bson.D{
+		{Key: "createRole", Value: role},
+		{Key: "privileges", Value: bson.A{
+			bson.M{"resource": bson.M{"cluster": true}, "actions": bson.A{"listDatabases"}},
+			bson.M{"resource": bson.M{"db": "", "collection": ""}, "actions": bson.A{"find"}},
+		}},
+		{Key: "roles", Value: bson.A{}},
+	}).Err())
+	require.NoError(t, adminDB.RunCommand(ctx, bson.D{
+		{Key: "createUser", Value: user},
+		{Key: "pwd", Value: password},
+		{Key: "roles", Value: bson.A{role}},
+	}).Err())
+
+	t.Cleanup(func() {
+		ctx := context.Background()
+		adminDB.RunCommand(ctx, bson.D{{Key: "dropUser", Value: user}})
+		adminDB.RunCommand(ctx, bson.D{{Key: "dropRole", Value: role}})
+	})
+
+	userURI := func(host string) string {
+		return "mongodb://" + user + ":" + password + "@" + host + "/admin"
+	}
+
+	want, err := databases(ctx, proxyTestClient(ctx, t, userURI(addr)), nil, nil)
+	require.NoError(t, err)
+	assert.NotContains(t, want, "local")
+	assert.NotContains(t, want, "config")
+
+	proxy := startStrictProxy(ctx, t, addr, rejectArgs("listDatabases", "authorizedDatabases"))
+
+	got, err := databases(ctx, proxyTestClient(ctx, t, userURI(proxy.addr)), nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+	assert.Positive(t, proxy.rejected.Load())
 }
 
 //nolint:funlen
@@ -323,55 +396,69 @@ func TestDatabasesFromPrivileges(t *testing.T) {
 
 	str := func(s string) *string { return &s }
 
+	all := []string{"admin", "app1", "app2", "config", "local"}
+
 	tests := []struct {
 		name      string
 		resources []privilegeResource
-		want      map[string]struct{}
-		wantAll   bool
+		want      []string
 	}{
 		{
 			name:      "no privileges",
 			resources: nil,
-			want:      map[string]struct{}{},
+			want:      []string{},
 		},
 		{
 			name: "cluster privilege only",
 			resources: []privilegeResource{
 				{}, // {cluster: true}
 			},
-			want: map[string]struct{}{},
+			want: []string{},
 		},
 		{
 			name: "database and collection privileges",
 			resources: []privilegeResource{
 				{},
-				{DB: str("app1"), SystemBuckets: nil},
-				{DB: str("app2")},
-				{DB: str("app2")},
+				{DB: str("app1"), Collection: str("")},
+				{DB: str("app2"), Collection: str("c1")},
+				{DB: str("app2"), Collection: str("c2")},
 			},
-			want: map[string]struct{}{"app1": {}, "app2": {}},
+			want: []string{"app1", "app2"},
 		},
 		{
 			name: "system buckets in one database",
 			resources: []privilegeResource{
 				{DB: str("app1"), SystemBuckets: str("")},
 			},
-			want: map[string]struct{}{"app1": {}},
+			want: []string{"app1"},
 		},
 		{
-			name:      "any database",
-			resources: []privilegeResource{{DB: str("app1")}, {DB: str("")}},
-			wantAll:   true,
+			name:      "all databases excludes local and config",
+			resources: []privilegeResource{{DB: str(""), Collection: str("")}},
+			want:      []string{"admin", "app1", "app2"},
+		},
+		{
+			name: "all databases plus explicit local",
+			resources: []privilegeResource{
+				{DB: str(""), Collection: str("")},
+				{DB: str("local"), Collection: str("")},
+			},
+			want: []string{"admin", "app1", "app2", "local"},
+		},
+		{
+			name:      "one collection name in all databases",
+			resources: []privilegeResource{{DB: str("app1")}, {DB: str(""), Collection: str("system.profile")}},
+			want:      all,
 		},
 		{
 			name:      "system buckets in any database",
 			resources: []privilegeResource{{SystemBuckets: str("")}},
-			wantAll:   true,
+			want:      all,
 		},
 		{
 			name:      "any resource",
 			resources: []privilegeResource{{AnyResource: true}},
-			wantAll:   true,
+			want:      all,
 		},
 	}
 
@@ -379,11 +466,15 @@ func TestDatabasesFromPrivileges(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, all := databasesFromPrivileges(tc.resources)
-			assert.Equal(t, tc.wantAll, all)
-			if !tc.wantAll {
-				assert.Equal(t, tc.want, got)
+			access := databasesFromPrivileges(tc.resources)
+
+			got := []string{}
+			for _, name := range all {
+				if access.allows(name) {
+					got = append(got, name)
+				}
 			}
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

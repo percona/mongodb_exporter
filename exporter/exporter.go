@@ -43,6 +43,9 @@ type Exporter struct {
 	opts                  *Opts
 	lock                  *sync.Mutex
 	totalCollectionsCount int
+	// collectionsCountFinal is false while the count must be recalculated on the next scrape,
+	// for example because some databases were skipped as unauthorized.
+	collectionsCountFinal bool
 }
 
 // Opts holds new exporter options.
@@ -132,6 +135,13 @@ func (e *Exporter) getTotalCollectionsCount() int {
 	defer e.lock.Unlock()
 
 	return e.totalCollectionsCount
+}
+
+func (e *Exporter) collectionsCountNeeded() bool {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	return !e.collectionsCountFinal || e.totalCollectionsCount <= 0
 }
 
 func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topologyInfo labelsGetter, requestOpts Opts) *prometheus.Registry {
@@ -332,11 +342,12 @@ func (e *Exporter) Handler() http.Handler {
 			e.logger.Error("Cannot connect to MongoDB", "error", err)
 		}
 
-		if client != nil && e.getTotalCollectionsCount() <= 0 {
-			count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
+		if client != nil && e.collectionsCountNeeded() {
+			count, complete, err := nonSystemCollectionsCount(ctx, client, nil, nil)
 			if err == nil {
 				e.lock.Lock()
 				e.totalCollectionsCount = count
+				e.collectionsCountFinal = complete
 				e.lock.Unlock()
 			} else {
 				e.logger.Debug("Cannot count collections for the collstats limit", "error", err)

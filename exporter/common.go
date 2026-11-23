@@ -118,15 +118,15 @@ func authorizedDatabaseNames(ctx context.Context, client *mongo.Client) ([]strin
 		return nil, errors.Wrap(err, "listDatabases failed")
 	}
 
-	allowed, allDBs, privErr := userDatabasePrivileges(ctx, client)
-	if privErr != nil || allDBs {
+	access, privErr := userDatabasePrivileges(ctx, client)
+	if privErr != nil {
 		// Without the user's privileges we can't do better than the full list.
 		return allNames, nil //nolint:nilerr
 	}
 
 	authorized := make([]string, 0, len(allNames))
 	for _, name := range allNames {
-		if _, ok := allowed[name]; ok {
+		if access.allows(name) {
 			authorized = append(authorized, name)
 		}
 	}
@@ -160,13 +160,38 @@ func listDatabaseNamesBare(ctx context.Context, client *mongo.Client) ([]string,
 
 type privilegeResource struct {
 	DB            *string `bson:"db"`
+	Collection    *string `bson:"collection"`
 	SystemBuckets *string `bson:"system_buckets"`
 	AnyResource   bool    `bson:"anyResource"`
 }
 
+// databaseAccess describes the databases the connected user has privileges on.
+type databaseAccess struct {
+	// all is true when every database is authorized.
+	all bool
+	// allNormal is true when every database except local and config is authorized.
+	allNormal bool
+	// dbs are the databases authorized by name.
+	dbs map[string]struct{}
+}
+
+func (a databaseAccess) allows(name string) bool {
+	if a.all {
+		return true
+	}
+
+	if a.allNormal && name != "local" && name != "config" {
+		return true
+	}
+
+	_, ok := a.dbs[name]
+
+	return ok
+}
+
 // userDatabasePrivileges returns the databases the connected user has any privilege on, using
-// connectionStatus. allDBs is true when auth is disabled or a privilege applies to every database.
-func userDatabasePrivileges(ctx context.Context, client *mongo.Client) (map[string]struct{}, bool, error) {
+// connectionStatus. Every database is authorized when auth is disabled.
+func userDatabasePrivileges(ctx context.Context, client *mongo.Client) (databaseAccess, error) {
 	var res struct {
 		AuthInfo struct {
 			AuthenticatedUsers []bson.Raw `bson:"authenticatedUsers"`
@@ -180,11 +205,11 @@ func userDatabasePrivileges(ctx context.Context, client *mongo.Client) (map[stri
 
 	err := client.Database("admin").RunCommand(ctx, cmd).Decode(&res)
 	if err != nil {
-		return nil, false, errors.Wrap(err, "connectionStatus failed")
+		return databaseAccess{}, errors.Wrap(err, "connectionStatus failed")
 	}
 
 	if len(res.AuthInfo.AuthenticatedUsers) == 0 {
-		return nil, true, nil
+		return databaseAccess{all: true}, nil
 	}
 
 	resources := make([]privilegeResource, 0, len(res.AuthInfo.Privileges))
@@ -192,32 +217,36 @@ func userDatabasePrivileges(ctx context.Context, client *mongo.Client) (map[stri
 		resources = append(resources, p.Resource)
 	}
 
-	allowed, allDBs := databasesFromPrivileges(resources)
-
-	return allowed, allDBs, nil
+	return databasesFromPrivileges(resources), nil
 }
 
 // databasesFromPrivileges mirrors listDatabases with authorizedDatabases: true. A database is
-// authorized if the user has a privilege on it or on any of its collections. Privileges with an
-// empty database name, on system buckets without a database, or on any resource apply to all
-// databases. Cluster privileges don't authorize any database.
-func databasesFromPrivileges(resources []privilegeResource) (map[string]struct{}, bool) {
-	allowed := make(map[string]struct{})
+// authorized if the user has a privilege on it or on any of its collections. A privilege on
+// all databases ({db: "", collection: ""}) doesn't include local and config, like on the server.
+// A privilege on one collection name in all databases ({db: "", collection: "name"}), on system
+// buckets without a database, or on any resource authorizes every database. Cluster privileges
+// don't authorize any database.
+func databasesFromPrivileges(resources []privilegeResource) databaseAccess {
+	access := databaseAccess{dbs: make(map[string]struct{})}
 
 	for _, r := range resources {
 		switch {
 		case r.AnyResource:
-			return nil, true
-		case r.DB != nil && *r.DB == "":
-			return nil, true
-		case r.DB != nil:
-			allowed[*r.DB] = struct{}{}
-		case r.SystemBuckets != nil:
-			return nil, true
+			access.all = true
+		case r.SystemBuckets != nil && (r.DB == nil || *r.DB == ""):
+			access.all = true
+		case r.DB == nil:
+			// Cluster privilege.
+		case *r.DB != "":
+			access.dbs[*r.DB] = struct{}{}
+		case r.Collection == nil || *r.Collection == "":
+			access.allNormal = true
+		default:
+			access.all = true
 		}
 	}
 
-	return allowed, false
+	return access
 }
 
 // filterDatabaseNames keeps the databases named in filterInNamespaces (the part before the
@@ -365,27 +394,32 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 	return namespaces, nil
 }
 
-func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includeNamespaces []string, filterInCollections []string) (int, error) {
+// nonSystemCollectionsCount counts the non-system collections. Databases the user isn't
+// authorized on are skipped; complete is false when that happens, so the count only covers
+// the databases that could be read.
+func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, includeNamespaces []string, filterInCollections []string) (int, bool, error) {
 	databases, err := databases(ctx, client, includeNamespaces, systemDBs)
 	if err != nil {
-		return 0, errors.Wrap(err, "cannot retrieve the collection names for count collections")
+		return 0, false, errors.Wrap(err, "cannot retrieve the collection names for count collections")
 	}
 
-	var count int
+	count := 0
+	complete := true
 
 	for _, dbname := range databases {
 		colls, err := listCollections(ctx, client, dbname, filterInCollections, true)
 		if err != nil {
 			if isUnauthorizedError(err) {
+				complete = false
 				continue
 			}
 
-			return 0, errors.Wrap(err, "cannot get collections count")
+			return 0, false, errors.Wrap(err, "cannot get collections count")
 		}
 		count += len(colls)
 	}
 
-	return count, nil
+	return count, complete, nil
 }
 
 // splitNamespace splits the namespace into database and collection.
