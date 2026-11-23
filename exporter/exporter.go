@@ -46,8 +46,9 @@ type Exporter struct {
 	// collectionsCountFinal is false while the count must be recalculated on the next scrape,
 	// for example because some databases were skipped as unauthorized.
 	collectionsCountFinal bool
-	// countMu makes sure only one scrape counts the collections at a time.
-	countMu sync.Mutex
+	// countSem makes sure only one scrape counts the collections at a time. It's a channel
+	// instead of a mutex so a canceled scrape can stop waiting.
+	countSem chan struct{}
 }
 
 // Opts holds new exporter options.
@@ -120,6 +121,7 @@ func New(opts *Opts) *Exporter {
 		opts:                  opts,
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
+		countSem:              make(chan struct{}, 1),
 	}
 	// Try initial connect. Connection will be retried with every scrape.
 	go func() {
@@ -393,10 +395,14 @@ func (e *Exporter) collectionsCountNeeded() bool {
 // updateCollectionsCount counts the collections for the collstats limit if needed. Scrapes
 // count one at a time, so an older count can't overwrite a newer one. A scrape that waits for
 // another one to finish uses its count if it's final, and never builds the registry with the
-// uncounted value.
+// uncounted value. A scrape canceled while waiting returns without counting.
 func (e *Exporter) updateCollectionsCount(ctx context.Context, client *mongo.Client) {
-	e.countMu.Lock()
-	defer e.countMu.Unlock()
+	select {
+	case e.countSem <- struct{}{}:
+	case <-ctx.Done():
+		return
+	}
+	defer func() { <-e.countSem }()
 
 	if !e.collectionsCountNeeded() {
 		return

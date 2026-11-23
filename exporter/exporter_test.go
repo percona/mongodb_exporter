@@ -426,7 +426,7 @@ func TestUpdateCollectionsCountWaitsForRunningCount(t *testing.T) {
 	e := New(&Opts{Logger: promslog.NewNopLogger()})
 
 	// Another scrape is counting.
-	e.countMu.Lock()
+	e.countSem <- struct{}{}
 
 	done := make(chan struct{})
 	go func() {
@@ -446,7 +446,7 @@ func TestUpdateCollectionsCountWaitsForRunningCount(t *testing.T) {
 	e.totalCollectionsCount = 5
 	e.collectionsCountFinal = true
 	e.lock.Unlock()
-	e.countMu.Unlock()
+	<-e.countSem
 
 	// The waiting scrape must reuse it without counting again (it has no client to count with).
 	select {
@@ -457,4 +457,31 @@ func TestUpdateCollectionsCountWaitsForRunningCount(t *testing.T) {
 
 	assert.Equal(t, 5, e.getTotalCollectionsCount())
 	assert.False(t, e.collectionsCountNeeded())
+}
+
+func TestUpdateCollectionsCountCanceledWhileWaiting(t *testing.T) {
+	t.Parallel()
+
+	e := New(&Opts{Logger: promslog.NewNopLogger()})
+
+	// Another scrape is counting and doesn't finish during the test.
+	e.countSem <- struct{}{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.updateCollectionsCount(ctx, nil)
+	}()
+
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("a canceled scrape kept waiting for the running count")
+	}
+
+	assert.Equal(t, -1, e.getTotalCollectionsCount())
 }
