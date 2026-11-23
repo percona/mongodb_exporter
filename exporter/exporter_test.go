@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -419,16 +420,41 @@ func TestMakeRegistryBuildInfoWarning(t *testing.T) {
 	}
 }
 
-func TestUpdateCollectionsCountSkipsWhileCounting(t *testing.T) {
+func TestUpdateCollectionsCountWaitsForRunningCount(t *testing.T) {
 	t.Parallel()
 
 	e := New(&Opts{Logger: promslog.NewNopLogger()})
 
-	// Another scrape is counting: this one must keep the stored count and not touch the client.
+	// Another scrape is counting.
 	e.countMu.Lock()
-	e.updateCollectionsCount(context.Background(), nil)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.updateCollectionsCount(context.Background(), nil)
+	}()
+
+	// The scrape must wait, not build the registry with the uncounted value.
+	select {
+	case <-done:
+		t.Fatal("updateCollectionsCount returned while another count was running")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// The running count finishes with a final result.
+	e.lock.Lock()
+	e.totalCollectionsCount = 5
+	e.collectionsCountFinal = true
+	e.lock.Unlock()
 	e.countMu.Unlock()
 
-	assert.Equal(t, -1, e.getTotalCollectionsCount())
-	assert.True(t, e.collectionsCountNeeded())
+	// The waiting scrape must reuse it without counting again (it has no client to count with).
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("updateCollectionsCount didn't return after the running count finished")
+	}
+
+	assert.Equal(t, 5, e.getTotalCollectionsCount())
+	assert.False(t, e.collectionsCountNeeded())
 }

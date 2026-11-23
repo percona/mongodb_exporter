@@ -390,13 +390,12 @@ func (e *Exporter) collectionsCountNeeded() bool {
 	return !e.collectionsCountFinal || e.totalCollectionsCount <= 0
 }
 
-// updateCollectionsCount counts the collections for the collstats limit if needed. If another
-// scrape is already counting, the stored count is used, so an older count can't overwrite a
-// newer one.
+// updateCollectionsCount counts the collections for the collstats limit if needed. Scrapes
+// count one at a time, so an older count can't overwrite a newer one. A scrape that waits for
+// another one to finish uses its count if it's final, and never builds the registry with the
+// uncounted value.
 func (e *Exporter) updateCollectionsCount(ctx context.Context, client *mongo.Client) {
-	if !e.countMu.TryLock() {
-		return
-	}
+	e.countMu.Lock()
 	defer e.countMu.Unlock()
 
 	if !e.collectionsCountNeeded() {
