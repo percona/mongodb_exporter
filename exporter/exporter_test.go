@@ -418,3 +418,17 @@ func TestMakeRegistryBuildInfoWarning(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateCollectionsCountSkipsWhileCounting(t *testing.T) {
+	t.Parallel()
+
+	e := New(&Opts{Logger: promslog.NewNopLogger()})
+
+	// Another scrape is counting: this one must keep the stored count and not touch the client.
+	e.countMu.Lock()
+	e.updateCollectionsCount(context.Background(), nil)
+	e.countMu.Unlock()
+
+	assert.Equal(t, -1, e.getTotalCollectionsCount())
+	assert.True(t, e.collectionsCountNeeded())
+}

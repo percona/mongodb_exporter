@@ -46,6 +46,8 @@ type Exporter struct {
 	// collectionsCountFinal is false while the count must be recalculated on the next scrape,
 	// for example because some databases were skipped as unauthorized.
 	collectionsCountFinal bool
+	// countMu makes sure only one scrape counts the collections at a time.
+	countMu sync.Mutex
 }
 
 // Opts holds new exporter options.
@@ -335,16 +337,8 @@ func (e *Exporter) Handler() http.Handler {
 			e.logger.Error("Cannot connect to MongoDB", "error", err)
 		}
 
-		if client != nil && e.collectionsCountNeeded() {
-			count, complete, err := nonSystemCollectionsCount(ctx, client, nil)
-			if err == nil {
-				e.lock.Lock()
-				e.totalCollectionsCount = count
-				e.collectionsCountFinal = complete
-				e.lock.Unlock()
-			} else {
-				e.logger.Debug("Cannot count collections for the collstats limit", "error", err)
-			}
+		if client != nil {
+			e.updateCollectionsCount(ctx, client)
 		}
 
 		// Close client after usage.
@@ -394,6 +388,32 @@ func (e *Exporter) collectionsCountNeeded() bool {
 	defer e.lock.Unlock()
 
 	return !e.collectionsCountFinal || e.totalCollectionsCount <= 0
+}
+
+// updateCollectionsCount counts the collections for the collstats limit if needed. If another
+// scrape is already counting, the stored count is used, so an older count can't overwrite a
+// newer one.
+func (e *Exporter) updateCollectionsCount(ctx context.Context, client *mongo.Client) {
+	if !e.countMu.TryLock() {
+		return
+	}
+	defer e.countMu.Unlock()
+
+	if !e.collectionsCountNeeded() {
+		return
+	}
+
+	count, complete, err := nonSystemCollectionsCount(ctx, client, nil)
+	if err != nil {
+		e.logger.Debug("Cannot count collections for the collstats limit", "error", err)
+
+		return
+	}
+
+	e.lock.Lock()
+	e.totalCollectionsCount = count
+	e.collectionsCountFinal = complete
+	e.lock.Unlock()
 }
 
 // GetRequestOpts makes exporter.Opts structure from request filters and default options.

@@ -394,9 +394,11 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 	return namespaces, nil
 }
 
-// nonSystemCollectionsCount counts the non-system collections. Databases the user isn't
-// authorized on are skipped; complete is false when that happens, so the count only covers
-// the databases that could be read.
+// nonSystemCollectionsCount counts the non-system collections the user can see, the same ones
+// the collstats collector lists (listCollections with authorizedCollections). Databases the
+// user isn't authorized on are skipped; complete is false when that happens. complete doesn't
+// detect collections hidden by authorizedCollections, so privileges added while the exporter
+// runs aren't reflected in a complete count.
 func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, filterInCollections []string) (int, bool, error) {
 	databases, err := databases(ctx, client, nil, systemDBs)
 	if err != nil {
