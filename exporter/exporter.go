@@ -338,6 +338,8 @@ func (e *Exporter) Handler() http.Handler {
 				e.lock.Lock()
 				e.totalCollectionsCount = count
 				e.lock.Unlock()
+			} else {
+				e.logger.Debug("Cannot count collections for the collstats limit", "error", err)
 			}
 		}
 
