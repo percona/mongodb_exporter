@@ -118,7 +118,7 @@ The role includes:
 
 #### Sharded clusters
 Where you create the role and user depends on how the exporter connects:
-- Through `mongos`: run the commands above through `mongos`. The role and user are stored on the config server replica set.
+- Through `mongos`: run the commands above through `mongos`. The role and user are stored on the config server replica set. If you enable the PBM collector, also run the commands on the primary of each shard replica set. To report PBM agent status, the collector connects directly to every shard with the exporter's credentials, and users created through `mongos` can't authenticate there. Without the shard-local user, the `mongodb_pbm_agent_status` metrics are missing. The other PBM metrics are not affected.
 - Directly to shard members: users created through `mongos` can't authenticate to a shard directly, so also run the commands on the primary of each shard replica set. Keep the user and role on the config servers as well (create them through `mongos`), because the PBM collector reconnects from the shard to the config server replica set with the same credentials.
 
 More info about built-in roles in the MongoDB [documentation](https://www.mongodb.com/docs/manual/reference/built-in-roles/).
