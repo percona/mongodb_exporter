@@ -22,7 +22,9 @@ import (
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -432,13 +434,72 @@ func applyDirectConnect(clientOpts *options.ClientOptions, directConnect *bool) 
 	}
 }
 
-func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
-	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
+// removeURIOptions returns the URI without the given query options. Option names are case-insensitive.
+// It follows the driver's parsing: the user info ends at the first '@' and the options start at the next '?'.
+func removeURIOptions(uri string, names ...string) string {
+	rest, found := strings.CutPrefix(uri, "mongodb+srv://")
+	if !found {
+		if rest, found = strings.CutPrefix(uri, "mongodb://"); !found {
+			return uri
+		}
+	}
+
+	offset := len(uri) - len(rest)
+	if i := strings.Index(rest, "@"); i != -1 {
+		offset += i + 1
+	}
+
+	i := strings.Index(uri[offset:], "?")
+	if i == -1 {
+		return uri
+	}
+
+	base, query := uri[:offset+i], uri[offset+i+1:]
+
+	var kept []string
+	for _, pair := range strings.FieldsFunc(query, func(r rune) bool { return r == '&' || r == ';' }) {
+		key, _, _ := strings.Cut(pair, "=")
+		if !slices.ContainsFunc(names, func(name string) bool { return strings.EqualFold(name, key) }) {
+			kept = append(kept, pair)
+		}
+	}
+
+	if len(kept) == 0 {
+		return base
+	}
+
+	return base + "?" + strings.Join(kept, "&")
+}
+
+// clientOptionsForURI parses the URI and applies the direct connection setting.
+func clientOptionsForURI(uri string, directConnect *bool) (*options.ClientOptions, error) {
+	if directConnect != nil {
+		// The driver rejects directConnection=true for multi-host and SRV URIs while parsing,
+		// so drop it (and the legacy connect option) to let the explicit flag override it.
+		uri = removeURIOptions(uri, "directConnection", "connect")
+	}
+
+	clientOpts, err := dsn_fix.ClientOptionsForDSN(uri)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
 
-	applyDirectConnect(clientOpts, opts.DirectConnect)
+	applyDirectConnect(clientOpts, directConnect)
+
+	err = clientOpts.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("invalid dsn: %w", err)
+	}
+
+	return clientOpts, nil
+}
+
+func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
+	clientOpts, err := clientOptionsForURI(opts.URI, opts.DirectConnect)
+	if err != nil {
+		return nil, err
+	}
+
 	clientOpts.SetAppName("mongodb_exporter")
 
 	if clientOpts.ConnectTimeout == nil {

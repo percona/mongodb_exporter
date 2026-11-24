@@ -395,3 +395,95 @@ func TestApplyDirectConnect(t *testing.T) {
 		})
 	}
 }
+
+func TestClientOptionsForURI(t *testing.T) {
+	t.Parallel()
+
+	const multiHost = "mongodb://127.0.0.1:27017,127.0.0.1:27018/admin"
+
+	tests := []struct {
+		name          string
+		uri           string
+		directConnect *bool
+		expected      bool
+		wantErr       string
+	}{
+		{
+			name:          "flag false overrides URI true on multi-host URI",
+			uri:           multiHost + "?directConnection=true&replicaSet=rs0",
+			directConnect: new(false),
+			expected:      false,
+		},
+		{
+			name:          "flag false overrides legacy connect=direct on multi-host URI",
+			uri:           multiHost + "?connect=direct",
+			directConnect: new(false),
+			expected:      false,
+		},
+		{
+			name:          "flag true overrides URI false",
+			uri:           "mongodb://127.0.0.1:27017/?directConnection=false",
+			directConnect: new(true),
+			expected:      true,
+		},
+		{
+			name:    "URI true on multi-host URI without flag is rejected",
+			uri:     multiHost + "?directConnection=true",
+			wantErr: "multiple hosts",
+		},
+		{
+			name:          "flag true on multi-host URI is rejected",
+			uri:           multiHost + "?directConnection=false",
+			directConnect: new(true),
+			wantErr:       "multiple hosts",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			clientOpts, err := clientOptionsForURI(tt.uri, tt.directConnect)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, clientOpts.Direct)
+			assert.Equal(t, tt.expected, *clientOpts.Direct)
+		})
+	}
+}
+
+func TestRemoveURIOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		uri      string
+		expected string
+	}{
+		{name: "no query", uri: "mongodb://127.0.0.1:27017/admin", expected: "mongodb://127.0.0.1:27017/admin"},
+		{name: "only option", uri: "mongodb://h1:27017/?directConnection=true", expected: "mongodb://h1:27017/"},
+		{
+			name:     "case-insensitive, other options kept",
+			uri:      "mongodb://h1,h2/admin?replicaSet=rs0&DirectConnection=true;connect=direct&tls=true",
+			expected: "mongodb://h1,h2/admin?replicaSet=rs0&tls=true",
+		},
+		{name: "srv", uri: "mongodb+srv://cluster.example.com/?directConnection=true&w=majority", expected: "mongodb+srv://cluster.example.com/?w=majority"},
+		{
+			name:     "question mark in user info is not the query",
+			uri:      "mongodb://user:pa?ss@h1/?directConnection=true",
+			expected: "mongodb://user:pa?ss@h1/",
+		},
+		{name: "not a mongodb URI", uri: "h1:27017?directConnection=true", expected: "h1:27017?directConnection=true"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.expected, removeURIOptions(tt.uri, "directConnection", "connect"))
+		})
+	}
+}
