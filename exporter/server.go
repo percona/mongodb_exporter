@@ -17,12 +17,15 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -44,6 +47,9 @@ type ServerOpts struct {
 	TLSConfigPath          string
 	DisableDefaultRegistry bool
 }
+
+// shutdownTimeout bounds how long in-flight requests may take to finish on shutdown.
+const shutdownTimeout = 5 * time.Second
 
 // RunWebServer runs the main web-server
 func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
@@ -81,9 +87,32 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
 		WebListenAddresses: &[]string{opts.WebListenAddress},
 		WebConfigFile:      &opts.TLSConfigPath,
 	}
-	if err := web.ListenAndServe(server, flags, log); err != nil {
-		log.Error("error starting server", "error", err)
-		os.Exit(1)
+	// Stop on SIGINT or SIGTERM. SIGTERM is what container runtimes and
+	// Kubernetes send to stop the process; without handling it the process is
+	// killed by the default signal action and in-flight scrapes are cut off.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- web.ListenAndServe(server, flags, log)
+	}()
+
+	select {
+	case err := <-errCh:
+		stop()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("error starting server", "error", err)
+			os.Exit(1)
+		}
+	case <-ctx.Done():
+		stop()
+		log.Info("shutting down")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		err := server.Shutdown(shutdownCtx)
+		if err != nil {
+			log.Error("error shutting down server", "error", err)
+		}
 	}
 }
 
