@@ -141,7 +141,9 @@ For example, the password `p@ss:w%rd` is written as:
 --mongodb.uri=mongodb://user:p%40ss%3Aw%25rd@127.0.0.1:17001
 ```
 The values of `--mongodb.user`, `--mongodb.password`, `MONGODB_USER` and `MONGODB_PASSWORD` don't need any encoding: the exporter encodes them when it builds the URI.
-The exception is a URI with a percent-encoded Unix socket path, such as `mongodb://%2Ftmp%2Fmongodb-27017.sock`. In this case the exporter adds the user and password to the URI as they are, so you must percent-encode them yourself.
+The exception is a URI that the exporter can't parse as a URL, so it adds the user and password as they are and you must percent-encode them yourself. This happens with:
+- a percent-encoded Unix socket path, such as `mongodb://%2Ftmp%2Fmongodb-27017.sock`;
+- a host list where the last host has no port but an earlier one does, such as `mongodb://host1:27017,host2`. Adding the port to the last host (`mongodb://host1:27017,host2:27017`) avoids this.
 Prefer the environment variables, so the password stays out of the URI and the process list:
 ```sh
 MONGODB_USER=XXX MONGODB_PASSWORD=YYY build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --collector.collstats --mongodb.collstats-colls=db1.c1,db2.c2

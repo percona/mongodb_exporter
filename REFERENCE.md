@@ -40,6 +40,14 @@
 All MongoDB collectors are disabled by default. Enable them with `--collector.<name>`, or enable all of them with `--collect-all`.
 `--collect-all` doesn't enable `--collector.diagnosticdata-histograms`, which you must set on its own.
 
+Some collector flags only take effect together with another flag:
+- `--collector.diagnosticdata-histograms` needs `--collector.diagnosticdata` (or `--collect-all`).
+- `--collector.dbstatsfreestorage` needs `--collector.dbstats`.
+- `--collector.collstats` needs `--mongodb.collstats-colls` or `--discovering-mode`.
+- `--collector.indexstats` needs `--mongodb.indexstats-colls` or `--discovering-mode`.
+
+Without the second flag, the collector isn't registered and its metrics are missing.
+
 `--collector.exporter-metrics` (the exporter's own `go_*` and `process_*` metrics) is the exception: it is enabled by default. Disable it with `--no-collector.exporter-metrics`.
 
 | Collector Name     | Description                                                                                                                                                                                                                                                                                                   |
