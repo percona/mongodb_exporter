@@ -129,6 +129,19 @@ build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://1
 #### MongoDB Authentication
 You can supply the mongodb user/password direct in the `--mongodb.uri=` like `--mongodb.uri=mongodb://user:pass@127.0.0.1:17001`, you can also supply the mongodb user/password with `--mongodb.user=`, `--mongodb.password=`
 but the user and password info will be leaked via `ps` or `top` command, for security issue, you can use `MONGODB_USER` and `MONGODB_PASSWORD` env variable to set user/password for given uri
+
+##### Special characters in the password
+When the user or password is part of `--mongodb.uri` (or `MONGODB_URI`), it must be [percent-encoded](https://www.mongodb.com/docs/manual/reference/connection-string/#std-label-connections-standard-connection-string-format) if it contains any of `: / ? # [ ] @ %`.
+Otherwise, the exporter cannot parse the URI or fails to authenticate, and logs errors such as:
+```
+level=ERROR msg="Cannot connect to MongoDB" error="invalid dsn: error parsing uri: invalid password: invalid URL escape \"%s!\""
+```
+For example, the password `p@ss:w%rd` is written as:
+```sh
+--mongodb.uri=mongodb://user:p%40ss%3Aw%25rd@127.0.0.1:17001
+```
+The values of `--mongodb.user`, `--mongodb.password`, `MONGODB_USER` and `MONGODB_PASSWORD` don't need any encoding: the exporter encodes them when it builds the URI.
+Prefer the environment variables, so the password stays out of the URI and the process list:
 ```sh
 MONGODB_USER=XXX MONGODB_PASSWORD=YYY build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
 # or
@@ -164,6 +177,16 @@ we get metrics like this:
 mongodb_up{instance="host1:27015"} 1
 mongodb_up{instance="host2:27016"} 1
 ```
+
+#### Enabling collectors
+All collectors are disabled by default. Without any `--collector.<name>` flags, the exporter only exposes `mongodb_up` and its own `go_*` and `process_*` metrics, so a working exporter can look like it is not collecting anything.
+
+Enable the collectors you need, for example:
+```sh
+build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --collector.diagnosticdata --collector.replicasetstatus
+```
+or enable all of them with `--collect-all`. Most of the server metrics (`serverStatus`, WiredTiger, oplog and so on) come from `--collector.diagnosticdata`.
+See the [Reference Guide](REFERENCE.md#collectors) for the full list of collectors.
 
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.

@@ -37,6 +37,8 @@
 | --version                         | Show version and exit                                                                                                                                                         |
 
 ## Collectors
+All collectors are disabled by default. Enable them with `--collector.<name>`, or enable all of them with `--collect-all`.
+
 | Collector Name     | Description                                                                                                                                                                                                                                                                                                   |
 |--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | dbstats            | Collects metrics from dbStats. If the instance has a large number of collections or indexes, obtaining free space usage data may cause processing delays                                                                                                                                                      |
