@@ -141,13 +141,14 @@ For example, the password `p@ss:w%rd` is written as:
 --mongodb.uri=mongodb://user:p%40ss%3Aw%25rd@127.0.0.1:17001
 ```
 The values of `--mongodb.user`, `--mongodb.password`, `MONGODB_USER` and `MONGODB_PASSWORD` don't need any encoding: the exporter encodes them when it builds the URI.
+The exception is a URI with a percent-encoded Unix socket path, such as `mongodb://%2Ftmp%2Fmongodb-27017.sock`. In this case the exporter adds the user and password to the URI as they are, so you must percent-encode them yourself.
 Prefer the environment variables, so the password stays out of the URI and the process list:
 ```sh
-MONGODB_USER=XXX MONGODB_PASSWORD=YYY build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+MONGODB_USER=XXX MONGODB_PASSWORD=YYY build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --collector.collstats --mongodb.collstats-colls=db1.c1,db2.c2
 # or
 export MONGODB_USER=XXX
 export MONGODB_PASSWORD=YYY
-build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --collector.collstats --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 
 #### Multi-target support
@@ -179,20 +180,20 @@ mongodb_up{instance="host2:27016"} 1
 ```
 
 #### Enabling collectors
-All collectors are disabled by default. Without any `--collector.<name>` flags, the exporter only exposes `mongodb_up` and its own `go_*` and `process_*` metrics, so a working exporter can look like it is not collecting anything.
+All MongoDB collectors are disabled by default. Without any `--collector.<name>` flags or `--collect-all`, the exporter only exposes `mongodb_up` and its own `go_*` and `process_*` metrics, so a working exporter can look like it is not collecting anything.
 
 Enable the collectors you need, for example:
 ```sh
 build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --collector.diagnosticdata --collector.replicasetstatus
 ```
-or enable all of them with `--collect-all`. Most of the server metrics (`serverStatus`, WiredTiger, oplog and so on) come from `--collector.diagnosticdata`.
+or enable all of them with `--collect-all`. `--collect-all` doesn't enable `--collector.diagnosticdata-histograms`, so add that flag if you need histogram metrics. Most of the server metrics (`serverStatus`, WiredTiger, oplog and so on) come from `--collector.diagnosticdata`.
 See the [Reference Guide](REFERENCE.md#collectors) for the full list of collectors.
 
 #### Enabling collstats metrics gathering
 `--mongodb.collstats-colls` receives a list of databases and collections to monitor using collstats.
 Usage example: `--mongodb.collstats-colls=database1.collection1,database2.collection2`
 ```sh
-build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --mongodb.collstats-colls=db1.c1,db2.c2
+build/mongodb_exporter_linux_amd64_v1/mongodb_exporter --mongodb.uri=mongodb://127.0.0.1:17001 --collector.collstats --mongodb.collstats-colls=db1.c1,db2.c2
 ```
 #### Enabling compatibility mode.
 When compatibility mode is enabled by the `--compatible-mode`, the exporter will expose all new metrics with the new naming and labeling schema and at the same time will expose metrics in the version 1 compatible way.

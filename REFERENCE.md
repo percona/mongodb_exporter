@@ -37,7 +37,10 @@
 | --version                         | Show version and exit                                                                                                                                                         |
 
 ## Collectors
-All collectors are disabled by default. Enable them with `--collector.<name>`, or enable all of them with `--collect-all`.
+All MongoDB collectors are disabled by default. Enable them with `--collector.<name>`, or enable all of them with `--collect-all`.
+`--collect-all` doesn't enable `--collector.diagnosticdata-histograms`, which you must set on its own.
+
+`--collector.exporter-metrics` (the exporter's own `go_*` and `process_*` metrics) is the exception: it is enabled by default. Disable it with `--no-collector.exporter-metrics`.
 
 | Collector Name     | Description                                                                                                                                                                                                                                                                                                   |
 |--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
