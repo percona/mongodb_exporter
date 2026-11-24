@@ -65,6 +65,36 @@ build
 ### Running the exporter
 If you built the exporter using the method mentioned in the previous section, the generated binaries are in `build/mongodb_exporter_linux_amd64_v1/mongodb_exporter` or `build/mongodb_exporter_darwin_arm64_v8.0/mongodb_exporter`
 
+#### DEB and RPM packages
+The packages on the [releases page](https://github.com/percona/mongodb_exporter/releases) install the binary to
+`/usr/bin/mongodb_exporter` and a systemd unit to `/usr/lib/systemd/system/mongodb_exporter.service`. The service runs as
+the `mongodb_exporter` user and its primary group, both created on install. Put the exporter flags in
+`/etc/default/mongodb_exporter`:
+
+```sh
+OPTIONS="--mongodb.uri=mongodb://127.0.0.1:27017 --web.listen-address=:9216"
+```
+
+Then run `systemctl enable --now mongodb_exporter`. To change unit settings, use a drop-in rather than editing or copying
+the unit: `systemctl edit mongodb_exporter` creates `/etc/systemd/system/mongodb_exporter.service.d/override.conf`.
+
+##### Upgrading from v0.54.0 or earlier
+Earlier packages installed the unit to `/etc/systemd/system` with `Group=nogroup`, which does not exist on RHEL-family
+systems, so the service never started there. The upgrade changes this:
+- The unit moves to `/usr/lib/systemd/system`. An unmodified old unit is removed. A modified one is kept as
+  `mongodb_exporter.service.rpmsave` (RPM) or `mongodb_exporter.service.dpkg-bak` (DEB) and is **no longer used**. If you
+  changed the old unit, move your changes into a drop-in as shown above **before** upgrading, so they stay active. Do not
+  restore the whole old unit, as that brings back `Group=nogroup`.
+- The service no longer runs with the `nogroup` group, but with the primary group of the `mongodb_exporter` account. An
+  account that existed before the install keeps its own primary group, so check it with `id -gn mongodb_exporter`. If the
+  exporter reads files (TLS certificates, web config) that are readable only through `nogroup`, give that group read
+  access instead.
+- The upgrade does not restart a running exporter, which keeps the old binary and unit settings until it restarts. After
+  upgrading, run `systemctl daemon-reload && systemctl try-restart mongodb_exporter`. `try-restart` leaves a stopped
+  service stopped.
+- On RHEL-family systems the old service may be stuck in a failed state. Start it with
+  `systemctl reset-failed mongodb_exporter && systemctl restart mongodb_exporter`.
+
 #### Docker
 Images are published to the [official percona repository](https://hub.docker.com/r/percona/mongodb_exporter) on Docker Hub
 and to [GHCR](https://github.com/percona/mongodb_exporter/pkgs/container/mongodb_exporter). Both carry the same tags and are

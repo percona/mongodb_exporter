@@ -12,6 +12,11 @@ if ! getent passwd mongodb_exporter >/dev/null; then
         mongodb_exporter >/dev/null
 fi
 
+# See preinst.
+if [ -n "$DPKG_MAINTSCRIPT_PACKAGE" ]; then
+    dpkg-maintscript-helper rm_conffile /etc/systemd/system/mongodb_exporter.service 0.54.1~ -- "$@"
+fi
+
 systemctl --system daemon-reload >/dev/null || true
 
 exit 0
