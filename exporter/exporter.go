@@ -374,12 +374,14 @@ func (e *Exporter) Handler() http.Handler {
 		gatherers = append(gatherers, registry)
 
 		// Delegate http serving to Prometheus client library, which will call collector.Collect.
+		errorLog := newHTTPErrorLogger(e.logger)
 		h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{
 			ErrorHandling: promhttp.ContinueOnError,
-			ErrorLog:      newHTTPErrorLogger(e.logger),
+			ErrorLog:      errorLog,
 		})
 
 		h.ServeHTTP(w, r)
+		errorLog.logSuppressedErrors()
 	})
 }
 
