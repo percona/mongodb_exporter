@@ -82,11 +82,16 @@ the unit: `systemctl edit mongodb_exporter` creates `/etc/systemd/system/mongodb
 Earlier packages installed the unit to `/etc/systemd/system` with `Group=nogroup`, which does not exist on RHEL-family
 systems, so the service never started there. The upgrade changes this:
 - The unit moves to `/usr/lib/systemd/system`. An unmodified old unit is removed. A modified one is kept as
-  `mongodb_exporter.service.rpmsave` (RPM) or `mongodb_exporter.service.dpkg-bak` (DEB) and is **no longer used**: move
-  your changes into a drop-in as shown above, then run `systemctl daemon-reload`. Do not restore the whole old unit, as
-  that brings back `Group=nogroup`.
-- The service no longer runs with the `nogroup` group. If it reads files (TLS certificates, web config) that are readable
-  only through `nogroup`, give the `mongodb_exporter` group read access instead.
+  `mongodb_exporter.service.rpmsave` (RPM) or `mongodb_exporter.service.dpkg-bak` (DEB) and is **no longer used**. If you
+  changed the old unit, move your changes into a drop-in as shown above **before** upgrading, so they stay active. Do not
+  restore the whole old unit, as that brings back `Group=nogroup`.
+- The service no longer runs with the `nogroup` group, but with the primary group of the `mongodb_exporter` account. An
+  account that existed before the install keeps its own primary group, so check it with `id -gn mongodb_exporter`. If the
+  exporter reads files (TLS certificates, web config) that are readable only through `nogroup`, give that group read
+  access instead.
+- The upgrade does not restart a running exporter, which keeps the old binary and unit settings until it restarts. After
+  upgrading, run `systemctl daemon-reload && systemctl try-restart mongodb_exporter`. `try-restart` leaves a stopped
+  service stopped.
 - On RHEL-family systems the old service may be stuck in a failed state. Start it with
   `systemctl reset-failed mongodb_exporter && systemctl restart mongodb_exporter`.
 
