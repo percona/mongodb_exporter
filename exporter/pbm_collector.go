@@ -521,7 +521,10 @@ func (p *pbmCollector) shardIdentityFromPrimary(ctx context.Context, self *pbmHe
 // concern PBM uses. connectTimeout applies when the URI sets no connect timeout, as in the exporter's
 // own client.
 func pbmClientOptions(uri string, hosts []string, connectTimeout time.Duration) (*options.ClientOptions, error) {
-	opts, err := dsn_fix.ClientOptionsForDSN(uri)
+	// The driver rejects directConnection=true (or the legacy connect=direct) for a multi-host URI
+	// while parsing, which --no-mongodb.direct-connect allows for the exporter's own client.
+	// The replica set is always discovered here, so drop them.
+	opts, err := dsn_fix.ClientOptionsForDSN(removeURIOptions(uri, "directConnection", "connect"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}

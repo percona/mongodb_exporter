@@ -23,6 +23,7 @@ import (
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -437,8 +438,9 @@ func applyDirectConnect(clientOpts *options.ClientOptions, directConnect *bool) 
 	}
 }
 
-// removeURIOptions returns the URI without the given query options. Option names are case-insensitive.
-// It follows the driver's parsing: the user info ends at the first '@' and the options start at the next '?'.
+// removeURIOptions returns the URI without the given query options. Option names are case-insensitive
+// and percent-decoded before comparing. It follows the driver's parsing: the user info ends at the
+// first '@' and the options start at the next '?'.
 func removeURIOptions(uri string, names ...string) string {
 	rest, found := strings.CutPrefix(uri, "mongodb+srv://")
 	if !found {
@@ -462,6 +464,9 @@ func removeURIOptions(uri string, names ...string) string {
 	var kept []string
 	for _, pair := range strings.FieldsFunc(query, func(r rune) bool { return r == '&' || r == ';' }) {
 		key, _, _ := strings.Cut(pair, "=")
+		if unescaped, err := url.QueryUnescape(key); err == nil {
+			key = unescaped
+		}
 		if !slices.ContainsFunc(names, func(name string) bool { return strings.EqualFold(name, key) }) {
 			kept = append(kept, pair)
 		}

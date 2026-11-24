@@ -428,6 +428,12 @@ func TestClientOptionsForURI(t *testing.T) {
 			expected:      true,
 		},
 		{
+			name:          "flag false overrides percent-encoded directConnection on multi-host URI",
+			uri:           multiHost + "?%64irectConnection=true",
+			directConnect: new(false),
+			expected:      false,
+		},
+		{
 			name:    "URI true on multi-host URI without flag is rejected",
 			uri:     multiHost + "?directConnection=true",
 			wantErr: "multiple hosts",
@@ -473,6 +479,12 @@ func TestRemoveURIOptions(t *testing.T) {
 			expected: "mongodb://h1,h2/admin?replicaSet=rs0&tls=true",
 		},
 		{name: "srv", uri: "mongodb+srv://cluster.example.com/?directConnection=true&w=majority", expected: "mongodb+srv://cluster.example.com/?w=majority"},
+		{
+			name:     "percent-encoded name, retained pairs unchanged",
+			uri:      "mongodb://h1,h2/?%64irectConnection=true&app%4eame=a%20b",
+			expected: "mongodb://h1,h2/?app%4eame=a%20b",
+		},
+		{name: "undecodable name is kept", uri: "mongodb://h1/?%zz=1&connect=direct", expected: "mongodb://h1/?%zz=1"},
 		{
 			name:     "question mark in user info is not the query",
 			uri:      "mongodb://user:pa?ss@h1/?directConnection=true",
