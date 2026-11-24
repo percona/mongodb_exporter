@@ -225,6 +225,16 @@ The labels are:
 - rs_state: Replicaset state is an integer from `getDiagnosticData()` -> `replSetGetStatus.myState`. 
 Check [the official documentation](https://docs.mongodb.com/manual/reference/replica-states/) for details on replicaset status values.
 
+#### Client closed the connection during a scrape
+If the client closes the connection before the exporter finishes sending the metrics, the exporter logs a warning like this one, once per scrape:
+```
+level=WARN msg="Error sending metrics to the client, the client might have closed the connection (check the scrape or probe timeout)" error="write tcp ...: write: connection reset by peer"
+```
+This usually means the scrape takes longer than the client is willing to wait. Collectors such as `--collector.topmetrics` and `--collector.diagnosticdata` (especially with `--compatible-mode`) make scrapes slower. Common causes are:
+
+- A Kubernetes liveness or readiness probe pointed at `/metrics`. Point the probe at `/` instead, or increase its `timeoutSeconds`.
+- A Prometheus `scrape_timeout` shorter than the scrape duration. Increase the timeout, or scrape the slow collectors in a separate job, for example `/metrics?collect[]=topmetrics`.
+
 ## Usage Reference
 
 See the [Reference Guide](REFERENCE.md) for details on using the exporter.

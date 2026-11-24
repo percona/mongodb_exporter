@@ -18,14 +18,23 @@ package exporter
 import (
 	"fmt"
 	"log/slog"
+	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// encodingErrorMsg is the message promhttp logs when writing a metric family to the response fails.
+const encodingErrorMsg = "error encoding and sending metric family"
+
 // httpErrorLogger is a wrapper around slog.Logger that can log promhttp errors (by implementing a Println method).
+// A new httpErrorLogger must be created for every request.
 type httpErrorLogger struct {
 	logger *slog.Logger
+
+	mu                 sync.Mutex
+	encodingErrorCount int
 }
 
 func newHTTPErrorLogger(logger *slog.Logger) *httpErrorLogger {
@@ -40,15 +49,50 @@ func (h *httpErrorLogger) Println(v ...any) {
 		msg, mok := v[0].(string)
 		err, eok := v[1].(error)
 		if mok && eok {
+			if strings.HasPrefix(msg, encodingErrorMsg) {
+				h.logEncodingError(err)
+
+				return
+			}
+
 			multiErr := prometheus.MultiError{}
 			if errors.As(err, &multiErr) {
 				errCount := len(multiErr)
 				for i, err := range multiErr {
 					h.logger.Error(msg, "error", err, "total_errors", errCount, "error_no", i)
 				}
+
+				return
 			}
 		}
 	}
 	// fallback
 	h.logger.Error(fmt.Sprint(v...))
+}
+
+// logEncodingError logs only the first encoding error of a request.
+// When the client closes the connection (for example, after a scrape or probe timeout),
+// promhttp keeps trying to write every remaining metric family and each write fails
+// with the same error, so logging all of them floods the log.
+func (h *httpErrorLogger) logEncodingError(err error) {
+	h.mu.Lock()
+	h.encodingErrorCount++
+	first := h.encodingErrorCount == 1
+	h.mu.Unlock()
+
+	if first {
+		h.logger.Warn("Error sending metrics to the client, the client might have closed the connection "+
+			"(check the scrape or probe timeout)", "error", err)
+	}
+}
+
+// logSuppressedErrors logs how many encoding errors were not logged. Call it after the response has been written.
+func (h *httpErrorLogger) logSuppressedErrors() {
+	h.mu.Lock()
+	suppressed := h.encodingErrorCount - 1
+	h.mu.Unlock()
+
+	if suppressed > 0 {
+		h.logger.Debug("Suppressed repeated errors sending metrics to the client", "count", suppressed)
+	}
 }
