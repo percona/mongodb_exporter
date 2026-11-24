@@ -18,6 +18,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -91,8 +92,8 @@ type Opts struct {
 }
 
 var (
-	errCannotHandleType   = fmt.Errorf("don't know how to handle data type")
-	errUnexpectedDataType = fmt.Errorf("unexpected data type")
+	errCannotHandleType   = errors.New("don't know how to handle data type")
+	errUnexpectedDataType = errors.New("unexpected data type")
 )
 
 const (
@@ -146,7 +147,12 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	dbBuildInfo, err := retrieveMongoDBBuildInfo(ctx, client, e.logger.With("component", "buildInfo"))
 	if err != nil {
-		e.logger.Warn("Registry - Cannot get MongoDB buildInfo", "error", err)
+		// Since MongoDB 8.1 buildInfo requires authentication, which arbiters can't provide.
+		if nodeType == typeArbiter {
+			e.logger.Debug("Registry - Cannot get MongoDB buildInfo", "error", err)
+		} else {
+			e.logger.Warn("Registry - Cannot get MongoDB buildInfo", "error", err)
+		}
 	}
 
 	gc := newGeneralCollector(ctx, client, nodeType, e.opts.Logger)
@@ -154,11 +160,8 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 
 	// Enable collectors like collstats and indexstats depending on the number of collections
 	// present in the database.
-	limitsOk := false
-	if e.opts.CollStatsLimit <= 0 || // Unlimited
-		e.getTotalCollectionsCount() <= e.opts.CollStatsLimit {
-		limitsOk = true
-	}
+	limitsOk := e.opts.CollStatsLimit <= 0 || // Unlimited
+		e.getTotalCollectionsCount() <= e.opts.CollStatsLimit
 
 	if e.opts.CollectAll {
 		if len(e.opts.CollStatsNamespaces) == 0 {
@@ -263,7 +266,7 @@ func (e *Exporter) makeRegistry(ctx context.Context, client *mongo.Client, topol
 	}
 
 	if e.opts.EnablePBMMetrics && requestOpts.EnablePBMMetrics {
-		pbmc := newPbmCollector(ctx, client, e.opts.URI, e.opts.Logger)
+		pbmc := newPbmCollector(ctx, client, e.opts.URI, e.opts.ConnectTimeoutMS, e.opts.Logger)
 		registry.MustRegister(pbmc)
 	}
 
@@ -513,7 +516,8 @@ func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
 		return nil, fmt.Errorf("invalid MongoDB options: %w", err)
 	}
 
-	if err = client.Ping(ctx, nil); err != nil {
+	err = client.Ping(ctx, nil)
+	if err != nil {
 		// Ping failed. Close background connections. Error is ignored since the ping error is more relevant.
 		_ = client.Disconnect(ctx)
 
