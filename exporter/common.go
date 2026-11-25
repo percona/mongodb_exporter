@@ -17,7 +17,6 @@ package exporter
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sort"
 	"strings"
@@ -31,6 +30,8 @@ import (
 )
 
 var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
+
+var errMissingPrivileges = errors.New("connectionStatus reply has no authenticatedUserPrivileges")
 
 const (
 	unauthorizedErrorCode = 13
@@ -201,28 +202,45 @@ func (a databaseAccess) allows(name string) bool {
 // userDatabasePrivileges returns the databases the connected user has any privilege on, using
 // connectionStatus. Every database is authorized when auth is disabled.
 func userDatabasePrivileges(ctx context.Context, client *mongo.Client) (databaseAccess, error) {
+	cmd := bson.D{{Key: "connectionStatus", Value: 1}, {Key: "showPrivileges", Value: true}}
+
+	reply, err := client.Database("admin").RunCommand(ctx, cmd).Raw()
+	if err != nil {
+		return databaseAccess{}, errors.Wrap(err, "connectionStatus failed")
+	}
+
+	return databaseAccessFromConnectionStatus(reply)
+}
+
+// databaseAccessFromConnectionStatus reads the databases the user has privileges on from a
+// connectionStatus reply. An authenticated user without the authenticatedUserPrivileges field
+// (for example a proxy that dropped showPrivileges) is an error, so the caller uses the full
+// list instead of treating the user as having no privileges.
+func databaseAccessFromConnectionStatus(reply bson.Raw) (databaseAccess, error) {
 	var res struct {
 		AuthInfo struct {
 			AuthenticatedUsers []bson.Raw `bson:"authenticatedUsers"`
-			Privileges         []struct {
+			Privileges         *[]struct {
 				Resource privilegeResource `bson:"resource"`
 			} `bson:"authenticatedUserPrivileges"`
 		} `bson:"authInfo"`
 	}
 
-	cmd := bson.D{{Key: "connectionStatus", Value: 1}, {Key: "showPrivileges", Value: true}}
-
-	err := client.Database("admin").RunCommand(ctx, cmd).Decode(&res)
+	err := bson.Unmarshal(reply, &res)
 	if err != nil {
-		return databaseAccess{}, errors.Wrap(err, "connectionStatus failed")
+		return databaseAccess{}, errors.Wrap(err, "cannot decode the connectionStatus reply")
 	}
 
 	if len(res.AuthInfo.AuthenticatedUsers) == 0 {
 		return databaseAccess{all: true}, nil
 	}
 
-	resources := make([]privilegeResource, 0, len(res.AuthInfo.Privileges))
-	for _, p := range res.AuthInfo.Privileges {
+	if res.AuthInfo.Privileges == nil {
+		return databaseAccess{}, errMissingPrivileges
+	}
+
+	resources := make([]privilegeResource, 0, len(*res.AuthInfo.Privileges))
+	for _, p := range *res.AuthInfo.Privileges {
 		resources = append(resources, p.Resource)
 	}
 
@@ -332,33 +350,60 @@ func unique(slice []string) []string {
 	return list
 }
 
+// checkNamespacesForViews returns the namespaces to use for collstats and indexstats, or an
+// error if one of them is a view, since $collStats and $indexStats don't work on views. Only the
+// databases of the given namespaces are checked. A namespace that isn't a view is kept even if
+// it can't be listed, for example because the user isn't authorized on its database: the
+// collector then reports the error for that namespace and the other namespaces are collected.
 func checkNamespacesForViews(ctx context.Context, client *mongo.Client, logger *slog.Logger, collections []string) ([]string, error) {
-	onlyCollectionsNamespaces, err := listAllCollections(ctx, client, logger, nil, nil, true)
-	if err != nil {
-		return nil, err
-	}
+	namespaces := make([]string, 0, len(collections))
+	views := make(map[string]struct{})
+	checked := make(map[string]struct{})
 
-	namespaces := make(map[string]struct{})
-	for db, collections := range onlyCollectionsNamespaces {
-		for _, collection := range removeEmptyStrings(collections) {
-			namespaces[fmt.Sprintf("%s.%s", db, collection)] = struct{}{}
-		}
-	}
-
-	filteredCollections := []string{}
-	for _, collection := range removeEmptyStrings(collections) {
-		if len(strings.Split(collection, ".")) < 2 { //nolint:mnd
+	for _, namespace := range removeEmptyStrings(collections) {
+		db, collection := splitNamespace(namespace)
+		if collection == "" {
 			continue
 		}
 
-		if _, ok := namespaces[collection]; !ok {
-			return nil, errors.Errorf("namespace %s is a view and cannot be used for collstats/indexstats", collection)
+		namespaces = append(namespaces, namespace)
+
+		if _, ok := checked[db]; ok {
+			continue
+		}
+		checked[db] = struct{}{}
+
+		dbViews, err := listViews(ctx, client, db)
+		if err != nil {
+			if isUnauthorizedError(err) {
+				logger.Debug("not authorized to list views, cannot check the namespaces of the database",
+					"database", db, "error", err)
+
+				continue
+			}
+
+			return nil, errors.Wrapf(err, "cannot list the views in %q", db)
 		}
 
-		filteredCollections = append(filteredCollections, collection)
+		for _, view := range dbViews {
+			views[db+"."+view] = struct{}{}
+		}
 	}
 
-	return filteredCollections, nil
+	for _, namespace := range namespaces {
+		if _, ok := views[namespace]; ok {
+			return nil, errors.Errorf("namespace %s is a view and cannot be used for collstats/indexstats", namespace)
+		}
+	}
+
+	return namespaces, nil
+}
+
+// listViews returns the names of the views in database that the user can see.
+func listViews(ctx context.Context, client *mongo.Client, database string) ([]string, error) {
+	opts := options.ListCollections().SetNameOnly(true).SetAuthorizedCollections(true)
+
+	return client.Database(database).ListCollectionNames(ctx, bson.D{{Key: "type", Value: "view"}}, opts) //nolint:wrapcheck
 }
 
 func listAllCollections(ctx context.Context, client *mongo.Client, logger *slog.Logger, filterInNamespaces []string, excludeDBs []string, skipViews bool) (map[string][]string, error) {

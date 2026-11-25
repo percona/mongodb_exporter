@@ -301,6 +301,16 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 
 	addr := net.JoinHostPort("127.0.0.1", tu.GetenvDefault("TEST_MONGODB_S2_PRIMARY_PORT", "17004"))
 	admin := proxyTestClient(ctx, t, "mongodb://admin:admin@"+addr)
+	adminDB := admin.Database("admin")
+
+	// Registered first, so a failure below doesn't leave the databases or the user behind.
+	t.Cleanup(func() {
+		ctx := context.Background()
+		adminDB.RunCommand(ctx, bson.D{{Key: "dropUser", Value: user}})
+		adminDB.RunCommand(ctx, bson.D{{Key: "dropRole", Value: role}})
+		admin.Database(allowedDB).Drop(ctx) //nolint:errcheck
+		admin.Database(deniedDB).Drop(ctx)  //nolint:errcheck
+	})
 
 	for _, db := range []string{allowedDB, deniedDB} {
 		for _, coll := range []string{"c1", "c2"} {
@@ -309,7 +319,6 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 		}
 	}
 
-	adminDB := admin.Database("admin")
 	adminDB.RunCommand(ctx, bson.D{{Key: "dropUser", Value: user}})
 	adminDB.RunCommand(ctx, bson.D{{Key: "dropRole", Value: role}})
 	require.NoError(t, adminDB.RunCommand(ctx, bson.D{
@@ -327,14 +336,6 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 		{Key: "roles", Value: bson.A{role}},
 	}).Err())
 
-	t.Cleanup(func() {
-		ctx := context.Background()
-		adminDB.RunCommand(ctx, bson.D{{Key: "dropUser", Value: user}})
-		adminDB.RunCommand(ctx, bson.D{{Key: "dropRole", Value: role}})
-		admin.Database(allowedDB).Drop(ctx) //nolint:errcheck
-		admin.Database(deniedDB).Drop(ctx)  //nolint:errcheck
-	})
-
 	userURI := func(host string) string {
 		return "mongodb://" + user + ":" + password + "@" + host + "/admin"
 	}
@@ -345,6 +346,20 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 		dbs, err := databases(ctx, client, promslog.NewNopLogger(), nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{allowedDB}, dbs)
+	})
+
+	// A configured namespace in a database the user can't read must not be reported as a view,
+	// and must not stop collstats for the other namespaces.
+	t.Run("collstats namespace in a denied database", func(t *testing.T) {
+		client := proxyTestClient(ctx, t, userURI(addr))
+		namespaces := []string{allowedDB + ".c1", deniedDB + ".c1"}
+
+		got, err := checkNamespacesForViews(ctx, client, promslog.NewNopLogger(), namespaces)
+		require.NoError(t, err)
+		assert.Equal(t, namespaces, got)
+
+		c := newCollectionStatsCollector(ctx, client, promslog.NewNopLogger(), false, labelsGetterMock{}, namespaces, false)
+		assert.Equal(t, 1, testutil.CollectAndCount(c, "mongodb_collstats_storageStats_count"))
 	})
 
 	t.Run("authorizedDatabases rejected", func(t *testing.T) {
@@ -390,7 +405,7 @@ func TestListDatabasesUserPrivileges(t *testing.T) {
 	# HELP mongodb_profile_slow_query_count profile_slow_query.count
 	# TYPE mongodb_profile_slow_query_count counter
 	mongodb_profile_slow_query_count{database="` + allowedDB + `"} 0` + "\n")
-		assert.NoError(t, testutil.CollectAndCompare(c, expected, "mongodb_profile_slow_query_count"))
+		require.NoError(t, testutil.CollectAndCompare(c, expected, "mongodb_profile_slow_query_count"))
 
 		// dbstats must skip the unauthorized databases without logging an error for each one.
 		var logs bytes.Buffer
@@ -422,6 +437,12 @@ func TestListDatabasesAllDatabasesPrivilege(t *testing.T) {
 	admin := proxyTestClient(ctx, t, "mongodb://admin:admin@"+addr)
 
 	adminDB := admin.Database("admin")
+	t.Cleanup(func() {
+		ctx := context.Background()
+		adminDB.RunCommand(ctx, bson.D{{Key: "dropUser", Value: user}})
+		adminDB.RunCommand(ctx, bson.D{{Key: "dropRole", Value: role}})
+	})
+
 	adminDB.RunCommand(ctx, bson.D{{Key: "dropUser", Value: user}})
 	adminDB.RunCommand(ctx, bson.D{{Key: "dropRole", Value: role}})
 	require.NoError(t, adminDB.RunCommand(ctx, bson.D{
@@ -437,12 +458,6 @@ func TestListDatabasesAllDatabasesPrivilege(t *testing.T) {
 		{Key: "pwd", Value: password},
 		{Key: "roles", Value: bson.A{role}},
 	}).Err())
-
-	t.Cleanup(func() {
-		ctx := context.Background()
-		adminDB.RunCommand(ctx, bson.D{{Key: "dropUser", Value: user}})
-		adminDB.RunCommand(ctx, bson.D{{Key: "dropRole", Value: role}})
-	})
 
 	userURI := func(host string) string {
 		return "mongodb://" + user + ":" + password + "@" + host + "/admin"
@@ -665,6 +680,68 @@ func TestCheckNamespacesForViews(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"testdb01.col01", "testdb01.system.views"}, filtered)
 	})
+
+	t.Run("Unknown namespaces are not views", func(t *testing.T) {
+		filtered, err := checkNamespacesForViews(ctx, client, promslog.NewNopLogger(), []string{"testdb01.col01", "testdb01.nosuch", "nosuchdb.col01"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"testdb01.col01", "testdb01.nosuch", "nosuchdb.col01"}, filtered)
+	})
+}
+
+func TestDatabaseAccessFromConnectionStatus(t *testing.T) {
+	t.Parallel()
+
+	user := bson.A{bson.M{"user": "u", "db": "admin"}}
+
+	tests := []struct {
+		name    string
+		reply   bson.M
+		want    databaseAccess
+		wantErr error
+	}{
+		{
+			name:  "auth disabled",
+			reply: bson.M{"authInfo": bson.M{"authenticatedUsers": bson.A{}, "authenticatedUserPrivileges": bson.A{}}, "ok": 1},
+			want:  databaseAccess{all: true},
+		},
+		{
+			name: "privileges on one database",
+			reply: bson.M{"authInfo": bson.M{
+				"authenticatedUsers":          user,
+				"authenticatedUserPrivileges": bson.A{bson.M{"resource": bson.M{"db": "app", "collection": ""}, "actions": bson.A{"find"}}},
+			}, "ok": 1},
+			want: databaseAccess{dbs: map[string]struct{}{"app": {}}},
+		},
+		{
+			name:  "no privileges",
+			reply: bson.M{"authInfo": bson.M{"authenticatedUsers": user, "authenticatedUserPrivileges": bson.A{}}, "ok": 1},
+			want:  databaseAccess{dbs: map[string]struct{}{}},
+		},
+		{
+			name:    "privileges field missing",
+			reply:   bson.M{"authInfo": bson.M{"authenticatedUsers": user}, "ok": 1},
+			wantErr: errMissingPrivileges,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			reply, err := bson.Marshal(tt.reply)
+			require.NoError(t, err)
+
+			got, err := databaseAccessFromConnectionStatus(reply)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestIsUnauthorizedError(t *testing.T) {

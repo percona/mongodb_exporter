@@ -43,9 +43,12 @@ type Exporter struct {
 	opts                  *Opts
 	lock                  *sync.Mutex
 	totalCollectionsCount int
-	// collectionsCountFinal is false while the count must be recalculated on the next scrape,
+	// collectionsCountFinal is false while the count must be recalculated,
 	// for example because some databases were skipped as unauthorized.
 	collectionsCountFinal bool
+	// collectionsCountedAt is when the stored count was taken. A count that isn't final is
+	// recalculated at most once every incompleteCountInterval.
+	collectionsCountedAt time.Time
 	// countSem makes sure only one scrape counts the collections at a time. It's a channel
 	// instead of a mutex so a canceled scrape can stop waiting.
 	countSem chan struct{}
@@ -385,9 +388,18 @@ func (e *Exporter) Handler() http.Handler {
 	})
 }
 
+// incompleteCountInterval is how long a collection count that skipped databases is used before
+// it's recalculated. When some databases are always denied no count is ever final, and counting
+// costs a listCollections per database, so recounting on every scrape would be expensive.
+const incompleteCountInterval = 5 * time.Minute
+
 func (e *Exporter) collectionsCountNeeded() bool {
 	e.lock.Lock()
 	defer e.lock.Unlock()
+
+	if !e.collectionsCountFinal && !e.collectionsCountedAt.IsZero() {
+		return time.Since(e.collectionsCountedAt) >= incompleteCountInterval
+	}
 
 	return !e.collectionsCountFinal || e.totalCollectionsCount <= 0
 }
@@ -418,6 +430,7 @@ func (e *Exporter) updateCollectionsCount(ctx context.Context, client *mongo.Cli
 	e.lock.Lock()
 	e.totalCollectionsCount = count
 	e.collectionsCountFinal = complete
+	e.collectionsCountedAt = time.Now()
 	e.lock.Unlock()
 }
 
