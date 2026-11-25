@@ -36,6 +36,10 @@ const (
 	wireOpMsgPrefix = wireHeaderLen + 5 // header, flagBits and the section kind byte
 )
 
+// dropConnection, returned by a reject function, makes the proxy close the client connection
+// instead of answering, like a network failure.
+const dropConnection = "\x00drop connection"
+
 // strictProxy is a MongoDB wire protocol proxy that answers some commands with an error instead
 // of forwarding them, like the proxies some managed services put in front of MongoDB
 // (for example "Unallowed argument in listDatabases command: authorizedDatabases").
@@ -105,6 +109,12 @@ func (p *strictProxy) serve(client, server net.Conn, reject func(cmd bson.Raw) s
 
 		if errmsg := commandRejection(msg, reject); errmsg != "" {
 			p.rejected.Add(1)
+
+			if errmsg == dropConnection {
+				client.Close() //nolint:errcheck
+
+				return
+			}
 
 			_, err = client.Write(wireErrorReply(msg, errmsg))
 			if err != nil {
@@ -193,6 +203,16 @@ func rejectArgs(cmd string, args ...string) func(bson.Raw) string {
 
 		return ""
 	}
+}
+
+// commandName returns the name of the command in body, or "" if body is empty.
+func commandName(body bson.Raw) string {
+	elems, _ := body.Elements()
+	if len(elems) == 0 {
+		return ""
+	}
+
+	return elems[0].Key()
 }
 
 // rejectAny combines reject functions; the first rejection wins.

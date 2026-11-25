@@ -65,7 +65,7 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 	logger := d.base.logger
 	client := d.base.client
 
-	dbNames, err := databases(d.ctx, client, d.databaseFilter, nil)
+	dbNames, err := databases(d.ctx, client, logger, d.databaseFilter, nil)
 	if err != nil {
 		logger.Error("Failed to get database names", "error", err)
 
@@ -84,6 +84,14 @@ func (d *dbstatsCollector) collect(ch chan<- prometheus.Metric) {
 		r := client.Database(db).RunCommand(d.ctx, cmd)
 		err := r.Decode(&dbStats)
 		if err != nil {
+			// Can happen when the user's privileges couldn't be read (see authorizedDatabaseNames),
+			// or on Atlas, which lists local but denies dbStats on it.
+			if isUnauthorizedError(err) {
+				logger.Debug("not authorized to run dbStats, skipping database", "database", db, "error", err)
+
+				continue
+			}
+
 			logger.Error("Failed to get $dbstats for database", "database", db, "error", err)
 
 			continue

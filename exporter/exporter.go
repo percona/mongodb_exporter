@@ -408,7 +408,7 @@ func (e *Exporter) updateCollectionsCount(ctx context.Context, client *mongo.Cli
 		return
 	}
 
-	count, complete, err := nonSystemCollectionsCount(ctx, client, nil)
+	count, complete, err := nonSystemCollectionsCount(ctx, client, e.logger, nil)
 	if err != nil {
 		e.logger.Debug("Cannot count collections for the collstats limit", "error", err)
 

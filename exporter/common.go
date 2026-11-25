@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 
@@ -31,7 +32,10 @@ import (
 
 var systemDBs = []string{"admin", "config", "local"} //nolint:gochecknoglobals
 
-const unauthorizedErrorCode = 13
+const (
+	unauthorizedErrorCode = 13
+	atlasErrorCode        = 8000
+)
 
 func listCollections(ctx context.Context, client *mongo.Client, database string, filterInNamespaces []string, skipViews bool) ([]string, error) {
 	opts := &options.ListCollectionsOptions{NameOnly: pointer.ToBool(true), AuthorizedCollections: pointer.ToBool(true)}
@@ -85,8 +89,8 @@ func listCollections(ctx context.Context, client *mongo.Client, database string,
 //
 // Only databases the user has privileges on are returned, so collectors don't run
 // commands that fail with "not authorized".
-func databases(ctx context.Context, client *mongo.Client, filterInNamespaces []string, exclude []string) ([]string, error) {
-	dbNames, err := authorizedDatabaseNames(ctx, client)
+func databases(ctx context.Context, client *mongo.Client, logger *slog.Logger, filterInNamespaces []string, exclude []string) ([]string, error) {
+	dbNames, err := authorizedDatabaseNames(ctx, client, logger)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot get the database names list")
 	}
@@ -100,7 +104,8 @@ func databases(ctx context.Context, client *mongo.Client, filterInNamespaces []s
 // set of listDatabases arguments and rejects the others, for example "Unallowed argument in
 // listDatabases command: authorizedDatabases" or "...: filter". When the server rejects the
 // command, retry without those arguments and apply the authorization filter on our side.
-func authorizedDatabaseNames(ctx context.Context, client *mongo.Client) ([]string, error) {
+// Network errors and timeouts are returned as they are, without the retry.
+func authorizedDatabaseNames(ctx context.Context, client *mongo.Client, logger *slog.Logger) ([]string, error) {
 	opts := options.ListDatabases().SetNameOnly(true).SetAuthorizedDatabases(true)
 
 	dbNames, err := client.ListDatabaseNames(ctx, bson.D{}, opts)
@@ -108,20 +113,24 @@ func authorizedDatabaseNames(ctx context.Context, client *mongo.Client) ([]strin
 		return dbNames, nil
 	}
 
+	// The driver also returns network errors as a CommandError, so check for them first.
 	var cmdErr mongo.CommandError
-	if !errors.As(err, &cmdErr) {
+	if !errors.As(err, &cmdErr) || mongo.IsNetworkError(err) || mongo.IsTimeout(err) || ctx.Err() != nil {
 		return nil, errors.Wrap(err, "listDatabases failed")
 	}
 
 	allNames, fallbackErr := listDatabaseNamesBare(ctx, client)
 	if fallbackErr != nil {
-		return nil, errors.Wrap(err, "listDatabases failed")
+		return nil, errors.Wrapf(fallbackErr, "listDatabases failed (%v), retry without filter and authorizedDatabases failed", err)
 	}
 
 	access, privErr := userDatabasePrivileges(ctx, client)
 	if privErr != nil {
 		// Without the user's privileges we can't do better than the full list.
-		return allNames, nil //nolint:nilerr
+		logger.Debug("cannot read the user's privileges, using all databases",
+			"listDatabases_error", err, "error", privErr)
+
+		return allNames, nil
 	}
 
 	authorized := make([]string, 0, len(allNames))
@@ -279,10 +288,21 @@ func filterDatabaseNames(dbNames []string, filterInNamespaces []string, exclude 
 }
 
 // isUnauthorizedError reports whether err is a server "not authorized" (Unauthorized, code 13) error.
+// MongoDB Atlas reports authorization failures as AtlasError (code 8000) instead, with messages like
+// "(Unauthorized) not authorized on local to execute command ..." or
+// "user is not allowed to do action [find] on [db.system.profile]".
 func isUnauthorizedError(err error) bool {
 	var cmdErr mongo.CommandError
+	if !errors.As(err, &cmdErr) {
+		return false
+	}
 
-	return errors.As(err, &cmdErr) && cmdErr.Code == unauthorizedErrorCode
+	if cmdErr.Code == unauthorizedErrorCode {
+		return true
+	}
+
+	return cmdErr.Code == atlasErrorCode &&
+		(strings.HasPrefix(cmdErr.Message, "(Unauthorized)") || strings.Contains(cmdErr.Message, "is not allowed to do action"))
 }
 
 func removeEmptyStrings(items []string) []string {
@@ -312,8 +332,8 @@ func unique(slice []string) []string {
 	return list
 }
 
-func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collections []string) ([]string, error) {
-	onlyCollectionsNamespaces, err := listAllCollections(ctx, client, nil, nil, true)
+func checkNamespacesForViews(ctx context.Context, client *mongo.Client, logger *slog.Logger, collections []string) ([]string, error) {
+	onlyCollectionsNamespaces, err := listAllCollections(ctx, client, logger, nil, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -341,10 +361,10 @@ func checkNamespacesForViews(ctx context.Context, client *mongo.Client, collecti
 	return filteredCollections, nil
 }
 
-func listAllCollections(ctx context.Context, client *mongo.Client, filterInNamespaces []string, excludeDBs []string, skipViews bool) (map[string][]string, error) {
+func listAllCollections(ctx context.Context, client *mongo.Client, logger *slog.Logger, filterInNamespaces []string, excludeDBs []string, skipViews bool) (map[string][]string, error) {
 	namespaces := make(map[string][]string)
 
-	dbs, err := databases(ctx, client, filterInNamespaces, excludeDBs)
+	dbs, err := databases(ctx, client, logger, filterInNamespaces, excludeDBs)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot make the list of databases to list all collections")
 	}
@@ -367,9 +387,12 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 
 			colls, err := listCollections(ctx, client, db, []string{namespace}, skipViews)
 			if err != nil {
-				// Can happen when the user's privileges couldn't be read (see authorizedDatabaseNames).
-				// Skip the database so the authorized ones are still collected.
+				// Can happen when the user's privileges couldn't be read (see authorizedDatabaseNames),
+				// or when the user lacks listCollections on the database. Skip the database so the
+				// authorized ones are still collected.
 				if isUnauthorizedError(err) {
+					logger.Debug("not authorized to list collections, skipping database", "database", db, "error", err)
+
 					continue
 				}
 
@@ -399,8 +422,8 @@ func listAllCollections(ctx context.Context, client *mongo.Client, filterInNames
 // user isn't authorized on are skipped; complete is false when that happens. complete doesn't
 // detect collections hidden by authorizedCollections, so privileges added while the exporter
 // runs aren't reflected in a complete count.
-func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, filterInCollections []string) (int, bool, error) {
-	databases, err := databases(ctx, client, nil, systemDBs)
+func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, logger *slog.Logger, filterInCollections []string) (int, bool, error) {
+	databases, err := databases(ctx, client, logger, nil, systemDBs)
 	if err != nil {
 		return 0, false, errors.Wrap(err, "cannot retrieve the collection names for count collections")
 	}
@@ -412,6 +435,9 @@ func nonSystemCollectionsCount(ctx context.Context, client *mongo.Client, filter
 		colls, err := listCollections(ctx, client, dbname, filterInCollections, true)
 		if err != nil {
 			if isUnauthorizedError(err) {
+				logger.Debug("not authorized to list collections, skipping database in the collection count",
+					"database", dbname, "error", err)
+
 				complete = false
 
 				continue
