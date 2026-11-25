@@ -195,6 +195,10 @@ func (d *diagnosticDataCollector) mongosServerStatus() bson.M {
 		return nil
 	}
 
+	// Drop the reply metadata: FTDC samples don't carry it, so it would only show up in fallback mode.
+	delete(ss, "$clusterTime")
+	delete(ss, "operationTime")
+
 	return bson.M{serverStatusCmd: ss}
 }
 
