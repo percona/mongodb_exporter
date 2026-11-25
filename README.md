@@ -112,7 +112,7 @@ db.getSiblingDB("admin").createUser({
 
 The role includes:
 - `clusterMonitor` and `read` on `local`: the server, replication and diagnostic statistics used by most collectors.
-- `find` on `admin.system.version`: lets the exporter read the cluster ID.
+- `find` on `admin.system.version`: lets the exporter read the cluster ID and, on a shard member, lets the PBM collector find the config server replica set.
 - `find` on the `admin` database: needed by the PBM collector to read the PBM control collections. Granting `find` on the whole database instead of each [PBM collection](https://docs.percona.com/percona-backup-mongodb/details/control-collections.html) means the role keeps working when PBM adds new collections, or when the exporter starts reading more of them. If an existing user has `find` only on individual PBM collections, add `pbmRestores` and `pbmPITRChunks`, which earlier versions of the exporter didn't read: without them, the restore and PITR metrics are missing and the exporter logs a warning on each scrape.
 - `directShardOperations`: required on MongoDB 8.0 and newer when the exporter connects directly to shard members. Older versions don't need it, and servers that don't have this built-in role (such as 5.0) reject the `createRole` command if you include it.
 
