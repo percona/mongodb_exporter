@@ -84,42 +84,44 @@ docker run -d -p 9216:9216 ghcr.io/percona/mongodb_exporter:0.53 --mongodb.uri=m
 ```
 
 ### Permissions
-Connecting user should have sufficient rights to query needed stats:
+Create a dedicated role for the exporter, then create a user with that role. Run these commands in the `admin` database:
 
-```
-      {
-         "role":"clusterMonitor",
-         "db":"admin"
-      },
-      {
-         "role":"read",
-         "db":"local"
-      }
-```
-When using the PBM collector to get metrics from Percona Backup for MongoDB, the user should also have sufficient privileges
-to query the PBM internal collections (in the `admin` database). One option is to grant `find` privileges on the `admin` collection:
-```
-privileges: [
-        { resource: { db: "admin", collection: "" }, actions: [ "find" ] },
-],
+```javascript
+db.getSiblingDB("admin").createRole({
+  role: "mongodbExporter",
+  privileges: [
+    // Cluster ID lookup. Without this, mongod logs an authorization failure on every scrape.
+    { resource: { db: "admin", collection: "system.version" }, actions: [ "find" ] },
+    // PBM collector (--collector.pbm). This grants find on all non-system admin collections, including PBM configuration. Remove it if you don't use Percona Backup for MongoDB.
+    { resource: { db: "admin", collection: "" }, actions: [ "find" ] }
+  ],
+  roles: [
+    { role: "clusterMonitor", db: "admin" },
+    { role: "read", db: "local" }
+    // MongoDB 8.0+ sharded clusters only: uncomment to monitor shards directly.
+    // , { role: "directShardOperations", db: "admin" }
+  ]
+})
+
+db.getSiblingDB("admin").createUser({
+  user: "mongodb_exporter",
+  pwd: passwordPrompt(),
+  roles: [ { role: "mongodbExporter", db: "admin" } ]
+})
 ```
 
-Alternatively, you can grant the `find` privilege for each PBM internal collection (see: https://docs.percona.com/percona-backup-mongodb/details/control-collections.html):
-```
-privileges: [
-       { resource: { db: "admin", collection: "pbmBackups" }, actions: [ "find" ] },
-       { resource: { db: "admin", collection: "pbmAgents" }, actions: [ "find" ] },
-       { resource: { db: "admin", collection: "pbmConfig" }, actions: [ "find" ] },
-       { resource: { db: "admin", collection: "pbmRestores" }, actions: [ "find" ] },
-       { resource: { db: "admin", collection: "pbmPITRChunks" }, actions: [ "find" ] },
-       ...
-],
-```
-However, this is not recommended as the list of internal collections may change in future releases.
-The restore metrics, for example, need `find` on `pbmRestores`, which earlier versions of the exporter didn't read: without it,
-they are missing and the exporter logs a warning on each scrape.
+The role includes:
+- `clusterMonitor` and `read` on `local`: the server, replication and diagnostic statistics used by most collectors.
+- `find` on `admin.system.version`: lets the exporter read the cluster ID and, on a shard member, lets the PBM collector find the config server replica set.
+- `find` on the `admin` database: needed by the PBM collector to read the PBM control collections. Granting `find` on the whole database instead of each [PBM collection](https://docs.percona.com/percona-backup-mongodb/details/control-collections.html) means the role keeps working when PBM adds new collections, or when the exporter starts reading more of them. If an existing user has `find` only on individual PBM collections, add `pbmRestores` and `pbmPITRChunks`, which earlier versions of the exporter didn't read: without them, the restore and PITR metrics are missing and the exporter logs a warning on each scrape.
+- `directShardOperations`: required on MongoDB 8.0 and newer when the exporter connects directly to shard members. Older versions don't need it, and servers that don't have this built-in role (such as 5.0) reject the `createRole` command if you include it.
 
-More info about roles in MongoDB [documentation](https://docs.mongodb.com/manual/reference/built-in-roles/#mongodb-authrole-clusterMonitor).
+#### Sharded clusters
+Where you create the role and user depends on how the exporter connects:
+- Through `mongos`: run the commands above through `mongos`. The role and user are stored on the config server replica set. If you enable the PBM collector, also run the commands on the primary of each shard replica set. To report PBM agent status, the collector connects to every shard replica set with the exporter's credentials to read its configuration, and users created through `mongos` can't authenticate there. Without the shard-local user, the `mongodb_pbm_agent_status` and `mongodb_pbm_agent_version_info` metrics are missing. The other PBM metrics are not affected.
+- Directly to shard members: users created through `mongos` can't authenticate to a shard directly, so also run the commands on the primary of each shard replica set. Keep the user and role on the config servers as well (create them through `mongos`), because the PBM collector reconnects from the shard to the config server replica set with the same credentials.
+
+More info about built-in roles in the MongoDB [documentation](https://www.mongodb.com/docs/manual/reference/built-in-roles/).
 
 #### Example
 ```sh
