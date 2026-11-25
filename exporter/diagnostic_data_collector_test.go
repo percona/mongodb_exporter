@@ -263,6 +263,16 @@ func TestMongosDiagnosticDataCollectorMetrics(t *testing.T) {
 	defer cancel()
 
 	client := tu.DefaultTestClientMongoS(ctx, t)
+
+	var diag struct {
+		Data bson.M `bson:"data"`
+	}
+	err := client.Database("admin").RunCommand(ctx, bson.D{{Key: "getDiagnosticData", Value: 1}}).Decode(&diag)
+	require.NoError(t, err)
+	if len(diag.Data) != 0 {
+		t.Skip("mongos returns FTDC data, the serverStatus fallback is not exercised")
+	}
+
 	logger := promslog.New(&promslog.Config{})
 	ti := newTopologyInfo(ctx, client, logger)
 
@@ -278,13 +288,32 @@ func TestMongosDiagnosticDataCollectorMetrics(t *testing.T) {
 	filters := []string{
 		"mongodb_connections",
 		"mongodb_ss_connections",
+		"mongodb_ss_clusterTime_clusterTime",
+		"mongodb_ss_operationTime",
 	}
 	actualMetrics := filterMetrics(helpers.ReadMetrics(helpers.CollectMetrics(c)), filters)
 	metricNames := getMetricNames(helpers.Format(helpers.WriteMetrics(actualMetrics)))
 
-	for _, want := range filters {
-		assert.True(t, metricNames[want], "missing %q metric", want)
-	}
+	assert.True(t, metricNames["mongodb_connections"], "missing mongodb_connections metric")
+	assert.True(t, metricNames["mongodb_ss_connections"], "missing mongodb_ss_connections metric")
+	assert.False(t, metricNames["mongodb_ss_clusterTime_clusterTime"], "reply metadata exposed as a metric")
+	assert.False(t, metricNames["mongodb_ss_operationTime"], "reply metadata exposed as a metric")
+}
+
+func TestServerStatusFallbackError(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+
+	client := tu.DefaultTestClientMongoS(ctx, t)
+	logger := promslog.NewNopLogger()
+
+	cancelledCtx, cancelCmd := context.WithCancel(ctx)
+	cancelCmd()
+
+	c := newDiagnosticDataCollector(cancelledCtx, client, logger, true, labelsGetterMock{}, buildInfo{}, false)
+	assert.Nil(t, c.serverStatusFallback())
 }
 
 // errorCountHandler is a custom handler that keeps tracks of the number of errors and warnings that were logged.
