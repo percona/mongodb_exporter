@@ -407,7 +407,6 @@ func TestClientOptionsForURI(t *testing.T) {
 		uri           string
 		directConnect *bool
 		expected      bool
-		wantErr       string
 	}{
 		{
 			name:          "flag false overrides URI true on multi-host URI",
@@ -433,32 +432,45 @@ func TestClientOptionsForURI(t *testing.T) {
 			directConnect: new(false),
 			expected:      false,
 		},
-		{
-			name:    "URI true on multi-host URI without flag is rejected",
-			uri:     multiHost + "?directConnection=true",
-			wantErr: "multiple hosts",
-		},
-		{
-			name:          "flag true on multi-host URI is rejected",
-			uri:           multiHost + "?directConnection=false",
-			directConnect: new(true),
-			wantErr:       "multiple hosts",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			clientOpts, err := clientOptionsForURI(tt.uri, tt.directConnect)
-			if tt.wantErr != "" {
-				require.ErrorContains(t, err, tt.wantErr)
-
-				return
-			}
-
 			require.NoError(t, err)
 			require.NotNil(t, clientOpts.Direct)
 			assert.Equal(t, tt.expected, *clientOpts.Direct)
+		})
+	}
+}
+
+func TestClientOptionsForURIErrors(t *testing.T) {
+	t.Parallel()
+
+	const multiHost = "mongodb://127.0.0.1:27017,127.0.0.1:27018/admin"
+
+	tests := []struct {
+		name          string
+		uri           string
+		directConnect *bool
+	}{
+		{
+			name: "URI true on multi-host URI without flag is rejected",
+			uri:  multiHost + "?directConnection=true",
+		},
+		{
+			name:          "flag true on multi-host URI is rejected",
+			uri:           multiHost + "?directConnection=false",
+			directConnect: new(true),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := clientOptionsForURI(tt.uri, tt.directConnect)
+			require.ErrorContains(t, err, "multiple hosts")
 		})
 	}
 }

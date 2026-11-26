@@ -464,7 +464,8 @@ func removeURIOptions(uri string, names ...string) string {
 	var kept []string
 	for _, pair := range strings.FieldsFunc(query, func(r rune) bool { return r == '&' || r == ';' }) {
 		key, _, _ := strings.Cut(pair, "=")
-		if unescaped, err := url.QueryUnescape(key); err == nil {
+		unescaped, err := url.QueryUnescape(key)
+		if err == nil {
 			key = unescaped
 		}
 		if !slices.ContainsFunc(names, func(name string) bool { return strings.EqualFold(name, key) }) {
