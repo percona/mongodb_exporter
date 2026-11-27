@@ -58,10 +58,37 @@ var (
 	cumulativeRe = regexp.MustCompile(`(` +
 		` calls| calls due to cache pressure|(^| )total time \(msecs\)| cumulative` +
 		`|deferred operations applied|unchanged and skipped|conflicted with checkpoint` +
-		`|pulled into eviction|would not reduce file size|compact timeout|compact passes` +
+		`|pulled into eviction|would not reduce file size|compact timeout` +
 		`|checked against the data store|compact interrupted|compact recovered bytes` +
 		`|sleeps due to cache pressure)$` +
 		`|^background compact skipped`)
+
+	// WiredTiger sets these statistics to a point-in-time value (the size of a cache, a
+	// threshold, what the most recent checkpoint or step-up did), but doesn't flag them
+	// no_clear or no_scale and doesn't say "currently" in their description.
+	pointInTimeRe = regexp.MustCompile(`^(` +
+		`backup granularity size` +
+		`|(block cache )?file size causing bypass` +
+		`|(block cache )?total (blocks|bytes)` +
+		`|eviction threshold .+ multiplied by 100 for precision` +
+		`|threshold to call fsync` +
+		`|(transaction checkpoint )?most recent (handles|in-memory pages) .+` +
+		`|checkpoint has acquired a snapshot for its transaction` +
+		`|time spent on per-tree checkpoint work \(usecs\)` +
+		`|total time \(msecs\) writing pages to stable storage during checkpoint reconciliation` +
+		`|transaction checkpoint history store file duration \(usecs\)` +
+		`|total (bytes used by the cache( for pinned chunks)?|(pinned )?chunks held by the chunk cache)` +
+		`|.+ most recent time \(msecs\)` +
+		`|database size|role leader` +
+		`|pick up checkpoint time at startup \(msecs\)` +
+		`|step up (deferred checkpoint pickup retries before stepping up|ingest table drain bytes moved to stable tables` +
+		`|ingest tables drained|missing stable tables created)` +
+		`|the number of tables the layered table manager has open` +
+		`|average length of delta chain on (internal|leaf) page with deltas` +
+		`|max deltas seen on (internal|leaf) page during reconciliation` +
+		`|table compact passes` +
+		`|active filesystem (fsync|read|write) calls` +
+		`)$`)
 )
 
 func main() {
@@ -142,7 +169,7 @@ package exporter
 // no_clear (not reset with the other statistics) or no_scale (not turned into a rate per second
 // by its tools), and its convention is to put "currently" in the description of any other.
 func isGauge(desc, flags string) bool {
-	if strings.Contains(desc, "currently") {
+	if strings.Contains(desc, "currently") || pointInTimeRe.MatchString(desc) {
 		return true
 	}
 
