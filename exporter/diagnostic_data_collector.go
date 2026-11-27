@@ -18,6 +18,7 @@ package exporter
 import (
 	"context"
 	"log/slog"
+	"maps"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,6 +30,8 @@ const (
 	kmipEncryption         = "kmip"
 	vaultEncryption        = "vault"
 	localKeyFileEncryption = "localKeyFile"
+
+	serverStatusCmd = "serverStatus"
 )
 
 type diagnosticDataCollector struct {
@@ -91,6 +94,7 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	var metrics []prometheus.Metric
 	cmd := bson.D{{Key: "getDiagnosticData", Value: "1"}}
 	res := client.Database("admin").RunCommand(d.ctx, cmd)
+	haveData := res.Err() == nil
 	if res.Err() != nil {
 		if nodeType != typeArbiter {
 			logger.Warn("failed to run command: getDiagnosticData, some metrics might be unavailable", "error", res.Err())
@@ -111,42 +115,25 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 			err = errors.Wrapf(errUnexpectedDataType, "%T for data field", m["data"])
 			logger.Error("cannot decode getDiagnosticData", "error", err)
 		}
+	}
 
-		logger.Debug("getDiagnosticData result")
+	// getDiagnosticData returns empty data when FTDC is disabled (mongos without --logpath, or mongod with
+	// diagnosticDataCollectionEnabled=false), and fails when the user lacks the privilege for it.
+	// Fall back to serverStatus in both cases to keep the mongodb_ss_* metrics available.
+	source := "getDiagnosticData"
+	if len(m) == 0 && (nodeType == typeMongos || nodeType == typeMongod) {
+		if ss := d.serverStatusFallback(); ss != nil {
+			m = ss
+			haveData = true
+			source = serverStatusCmd
+		}
+	}
+
+	if haveData {
+		logger.Debug("diagnostic data result", "source", source)
 		debugResult(logger, m)
 
-		// MongoDB 8.0 splits the diagnostic data into multiple blocks, so we need to merge them
-		if _, ok := m["common"]; ok {
-			b := bson.M{}
-			for _, mv := range m {
-				block, ok := mv.(bson.M)
-				if !ok {
-					continue
-				}
-				for k, v := range block {
-					b[k] = v
-				}
-			}
-			m = b
-		}
-
-		metrics = makeMetricsWithHistograms("", m, d.topologyInfo.baseLabels(), d.compatibleMode, d.enableHistograms)
-		metrics = append(metrics, locksMetrics(logger, m)...)
-
-		securityMetric, err := d.getSecurityMetricFromLineOptions(client)
-		if err != nil {
-			logger.Error("failed to run command: getCmdLineOptions", "error", err)
-		} else if securityMetric != nil {
-			metrics = append(metrics, securityMetric)
-		}
-
-		if d.compatibleMode {
-			metrics = append(metrics, specialMetrics(d.ctx, client, m, nodeType, logger)...)
-
-			if cem, err := cacheEvictedTotalMetric(m); err == nil {
-				metrics = append(metrics, cem)
-			}
-		}
+		metrics = d.diagnosticDataMetrics(mergeDiagnosticDataBlocks(m), nodeType)
 	}
 
 	if d.compatibleMode {
@@ -166,6 +153,72 @@ func (d *diagnosticDataCollector) collect(ch chan<- prometheus.Metric) {
 	for _, metric := range metrics {
 		ch <- metric
 	}
+}
+
+// mergeDiagnosticDataBlocks merges the blocks MongoDB 8.0 splits the diagnostic data into.
+func mergeDiagnosticDataBlocks(m bson.M) bson.M {
+	if _, ok := m["common"]; !ok {
+		return m
+	}
+
+	b := bson.M{}
+	for _, mv := range m {
+		if block, ok := mv.(bson.M); ok {
+			maps.Copy(b, block)
+		}
+	}
+
+	return b
+}
+
+func (d *diagnosticDataCollector) diagnosticDataMetrics(m bson.M, nodeType mongoDBNodeType) []prometheus.Metric {
+	logger := d.base.logger
+	client := d.base.client
+
+	metrics := makeMetricsWithHistograms("", m, d.topologyInfo.baseLabels(), d.compatibleMode, d.enableHistograms)
+	metrics = append(metrics, locksMetrics(logger, m)...)
+
+	securityMetric, err := d.getSecurityMetricFromLineOptions(client)
+	if err != nil {
+		logger.Error("failed to run command: getCmdLineOptions", "error", err)
+	} else if securityMetric != nil {
+		metrics = append(metrics, securityMetric)
+	}
+
+	if d.compatibleMode {
+		metrics = append(metrics, specialMetrics(d.ctx, client, m, nodeType, logger)...)
+
+		cem, err := cacheEvictedTotalMetric(m)
+		if err == nil {
+			metrics = append(metrics, cem)
+		}
+	}
+
+	return metrics
+}
+
+// serverStatusFallback runs serverStatus and wraps the result the same way getDiagnosticData does,
+// so the existing metric names (mongodb_ss_*) are preserved. It returns nil on failure.
+func (d *diagnosticDataCollector) serverStatusFallback() bson.M {
+	logger := d.base.logger
+	logger.Debug("getDiagnosticData returned no data, falling back to serverStatus")
+
+	res := d.base.client.Database("admin").RunCommand(d.ctx, bson.D{{Key: serverStatusCmd, Value: 1}})
+
+	var ss bson.M
+
+	err := res.Decode(&ss)
+	if err != nil {
+		logger.Error("failed to run serverStatus fallback", "error", err)
+
+		return nil
+	}
+
+	// Drop the reply metadata: FTDC samples don't carry it, so it would only show up in fallback mode.
+	delete(ss, "$clusterTime")
+	delete(ss, "operationTime")
+
+	return bson.M{serverStatusCmd: ss}
 }
 
 func (d *diagnosticDataCollector) getSecurityMetricFromLineOptions(client *mongo.Client) (prometheus.Metric, error) {
