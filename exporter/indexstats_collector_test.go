@@ -71,7 +71,7 @@ func TestIndexStatsCollector(t *testing.T) {
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
 # HELP mongodb_indexstats_accesses_ops indexstats.accesses.ops
-# TYPE mongodb_indexstats_accesses_ops untyped
+# TYPE mongodb_indexstats_accesses_ops counter
 mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_",shard=""} 0
 mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="idx_01",shard=""} 0
 mongodb_indexstats_accesses_ops{collection="testcol_01",database="testdb",key_name="_id_",shard=""} 0
@@ -160,7 +160,7 @@ func TestDescendingIndexOverride(t *testing.T) {
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
   # HELP mongodb_indexstats_accesses_ops indexstats.accesses.ops
-  # TYPE mongodb_indexstats_accesses_ops untyped
+  # TYPE mongodb_indexstats_accesses_ops counter
   mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="_id_",shard=""} 0
   mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_1",shard=""} 0
   mongodb_indexstats_accesses_ops{collection="testcol_00",database="testdb",key_name="f1_DESC",shard=""} 0

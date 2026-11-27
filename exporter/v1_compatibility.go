@@ -106,7 +106,7 @@ func newToOldMetric(rm *rawMetric, c conversion) *rawMetric {
 		fqName: c.oldName,
 		help:   rm.help,
 		val:    rm.val,
-		vt:     rm.vt,
+		vt:     metricType(c.oldName),
 		ln:     make([]string, 0, len(rm.ln)),
 		lv:     make([]string, 0, len(rm.lv)),
 	}
@@ -163,7 +163,7 @@ func createOldMetricFromNew(rm *rawMetric, c conversion) *rawMetric {
 		fqName: c.oldName,
 		help:   c.oldName,
 		val:    rm.val,
-		vt:     rm.vt,
+		vt:     metricType(c.oldName),
 		ln:     []string{c.suffixLabel},
 		lv:     []string{suffix},
 	}
@@ -180,8 +180,9 @@ func cacheEvictedTotalMetric(m bson.M) (prometheus.Metric, error) {
 		return nil, err
 	}
 
-	d := prometheus.NewDesc("mongodb_mongod_wiredtiger_cache_evicted_total", "wiredtiger cache evicted total", nil, nil)
-	metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s)
+	const name = "mongodb_mongod_wiredtiger_cache_evicted_total"
+	d := prometheus.NewDesc(name, "wiredtiger cache evicted total", nil, nil)
+	metric, err := prometheus.NewConstMetric(d, metricType(name), s)
 	if err != nil {
 		return nil, err
 	}
@@ -770,7 +771,7 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 
 	d := prometheus.NewDesc(lm.name, lm.name, ln, nil)
 
-	return prometheus.NewConstMetric(d, prometheus.UntypedValue, *f, lv...)
+	return prometheus.NewConstMetric(d, metricType(lm.name), *f, lv...)
 }
 
 type specialMetric struct {
@@ -802,7 +803,7 @@ func specialMetrics(ctx context.Context, client *mongo.Client, m bson.M, nodeTyp
 		}
 
 		d := prometheus.NewDesc(def.name, def.help, nil, def.labels)
-		metric, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, val)
+		metric, err := prometheus.NewConstMetric(d, metricType(def.name), val)
 		if err != nil {
 			l.Error("cannot create metric for path", "paths", def.paths, "error", err)
 			continue

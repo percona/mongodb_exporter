@@ -176,13 +176,13 @@ When compatibility mode is enabled by the `--compatible-mode`, the exporter will
 For example, if compatibility mode is enabled, the metric `mongodb_ss_wt_log_log_bytes_written` (new format)
 ```
 # HELP mongodb_ss_wt_log_log_bytes_written serverStatus.wiredTiger.log.
-# TYPE mongodb_ss_wt_log_log_bytes_written untyped
+# TYPE mongodb_ss_wt_log_log_bytes_written counter
 mongodb_ss_wt_log_log_bytes_written 2.6208e+06
 ```
 will be also exposed as `mongodb_mongod_wiredtiger_log_bytes_total`  with the `unwritten` label.
 ```
 HELP mongodb_mongod_wiredtiger_log_bytes_total mongodb_mongod_wiredtiger_log_bytes_total
-# TYPE mongodb_mongod_wiredtiger_log_bytes_total untyped
+# TYPE mongodb_mongod_wiredtiger_log_bytes_total counter
 mongodb_mongod_wiredtiger_log_bytes_total{type="unwritten"} 2.6208e+06
 ```
 #### Enabling profile metrics gathering
@@ -201,11 +201,20 @@ When shard metrics collection is enabled by `--collector.shards`, the exporter w
 Example, if shards collector is enabled:
 ```
 # HELP mongodb_shards_collection_chunks_count sharded collection chunks.
-# TYPE mongodb_shards_collection_chunks_count counter
+# TYPE mongodb_shards_collection_chunks_count gauge
 mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs1"} 250
 mongodb_shards_collection_chunks_count{collection="system.sessions",database="config",shard="rs2"} 250
 ```
 You can see shard name, it's collection, database and count.
+
+#### Metric types
+Most metrics are built from the documents MongoDB returns (`serverStatus`, `getDiagnosticData`, `$collStats`, `top` and so on), and those documents don't say whether a value is cumulative or a point-in-time reading. The exporter assigns a Prometheus type to each metric name using the following rules:
+
+- WiredTiger statistics (`mongodb_ss_wt_*`, `mongodb_oplog_stats_wt_*`, `mongodb_collstats_storageStats_wiredTiger_*` and similar) follow the flags WiredTiger defines for each statistic. Statistics WiredTiger doesn't reset or scale per second are gauges, and the rest are counters. The list is generated from WiredTiger's `dist/stat_data.py` by `go generate ./exporter/...`.
+- Sections MongoDB documents as cumulative are counters. Examples are `mongodb_ss_opcounters`, `mongodb_ss_asserts`, `mongodb_ss_network_bytesIn`, most of `mongodb_ss_metrics_*`, `mongodb_ss_locks_*`, `mongodb_sys_cpu_*`, `mongodb_sys_netstat_*`, `mongodb_collstats_latencyStats_*`, `mongodb_indexstats_accesses_ops` and `mongodb_top_*`.
+- Everything else is a gauge, for example `mongodb_ss_connections`, `mongodb_ss_mem_resident`, `mongodb_rs_members_health`, `mongodb_dbstats_dataSize` and `mongodb_collstats_storageStats_count`.
+
+The type depends on the metric name only, never on a label value, so every series of a metric has the same type. A metric that mixes both kinds under one label, like `mongodb_ss_connections{conn_type="current|totalCreated"}`, is a gauge. You can still apply `rate()` to the cumulative series. New fields added by future MongoDB versions are gauges until a rule is added for them.
 
 #### Cluster role labels
 The exporter sets some topology labels in all metrics.

@@ -52,7 +52,7 @@ func TestProfileCollector(t *testing.T) {
 
 	expected := strings.NewReader(`
 	# HELP mongodb_profile_slow_query_count profile_slow_query.count
-	# TYPE mongodb_profile_slow_query_count counter
+	# TYPE mongodb_profile_slow_query_count gauge
 	mongodb_profile_slow_query_count{database="admin"} 0
 	mongodb_profile_slow_query_count{database="config"} 0
 	mongodb_profile_slow_query_count{database="local"} 0

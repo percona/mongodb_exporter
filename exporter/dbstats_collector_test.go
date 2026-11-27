@@ -61,13 +61,13 @@ func TestDBStatsCollector(t *testing.T) {
 	c := newDBStatsCollector(ctx, client, logger, false, ti, []string{dbName}, false)
 	expected := strings.NewReader(`
 	# HELP mongodb_dbstats_collections dbstats.collections
-	# TYPE mongodb_dbstats_collections untyped
+	# TYPE mongodb_dbstats_collections gauge
 	mongodb_dbstats_collections{database="testdb"} 3
 	# HELP mongodb_dbstats_indexes dbstats.indexes
-	# TYPE mongodb_dbstats_indexes untyped
+	# TYPE mongodb_dbstats_indexes gauge
 	mongodb_dbstats_indexes{database="testdb"} 3
 	# HELP mongodb_dbstats_objects dbstats.objects
-	# TYPE mongodb_dbstats_objects untyped
+	# TYPE mongodb_dbstats_objects gauge
 	mongodb_dbstats_objects{database="testdb"} 30` + "\n")
 
 	// Only look at metrics created by our activity
