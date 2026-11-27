@@ -40,7 +40,7 @@ func TestReplsetConfigCollector(t *testing.T) {
 	// The last \n at the end of this string is important
 	expected := strings.NewReader(`
 	# HELP mongodb_rs_cfg_protocolVersion rs_cfg.protocolVersion
-	# TYPE mongodb_rs_cfg_protocolVersion untyped
+	# TYPE mongodb_rs_cfg_protocolVersion gauge
 	mongodb_rs_cfg_protocolVersion 1` + "\n")
 	// Filter metrics for 2 reasons:
 	// 1. The result is huge

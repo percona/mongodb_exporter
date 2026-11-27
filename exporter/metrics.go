@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -186,15 +185,20 @@ func prometheusize(s string) string {
 		}
 	}
 
-	s = specialCharsRe.ReplaceAllString(s, "_")
-	s = dollarRe.ReplaceAllString(s, "")
-	s = repeatedUnderscoresRe.ReplaceAllString(s, "_")
-	s = strings.TrimPrefix(s, "_")
-	s = exporterPrefix + s
+	s = exporterPrefix + normalizeMetricName(s)
 
 	prometheusizeCache.Store(backup, strings.Clone(s))
 
 	return s
+}
+
+// normalizeMetricName replaces the characters Prometheus does not allow in metric names.
+func normalizeMetricName(s string) string {
+	s = specialCharsRe.ReplaceAllString(s, "_")
+	s = dollarRe.ReplaceAllString(s, "")
+	s = repeatedUnderscoresRe.ReplaceAllString(s, "_")
+
+	return strings.TrimPrefix(s, "_")
 }
 
 // nameAndLabel checks if there are predefined metric name and label for that metric or
@@ -222,19 +226,11 @@ func makeRawMetric(prefix, name string, value any, labels map[string]string) (*r
 
 	fqName, label := nameAndLabel(prefix, name)
 
-	metricType := prometheus.UntypedValue
-
-	// reservedPrefixes are used for metrics that might include the word ‘count’ in their name but are not actual counters.
-	reservedPrefixes := []string{"collstats.storageStats.indexSizes."}
-	if !slices.Contains(reservedPrefixes, prefix) && strings.HasSuffix(strings.ToLower(name), "count") {
-		metricType = prometheus.CounterValue
-	}
-
 	rm := &rawMetric{
 		fqName: fqName,
 		help:   help,
 		val:    *f,
-		vt:     metricType,
+		vt:     metricType(fqName),
 		ln:     make([]string, 0, len(labels)),
 		lv:     make([]string, 0, len(labels)),
 	}

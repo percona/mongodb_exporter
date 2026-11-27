@@ -51,7 +51,7 @@ func TestTopCollector(t *testing.T) {
 			  It looks like:
 
 		      # HELP mongodb_top_update_count top.update.
-		      # TYPE mongodb_top_update_count untyped
+		      # TYPE mongodb_top_update_count counter
 		      mongodb_top_update_count{namespace="admin.system.roles"} 0
 		      mongodb_top_update_count{namespace="admin.system.version"} 3
 		      mongodb_top_update_count{namespace="config.cache.chunks.config.system.sessions"} 0

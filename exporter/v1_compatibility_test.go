@@ -194,7 +194,7 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 		ln:     []string{},
 		lv:     []string{},
 		val:    1,
-		vt:     prometheus.UntypedValue,
+		vt:     prometheus.GaugeValue,
 	}
 	c := conversion{
 		oldName:     "mongodb_mongod_global_lock_client",
@@ -208,7 +208,7 @@ func TestCreateOldMetricFromNew(t *testing.T) {
 		ln:     []string{"type"},
 		lv:     []string{"mmm"}, // suffix is being converted. no mapping
 		val:    1,
-		vt:     3,
+		vt:     prometheus.GaugeValue,
 	}
 	nm := createOldMetricFromNew(rm, c)
 	assert.Equal(t, want, nm)

@@ -199,7 +199,7 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 			in: &rawMetric{
 				fqName: "mongodb_ss_opLatencies_commands_latency",
 				val:    float64(1),
-				vt:     prometheus.UntypedValue,
+				vt:     prometheus.CounterValue,
 			},
 			want: &rawMetric{
 				fqName: "mongodb_ss_opLatencies_latency",
@@ -207,14 +207,14 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 				ln:     []string{"op_type"},
 				lv:     []string{"commands"},
 				val:    1,
-				vt:     3,
+				vt:     prometheus.CounterValue,
 			},
 		},
 		{
 			in: &rawMetric{
 				fqName: "mongodb_ss_opLatencies_commands_ops",
 				val:    float64(1),
-				vt:     prometheus.UntypedValue,
+				vt:     prometheus.CounterValue,
 			},
 			want: &rawMetric{
 				fqName: "mongodb_ss_opLatencies_ops",
@@ -222,7 +222,7 @@ func TestRawToCompatibleRawMetric(t *testing.T) {
 				ln:     []string{"op_type"},
 				lv:     []string{"commands"},
 				val:    1,
-				vt:     3,
+				vt:     prometheus.CounterValue,
 			},
 		},
 	}

@@ -59,10 +59,10 @@ func TestDiagnosticDataCollector(t *testing.T) {
 	// The last \n at the end of this string is important
 	expectedString := fmt.Sprintf(`
 	# HELP mongodb_oplog_stats_wt_btree_fixed_record_size %s.btree.fixed-record size
-	# TYPE mongodb_oplog_stats_wt_btree_fixed_record_size untyped
+	# TYPE mongodb_oplog_stats_wt_btree_fixed_record_size gauge
 	mongodb_oplog_stats_wt_btree_fixed_record_size 0
 	# HELP mongodb_oplog_stats_wt_transaction_update_conflicts %s.transaction.update conflicts
-	# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts untyped
+	# TYPE mongodb_oplog_stats_wt_transaction_update_conflicts counter
 	mongodb_oplog_stats_wt_transaction_update_conflicts 0`, prefix, prefix)
 	expected := strings.NewReader(expectedString + "\n")
 
