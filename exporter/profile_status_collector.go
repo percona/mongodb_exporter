@@ -62,7 +62,7 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	client := d.base.client
 	timeScrape := d.profiletimets
 
-	databases, err := databases(d.ctx, client, nil, nil)
+	databases, err := databases(d.ctx, client, logger, nil, nil)
 	if err != nil {
 		logger.Warn("cannot get databases", "error", err)
 		return
@@ -78,6 +78,16 @@ func (d *profileCollector) collect(ch chan<- prometheus.Metric) {
 	for _, db := range databases {
 		res, err := client.Database(db).Collection("system.profile").CountDocuments(d.ctx, cmd)
 		if err != nil {
+			// The user may not have find on system.profile in this database (the read role doesn't
+			// cover system collections, and Atlas shared tiers deny it), or the user's privileges
+			// couldn't be read (see authorizedDatabaseNames). Skip the database so the authorized
+			// ones are still collected.
+			if isUnauthorizedError(err) {
+				logger.Debug("not authorized to read system.profile, skipping database", "database", db, "error", err)
+
+				continue
+			}
+
 			logger.Warn("cannot get profile count for database", "database", db, "error", err)
 			break
 		}

@@ -67,7 +67,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 
 	var collections []string
 	if d.discoveringMode {
-		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, d.collections, systemDBs, true)
+		onlyCollectionsNamespaces, err := listAllCollections(d.ctx, client, logger, d.collections, systemDBs, true)
 		if err != nil {
 			logger.Error("cannot auto discover databases and collections", "error", err.Error())
 
@@ -77,7 +77,7 @@ func (d *indexstatsCollector) collect(ch chan<- prometheus.Metric) {
 		collections = fromMapToSlice(onlyCollectionsNamespaces)
 	} else {
 		var err error
-		collections, err = checkNamespacesForViews(d.ctx, client, d.collections)
+		collections, err = checkNamespacesForViews(d.ctx, client, logger, d.collections)
 		if err != nil {
 			logger.Error("cannot list collections", "error", err.Error())
 

@@ -43,6 +43,15 @@ type Exporter struct {
 	opts                  *Opts
 	lock                  *sync.Mutex
 	totalCollectionsCount int
+	// collectionsCountFinal is false while the count must be recalculated,
+	// for example because some databases were skipped as unauthorized.
+	collectionsCountFinal bool
+	// collectionsCountedAt is when the stored count was taken. A count that isn't final is
+	// recalculated at most once every incompleteCountInterval.
+	collectionsCountedAt time.Time
+	// countSem makes sure only one scrape counts the collections at a time. It's a channel
+	// instead of a mutex so a canceled scrape can stop waiting.
+	countSem chan struct{}
 }
 
 // Opts holds new exporter options.
@@ -115,6 +124,7 @@ func New(opts *Opts) *Exporter {
 		opts:                  opts,
 		lock:                  &sync.Mutex{},
 		totalCollectionsCount: -1, // Not calculated yet. waiting the db connection.
+		countSem:              make(chan struct{}, 1),
 	}
 	// Try initial connect. Connection will be retried with every scrape.
 	go func() {
@@ -332,13 +342,8 @@ func (e *Exporter) Handler() http.Handler {
 			e.logger.Error("Cannot connect to MongoDB", "error", err)
 		}
 
-		if client != nil && e.getTotalCollectionsCount() <= 0 {
-			count, err := nonSystemCollectionsCount(ctx, client, nil, nil)
-			if err == nil {
-				e.lock.Lock()
-				e.totalCollectionsCount = count
-				e.lock.Unlock()
-			}
+		if client != nil {
+			e.updateCollectionsCount(ctx, client)
 		}
 
 		// Close client after usage.
@@ -381,6 +386,52 @@ func (e *Exporter) Handler() http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+// incompleteCountInterval is how long a collection count that skipped databases is used before
+// it's recalculated. When some databases are always denied no count is ever final, and counting
+// costs a listCollections per database, so recounting on every scrape would be expensive.
+const incompleteCountInterval = 5 * time.Minute
+
+func (e *Exporter) collectionsCountNeeded() bool {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if !e.collectionsCountFinal && !e.collectionsCountedAt.IsZero() {
+		return time.Since(e.collectionsCountedAt) >= incompleteCountInterval
+	}
+
+	return !e.collectionsCountFinal || e.totalCollectionsCount <= 0
+}
+
+// updateCollectionsCount counts the collections for the collstats limit if needed. Scrapes
+// count one at a time, so an older count can't overwrite a newer one. A scrape that waits for
+// another one to finish uses its count if it's final, and never builds the registry with the
+// uncounted value. A scrape canceled while waiting returns without counting.
+func (e *Exporter) updateCollectionsCount(ctx context.Context, client *mongo.Client) {
+	select {
+	case e.countSem <- struct{}{}:
+	case <-ctx.Done():
+		return
+	}
+	defer func() { <-e.countSem }()
+
+	if !e.collectionsCountNeeded() {
+		return
+	}
+
+	count, complete, err := nonSystemCollectionsCount(ctx, client, e.logger, nil)
+	if err != nil {
+		e.logger.Debug("Cannot count collections for the collstats limit", "error", err)
+
+		return
+	}
+
+	e.lock.Lock()
+	e.totalCollectionsCount = count
+	e.collectionsCountFinal = complete
+	e.collectionsCountedAt = time.Now()
+	e.lock.Unlock()
 }
 
 // GetRequestOpts makes exporter.Opts structure from request filters and default options.

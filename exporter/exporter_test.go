@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -417,4 +418,102 @@ func TestMakeRegistryBuildInfoWarning(t *testing.T) {
 			assert.Equal(t, tc.wantWarn, warned)
 		})
 	}
+}
+
+func TestUpdateCollectionsCountWaitsForRunningCount(t *testing.T) {
+	t.Parallel()
+
+	e := New(&Opts{Logger: promslog.NewNopLogger()})
+
+	// Another scrape is counting.
+	e.countSem <- struct{}{}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.updateCollectionsCount(context.Background(), nil)
+	}()
+
+	// The scrape must wait, not build the registry with the uncounted value.
+	select {
+	case <-done:
+		t.Fatal("updateCollectionsCount returned while another count was running")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// The running count finishes with a final result.
+	e.lock.Lock()
+	e.totalCollectionsCount = 5
+	e.collectionsCountFinal = true
+	e.lock.Unlock()
+	<-e.countSem
+
+	// The waiting scrape must reuse it without counting again (it has no client to count with).
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("updateCollectionsCount didn't return after the running count finished")
+	}
+
+	assert.Equal(t, 5, e.getTotalCollectionsCount())
+	assert.False(t, e.collectionsCountNeeded())
+}
+
+func TestCollectionsCountNeeded(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		count     int
+		final     bool
+		countedAt time.Time
+		want      bool
+	}{
+		{name: "not counted yet", count: -1, want: true},
+		{name: "final", count: 5, final: true, countedAt: time.Now(), want: false},
+		{name: "final but zero", count: 0, final: true, countedAt: time.Now(), want: true},
+		{name: "incomplete, recent", count: 5, countedAt: time.Now(), want: false},
+		{name: "incomplete zero, recent", count: 0, countedAt: time.Now(), want: false},
+		{name: "incomplete, old", count: 5, countedAt: time.Now().Add(-incompleteCountInterval), want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			e := New(&Opts{Logger: promslog.NewNopLogger()})
+			e.totalCollectionsCount = tt.count
+			e.collectionsCountFinal = tt.final
+			e.collectionsCountedAt = tt.countedAt
+
+			assert.Equal(t, tt.want, e.collectionsCountNeeded())
+		})
+	}
+}
+
+func TestUpdateCollectionsCountCanceledWhileWaiting(t *testing.T) {
+	t.Parallel()
+
+	e := New(&Opts{Logger: promslog.NewNopLogger()})
+
+	// Another scrape is counting and doesn't finish during the test.
+	e.countSem <- struct{}{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.updateCollectionsCount(ctx, nil)
+	}()
+
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("a canceled scrape kept waiting for the running count")
+	}
+
+	assert.Equal(t, -1, e.getTotalCollectionsCount())
 }
