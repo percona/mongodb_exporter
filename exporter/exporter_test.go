@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -178,7 +179,7 @@ func TestConnect(t *testing.T) {
 		for name, port := range ports {
 			exporterOpts := &Opts{
 				URI:           fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, port)),
-				DirectConnect: true,
+				DirectConnect: new(true),
 			}
 			client, err := connect(ctx, exporterOpts)
 			assert.NoError(t, err, name)
@@ -195,7 +196,7 @@ func TestConnect(t *testing.T) {
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: false,
-			DirectConnect:  true,
+			DirectConnect:  new(true),
 		}
 
 		e := New(exporterOpts)
@@ -229,7 +230,7 @@ func TestConnect(t *testing.T) {
 			Logger:         log,
 			URI:            fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tu.MongoDBS1PrimaryPort),
 			GlobalConnPool: true,
-			DirectConnect:  true,
+			DirectConnect:  new(true),
 		}
 
 		e := New(exporterOpts)
@@ -288,7 +289,7 @@ func TestMongoS(t *testing.T) {
 		exporterOpts := &Opts{
 			Logger:                 promslog.New(&promslog.Config{}),
 			URI:                    fmt.Sprintf("mongodb://%s/admin", net.JoinHostPort(hostname, test.port)),
-			DirectConnect:          true,
+			DirectConnect:          new(true),
 			GlobalConnPool:         false,
 			EnableReplicasetStatus: true,
 		}
@@ -332,7 +333,7 @@ func TestMongoUpMetric(t *testing.T) {
 				Logger:           promslog.New(&promslog.Config{}),
 				URI:              tc.URI,
 				ConnectTimeoutMS: 200,
-				DirectConnect:    true,
+				DirectConnect:    new(true),
 				GlobalConnPool:   false,
 				CollectAll:       true,
 			}
@@ -366,6 +367,152 @@ func TestMongoUpMetric(t *testing.T) {
 	}
 }
 
+func TestApplyDirectConnect(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		uri           string
+		directConnect *bool
+		expected      bool
+	}{
+		{name: "neither set", uri: "mongodb://127.0.0.1:27017/", expected: true},
+		{name: "URI false", uri: "mongodb://127.0.0.1:27017/?directConnection=false", expected: false},
+		{name: "URI true", uri: "mongodb://127.0.0.1:27017/?directConnection=true", expected: true},
+		{name: "flag false overrides URI true", uri: "mongodb://127.0.0.1:27017/?directConnection=true", directConnect: new(false), expected: false},
+		{name: "flag true overrides URI false", uri: "mongodb://127.0.0.1:27017/?directConnection=false", directConnect: new(true), expected: true},
+		{name: "flag false without URI parameter", uri: "mongodb://127.0.0.1:27017/", directConnect: new(false), expected: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			clientOpts := options.Client().ApplyURI(tt.uri)
+			require.NoError(t, clientOpts.Validate())
+
+			applyDirectConnect(clientOpts, tt.directConnect)
+			require.NotNil(t, clientOpts.Direct)
+			assert.Equal(t, tt.expected, *clientOpts.Direct)
+		})
+	}
+}
+
+func TestClientOptionsForURI(t *testing.T) {
+	t.Parallel()
+
+	const multiHost = "mongodb://127.0.0.1:27017,127.0.0.1:27018/admin"
+
+	tests := []struct {
+		name          string
+		uri           string
+		directConnect *bool
+		expected      bool
+	}{
+		{
+			name:          "flag false overrides URI true on multi-host URI",
+			uri:           multiHost + "?directConnection=true&replicaSet=rs0",
+			directConnect: new(false),
+			expected:      false,
+		},
+		{
+			name:          "flag false overrides legacy connect=direct on multi-host URI",
+			uri:           multiHost + "?connect=direct",
+			directConnect: new(false),
+			expected:      false,
+		},
+		{
+			name:          "flag true overrides URI false",
+			uri:           "mongodb://127.0.0.1:27017/?directConnection=false",
+			directConnect: new(true),
+			expected:      true,
+		},
+		{
+			name:          "flag false overrides percent-encoded directConnection on multi-host URI",
+			uri:           multiHost + "?%64irectConnection=true",
+			directConnect: new(false),
+			expected:      false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			clientOpts, err := clientOptionsForURI(tt.uri, tt.directConnect)
+			require.NoError(t, err)
+			require.NotNil(t, clientOpts.Direct)
+			assert.Equal(t, tt.expected, *clientOpts.Direct)
+		})
+	}
+}
+
+func TestClientOptionsForURIErrors(t *testing.T) {
+	t.Parallel()
+
+	const multiHost = "mongodb://127.0.0.1:27017,127.0.0.1:27018/admin"
+
+	tests := []struct {
+		name          string
+		uri           string
+		directConnect *bool
+	}{
+		{
+			name: "URI true on multi-host URI without flag is rejected",
+			uri:  multiHost + "?directConnection=true",
+		},
+		{
+			name:          "flag true on multi-host URI is rejected",
+			uri:           multiHost + "?directConnection=false",
+			directConnect: new(true),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := clientOptionsForURI(tt.uri, tt.directConnect)
+			require.ErrorContains(t, err, "multiple hosts")
+		})
+	}
+}
+
+func TestRemoveURIOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		uri      string
+		expected string
+	}{
+		{name: "no query", uri: "mongodb://127.0.0.1:27017/admin", expected: "mongodb://127.0.0.1:27017/admin"},
+		{name: "only option", uri: "mongodb://h1:27017/?directConnection=true", expected: "mongodb://h1:27017/"},
+		{
+			name:     "case-insensitive, other options kept",
+			uri:      "mongodb://h1,h2/admin?replicaSet=rs0&DirectConnection=true;connect=direct&tls=true",
+			expected: "mongodb://h1,h2/admin?replicaSet=rs0&tls=true",
+		},
+		{name: "srv", uri: "mongodb+srv://cluster.example.com/?directConnection=true&w=majority", expected: "mongodb+srv://cluster.example.com/?w=majority"},
+		{
+			name:     "percent-encoded name, retained pairs unchanged",
+			uri:      "mongodb://h1,h2/?%64irectConnection=true&app%4eame=a%20b",
+			expected: "mongodb://h1,h2/?app%4eame=a%20b",
+		},
+		{name: "undecodable name is kept", uri: "mongodb://h1/?%zz=1&connect=direct", expected: "mongodb://h1/?%zz=1"},
+		{
+			name:     "question mark in user info is not the query",
+			uri:      "mongodb://user:pa?ss@h1/?directConnection=true",
+			expected: "mongodb://user:pa?ss@h1/",
+		},
+		{name: "not a mongodb URI", uri: "h1:27017?directConnection=true", expected: "h1:27017?directConnection=true"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.expected, removeURIOptions(tt.uri, "directConnection", "connect"))
+		})
+	}
+}
+
 // Since MongoDB 8.1 buildInfo requires authentication, which an arbiter can't provide: it stores no users.
 // makeRegistry runs on every scrape, so it must not warn about that on an arbiter.
 func TestMakeRegistryBuildInfoWarning(t *testing.T) {
@@ -391,7 +538,7 @@ func TestMakeRegistryBuildInfoWarning(t *testing.T) {
 				Logger:           slog.New(logHandler),
 				URI:              fmt.Sprintf("mongodb://127.0.0.1:%s/admin", tc.port),
 				ConnectTimeoutMS: 1000,
-				DirectConnect:    true,
+				DirectConnect:    new(true),
 			}
 
 			client, err := connect(ctx, exporterOpts)

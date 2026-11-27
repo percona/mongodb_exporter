@@ -23,7 +23,10 @@ import (
 	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
+	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +34,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promslog"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/percona/mongodb_exporter/exporter/dsn_fix"
 )
@@ -48,7 +52,7 @@ type Exporter struct {
 // Opts holds new exporter options.
 type Opts struct {
 	CompatibleMode         bool
-	DirectConnect          bool
+	DirectConnect          *bool
 	ConnectTimeoutMS       int
 	DisableDefaultRegistry bool
 	DiscoveringMode        bool
@@ -423,13 +427,88 @@ func GetRequestOpts(filters []string, defaultOpts *Opts) Opts {
 	return requestOpts
 }
 
-func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
-	clientOpts, err := dsn_fix.ClientOptionsForDSN(opts.URI)
+// applyDirectConnect sets whether the driver connects directly to the host in the URI.
+// An explicit flag wins over directConnection in the URI; with neither, a direct connection is made.
+func applyDirectConnect(clientOpts *options.ClientOptions, directConnect *bool) {
+	switch {
+	case directConnect != nil:
+		clientOpts.SetDirect(*directConnect)
+	case clientOpts.Direct == nil:
+		clientOpts.SetDirect(true)
+	}
+}
+
+// removeURIOptions returns the URI without the given query options. Option names are case-insensitive
+// and percent-decoded before comparing. It follows the driver's parsing: the user info ends at the
+// first '@' and the options start at the next '?'.
+func removeURIOptions(uri string, names ...string) string {
+	rest, found := strings.CutPrefix(uri, "mongodb+srv://")
+	if !found {
+		if rest, found = strings.CutPrefix(uri, "mongodb://"); !found {
+			return uri
+		}
+	}
+
+	offset := len(uri) - len(rest)
+	if i := strings.Index(rest, "@"); i != -1 {
+		offset += i + 1
+	}
+
+	i := strings.Index(uri[offset:], "?")
+	if i == -1 {
+		return uri
+	}
+
+	base, query := uri[:offset+i], uri[offset+i+1:]
+
+	var kept []string
+	for _, pair := range strings.FieldsFunc(query, func(r rune) bool { return r == '&' || r == ';' }) {
+		key, _, _ := strings.Cut(pair, "=")
+		unescaped, err := url.QueryUnescape(key)
+		if err == nil {
+			key = unescaped
+		}
+		if !slices.ContainsFunc(names, func(name string) bool { return strings.EqualFold(name, key) }) {
+			kept = append(kept, pair)
+		}
+	}
+
+	if len(kept) == 0 {
+		return base
+	}
+
+	return base + "?" + strings.Join(kept, "&")
+}
+
+// clientOptionsForURI parses the URI and applies the direct connection setting.
+func clientOptionsForURI(uri string, directConnect *bool) (*options.ClientOptions, error) {
+	if directConnect != nil {
+		// The driver rejects directConnection=true for multi-host and SRV URIs while parsing,
+		// so drop it (and the legacy connect option) to let the explicit flag override it.
+		uri = removeURIOptions(uri, "directConnection", "connect")
+	}
+
+	clientOpts, err := dsn_fix.ClientOptionsForDSN(uri)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dsn: %w", err)
 	}
 
-	clientOpts.SetDirect(opts.DirectConnect)
+	applyDirectConnect(clientOpts, directConnect)
+
+	err = clientOpts.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("invalid dsn: %w", err)
+	}
+
+	return clientOpts, nil
+}
+
+func connect(ctx context.Context, opts *Opts) (*mongo.Client, error) {
+	clientOpts, err := clientOptionsForURI(opts.URI, opts.DirectConnect)
+	if err != nil {
+		return nil, err
+	}
+
 	clientOpts.SetAppName("mongodb_exporter")
 
 	if clientOpts.ConnectTimeout == nil {

@@ -50,7 +50,7 @@ func TestPBMCollector(t *testing.T) {
 	mongoURI := "mongodb://admin:admin@127.0.0.1:17006/?connectTimeoutMS=1000&directConnection=true&serverSelectionTimeoutMS=1000" //nolint:gosec
 
 	// The exporter gives the collector its own client, built from the same URI (see makeRegistry).
-	client, err := connect(ctx, &Opts{URI: mongoURI, DirectConnect: true})
+	client, err := connect(ctx, &Opts{URI: mongoURI, DirectConnect: new(true)})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
 
@@ -563,7 +563,16 @@ func TestPBMClientOptions(t *testing.T) {
 	require.NotNil(t, opts.ConnectTimeout)
 	assert.Equal(t, time.Second, *opts.ConnectTimeout)
 
-	_, err = pbmClientOptions("mongodb://node1:27017,node2:27017/?directConnection=true", hosts, 0)
+	// --no-mongodb.direct-connect lets the exporter use a multi-host URI that asks for a direct connection.
+	for _, query := range []string{"directConnection=true", "connect=direct", "%64irectConnection=true"} {
+		opts, err = pbmClientOptions("mongodb://node1:27017,node2:27017/?"+query, hosts, 0)
+		require.NoError(t, err, query)
+		require.NotNil(t, opts.Direct, query)
+		assert.False(t, *opts.Direct, query)
+		require.NoError(t, opts.Validate(), query)
+	}
+
+	_, err = pbmClientOptions("mongodb://node1:27017/?connectTimeoutMS=abc", hosts, 0)
 	assert.Error(t, err)
 }
 

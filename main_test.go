@@ -20,9 +20,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alecthomas/kong"
 	"github.com/foxcpp/go-mockdns"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -274,6 +276,33 @@ func TestBuildURI(t *testing.T) {
 		t.Run(tc.situation, func(t *testing.T) {
 			newURI := buildURI(tc.origin, tc.newUser, tc.newPassword)
 			assert.Equal(t, tc.expect, newURI)
+		})
+	}
+}
+
+func TestDirectConnectFlag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		args     []string
+		expected *bool
+	}{
+		{name: "not set", args: nil, expected: nil},
+		{name: "set", args: []string{"--mongodb.direct-connect"}, expected: new(true)},
+		{name: "negated", args: []string{"--no-mongodb.direct-connect"}, expected: new(false)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var opts GlobalFlags
+			parser, err := kong.New(&opts, kong.Vars{"version": "test"})
+			require.NoError(t, err)
+
+			_, err = parser.Parse(tt.args)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, opts.DirectConnect)
 		})
 	}
 }
