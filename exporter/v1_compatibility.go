@@ -771,7 +771,12 @@ func makeLockMetric(m bson.M, lm lockMetric) (prometheus.Metric, error) {
 
 	d := prometheus.NewDesc(lm.name, lm.name, ln, nil)
 
-	return prometheus.NewConstMetric(d, metricType(lm.name), *f, lv...)
+	metric, err := prometheus.NewConstMetric(d, metricType(lm.name), *f, lv...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create lock metric %s: %w", lm.name, err)
+	}
+
+	return metric, nil
 }
 
 type specialMetric struct {
