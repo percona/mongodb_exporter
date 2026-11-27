@@ -322,8 +322,8 @@ services:
             - KRB5_KTNAME=/krb5/mongodb.keytab
             - KRB5CCNAME=/krb5/krb5cc_0
             - KRB5_CONFIG=/krb5/krb5.conf
-            - MONGO_INITDB_ROOT_USERNAME=admin
-            - MONGO_INITDB_ROOT_PASSWORD=adminpassword
+            - MONGO_ADMIN_USERNAME=admin
+            - MONGO_ADMIN_PASSWORD=adminpassword
         volumes:
             - ./test-setup/scripts:/scripts
             - kerberos-config:/krb5
