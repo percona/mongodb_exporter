@@ -17,12 +17,15 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -44,6 +47,12 @@ type ServerOpts struct {
 	TLSConfigPath          string
 	DisableDefaultRegistry bool
 }
+
+// shutdownTimeout bounds how long in-flight requests may take to finish on shutdown.
+// It is kept below pmm-agent's 5s SIGTERM-to-SIGKILL delay (killT in
+// percona/pmm agent/agents/process/process.go), so that under pmm-agent the
+// exporter still exits through the shutdown path instead of being killed.
+const shutdownTimeout = 4 * time.Second
 
 // RunWebServer runs the main web-server
 func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
@@ -81,9 +90,44 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
 		WebListenAddresses: &[]string{opts.WebListenAddress},
 		WebConfigFile:      &opts.TLSConfigPath,
 	}
-	if err := web.ListenAndServe(server, flags, log); err != nil {
-		log.Error("error starting server", "error", err)
-		os.Exit(1)
+	// Stop on SIGINT or SIGTERM. SIGTERM is what container runtimes and
+	// Kubernetes send to stop the process; without handling it the process is
+	// killed by the default signal action and in-flight scrapes are cut off.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- web.ListenAndServe(server, flags, log)
+	}()
+
+	select {
+	case err := <-errCh:
+		stop()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("error starting server", "error", err)
+			os.Exit(1)
+		}
+	case <-ctx.Done():
+		stop()
+		log.Info("shutting down")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		err := server.Shutdown(shutdownCtx)
+		if err != nil {
+			log.Error("error shutting down server", "error", err)
+		}
+		// The listener may have failed before the signal arrived, for example
+		// because the address is in use. Report that instead of exiting 0, but
+		// don't wait past the shutdown deadline for it.
+		var serveErr error
+		select {
+		case serveErr = <-errCh:
+		case <-shutdownCtx.Done():
+		}
+		cancel()
+		if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+			log.Error("error starting server", "error", serveErr)
+			os.Exit(1)
+		}
 	}
 }
 
