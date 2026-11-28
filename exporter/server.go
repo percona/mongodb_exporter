@@ -111,10 +111,22 @@ func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
 		stop()
 		log.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		defer cancel()
 		err := server.Shutdown(shutdownCtx)
 		if err != nil {
 			log.Error("error shutting down server", "error", err)
+		}
+		// The listener may have failed before the signal arrived, for example
+		// because the address is in use. Report that instead of exiting 0, but
+		// don't wait past the shutdown deadline for it.
+		var serveErr error
+		select {
+		case serveErr = <-errCh:
+		case <-shutdownCtx.Done():
+		}
+		cancel()
+		if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+			log.Error("error starting server", "error", serveErr)
+			os.Exit(1)
 		}
 	}
 }
