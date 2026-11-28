@@ -49,7 +49,10 @@ type ServerOpts struct {
 }
 
 // shutdownTimeout bounds how long in-flight requests may take to finish on shutdown.
-const shutdownTimeout = 5 * time.Second
+// It is kept below pmm-agent's 5s SIGTERM-to-SIGKILL delay (killT in
+// percona/pmm agent/agents/process/process.go), so that under pmm-agent the
+// exporter still exits through the shutdown path instead of being killed.
+const shutdownTimeout = 4 * time.Second
 
 // RunWebServer runs the main web-server
 func RunWebServer(opts *ServerOpts, exporters []*Exporter, log *slog.Logger) {
